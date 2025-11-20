@@ -334,20 +334,32 @@ class ActiveInferenceEngine:
         for action in available_actions:
             # Simulate future under this action (simplified)
             predicted_states = self._simulate_future(beliefs, action)
-            predicted_obs = predicted_states[0]  # Simplified
+            # Treat predicted states as predicted observations
+            predicted_observations = np.stack(predicted_states)
 
             # Preferences (could be learned or specified)
-            preferences = np.ones_like(predicted_obs) / len(predicted_obs)
+            preferences = np.ones_like(predicted_observations[0]) / len(predicted_observations[0])
 
             # Uncertainty
-            state_uncertainty = np.array([b.covariance.diagonal()
-                                         for b in beliefs])
+            level_uncertainties = [
+                float(np.mean(np.diag(b.covariance))) if b.covariance.size > 0 else 0.0
+                for b in beliefs
+            ]
+
+            if not level_uncertainties:
+                level_uncertainties = [0.0]
+
+            if self.planning_horizon > 0:
+                repeats = max(1, (self.planning_horizon + len(level_uncertainties) - 1) // len(level_uncertainties))
+                state_uncertainty = np.tile(level_uncertainties, repeats)[:self.planning_horizon]
+            else:
+                state_uncertainty = np.array(level_uncertainties)
 
             # Compute expected free energy
             efe, components = self.fe_calc.compute_expected_free_energy(
                 policy=action,
                 predicted_states=predicted_states,
-                predicted_observations=np.array([predicted_obs]),
+                predicted_observations=predicted_observations,
                 preferences=preferences,
                 state_uncertainty=state_uncertainty,
                 horizon=self.planning_horizon
