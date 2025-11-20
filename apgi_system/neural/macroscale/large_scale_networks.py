@@ -218,15 +218,25 @@ class SalienceNetwork:
             info: Diagnostic information
         """
         # Insula processes interoceptive signals
-        target_insula = interoceptive_input[:self.insula_nodes]
+        # Pad interoceptive input to match insula nodes
+        intero_padded = np.zeros(self.insula_nodes)
+        intero_padded[:min(len(interoceptive_input), self.insula_nodes)] = \
+            interoceptive_input[:min(len(interoceptive_input), self.insula_nodes)]
+
+        target_insula = intero_padded
         dinsula = (dt / self.tau) * (target_insula - self.insula_activity)
         self.insula_activity += dinsula
         self.insula_activity = np.maximum(0, self.insula_activity)
 
         # ACC processes conflict and prediction errors
+        # Pad interoceptive input for ACC processing
+        intero_acc_padded = np.zeros(self.acc_nodes//2)
+        intero_acc_padded[:min(len(interoceptive_input), self.acc_nodes//2)] = \
+            interoceptive_input[:min(len(interoceptive_input), self.acc_nodes//2)]
+
         combined_signal = np.concatenate([
             exteroceptive_input[:self.acc_nodes//2],
-            interoceptive_input[:self.acc_nodes//2]
+            intero_acc_padded
         ])[:self.acc_nodes]
 
         # Add conflict signal
@@ -345,11 +355,21 @@ class DefaultModeNetwork:
         suppression = 1.0 - 0.7 * task_activity
 
         # Update subregions
-        target_mpfc = self_related_input[:len(self.mpfc_activity)] * suppression
+        # Pad self-related input to match mpfc size
+        self_padded = np.zeros(len(self.mpfc_activity))
+        self_padded[:min(len(self_related_input), len(self.mpfc_activity))] = \
+            self_related_input[:min(len(self_related_input), len(self.mpfc_activity))]
+
+        target_mpfc = self_padded * suppression
         dmpfc = (dt / self.tau) * (target_mpfc - self.mpfc_activity)
         self.mpfc_activity += dmpfc
 
-        target_pcc = memory_input[:len(self.pcc_activity)] * suppression
+        # Pad memory input to match pcc size
+        memory_padded = np.zeros(len(self.pcc_activity))
+        memory_padded[:min(len(memory_input), len(self.pcc_activity))] = \
+            memory_input[:min(len(memory_input), len(self.pcc_activity))]
+
+        target_pcc = memory_padded * suppression
         dpcc = (dt / self.tau) * (target_pcc - self.pcc_activity)
         self.pcc_activity += dpcc
 
