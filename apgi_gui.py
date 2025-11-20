@@ -1057,16 +1057,16 @@ class APGIGui:
         """Run preset experimental task."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Run Preset Task")
-        dialog.geometry("400x300")
+        dialog.geometry("500x400")
 
         ttk.Label(dialog, text="Select Preset Task:", font=('Arial', 12, 'bold')).pack(pady=10)
 
         tasks = [
             "Attentional Blink",
-            "Change Blindness",
-            "Binocular Rivalry",
-            "Masking Paradigm",
-            "Iowa Gambling Task"
+            "Change Blindness (Coming Soon)",
+            "Binocular Rivalry (Coming Soon)",
+            "Masking Paradigm (Coming Soon)",
+            "Iowa Gambling Task (Coming Soon)"
         ]
 
         listbox = tk.Listbox(dialog, height=len(tasks))
@@ -1074,16 +1074,154 @@ class APGIGui:
             listbox.insert(tk.END, task)
         listbox.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
 
+        # Task configuration frame
+        config_frame = ttk.LabelFrame(dialog, text="Task Configuration", padding=10)
+        config_frame.pack(pady=5, padx=20, fill=tk.BOTH)
+
+        ttk.Label(config_frame, text="Trials per condition:").grid(row=0, column=0, sticky=tk.W)
+        trials_var = tk.IntVar(value=20)
+        ttk.Spinbox(config_frame, from_=5, to=100, textvariable=trials_var, width=10).grid(row=0, column=1)
+
         def run_selected():
             selection = listbox.curselection()
             if selection:
                 task_name = tasks[selection[0]]
-                self._log_event(f"Running task: {task_name}")
-                messagebox.showinfo("Task", f"Running {task_name}\n(Implementation pending)")
-                dialog.destroy()
+
+                if task_name == "Attentional Blink":
+                    dialog.destroy()
+                    self._run_attentional_blink_task(num_trials=trials_var.get())
+                else:
+                    self._log_event(f"Task not yet implemented: {task_name}")
+                    messagebox.showinfo("Coming Soon",
+                                      f"{task_name} implementation coming soon!\n\n"
+                                      "Currently available:\n- Attentional Blink")
 
         ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
+
+    def _run_attentional_blink_task(self, num_trials: int = 20):
+        """Run the Attentional Blink experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Attentional Blink task...")
+        self._update_status("Running Attentional Blink task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import AttentionalBlinkTask
+
+            # Create task with specified parameters
+            task = AttentionalBlinkTask(
+                stream_length=15,
+                item_duration_ms=100.0,
+                num_trials_per_lag=num_trials,
+                lags=[1, 2, 3, 4, 8],
+                target_salience=2.0
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Attentional Blink Task")
+            progress_dialog.geometry("400x200")
+
+            ttk.Label(progress_dialog, text="Running trials...",
+                     font=('Arial', 12, 'bold')).pack(pady=10)
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(progress_dialog, length=300,
+                                          mode='determinate', variable=progress_var)
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=6, width=50)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            # Run task in separate thread
+            def run_task_thread():
+                total_trials = len(task.trials)
+
+                for trial_idx, trial in enumerate(task.trials):
+                    # Update progress
+                    progress = (trial_idx / total_trials) * 100
+                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
+                        progress_var.set(p),
+                        status_label.config(text=f"Trial {i+1} of {t}")
+                    ))
+
+                    # Run trial
+                    result = task.run_trial(self.apgi_system, trial)
+
+                    # Log result
+                    if trial_idx % 10 == 0:
+                        msg = f"Trial {trial_idx}: Lag {result.lag}, T1: {result.t1_detected}, T2: {result.t2_detected}\n"
+                        self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
+                        self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Task complete
+                self.root.after(0, lambda: progress_var.set(100))
+                self.root.after(0, lambda: status_label.config(text="Analysis complete!"))
+
+                # Analyze results
+                analysis = task.analyze_results()
+
+                # Display summary
+                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary += f"Total Trials: {analysis['total_trials']}\n"
+                summary += f"Overall T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
+                summary += f"Overall T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
+                summary += f"Overall Blink Rate: {analysis['overall_blink_rate']:.1%}\n"
+                summary += f"Peak Blink at Lag {analysis['max_blink_lag']}: {analysis['max_blink_rate']:.1%}\n\n"
+
+                summary += "By Lag:\n"
+                for lag in sorted(analysis['lag_analysis'].keys()):
+                    lag_data = analysis['lag_analysis'][lag]
+                    summary += f"  Lag {lag}: T2|T1={lag_data['t2_given_t1_accuracy']:.1%}, Blink={lag_data['blink_rate']:.1%}\n"
+
+                self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
+                self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Save results
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"attentional_blink_results_{timestamp}.json"
+                task.save_results(filename)
+
+                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+
+                # Add close button
+                def close_and_show_results():
+                    progress_dialog.destroy()
+                    task.print_results(analysis)
+                    messagebox.showinfo("Task Complete",
+                                      f"Attentional Blink task completed!\n\n"
+                                      f"T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
+                                      f"T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
+                                      f"Blink Rate: {analysis['overall_blink_rate']:.1%}\n\n"
+                                      f"Results saved to:\n{filename}")
+
+                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
+                                                      command=close_and_show_results).pack(pady=5))
+
+            # Start task thread
+            import threading
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def _trigger_ignition(self):
         """Manually trigger ignition event."""
