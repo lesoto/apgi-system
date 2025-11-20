@@ -1064,7 +1064,7 @@ class APGIGui:
         tasks = [
             "Attentional Blink",
             "Change Blindness",
-            "Binocular Rivalry (Coming Soon)",
+            "Binocular Rivalry",
             "Masking Paradigm (Coming Soon)",
             "Iowa Gambling Task (Coming Soon)"
         ]
@@ -1093,11 +1093,14 @@ class APGIGui:
                 elif task_name == "Change Blindness":
                     dialog.destroy()
                     self._run_change_blindness_task(num_trials=trials_var.get())
+                elif task_name == "Binocular Rivalry":
+                    dialog.destroy()
+                    self._run_binocular_rivalry_task(num_trials=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
                     messagebox.showinfo("Coming Soon",
                                       f"{task_name} implementation coming soon!\n\n"
-                                      "Currently available:\n- Attentional Blink\n- Change Blindness")
+                                      "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry")
 
         ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
@@ -1339,6 +1342,131 @@ class APGIGui:
                                       f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
                                       f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
                                       f"Avg Alternations: {analysis['overall_avg_alternations']:.1f}\n\n"
+                                      f"Results saved to:\n{filename}")
+
+                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
+                                                      command=close_and_show_results).pack(pady=5))
+
+            # Start task thread
+            import threading
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _run_binocular_rivalry_task(self, num_trials: int = 10):
+        """Run the Binocular Rivalry experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Binocular Rivalry task...")
+        self._update_status("Running Binocular Rivalry task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import BinocularRivalryTask
+
+            # Create task with specified parameters
+            task = BinocularRivalryTask(
+                trial_duration_ms=30000.0,  # 30 seconds per trial
+                num_trials=num_trials,
+                strength_ratios=[(1.0, 1.0), (1.0, 0.8), (1.2, 1.0)],
+                sampling_interval_ms=100.0
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Binocular Rivalry Task")
+            progress_dialog.geometry("400x200")
+
+            ttk.Label(progress_dialog, text="Running trials...",
+                     font=('Arial', 12, 'bold')).pack(pady=10)
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(progress_dialog, length=300,
+                                          mode='determinate', variable=progress_var)
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=6, width=50)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            # Run task in separate thread
+            def run_task_thread():
+                total_trials = len(task.trials)
+
+                for trial_idx, trial in enumerate(task.trials):
+                    # Update progress
+                    progress = (trial_idx / total_trials) * 100
+                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
+                        progress_var.set(p),
+                        status_label.config(text=f"Trial {i+1} of {t}")
+                    ))
+
+                    # Run trial
+                    result = task.run_trial(self.apgi_system, trial)
+
+                    # Log result
+                    if trial_idx % 5 == 0:
+                        msg = (f"Trial {trial_idx}: {result.num_alternations} alternations, "
+                               f"Pattern A dominance: {result.pattern_a_dominance_ratio:.1%}\n")
+                        self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
+                        self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Task complete
+                self.root.after(0, lambda: progress_var.set(100))
+                self.root.after(0, lambda: status_label.config(text="Analysis complete!"))
+
+                # Analyze results
+                analysis = task.analyze_results()
+
+                # Display summary
+                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary += f"Total Trials: {analysis['total_trials']}\n"
+                summary += f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
+                summary += f"Avg Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
+                summary += f"Pattern A Dominance: {analysis['avg_pattern_a_dominance_ratio']:.1%}\n"
+                summary += f"Total Alternations: {analysis['total_alternations']}\n\n"
+
+                summary += "By Strength Ratio:\n"
+                for ratio_key in sorted(analysis['by_strength_ratio'].keys()):
+                    data = analysis['by_strength_ratio'][ratio_key]
+                    summary += (f"  {ratio_key}: Dom={data['avg_dominance_duration_ms']:.0f}ms, "
+                               f"Alt={data['avg_alternation_rate']:.2f}/s\n")
+
+                self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
+                self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Save results
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"binocular_rivalry_results_{timestamp}.json"
+                task.save_results(filename)
+
+                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+
+                # Add close button
+                def close_and_show_results():
+                    progress_dialog.destroy()
+                    task.print_results(analysis)
+                    messagebox.showinfo("Task Complete",
+                                      f"Binocular Rivalry task completed!\n\n"
+                                      f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
+                                      f"Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
+                                      f"Total Alternations: {analysis['total_alternations']}\n\n"
                                       f"Results saved to:\n{filename}")
 
                 self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
