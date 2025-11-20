@@ -43,6 +43,8 @@ Thumbs.db
 *.pdf
 results/
 logs/
+*_results.json
+*_results_*.json
 .clinerules/byterover-rules.md
 .kilocode/rules/byterover-rules.md
 .roo/rules/byterover-rules.md
