@@ -1063,7 +1063,7 @@ class APGIGui:
 
         tasks = [
             "Attentional Blink",
-            "Change Blindness (Coming Soon)",
+            "Change Blindness",
             "Binocular Rivalry (Coming Soon)",
             "Masking Paradigm (Coming Soon)",
             "Iowa Gambling Task (Coming Soon)"
@@ -1090,11 +1090,14 @@ class APGIGui:
                 if task_name == "Attentional Blink":
                     dialog.destroy()
                     self._run_attentional_blink_task(num_trials=trials_var.get())
+                elif task_name == "Change Blindness":
+                    dialog.destroy()
+                    self._run_change_blindness_task(num_trials=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
                     messagebox.showinfo("Coming Soon",
                                       f"{task_name} implementation coming soon!\n\n"
-                                      "Currently available:\n- Attentional Blink")
+                                      "Currently available:\n- Attentional Blink\n- Change Blindness")
 
         ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
@@ -1207,6 +1210,135 @@ class APGIGui:
                                       f"T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
                                       f"T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
                                       f"Blink Rate: {analysis['overall_blink_rate']:.1%}\n\n"
+                                      f"Results saved to:\n{filename}")
+
+                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
+                                                      command=close_and_show_results).pack(pady=5))
+
+            # Start task thread
+            import threading
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _run_change_blindness_task(self, num_trials: int = 10):
+        """Run the Change Blindness experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Change Blindness task...")
+        self._update_status("Running Change Blindness task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import ChangeBlindnessTask
+
+            # Create task with specified parameters
+            task = ChangeBlindnessTask(
+                presentation_duration_ms=240.0,
+                blank_duration_ms=80.0,
+                max_alternations=20,
+                num_trials_per_condition=num_trials,
+                change_magnitudes=[0.3, 0.5, 0.8]
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Change Blindness Task")
+            progress_dialog.geometry("400x200")
+
+            ttk.Label(progress_dialog, text="Running trials...",
+                     font=('Arial', 12, 'bold')).pack(pady=10)
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(progress_dialog, length=300,
+                                          mode='determinate', variable=progress_var)
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=6, width=50)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            # Run task in separate thread
+            def run_task_thread():
+                total_trials = len(task.trials)
+
+                for trial_idx, trial in enumerate(task.trials):
+                    # Update progress
+                    progress = (trial_idx / total_trials) * 100
+                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
+                        progress_var.set(p),
+                        status_label.config(text=f"Trial {i+1} of {t}")
+                    ))
+
+                    # Run trial
+                    result = task.run_trial(self.apgi_system, trial)
+
+                    # Log result
+                    if trial_idx % 10 == 0:
+                        detected_str = "Yes" if result.change_detected else "No"
+                        msg = f"Trial {trial_idx}: {result.change_type.value}, Detected: {detected_str}\n"
+                        self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
+                        self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Task complete
+                self.root.after(0, lambda: progress_var.set(100))
+                self.root.after(0, lambda: status_label.config(text="Analysis complete!"))
+
+                # Analyze results
+                analysis = task.analyze_results()
+
+                # Display summary
+                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary += f"Total Trials: {analysis['total_trials']}\n"
+                summary += f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                summary += f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
+                summary += f"Avg Alternations: {analysis['overall_avg_alternations']:.1f}\n"
+                summary += f"Avg Time to Detection: {analysis['overall_avg_time_ms']:.0f} ms\n\n"
+
+                summary += "By Change Type:\n"
+                for change_type, data in analysis['by_change_type'].items():
+                    summary += f"  {change_type}: {data['detection_rate']:.1%}\n"
+
+                summary += "\nBy Magnitude:\n"
+                for magnitude in sorted(analysis['by_magnitude'].keys()):
+                    data = analysis['by_magnitude'][magnitude]
+                    summary += f"  {magnitude:.1f}: {data['detection_rate']:.1%}\n"
+
+                self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
+                self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Save results
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"change_blindness_results_{timestamp}.json"
+                task.save_results(filename)
+
+                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+
+                # Add close button
+                def close_and_show_results():
+                    progress_dialog.destroy()
+                    task.print_results(analysis)
+                    messagebox.showinfo("Task Complete",
+                                      f"Change Blindness task completed!\n\n"
+                                      f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                                      f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
+                                      f"Avg Alternations: {analysis['overall_avg_alternations']:.1f}\n\n"
                                       f"Results saved to:\n{filename}")
 
                 self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
