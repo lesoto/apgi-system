@@ -174,15 +174,20 @@ class HierarchicalPredictor:
             timestep_ms=timestep_ms
         )
 
+        # Interoceptive dimension is 6 (body state vector size)
+        # heart_rate, respiration, temperature, glucose, cortisol, blood_pressure
         self.interoceptive_channel = PredictionErrorChannel(
             name='interoceptive',
-            dimension=self.levels[0]['nodes'],  # Same for now
+            dimension=6,  # Body state vector size
             window_size_ms=window_size,
             timestep_ms=timestep_ms
         )
 
         # Learning rates per level
         self.learning_rates = [0.01 / (i + 1) for i in range(self.num_levels)]
+
+        # Interoceptive prediction (separate from hierarchical levels)
+        self.intero_prediction = np.zeros(6)
 
     def predict(
         self,
@@ -223,13 +228,16 @@ class HierarchicalPredictor:
         if intero_input is not None:
             intero_error = self.interoceptive_channel.update(
                 observation=intero_input,
-                prediction=self.levels[0]['prediction'],  # Simplified
+                prediction=self.intero_prediction,  # 6-dimensional body prediction
                 precision=self.levels[0]['precision']
             )
             results['interoceptive'] = {
                 'error': intero_error,
                 'stats': self.interoceptive_channel.get_statistics()
             }
+
+            # Update interoceptive prediction (simple running average)
+            self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input
 
         # Update hierarchical levels
         self._update_hierarchy(dt_ms)
@@ -330,3 +338,4 @@ class HierarchicalPredictor:
 
         self.exteroceptive_channel.reset()
         self.interoceptive_channel.reset()
+        self.intero_prediction = np.zeros(6)
