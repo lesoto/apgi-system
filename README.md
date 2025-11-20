@@ -33,17 +33,50 @@ pip install -e .
 
 ## Quick Start
 
+### GUI Application (Recommended)
+
+```bash
+# Launch the comprehensive GUI
+python run_gui.py
+
+# Or directly
+python apgi_gui.py
+```
+
+**Features:**
+- Real-time visualization of all subsystems
+- Interactive parameter adjustment
+- Multi-panel displays (6 tabs)
+- Complete menu system with all controls
+- Data export (CSV/JSON)
+- Preset experimental tasks
+
+See [GUI_README.md](GUI_README.md) for complete GUI documentation.
+
+### Programmatic Usage
+
 ```python
-from apgi_system.core import APGISystem
+from apgi_system.system import APGISystem
 
 # Initialize the system
 system = APGISystem(config_path="config/default.yaml")
 
 # Run a simulation
-results = system.run(duration=10.0, task="attentional_blink")
+results = system.run(duration_ms=10000.0)
 
-# Visualize results
-system.visualize(results)
+# Access results
+print(f"Ignition events: {results['ignition_count']}")
+print(f"Final state: {results['final_state']}")
+```
+
+### Command Line Examples
+
+```bash
+# Run basic simulation example
+python examples/basic_simulation.py
+
+# Run tests
+pytest tests/test_core.py -v
 ```
 
 ## Key Features

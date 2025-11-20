@@ -1,0 +1,282 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   APGI SYSTEM - GUI QUICK START                           ║
+║            Allostatic Precision-Gated Ignition Framework                  ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+🚀 LAUNCH GUI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Method 1 (Recommended):
+    $ python run_gui.py
+
+  Method 2:
+    $ python apgi_gui.py
+
+  The GUI will initialize the APGI system and open a window with:
+    - Control panel (left)
+    - 6 visualization tabs (right)
+    - Menu bar (top)
+    - Status bar (bottom)
+
+
+📊 INTERFACE OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  LEFT PANEL - Controls:
+  ┌─────────────────────────────────────┐
+  │  ▶ Start  ⏸ Pause  ⏹ Stop  ↻ Reset │
+  │  Speed: [━━━━━━━━] 1.0x            │
+  ├─────────────────────────────────────┤
+  │  System Status:                     │
+  │    Time: 0.00 s                     │
+  │    Ignition Events: 0               │
+  │    Workspace: Idle                  │
+  │    Metabolic: 100.0%                │
+  │    Load: 0.0%                       │
+  ├─────────────────────────────────────┤
+  │  Quick Parameters:                  │
+  │    Ignition Threshold  [━━━━━]      │
+  │    Extero Precision    [━━━━━]      │
+  │    Intero Precision    [━━━━━]      │
+  │    Arousal Level       [━━━━━]      │
+  │    Stress Level        [━━━━━]      │
+  │    Activity Level      [━━━━━]      │
+  │    ... (more sliders)               │
+  ├─────────────────────────────────────┤
+  │  Event Log:                         │
+  │  [09:45:12] System initialized      │
+  │  [09:45:15] Simulation started      │
+  │  [09:45:17] Ignition event          │
+  └─────────────────────────────────────┘
+
+  RIGHT PANEL - 6 Tabs:
+  ┌─────────────────────────────────────────────────────────────┐
+  │ [Neural Activity] [Interoception] [Metrics] [Self] [Osc] [3D]│
+  ├─────────────────────────────────────────────────────────────┤
+  │                                                             │
+  │  📈 Real-time plots updating every 100ms                   │
+  │                                                             │
+  │  Tab 1: Ignition events, Workspace, Precision, Free Energy │
+  │  Tab 2: Heart rate, Cortisol, Load, Metabolic              │
+  │  Tab 3: Somatic markers, Gamma, Beta                       │
+  │  Tab 4: Self-model coherence                               │
+  │  Tab 5: Oscillation signals & spectrum                     │
+  │  Tab 6: 3D state space trajectory                          │
+  │                                                             │
+  │  🔍 Navigation toolbar for zoom/pan                        │
+  │                                                             │
+  └─────────────────────────────────────────────────────────────┘
+
+
+⌨️  KEYBOARD SHORTCUTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Simulation Control:
+    F5        Start simulation
+    F6        Pause/Resume
+    F7        Stop simulation
+    F8        Reset system
+
+  File Operations:
+    Ctrl+N    New session
+    Ctrl+O    Load configuration
+    Ctrl+S    Save configuration
+    Ctrl+E    Export data (CSV/JSON)
+    Ctrl+Q    Exit application
+
+
+🎛️  BASIC WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Launch GUI
+     └─> System initializes automatically
+
+  2. Start Simulation
+     └─> Click "▶ Start" or press F5
+     └─> Observe real-time metrics in all tabs
+
+  3. Adjust Parameters
+     └─> Use sliders in "Quick Parameters"
+     └─> Changes apply immediately
+     └─> Watch plots respond to changes
+
+  4. Trigger Events
+     └─> Tools → Trigger Ignition Event
+     └─> Tools → Induce Stressor
+     └─> See immediate effects on all metrics
+
+  5. Export Data
+     └─> File → Export Data (Ctrl+E)
+     └─> Choose CSV or JSON
+     └─> Save plots: File → Export Plot
+
+  6. Analyze Results
+     └─> Analysis → Ignition Statistics
+     └─> Analysis → Energy Budget Report
+     └─> Analysis → Generate Report
+
+
+📋 MENU GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File Menu:
+    • New Session - Start fresh
+    • Load/Save Configuration - YAML format
+    • Export Data - CSV or JSON
+    • Export Plot - PNG or PDF
+    • Auto-save - Toggle periodic saving
+    • Exit - Close application
+
+  Simulation Menu:
+    • Start/Pause/Stop/Reset - Basic controls
+    • Run Preset Task - Experimental paradigms:
+        - Attentional Blink
+        - Change Blindness
+        - Binocular Rivalry
+        - Masking Paradigm
+        - Iowa Gambling Task
+
+  Tools Menu:
+    • Trigger Ignition - Force consciousness event
+    • Induce Stressor - Add allostatic load
+    • Modulate Precision - Adjust precision weights
+    • System Diagnostics - Health check
+
+  Analysis Menu:
+    • Ignition Statistics - Detailed metrics
+    • Energy Budget Report - Metabolic analysis
+    • Somatic Marker Analysis - Learning stats
+    • Generate Report - Comprehensive text report
+
+
+🔍 WHAT TO WATCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Neural Activity Tab:
+    🔴 Red dots = Ignition events (consciousness)
+    📊 Blue line = Global workspace (0=unconscious, 1=conscious)
+    📈 Green/Red = Precision (sensory/body confidence)
+    💜 Purple = Free energy (prediction errors)
+
+  Interoception Tab:
+    ❤️  Heart rate responds to arousal/activity
+    🧪 Cortisol tracks stress levels
+    ⚠️  Allostatic load accumulates with stress
+    🔋 Metabolic reserves deplete with ignition (~7.5% each)
+
+  System Metrics Tab:
+    🧠 Somatic markers = Learned associations
+    🌊 Gamma power = Local neural binding (30-80 Hz)
+    📡 Beta power = Top-down predictions (12-30 Hz)
+
+  Self-Model Tab:
+    🎯 Coherence above 0.7 = Normal
+    ⚠️  0.4-0.7 = Reduced coherence
+    🚨 Below 0.4 = Depersonalization threshold
+
+  3D State Space Tab:
+    📍 X = Free Energy (prediction errors)
+    📍 Y = Precision (confidence)
+    📍 Z = Allostatic Load (stress)
+    🌈 Color = Time (blue→red = early→late)
+
+
+💡 TIPS & TRICKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  For Experimentation:
+    ✓ Change ONE parameter at a time
+    ✓ Let simulation run 10-20 seconds for baseline
+    ✓ Export data before major changes
+    ✓ Save configurations with meaningful names
+
+  For Demonstrations:
+    ✓ Start with default parameters
+    ✓ Use Tools → Trigger Ignition for dramatic effect
+    ✓ Show 3D state space for spatial intuition
+    ✓ Gradually increase arousal to show threshold
+
+  For Learning:
+    ✓ Watch event log to follow system events
+    ✓ Correlate plots - see how ignition affects everything
+    ✓ Test extreme values to understand boundaries
+    ✓ Switch between tabs during same run
+
+
+⚙️  ADVANCED FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Manual Interventions:
+    • Force ignition: Set Arousal=0.9, Stress=0.8
+    • Simulate fatigue: Lower metabolic reserves
+    • Test resilience: High stress + activity
+    • Precision test: Modulate extero/intero separately
+
+  Data Analysis:
+    • CSV export for R/Python analysis
+    • JSON export for programmatic access
+    • Automatic timestamping
+    • All metrics captured at 10 Hz
+
+  Configuration Management:
+    • Save parameter sets as YAML
+    • Load previous experiments
+    • Share configurations with team
+    • Version control your configs
+
+
+🐛 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GUI won't start:
+    $ pip install matplotlib pyyaml numpy scipy
+
+  Slow performance:
+    - Reduce simulation speed slider
+    - Close other applications
+    - Check FPS counter in status bar
+
+  Plots not updating:
+    - Verify simulation is running (not paused)
+    - Check FPS counter shows activity
+    - Try Reset (F8)
+
+  Memory issues:
+    - Export data periodically
+    - Reset simulation to clear buffers
+    - Reduce buffer size in code if needed
+
+
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Full GUI Documentation:    GUI_README.md (400+ lines)
+  Main System Documentation: README.md
+  Example Scripts:           examples/
+  Tests:                     tests/
+  Configuration:             config/default.yaml
+
+
+🎯 QUICK EXPERIMENT EXAMPLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Goal: Observe how stress affects ignition threshold
+
+  1. Start simulation (F5)
+  2. Let run 10 seconds (baseline)
+  3. Gradually increase "Stress Level" slider
+  4. Watch "Ignition Threshold" in plots increase
+  5. Note: Fewer ignition events despite same sensory input
+  6. Export data (Ctrl+E)
+  7. Generate report: Analysis → Generate Report
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+              🧠 APGI System - Modeling Consciousness
+                 Built with Active Inference &
+              Predictive Processing Principles
+
+         For detailed information: See GUI_README.md
+
+═══════════════════════════════════════════════════════════════════════════
