@@ -1065,8 +1065,8 @@ class APGIGui:
             "Attentional Blink",
             "Change Blindness",
             "Binocular Rivalry",
-            "Masking Paradigm (Coming Soon)",
-            "Iowa Gambling Task (Coming Soon)"
+            "Iowa Gambling Task",
+            "Masking Paradigm (Coming Soon)"
         ]
 
         listbox = tk.Listbox(dialog, height=len(tasks))
@@ -1096,11 +1096,14 @@ class APGIGui:
                 elif task_name == "Binocular Rivalry":
                     dialog.destroy()
                     self._run_binocular_rivalry_task(num_trials=trials_var.get())
+                elif task_name == "Iowa Gambling Task":
+                    dialog.destroy()
+                    self._run_iowa_gambling_task(num_trials=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
                     messagebox.showinfo("Coming Soon",
                                       f"{task_name} implementation coming soon!\n\n"
-                                      "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry")
+                                      "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task")
 
         ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
@@ -1467,6 +1470,136 @@ class APGIGui:
                                       f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
                                       f"Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
                                       f"Total Alternations: {analysis['total_alternations']}\n\n"
+                                      f"Results saved to:\n{filename}")
+
+                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
+                                                      command=close_and_show_results).pack(pady=5))
+
+            # Start task thread
+            import threading
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _run_iowa_gambling_task(self, num_trials: int = 100):
+        """Run the Iowa Gambling Task experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Iowa Gambling Task...")
+        self._update_status("Running Iowa Gambling Task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import IowaGamblingTask
+
+            # Create task with specified parameters
+            task = IowaGamblingTask(
+                num_trials=num_trials,
+                initial_balance=2000,
+                deck_stimulus_strength=1.5,
+                outcome_stimulus_strength=2.0,
+                interoceptive_gain=1.0,
+                deck_selection_strategy='balanced'
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Iowa Gambling Task")
+            progress_dialog.geometry("500x250")
+
+            ttk.Label(progress_dialog, text="Running trials...",
+                     font=('Arial', 12, 'bold')).pack(pady=10)
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(progress_dialog, length=400,
+                                          mode='determinate', variable=progress_var)
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=8, width=60)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            # Run task in separate thread
+            def run_task_thread():
+                total_trials = len(task.trials)
+
+                for trial_idx, trial in enumerate(task.trials):
+                    # Update progress
+                    progress = (trial_idx / total_trials) * 100
+                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
+                        progress_var.set(p),
+                        status_label.config(text=f"Trial {i+1} of {t}")
+                    ))
+
+                    # Run trial
+                    result = task.run_trial(self.apgi_system, trial)
+
+                    # Log result
+                    if trial_idx % 10 == 0:
+                        deck = result.deck_choice.value
+                        net = result.net_outcome
+                        balance = result.running_total
+                        msg = f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
+                        self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
+                        self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Task complete
+                self.root.after(0, lambda: progress_var.set(100))
+                self.root.after(0, lambda: status_label.config(text="Analysis complete!"))
+
+                # Analyze results
+                analysis = task.analyze_results()
+
+                # Display summary
+                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary += f"Total Trials: {analysis['total_trials']}\n"
+                summary += f"Final Balance: ${analysis['final_balance']}\n"
+                summary += f"Total Earnings: ${analysis['total_earnings']}\n"
+                summary += f"Good Deck Choices: {analysis['good_deck_choices']} ({analysis['advantageous_ratio']:.1%})\n"
+                summary += f"Bad Deck Choices: {analysis['bad_deck_choices']}\n"
+                summary += f"Net Score: {analysis['net_score']}\n\n"
+
+                summary += "Deck Selections:\n"
+                for deck in ['A', 'B', 'C', 'D']:
+                    deck_data = analysis['by_deck'][deck]
+                    deck_type = 'Bad' if deck in ['A', 'B'] else 'Good'
+                    summary += f"  Deck {deck} ({deck_type}): {deck_data['selections']} ({deck_data['selection_percentage']:.1f}%)\n"
+
+                self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
+                self.root.after(0, lambda: results_text.see(tk.END))
+
+                # Save results
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"iowa_gambling_results_{timestamp}.json"
+                task.save_results(filename)
+
+                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+
+                # Add close button
+                def close_and_show_results():
+                    progress_dialog.destroy()
+                    task.print_results(analysis)
+                    messagebox.showinfo("Task Complete",
+                                      f"Iowa Gambling Task completed!\n\n"
+                                      f"Total Earnings: ${analysis['total_earnings']}\n"
+                                      f"Good Deck Choices: {analysis['advantageous_ratio']:.1%}\n"
+                                      f"Net Score: {analysis['net_score']}\n\n"
                                       f"Results saved to:\n{filename}")
 
                 self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
