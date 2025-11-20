@@ -1,5 +1,5 @@
 """Experimental tasks and validation framework."""
 
-from apgi_system.experiments.tasks import AttentionalBlinkTask, ChangeBlindnessTask, BinocularRivalryTask
+from apgi_system.experiments.tasks import AttentionalBlinkTask, ChangeBlindnessTask, BinocularRivalryTask, MaskingParadigmTask
 
-__all__ = ["AttentionalBlinkTask", "ChangeBlindnessTask", "BinocularRivalryTask"]
+__all__ = ["AttentionalBlinkTask", "ChangeBlindnessTask", "BinocularRivalryTask", "MaskingParadigmTask"]
