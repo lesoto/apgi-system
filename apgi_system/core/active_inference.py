@@ -379,7 +379,10 @@ class ActiveInferenceEngine:
 
         for _ in range(horizon):
             # Simple dynamics: s_{t+1} = s_t + action + noise
-            current_state = current_state + 0.1 * action[:len(current_state)]
+            # Pad action to match state dimensionality
+            action_padded = np.zeros_like(current_state)
+            action_padded[:len(action)] = action
+            current_state = current_state + 0.1 * action_padded
             future_states.append(current_state.copy())
 
         return future_states
