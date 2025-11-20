@@ -30,8 +30,8 @@ class APGIGui:
     def __init__(self, root):
         """Initialize the GUI application."""
         self.root = root
-        self.root.title("APGI System - Consciousness Modeling Framework")
-        self.root.geometry("1600x1000")
+        self.root.title("APGIConsciousness Modeling Framework")
+        self.root.geometry("1720x1200")
 
         # System state
         self.apgi_system = None
@@ -1066,7 +1066,7 @@ class APGIGui:
             "Change Blindness",
             "Binocular Rivalry",
             "Iowa Gambling Task",
-            "Masking Paradigm (Coming Soon)"
+            "Masking Paradigm"
         ]
 
         listbox = tk.Listbox(dialog, height=len(tasks))
@@ -1099,6 +1099,9 @@ class APGIGui:
                 elif task_name == "Iowa Gambling Task":
                     dialog.destroy()
                     self._run_iowa_gambling_task(num_trials=trials_var.get())
+                elif task_name == "Masking Paradigm":
+                    dialog.destroy()
+                    self._run_masking_paradigm_task(trials_per_condition=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
                     messagebox.showinfo("Coming Soon",
@@ -1486,6 +1489,108 @@ class APGIGui:
             import traceback
             traceback.print_exc()
 
+    def _run_masking_paradigm_task(self, trials_per_condition: int = 20):
+        """Run the Masking Paradigm experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Masking Paradigm task...")
+        self._update_status("Running Masking Paradigm task...")
+
+        try:
+            from apgi_system.experiments.tasks import MaskingParadigmTask
+
+            task = MaskingParadigmTask(num_trials_per_condition=trials_per_condition)
+
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Masking Paradigm Task")
+            progress_dialog.geometry("420x240")
+
+            ttk.Label(progress_dialog, text="Running trials...",
+                     font=('Arial', 12, 'bold')).pack(pady=10)
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(progress_dialog, length=320,
+                                           mode='determinate', variable=progress_var)
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=6, width=60)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            def run_task_thread():
+                total_trials = len(task.trials)
+
+                for trial_idx, trial in enumerate(task.trials):
+                    progress = (trial_idx / total_trials) * 100 if total_trials else 0
+                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
+                        progress_var.set(p),
+                        status_label.config(text=f"Trial {i+1} of {t}")
+                    ))
+
+                    result = task.run_trial(self.apgi_system, trial)
+
+                    if trial_idx % 10 == 0:
+                        detected = "Yes" if result.target_detected else "No"
+                        msg = (f"Trial {trial_idx}: SOA {result.soa_ms}ms, Detected: {detected}, "
+                               f"Ignitions: {result.ignition_count}\n")
+                        self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
+                        self.root.after(0, lambda: results_text.see(tk.END))
+
+                self.root.after(0, lambda: progress_var.set(100))
+                self.root.after(0, lambda: status_label.config(text="Analysis complete!"))
+
+                analysis = task.analyze_results()
+
+                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary += f"Total Trials: {analysis['total_trials']}\n"
+                summary += f"Overall Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                summary += f"Overall Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n"
+                summary += f"Masking Effect: {analysis['masking_effect']:.1%}\n\n"
+                summary += "By SOA:\n"
+                for soa in sorted(analysis['by_soa'].keys()):
+                    data = analysis['by_soa'][soa]
+                    summary += (f"  {soa:.0f}ms: Det={data['detection_rate']:.1%}, "
+                                f"Supp={data['suppression_rate']:.1%}, "
+                                f"Avg Strength={data['avg_ignition_strength']:.2f}\n")
+
+                self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
+                self.root.after(0, lambda: results_text.see(tk.END))
+
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"masking_paradigm_results_{timestamp}.json"
+                task.save_results(filename)
+
+                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+
+                def close_and_show_results():
+                    progress_dialog.destroy()
+                    task.print_results(analysis)
+                    messagebox.showinfo("Task Complete",
+                                        f"Masking Paradigm task completed!\n\n"
+                                        f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                                        f"Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n\n"
+                                        f"Results saved to:\n{filename}")
+
+                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
+                                                      command=close_and_show_results).pack(pady=5))
+
+            threading.Thread(target=run_task_thread, daemon=True).start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
     def _run_iowa_gambling_task(self, num_trials: int = 100):
         """Run the Iowa Gambling Task experimental task."""
         if not self.apgi_system:
@@ -1605,7 +1710,6 @@ class APGIGui:
                 self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
                                                       command=close_and_show_results).pack(pady=5))
 
-            # Start task thread
             import threading
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()

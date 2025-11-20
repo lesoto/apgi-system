@@ -5,6 +5,7 @@ A computational implementation of consciousness based on active inference, predi
 ## Overview
 
 The APGI framework integrates:
+
 - **Active Inference**: Variational free energy minimization and Bayesian inference
 - **Predictive Processing**: Hierarchical prediction error minimization
 - **Allostatic Regulation**: Interoceptive predictive processing and homeostatic control
@@ -13,7 +14,7 @@ The APGI framework integrates:
 
 ## Architecture
 
-```
+```text
 apgi_system/
 ├── core/               # Active inference and predictive processing
 ├── neural/             # Multi-scale neural networks
@@ -44,6 +45,7 @@ python apgi_gui.py
 ```
 
 **Features:**
+
 - Real-time visualization of all subsystems
 - Interactive parameter adjustment
 - Multi-panel displays (6 tabs)
@@ -92,11 +94,13 @@ pytest tests/test_core.py -v
 ## Success Criteria
 
 ### Minimal
+
 - Ignition dynamics match 300-500ms timeline
 - Metabolic costs align with 5-10% overhead
 - Reproduces attentional blink and masking phenomena
 
 ### Target
+
 - Human-comparable performance on benchmark tasks
 - Neural signatures match empirical data
 - Pathology models reproduce clinical phenotypes

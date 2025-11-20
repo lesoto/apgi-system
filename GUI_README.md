@@ -7,6 +7,7 @@ The APGI GUI provides a comprehensive, real-time interface for interacting with 
 ## Features
 
 ### 🎛️ **Complete System Control**
+
 - **Real-time simulation** with start/pause/stop/reset controls
 - **Adjustable simulation speed** (0.1x to 10x)
 - **Live parameter adjustment** for all subsystems
@@ -15,33 +16,39 @@ The APGI GUI provides a comprehensive, real-time interface for interacting with 
 ### 📊 **Multi-Panel Visualization**
 
 #### **Tab 1: Neural Activity**
+
 - Ignition events timeline (scatter plot)
 - Global workspace activity
 - Exteroceptive/interoceptive precision dynamics
 - Free energy trajectory
 
 #### **Tab 2: Interoception**
+
 - Heart rate monitoring
 - Cortisol levels
 - Allostatic load accumulation
 - Metabolic energy reserves
 
 #### **Tab 3: System Metrics**
+
 - Somatic marker count
 - Gamma band power (30-80 Hz)
 - Beta band power (12-30 Hz)
 
 #### **Tab 4: Self-Model**
+
 - Minimal self coherence
 - Depersonalization threshold indicators
 - Narrative self integrity
 
 #### **Tab 5: Oscillations**
+
 - Real-time oscillation signal
 - Multi-band power spectrum
 - Delta, theta, alpha, beta, gamma
 
 #### **Tab 6: 3D State Space**
+
 - 3D trajectory visualization
 - Free Energy × Precision × Allostatic Load
 - Color-coded temporal evolution
@@ -49,6 +56,7 @@ The APGI GUI provides a comprehensive, real-time interface for interacting with 
 ### 🎚️ **Quick Parameter Controls**
 
 Adjust in real-time:
+
 - **Ignition Threshold** (1.0 - 5.0)
 - **Exteroceptive Precision** (0.1 - 10.0)
 - **Interoceptive Precision** (0.1 - 10.0)
@@ -61,6 +69,7 @@ Adjust in real-time:
 ### 📋 **Menu System**
 
 #### **File Menu**
+
 - **New Session** (Ctrl+N) - Start fresh simulation
 - **Load Configuration** (Ctrl+O) - Load YAML config
 - **Save Configuration** (Ctrl+S) - Save current parameters
@@ -70,12 +79,14 @@ Adjust in real-time:
 - **Exit** (Ctrl+Q) - Close application
 
 #### **Edit Menu**
+
 - **System Parameters** - Advanced parameter editing
 - **Precision Settings** - Precision modulation controls
 - **Ignition Threshold** - Threshold configuration
 - **Reset to Defaults** - Restore default parameters
 
 #### **Simulation Menu**
+
 - **Start** (F5) - Begin simulation
 - **Pause/Resume** (F6) - Toggle pause state
 - **Stop** (F7) - Stop simulation
@@ -83,11 +94,13 @@ Adjust in real-time:
 - **Run Preset Task** - Execute experimental paradigms
 
 #### **View Menu**
+
 - Toggle panel visibility
 - Zoom controls
 - Display customization
 
 #### **Tools Menu**
+
 - **Trigger Ignition Event** - Force ignition
 - **Induce Stressor** - Apply allostatic stressor
 - **Modulate Precision** - Precision modulation dialog
@@ -96,6 +109,7 @@ Adjust in real-time:
 - **System Diagnostics** - View system health
 
 #### **Analysis Menu**
+
 - **Ignition Statistics** - Detailed ignition metrics
 - **Energy Budget Report** - Metabolic analysis
 - **Somatic Marker Analysis** - Marker statistics
@@ -103,6 +117,7 @@ Adjust in real-time:
 - **Generate Report** - Comprehensive text report
 
 #### **Help Menu**
+
 - **Documentation** - System overview
 - **Keyboard Shortcuts** - Hotkey reference
 - **About APGI System** - Version information
@@ -110,6 +125,7 @@ Adjust in real-time:
 ### 📈 **Status Indicators**
 
 Real-time display of:
+
 - **Simulation Time** (seconds)
 - **Ignition Event Count**
 - **Global Workspace State** (Idle/Broadcasting)
@@ -120,6 +136,7 @@ Real-time display of:
 ### 📝 **Event Log**
 
 Scrollable log showing:
+
 - System initialization
 - Simulation state changes
 - Parameter modifications
@@ -193,19 +210,19 @@ python -m apgi_gui
 #### Manual Interventions
 
 **Trigger Ignition:**
-```
+```bash
 Tools → Trigger Ignition Event
 ```
 Forces high arousal/stress to induce ignition
 
 **Induce Stressor:**
-```
+```bash
 Tools → Induce Stressor
 ```
 Adds allostatic load spike
 
 **Modulate Precision:**
-```
+```bash
 Tools → Modulate Precision
 ```
 Apply multiplicative factor to precision weights
@@ -213,13 +230,13 @@ Apply multiplicative factor to precision weights
 #### Configuration Management
 
 **Save Current Setup:**
-```
+```bash
 File → Save Configuration (Ctrl+S)
 ```
 Saves all parameter values to YAML
 
 **Load Previous Setup:**
-```
+```bash
 File → Load Configuration (Ctrl+O)
 ```
 Restores parameters from YAML file
