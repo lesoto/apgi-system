@@ -170,8 +170,9 @@ class BinocularRivalryTask:
             # Represents, e.g., vertical grating or green color
             region_size = self.stim_dim // 3
             pattern[region_size:2*region_size] = 2.0 * np.sin(np.linspace(0, 8 * np.pi, region_size))
-            # Add spatial structure
-            pattern[2*region_size:] = 0.5 * np.cos(np.linspace(0, 4 * np.pi, region_size))
+            # Add spatial structure (calculate actual size of third region)
+            third_region_size = self.stim_dim - 2 * region_size
+            pattern[2*region_size:] = 0.5 * np.cos(np.linspace(0, 4 * np.pi, third_region_size))
 
         # Add some shared components (background)
         pattern += 0.3 * np.random.randn(self.stim_dim)
