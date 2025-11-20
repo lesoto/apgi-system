@@ -1,0 +1,125 @@
+# APGI System Default Configuration
+
+system:
+  name: "APGI-v0.1"
+  timestep_ms: 1.0  # Microscale timestep
+  random_seed: 42
+
+# Hierarchical structure
+hierarchy:
+  num_levels: 4
+  level_configs:
+    - name: "sensory"
+      nodes: 256
+      timescale_ms: 10
+    - name: "feature"
+      nodes: 128
+      timescale_ms: 50
+    - name: "category"
+      nodes: 64
+      timescale_ms: 200
+    - name: "abstract"
+      nodes: 32
+      timescale_ms: 500
+
+# Active inference parameters
+active_inference:
+  learning_rate: 0.01
+  precision_init: 1.0
+  precision_range: [0.1, 10.0]
+  free_energy_threshold: 100.0
+
+# Predictive processing
+predictive_processing:
+  prediction_horizon_ms: 200
+  error_accumulation_window_ms: 100
+  temporal_discount: 0.95
+
+# Precision weighting
+precision:
+  exteroceptive_baseline: 1.0
+  interoceptive_baseline: 0.8
+  attention_gain_range: [0.5, 3.0]
+  volatility_sensitivity: 0.1
+  neuromodulator_effects:
+    norepinephrine: 1.5  # Increases precision
+    acetylcholine: 1.2   # Increases volatility sensitivity
+
+# Ignition dynamics
+ignition:
+  baseline_threshold: 2.0
+  threshold_range: [1.0, 5.0]
+  sigmoid_alpha: 5.0
+  amplification_duration_ms: 300
+  refractory_period_ms: 200
+  workspace_nodes: 1000
+
+# Interoception
+interoception:
+  body_states:
+    - heart_rate: {baseline: 70, range: [50, 120], variance: 5}
+    - respiration: {baseline: 15, range: [10, 30], variance: 2}
+    - temperature: {baseline: 37.0, range: [36.0, 39.0], variance: 0.2}
+    - glucose: {baseline: 5.0, range: [3.0, 8.0], variance: 0.5}
+    - cortisol: {baseline: 10, range: [5, 30], variance: 3}
+  prediction_lead_ms: 100
+  allostatic_ranges:
+    tight: 0.1  # 10% deviation
+    moderate: 0.2
+    wide: 0.3
+
+# Somatic markers
+somatic_markers:
+  capacity: 10000
+  learning_rate: 0.05
+  decay_rate: 0.001
+  retrieval_threshold: 0.3
+  gain_modulation_range: [0.5, 2.0]
+
+# Self model
+self_model:
+  minimal_self:
+    update_rate_ms: 50
+    coherence_threshold: 0.7
+    depersonalization_threshold: 0.4
+  narrative_self:
+    episodic_memory_capacity: 1000
+    consolidation_rate: 0.01
+    coherence_maintenance_rate: 100  # ms
+
+# Neural oscillations
+oscillations:
+  bands:
+    delta: {range: [1, 4], amplitude: 0.5}
+    theta: {range: [4, 8], amplitude: 0.7}
+    alpha: {range: [8, 12], amplitude: 1.0}
+    beta: {range: [12, 30], amplitude: 0.8}
+    gamma: {range: [30, 80], amplitude: 0.6}
+  coupling_strength: 0.3
+  criticality_parameter: 1.0
+
+# Thermodynamic constraints
+thermodynamic:
+  total_energy_budget: 100.0  # Arbitrary units
+  baseline_consumption: 20.0  # 20% baseline
+  ignition_cost: 7.5  # 5-10% additional
+  task_overhead: 27.5  # 25-30% during demanding tasks
+  recovery_rate: 5.0  # Energy/second
+  depletion_threshold: 10.0  # Minimum reserve
+  landauer_constant: 1.0  # Information erasure cost
+
+# Validation and metrics
+validation:
+  compute_phi: true  # IIT integration metric
+  compute_pci: true  # Perturbational complexity
+  track_erp_analogs: true
+  measure_ignition_frequency: true
+
+# Visualization
+visualization:
+  update_rate_ms: 100
+  plot_prediction_errors: true
+  plot_precision_dynamics: true
+  plot_ignition_events: true
+  plot_oscillations: true
+  plot_energy_budget: true

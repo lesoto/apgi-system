@@ -1,0 +1,327 @@
+"""
+Precision Weighting Module
+
+Implements dynamic precision modulation for attention, uncertainty,
+and neuromodulator effects.
+"""
+
+import numpy as np
+from typing import Dict, Any, Optional, List
+from enum import Enum
+
+
+class NeuromodulatorType(Enum):
+    """Types of neuromodulators affecting precision."""
+    NOREPINEPHRINE = "norepinephrine"  # Increases precision
+    ACETYLCHOLINE = "acetylcholine"     # Volatility sensitivity
+    DOPAMINE = "dopamine"               # Prediction error signaling
+    SEROTONIN = "serotonin"             # Prior confidence
+
+
+class PrecisionWeighting:
+    """
+    Manages precision (inverse variance) across hierarchical levels
+    and different processing streams.
+
+    Precision modulates the influence of prediction errors:
+    - High precision → errors have more influence
+    - Low precision → errors are downweighted
+
+    Precision is modulated by:
+    - Attention (voluntary/involuntary)
+    - Uncertainty estimates
+    - Context
+    - Neuromodulators
+    - Fatigue/resources
+    """
+
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize precision weighting system.
+
+        Args:
+            config: Configuration dictionary
+        """
+        self.config = config
+        precision_config = config.get('precision', {})
+
+        # Baseline precisions
+        self.extero_baseline = precision_config.get('exteroceptive_baseline', 1.0)
+        self.intero_baseline = precision_config.get('interoceptive_baseline', 0.8)
+
+        # Current precisions
+        self.extero_precision = self.extero_baseline
+        self.intero_precision = self.intero_baseline
+
+        # Precision parameters
+        self.gain_range = precision_config.get('attention_gain_range', [0.5, 3.0])
+        self.volatility_sensitivity = precision_config.get('volatility_sensitivity', 0.1)
+
+        # Neuromodulator levels (0-1 normalized)
+        self.neuromodulators = {
+            NeuromodulatorType.NOREPINEPHRINE: 0.5,
+            NeuromodulatorType.ACETYLCHOLINE: 0.5,
+            NeuromodulatorType.DOPAMINE: 0.5,
+            NeuromodulatorType.SEROTONIN: 0.5
+        }
+
+        # Neuromodulator effects from config
+        nm_effects = precision_config.get('neuromodulator_effects', {})
+        self.nm_gain = {
+            NeuromodulatorType.NOREPINEPHRINE: nm_effects.get('norepinephrine', 1.5),
+            NeuromodulatorType.ACETYLCHOLINE: nm_effects.get('acetylcholine', 1.2),
+            NeuromodulatorType.DOPAMINE: 1.0,
+            NeuromodulatorType.SEROTONIN: 1.0
+        }
+
+        # Attention state
+        self.attention_focus = None  # Which stream is attended
+        self.attention_gain = 1.0
+
+        # Resource tracking
+        self.fatigue_level = 0.0  # 0 = fresh, 1 = exhausted
+        self.cognitive_load = 0.0  # Current task demands
+
+        # Uncertainty tracking
+        self.extero_uncertainty = 1.0
+        self.intero_uncertainty = 1.0
+
+        # Volatility tracking
+        self.extero_volatility = 0.0
+        self.intero_volatility = 0.0
+        self.volatility_window = []
+
+    def update(
+        self,
+        extero_error_variance: Optional[float] = None,
+        intero_error_variance: Optional[float] = None,
+        attention_target: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, float]:
+        """
+        Update precision estimates.
+
+        Args:
+            extero_error_variance: Variance of exteroceptive errors
+            intero_error_variance: Variance of interoceptive errors
+            attention_target: 'extero' or 'intero'
+            context: Context information
+
+        Returns:
+            Dictionary with current precisions
+        """
+        # Update uncertainty estimates from error variance
+        if extero_error_variance is not None:
+            self._update_uncertainty('extero', extero_error_variance)
+
+        if intero_error_variance is not None:
+            self._update_uncertainty('intero', intero_error_variance)
+
+        # Update volatility
+        self._update_volatility()
+
+        # Apply attention modulation
+        if attention_target is not None:
+            self._apply_attention(attention_target)
+
+        # Apply neuromodulator effects
+        self._apply_neuromodulators()
+
+        # Apply resource constraints
+        self._apply_resource_constraints()
+
+        # Context-dependent modulation
+        if context is not None:
+            self._apply_context_modulation(context)
+
+        # Clamp to valid ranges
+        self._clamp_precisions()
+
+        return {
+            'exteroceptive': self.extero_precision,
+            'interoceptive': self.intero_precision,
+            'attention_gain': self.attention_gain,
+            'fatigue_penalty': self.fatigue_level
+        }
+
+    def _update_uncertainty(self, stream: str, error_variance: float):
+        """
+        Update uncertainty estimate from prediction error variance.
+
+        Precision ∝ 1 / uncertainty
+        """
+        # Smooth update
+        alpha = 0.1
+        if stream == 'extero':
+            self.extero_uncertainty = (1 - alpha) * self.extero_uncertainty + \
+                                      alpha * error_variance
+            # Update precision (inverse uncertainty)
+            self.extero_precision = self.extero_baseline / (self.extero_uncertainty + 1e-6)
+        else:
+            self.intero_uncertainty = (1 - alpha) * self.intero_uncertainty + \
+                                     alpha * error_variance
+            self.intero_precision = self.intero_baseline / (self.intero_uncertainty + 1e-6)
+
+    def _update_volatility(self):
+        """
+        Update volatility estimates.
+
+        Volatility = rate of change of uncertainty
+        """
+        self.volatility_window.append({
+            'extero_uncertainty': self.extero_uncertainty,
+            'intero_uncertainty': self.intero_uncertainty
+        })
+
+        # Keep window size limited
+        if len(self.volatility_window) > 10:
+            self.volatility_window.pop(0)
+
+        # Compute volatility as variance of uncertainty
+        if len(self.volatility_window) > 2:
+            extero_unc = [w['extero_uncertainty'] for w in self.volatility_window]
+            intero_unc = [w['intero_uncertainty'] for w in self.volatility_window]
+
+            self.extero_volatility = np.var(extero_unc)
+            self.intero_volatility = np.var(intero_unc)
+
+    def _apply_attention(self, target: str):
+        """
+        Apply attention-based gain modulation.
+
+        Attended stream gets increased precision.
+        """
+        self.attention_focus = target
+
+        if target == 'extero':
+            self.attention_gain = self.gain_range[1]  # High gain
+            self.extero_precision *= self.attention_gain
+            self.intero_precision *= 0.5  # Reduce unattended
+        elif target == 'intero':
+            self.attention_gain = self.gain_range[1]
+            self.intero_precision *= self.attention_gain
+            self.extero_precision *= 0.5
+        else:
+            self.attention_gain = 1.0  # Neutral
+
+    def _apply_neuromodulators(self):
+        """
+        Apply neuromodulator effects on precision.
+
+        - Norepinephrine: Increases precision (arousal)
+        - Acetylcholine: Modulates based on volatility
+        """
+        # Norepinephrine effect
+        ne_level = self.neuromodulators[NeuromodulatorType.NOREPINEPHRINE]
+        ne_gain = 1.0 + (self.nm_gain[NeuromodulatorType.NOREPINEPHRINE] - 1.0) * ne_level
+
+        self.extero_precision *= ne_gain
+        self.intero_precision *= ne_gain
+
+        # Acetylcholine effect (volatility-dependent)
+        ach_level = self.neuromodulators[NeuromodulatorType.ACETYLCHOLINE]
+
+        # High ACh in volatile environments increases learning rate (reduces precision of priors)
+        volatility_factor = (self.extero_volatility + self.intero_volatility) / 2
+        ach_modulation = 1.0 - ach_level * volatility_factor * self.volatility_sensitivity
+
+        self.extero_precision *= max(0.5, ach_modulation)
+        self.intero_precision *= max(0.5, ach_modulation)
+
+    def _apply_resource_constraints(self):
+        """
+        Apply fatigue and cognitive load effects.
+
+        Fatigue reduces precision (increased noise).
+        """
+        # Fatigue penalty (1 = no fatigue, 0 = exhausted)
+        fatigue_factor = 1.0 - 0.5 * self.fatigue_level
+
+        self.extero_precision *= fatigue_factor
+        self.intero_precision *= fatigue_factor
+
+        # High cognitive load slightly reduces precision
+        load_factor = 1.0 - 0.2 * self.cognitive_load
+        self.extero_precision *= load_factor
+        self.intero_precision *= load_factor
+
+    def _apply_context_modulation(self, context: Dict[str, Any]):
+        """
+        Apply context-dependent precision modulation.
+
+        Different contexts may prioritize different streams.
+        """
+        # Example: threat context increases interoceptive precision
+        if context.get('threat_level', 0) > 0.5:
+            self.intero_precision *= 1.5
+
+        # Example: task context increases exteroceptive precision
+        if context.get('task_demand', 0) > 0.5:
+            self.extero_precision *= 1.3
+
+    def _clamp_precisions(self):
+        """Clamp precisions to valid range."""
+        precision_range = self.config.get('active_inference', {}).get(
+            'precision_range', [0.1, 10.0]
+        )
+
+        self.extero_precision = np.clip(
+            self.extero_precision,
+            precision_range[0],
+            precision_range[1]
+        )
+
+        self.intero_precision = np.clip(
+            self.intero_precision,
+            precision_range[0],
+            precision_range[1]
+        )
+
+    def set_neuromodulator(self, modulator: NeuromodulatorType, level: float):
+        """
+        Set neuromodulator level.
+
+        Args:
+            modulator: Neuromodulator type
+            level: Level (0-1)
+        """
+        self.neuromodulators[modulator] = np.clip(level, 0.0, 1.0)
+
+    def set_fatigue(self, level: float):
+        """Set fatigue level (0-1)."""
+        self.fatigue_level = np.clip(level, 0.0, 1.0)
+
+    def set_cognitive_load(self, load: float):
+        """Set cognitive load (0-1)."""
+        self.cognitive_load = np.clip(load, 0.0, 1.0)
+
+    def get_precision_matrix(self, stream: str, dimension: int) -> np.ndarray:
+        """
+        Get precision matrix for a stream.
+
+        Args:
+            stream: 'extero' or 'intero'
+            dimension: Matrix dimension
+
+        Returns:
+            Precision matrix (diagonal)
+        """
+        if stream == 'extero':
+            precision = self.extero_precision
+        else:
+            precision = self.intero_precision
+
+        return precision * np.eye(dimension)
+
+    def reset(self):
+        """Reset to baseline state."""
+        self.extero_precision = self.extero_baseline
+        self.intero_precision = self.intero_baseline
+        self.attention_focus = None
+        self.attention_gain = 1.0
+        self.fatigue_level = 0.0
+        self.cognitive_load = 0.0
+        self.volatility_window = []
+
+        for modulator in self.neuromodulators:
+            self.neuromodulators[modulator] = 0.5
