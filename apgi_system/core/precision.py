@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List
 from enum import Enum
 
 from apgi_system.validation import InputValidator
+from apgi_system.types import FloatArray, ConfigDict
 
 
 class NeuromodulatorType(Enum):
@@ -94,7 +95,7 @@ class PrecisionWeighting:
     >>> print(f"Extero precision: {precisions['exteroceptive']:.2f}")
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize precision weighting system.
 
@@ -287,7 +288,7 @@ class PrecisionWeighting:
             'fatigue_penalty': self.fatigue_level
         }
 
-    def _update_uncertainty(self, stream: str, error_variance: float):
+    def _update_uncertainty(self, stream: str, error_variance: float) -> None:
         """
         Update uncertainty estimate from prediction error variance.
 
@@ -305,7 +306,7 @@ class PrecisionWeighting:
                                      alpha * error_variance
             self.intero_precision = self.intero_baseline / (self.intero_uncertainty + 1e-6)
 
-    def _update_volatility(self):
+    def _update_volatility(self) -> None:
         """
         Update volatility estimates.
 
@@ -328,7 +329,7 @@ class PrecisionWeighting:
             self.extero_volatility = np.var(extero_unc)
             self.intero_volatility = np.var(intero_unc)
 
-    def _apply_attention(self, target: str):
+    def _apply_attention(self, target: str) -> None:
         """
         Apply attention-based gain modulation.
 
@@ -347,7 +348,7 @@ class PrecisionWeighting:
         else:
             self.attention_gain = 1.0  # Neutral
 
-    def _apply_neuromodulators(self):
+    def _apply_neuromodulators(self) -> None:
         """
         Apply neuromodulator effects on precision.
 
@@ -371,7 +372,7 @@ class PrecisionWeighting:
         self.extero_precision *= max(0.5, ach_modulation)
         self.intero_precision *= max(0.5, ach_modulation)
 
-    def _apply_resource_constraints(self):
+    def _apply_resource_constraints(self) -> None:
         """
         Apply fatigue and cognitive load effects.
 
@@ -388,7 +389,7 @@ class PrecisionWeighting:
         self.extero_precision *= load_factor
         self.intero_precision *= load_factor
 
-    def _apply_context_modulation(self, context: Dict[str, Any]):
+    def _apply_context_modulation(self, context: Dict[str, Any]) -> None:
         """
         Apply context-dependent precision modulation.
 
@@ -402,7 +403,7 @@ class PrecisionWeighting:
         if context.get('task_demand', 0) > 0.5:
             self.extero_precision *= 1.3
 
-    def _clamp_precisions(self):
+    def _clamp_precisions(self) -> None:
         """Clamp precisions to valid range."""
         precision_range = self.config.get('active_inference', {}).get(
             'precision_range', [0.1, 10.0]
@@ -420,7 +421,7 @@ class PrecisionWeighting:
             precision_range[1]
         )
 
-    def set_neuromodulator(self, modulator: NeuromodulatorType, level: float):
+    def set_neuromodulator(self, modulator: NeuromodulatorType, level: float) -> None:
         """
         Set neuromodulator level.
 
@@ -447,7 +448,7 @@ class PrecisionWeighting:
         """
         self.neuromodulators[modulator] = np.clip(level, 0.0, 1.0)
 
-    def set_fatigue(self, level: float):
+    def set_fatigue(self, level: float) -> None:
         """
         Set fatigue level.
 
@@ -463,7 +464,7 @@ class PrecisionWeighting:
         """
         self.fatigue_level = np.clip(level, 0.0, 1.0)
 
-    def set_cognitive_load(self, load: float):
+    def set_cognitive_load(self, load: float) -> None:
         """
         Set cognitive load level.
 
@@ -479,7 +480,7 @@ class PrecisionWeighting:
         """
         self.cognitive_load = np.clip(load, 0.0, 1.0)
 
-    def get_precision_matrix(self, stream: str, dimension: int) -> np.ndarray:
+    def get_precision_matrix(self, stream: str, dimension: int) -> FloatArray:
         """
         Get precision matrix for a processing stream.
 
@@ -518,7 +519,7 @@ class PrecisionWeighting:
 
         return precision * np.eye(dimension)
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset precision system to baseline state.
 

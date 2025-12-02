@@ -11,16 +11,17 @@ from dataclasses import dataclass
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.validation import InputValidator
+from apgi_system.types import FloatArray, ConfigDict
 
 
 @dataclass
 class BeliefState:
     """Represents beliefs at a single hierarchical level."""
-    mean: np.ndarray  # Posterior mean
-    covariance: np.ndarray  # Posterior covariance
+    mean: FloatArray  # Posterior mean
+    covariance: FloatArray  # Posterior covariance
     precision: float  # Precision (inverse variance)
-    prediction: np.ndarray  # Predicted observation/state
-    prediction_error: np.ndarray  # Prediction error
+    prediction: FloatArray  # Predicted observation/state
+    prediction_error: FloatArray  # Prediction error
 
 
 class HierarchicalGaussianFilter:
@@ -72,8 +73,8 @@ class HierarchicalGaussianFilter:
         num_levels: int,
         state_dims: List[int],
         observation_dim: int,
-        config: Optional[Dict[str, Any]] = None
-    ):
+        config: Optional[ConfigDict] = None
+    ) -> None:
         """
         Initialize hierarchical Gaussian filter.
 
@@ -125,8 +126,8 @@ class HierarchicalGaussianFilter:
 
     def update(
         self,
-        observation: np.ndarray,
-        action: Optional[np.ndarray] = None,
+        observation: FloatArray,
+        action: Optional[FloatArray] = None,
         dt: float = 0.001
     ) -> Tuple[List[BeliefState], float]:
         """
@@ -208,7 +209,7 @@ class HierarchicalGaussianFilter:
 
         return self.beliefs, total_fe
 
-    def _bottom_up_pass(self, observation: np.ndarray):
+    def _bottom_up_pass(self, observation: FloatArray) -> None:
         """
         Bottom-up pass: compute prediction errors at each level.
 
@@ -239,7 +240,7 @@ class HierarchicalGaussianFilter:
             self.beliefs[level].prediction_error = \
                 self.beliefs[level - 1].mean - higher_prediction
 
-    def _top_down_pass(self, dt: float):
+    def _top_down_pass(self, dt: float) -> None:
         """
         Top-down pass: update beliefs using precision-weighted errors.
 
@@ -292,7 +293,7 @@ class HierarchicalGaussianFilter:
             # Update prediction for next iteration
             self.beliefs[level].prediction = self._generate_prediction(level)
 
-    def _update_precisions(self):
+    def _update_precisions(self) -> None:
         """
         Update precision estimates based on prediction error statistics.
 
@@ -324,7 +325,7 @@ class HierarchicalGaussianFilter:
                 self.precision_max
             )
 
-    def _generate_prediction(self, level: int) -> np.ndarray:
+    def _generate_prediction(self, level: int) -> FloatArray:
         """
         Generate prediction at a given level from belief above.
 
@@ -349,7 +350,7 @@ class HierarchicalGaussianFilter:
             # Top level predicts itself (prior)
             return self.beliefs[level].mean
 
-    def _map_down(self, from_level: int, state: np.ndarray) -> np.ndarray:
+    def _map_down(self, from_level: int, state: FloatArray) -> FloatArray:
         """
         Map state representation down one level in the hierarchy.
 
@@ -387,7 +388,7 @@ class HierarchicalGaussianFilter:
 
         return self._projection_matrices[key] @ state
 
-    def _compute_total_free_energy(self, observation: np.ndarray) -> float:
+    def _compute_total_free_energy(self, observation: FloatArray) -> float:
         """
         Compute total variational free energy across hierarchy.
 
@@ -473,7 +474,7 @@ class ActiveInferenceEngine:
     >>> print(f"Free energy: {info['free_energy']:.2f}")
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize active inference engine.
 
@@ -541,9 +542,9 @@ class ActiveInferenceEngine:
 
     def step(
         self,
-        observation: np.ndarray,
-        available_actions: Optional[List[np.ndarray]] = None
-    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        observation: FloatArray,
+        available_actions: Optional[List[FloatArray]] = None
+    ) -> Tuple[FloatArray, Dict[str, Any]]:
         """
         Execute single step of active inference loop.
 
@@ -616,8 +617,8 @@ class ActiveInferenceEngine:
     def _select_action(
         self,
         beliefs: List[BeliefState],
-        available_actions: List[np.ndarray]
-    ) -> Tuple[np.ndarray, Dict[str, float]]:
+        available_actions: List[FloatArray]
+    ) -> Tuple[FloatArray, Dict[str, float]]:
         """
         Select action by minimizing expected free energy.
 
@@ -700,9 +701,9 @@ class ActiveInferenceEngine:
     def _simulate_future(
         self,
         beliefs: List[BeliefState],
-        action: np.ndarray,
+        action: FloatArray,
         horizon: Optional[int] = None
-    ) -> List[np.ndarray]:
+    ) -> List[FloatArray]:
         """
         Simulate future states under a policy.
 
@@ -747,7 +748,7 @@ class ActiveInferenceEngine:
 
         return future_states
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset the engine to initial state.
 

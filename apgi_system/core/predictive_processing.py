@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, Tuple, List
 from collections import deque
 
 from apgi_system.validation import InputValidator
+from apgi_system.types import FloatArray, ConfigDict
 
 
 class PredictionErrorChannel:
@@ -62,7 +63,7 @@ class PredictionErrorChannel:
         dimension: int,
         window_size_ms: float = 100.0,
         timestep_ms: float = 1.0
-    ):
+    ) -> None:
         """
         Initialize prediction error channel.
 
@@ -101,10 +102,10 @@ class PredictionErrorChannel:
 
     def update(
         self,
-        observation: np.ndarray,
-        prediction: np.ndarray,
+        observation: FloatArray,
+        prediction: FloatArray,
         precision: float = 1.0
-    ) -> np.ndarray:
+    ) -> FloatArray:
         """
         Update prediction error with new observation.
 
@@ -151,7 +152,7 @@ class PredictionErrorChannel:
 
         return self.current_error
 
-    def _update_accumulated_error(self):
+    def _update_accumulated_error(self) -> None:
         """Update accumulated error over sliding window."""
         if len(self.error_buffer) == 0:
             self.accumulated_error = 0.0
@@ -215,7 +216,7 @@ class PredictionErrorChannel:
             'current_magnitude': float(np.linalg.norm(self.current_error))
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset channel to initial state.
 
@@ -279,7 +280,7 @@ class HierarchicalPredictor:
     >>> results = predictor.predict(extero_input, intero_input, dt_ms=1.0)
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize hierarchical predictor.
 
@@ -370,8 +371,8 @@ class HierarchicalPredictor:
 
     def predict(
         self,
-        extero_input: Optional[np.ndarray] = None,
-        intero_input: Optional[np.ndarray] = None,
+        extero_input: Optional[FloatArray] = None,
+        intero_input: Optional[FloatArray] = None,
         dt_ms: float = 1.0
     ) -> Dict[str, Any]:
         """
@@ -493,7 +494,7 @@ class HierarchicalPredictor:
 
         return results
 
-    def _update_hierarchy(self, dt_ms: float):
+    def _update_hierarchy(self, dt_ms: float) -> None:
         """
         Update hierarchical levels with different timescales.
 
@@ -544,7 +545,7 @@ class HierarchicalPredictor:
                 # Update state (gradient descent on prediction error)
                 level['state'] += self.learning_rates[i] * level['error']
 
-    def _map_down(self, state: np.ndarray, target_dim: int) -> np.ndarray:
+    def _map_down(self, state: FloatArray, target_dim: int) -> FloatArray:
         """Map state from higher to lower level."""
         if len(state) == target_dim:
             return state.copy()
@@ -557,7 +558,7 @@ class HierarchicalPredictor:
             # Downsample
             return state[:target_dim]
 
-    def _map_up(self, state: np.ndarray, target_dim: int) -> np.ndarray:
+    def _map_up(self, state: FloatArray, target_dim: int) -> FloatArray:
         """Map state from lower to higher level."""
         if len(state) == target_dim:
             return state.copy()
@@ -603,7 +604,7 @@ class HierarchicalPredictor:
             'interoceptive_stats': self.interoceptive_channel.get_statistics()
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset all hierarchical levels and prediction error channels.
 

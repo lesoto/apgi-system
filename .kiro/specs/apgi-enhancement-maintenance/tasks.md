@@ -1,6 +1,13 @@
 # Implementation Plan
 
 - [ ] 1. Set up testing infrastructure and framework
+
+
+
+
+
+
+
   - Install Hypothesis for property-based testing (add to pyproject.toml dependencies)
   - Create testing directory structure (tests/unit/, tests/property/, tests/integration/)
   - Create tests/conftest.py with shared fixtures (apgi_system, config, body_model, random_observation, random_body_state)
@@ -9,14 +16,23 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4, 5.5_
 
 - [ ] 2. Create custom Hypothesis strategies for APGI data types
+
+
+
+
+
   - Create tests/strategies.py module
   - Implement body_state_strategy for generating valid physiological states
   - Implement observation_strategy for generating valid observation vectors
   - Implement belief_state_strategy for generating valid belief states
   - Implement config_strategy for generating valid configuration dictionaries
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+-
+
 
 - [ ] 3. Implement core system property-based tests
+
+
   - Create tests/property/test_properties_core.py
   - Use @given decorator from Hypothesis with custom strategies
   - Configure to run minimum 100 iterations per property
@@ -60,6 +76,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 5. Implement ignition dynamics property-based tests
+
   - Create tests/property/test_properties_ignition.py
   - Use custom strategies for generating precision-weighted errors
   - [ ] 5.1 Write property test for ignition threshold crossing
@@ -86,6 +103,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
 - [ ] 7. Implement interoception and allostasis property-based tests
+
   - Create tests/property/test_properties_interoception.py
   - Use body_state_strategy for generating valid physiological states
   - [ ] 7.1 Write property test for homeostatic bounds invariant
@@ -112,6 +130,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [ ] 9. Checkpoint - Ensure all core and subsystem tests pass
+
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 10. Add comprehensive docstrings to core components
@@ -141,7 +160,11 @@
   - Add docstrings to SomaticMarkerSystem
   - _Requirements: 1.1_
 
-- [ ] 13. Add type hints throughout codebase
+- [x] 13. Add type hints throughout codebase
+
+
+
+
   - Create apgi_system/types.py with type aliases (FloatArray, IntArray, BodyState, BeliefState, SystemState, ConfigDict)
   - Add type hints to all core component methods (active_inference.py, predictive_processing.py, precision.py, free_energy.py)
   - Add type hints to all ignition component methods (threshold.py, global_workspace.py, temporal_dynamics.py)
@@ -190,6 +213,7 @@
   - _Requirements: 8.3, 10.2_
 
 - [ ] 19. Implement GUI and interaction property-based tests
+
   - Create tests/property/test_properties_gui.py
   - Test GUI parameter updates without launching full GUI (test backend logic)
   - [ ] 19.1 Write property test for parameter adjustment application
@@ -211,6 +235,7 @@
   - _Requirements: 6.1, 6.2, 6.4, 6.5_
 
 - [ ] 21. Implement experimental task property-based tests
+
   - Create tests/property/test_properties_tasks.py
   - Test task behavior across different random seeds and configurations
   - [ ] 21.1 Write property test for Iowa Gambling Task learning
@@ -234,6 +259,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 23. Implement integration and consistency property-based tests
+
   - Create tests/property/test_properties_system.py
   - Test full system integration across random inputs
   - [ ] 23.1 Write property test for state information completeness
@@ -255,6 +281,7 @@
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
 - [ ] 25. Implement error handling property-based tests
+
   - Add to tests/property/test_properties_system.py
   - [ ] 25.1 Write property test for input validation
     - **Property 32: Input validation**
@@ -262,6 +289,7 @@
     - Test: For any invalid input, system should raise informative error
 
 - [ ] 26. Implement configuration property-based tests
+
   - Add to tests/property/test_properties_system.py
   - [ ] 26.1 Write property test for parameter validation and application
     - **Property 33: Parameter validation and application**
@@ -269,6 +297,7 @@
     - Test: For any config parameter modification, system validates and applies correctly
 
 - [ ] 27. Implement data export property-based tests
+
   - Create tests/property/test_properties_export.py
   - [ ] 27.1 Write property test for export data completeness
     - **Property 34: Export data completeness**
@@ -291,15 +320,18 @@
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
 - [ ] 29. Checkpoint - Ensure all tests pass
+
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 30. Configure mypy for static type checking
+
   - Create mypy.ini with strict type checking settings
   - Set python_version=3.11, warn_return_any, disallow_untyped_defs, check_untyped_defs
   - Run mypy on apgi_system package and fix type errors iteratively
   - _Requirements: 1.2_
 
 - [ ] 31. Set up continuous integration pipeline
+
   - Create .github/workflows/ directory
   - Create .github/workflows/test.yml with pytest, coverage, and linting jobs
   - Configure CI to run black, flake8, mypy
@@ -344,6 +376,7 @@
   - _Requirements: 10.2_
 
 - [ ] 37. Final checkpoint - Comprehensive test run
+
   - Run full test suite with coverage report
   - Verify 80% coverage target achieved
   - Run mypy and ensure no type errors

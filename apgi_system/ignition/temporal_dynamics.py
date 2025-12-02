@@ -11,6 +11,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from dataclasses import dataclass
+from ..types import ConfigDict
 
 
 class TimelinePhase(Enum):
@@ -119,7 +120,7 @@ class IgnitionTimeline:
     >>> print(f"Recent events: {len(state['recent_events'])}")
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize ignition timeline orchestrator.
 
@@ -294,7 +295,7 @@ class IgnitionTimeline:
 
         return self._get_timeline_state()
 
-    def _process_pre_ignition(self, context_info: Optional[Dict[str, Any]], dt: float):
+    def _process_pre_ignition(self, context_info: Optional[Dict[str, Any]], dt: float) -> None:
         """
         Process pre-ignition phase (-500 to 0 ms).
 
@@ -330,7 +331,7 @@ class IgnitionTimeline:
             self.thalamus_gated = True
             self._log_event("thalamic_gating", {})
 
-    def _process_ignition_event(self, dt: float):
+    def _process_ignition_event(self, dt: float) -> None:
         """
         Process ignition event phase (0 to +500 ms).
 
@@ -361,7 +362,7 @@ class IgnitionTimeline:
             self.broadcasting = True
             self._log_event("global_broadcast_start", {})
 
-    def _process_post_ignition(self, dt: float):
+    def _process_post_ignition(self, dt: float) -> None:
         """
         Process post-ignition phase (+500 ms onwards).
 
@@ -391,7 +392,7 @@ class IgnitionTimeline:
             self.markers_updated = True
             self._log_event("somatic_marker_update", {})
 
-    def _transition_to_ignition(self):
+    def _transition_to_ignition(self) -> None:
         """Transition from pre-ignition to ignition event."""
         self.current_phase = TimelinePhase.IGNITION_EVENT
         self.phase_time = 0.0
@@ -403,7 +404,7 @@ class IgnitionTimeline:
         self.amplification_active = False
         self.broadcasting = False
 
-    def _transition_to_post_ignition(self):
+    def _transition_to_post_ignition(self) -> None:
         """Transition from ignition event to post-ignition."""
         self.current_phase = TimelinePhase.POST_IGNITION
         self.phase_time = 0.0
@@ -415,7 +416,7 @@ class IgnitionTimeline:
         self.memory_encoded = False
         self.markers_updated = False
 
-    def _transition_to_pre_ignition(self):
+    def _transition_to_pre_ignition(self) -> None:
         """Transition back to pre-ignition (ready for next event)."""
         self.current_phase = TimelinePhase.PRE_IGNITION
         self.phase_time = 0.0
@@ -428,7 +429,7 @@ class IgnitionTimeline:
         self.somatic_marker_retrieved = False
         self.thalamus_gated = False
 
-    def _log_event(self, event_type: str, data: Dict[str, Any]):
+    def _log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Log a timeline event."""
         event = TimelineEvent(
             time=self.total_time,
@@ -504,7 +505,7 @@ class IgnitionTimeline:
             if start_time <= event.time <= end_time
         ]
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset timeline to initial state.
 

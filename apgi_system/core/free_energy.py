@@ -6,11 +6,12 @@ calculations for active inference.
 """
 
 import numpy as np
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, Union
 from scipy import linalg
 from scipy.special import xlogy
 
 from apgi_system.validation import InputValidator
+from apgi_system.types import FloatArray, ConfigDict
 
 
 class FreeEnergyCalculator:
@@ -75,7 +76,7 @@ class FreeEnergyCalculator:
     >>> print(f"Free energy: {fe:.3f}")
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[ConfigDict] = None) -> None:
         """
         Initialize free energy calculator.
 
@@ -94,13 +95,13 @@ class FreeEnergyCalculator:
 
     def compute_variational_free_energy(
         self,
-        observation: np.ndarray,
-        prediction: np.ndarray,
-        precision: np.ndarray,
-        posterior_mean: np.ndarray,
-        posterior_cov: np.ndarray,
-        prior_mean: np.ndarray,
-        prior_cov: np.ndarray
+        observation: FloatArray,
+        prediction: FloatArray,
+        precision: Union[float, FloatArray],
+        posterior_mean: FloatArray,
+        posterior_cov: FloatArray,
+        prior_mean: FloatArray,
+        prior_cov: FloatArray
     ) -> Tuple[float, Dict[str, float]]:
         """
         Compute variational free energy F.
@@ -238,11 +239,11 @@ class FreeEnergyCalculator:
 
     def compute_expected_free_energy(
         self,
-        policy: np.ndarray,
-        predicted_states: np.ndarray,
-        predicted_observations: np.ndarray,
-        preferences: np.ndarray,
-        state_uncertainty: np.ndarray,
+        policy: FloatArray,
+        predicted_states: FloatArray,
+        predicted_observations: FloatArray,
+        preferences: FloatArray,
+        state_uncertainty: FloatArray,
         horizon: int = 3
     ) -> Tuple[float, Dict[str, float]]:
         """
@@ -338,10 +339,10 @@ class FreeEnergyCalculator:
 
     def _kl_divergence_gaussian(
         self,
-        mu_q: np.ndarray,
-        sigma_q: np.ndarray,
-        mu_p: np.ndarray,
-        sigma_p: np.ndarray
+        mu_q: FloatArray,
+        sigma_q: FloatArray,
+        mu_p: FloatArray,
+        sigma_p: FloatArray
     ) -> float:
         """
         Compute KL divergence between two Gaussian distributions.
@@ -427,9 +428,9 @@ class FreeEnergyCalculator:
 
     def compute_prediction_error(
         self,
-        observation: np.ndarray,
-        prediction: np.ndarray,
-        precision: Optional[np.ndarray] = None
+        observation: FloatArray,
+        prediction: FloatArray,
+        precision: Optional[Union[float, FloatArray]] = None
     ) -> Dict[str, float]:
         """
         Compute precision-weighted prediction error.
@@ -501,8 +502,8 @@ class FreeEnergyCalculator:
 
     def compute_surprise(
         self,
-        observation: np.ndarray,
-        generative_density: np.ndarray
+        observation: FloatArray,
+        generative_density: FloatArray
     ) -> float:
         """
         Compute surprise (negative log probability).

@@ -8,6 +8,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from apgi_system.validation import InputValidator
+from apgi_system.types import FloatArray, ConfigDict, BodyState
 
 
 @dataclass

@@ -12,6 +12,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
 from collections import deque
 from ..validation import InputValidator
+from ..types import FloatArray, ConfigDict
 
 
 class IgnitionThreshold:
@@ -95,7 +96,7 @@ class IgnitionThreshold:
     >>> print(f"Signal: {info['total_signal']:.2f}, Threshold: {info['threshold']:.2f}")
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize ignition threshold system.
 
@@ -150,9 +151,9 @@ class IgnitionThreshold:
 
     def compute_ignition_signal(
         self,
-        extero_error: np.ndarray,
+        extero_error: FloatArray,
         extero_precision: float,
-        intero_error: np.ndarray,
+        intero_error: FloatArray,
         intero_precision: float,
         somatic_marker_gain: float = 1.0,
         current_time: float = 0.0
@@ -306,7 +307,7 @@ class IgnitionThreshold:
 
         return ignition_occurred, components
 
-    def _update_threshold(self, current_time: float):
+    def _update_threshold(self, current_time: float) -> None:
         """
         Update dynamic threshold based on metabolic and contextual factors.
 
@@ -392,7 +393,7 @@ class IgnitionThreshold:
         """
         return 1.0 / (1.0 + np.exp(-x))
 
-    def update_metabolic_state(self, reserves: float, allostatic_load: float):
+    def update_metabolic_state(self, reserves: float, allostatic_load: float) -> None:
         """
         Update metabolic state variables that modulate ignition threshold.
 
@@ -466,7 +467,7 @@ class IgnitionThreshold:
             'current_probability': float(self.ignition_probability)
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset ignition threshold system to initial state.
 

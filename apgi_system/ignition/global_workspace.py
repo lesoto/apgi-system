@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from ..validation import InputValidator
+from ..types import FloatArray, ConfigDict
 
 
 class WorkspaceState(Enum):
@@ -24,7 +25,7 @@ class WorkspaceState(Enum):
 @dataclass
 class BroadcastContent:
     """Content being broadcast in the global workspace."""
-    content: np.ndarray
+    content: FloatArray
     ignition_time: float
     source: str
     priority: float = 1.0
@@ -116,7 +117,7 @@ class GlobalWorkspace:
     >>> print(f"Is reportable: {state['is_reportable']}")
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: ConfigDict) -> None:
         """
         Initialize global workspace system.
 
@@ -166,7 +167,7 @@ class GlobalWorkspace:
     def update(
         self,
         ignition_occurred: bool,
-        candidate_content: Optional[np.ndarray] = None,
+        candidate_content: Optional[FloatArray] = None,
         source: str = "unknown",
         priority: float = 1.0,
         dt: float = 1.0
@@ -329,34 +330,34 @@ class GlobalWorkspace:
 
         return self._get_state_info()
 
-    def _transition_to_igniting(self):
+    def _transition_to_igniting(self) -> None:
         """Transition to igniting state."""
         self.state = WorkspaceState.IGNITING
         self.state_time = 0.0
 
-    def _transition_to_broadcasting(self):
+    def _transition_to_broadcasting(self) -> None:
         """Transition to broadcasting state."""
         self.state = WorkspaceState.BROADCASTING
         self.state_time = 0.0
 
-    def _transition_to_maintaining(self):
+    def _transition_to_maintaining(self) -> None:
         """Transition to maintaining state."""
         self.state = WorkspaceState.MAINTAINING
         self.state_time = 0.0
 
-    def _transition_to_fading(self):
+    def _transition_to_fading(self) -> None:
         """Transition to fading state."""
         self.state = WorkspaceState.FADING
         self.state_time = 0.0
 
-    def _transition_to_idle(self):
+    def _transition_to_idle(self) -> None:
         """Transition to idle state."""
         self.state = WorkspaceState.IDLE
         self.state_time = 0.0
         self.current_content = None
         self.competing_contents.clear()
 
-    def _select_winner(self):
+    def _select_winner(self) -> None:
         """
         Select winner from competing contents.
 
@@ -378,7 +379,7 @@ class GlobalWorkspace:
         # Clear competition
         self.competing_contents.clear()
 
-    def _amplify_content(self):
+    def _amplify_content(self) -> None:
         """
         Apply recurrent amplification to current content.
 
@@ -397,7 +398,7 @@ class GlobalWorkspace:
         noise = np.random.randn(*self.current_content.content.shape) * 0.01
         self.current_content.content += noise
 
-    def _broadcast_to_subscribers(self):
+    def _broadcast_to_subscribers(self) -> None:
         """Broadcast current content to all subscribers."""
         if self.current_content is None:
             return
@@ -409,7 +410,7 @@ class GlobalWorkspace:
                 # Don't let subscriber errors crash the workspace
                 print(f"Subscriber error: {e}")
 
-    def subscribe(self, callback: Callable):
+    def subscribe(self, callback: Callable) -> None:
         """
         Subscribe a system to receive workspace broadcasts.
 
@@ -451,7 +452,7 @@ class GlobalWorkspace:
         """
         self.subscribers.append(callback)
 
-    def get_current_broadcast(self) -> Optional[np.ndarray]:
+    def get_current_broadcast(self) -> Optional[FloatArray]:
         """
         Get currently broadcast content.
 
@@ -515,7 +516,7 @@ class GlobalWorkspace:
 
         return info
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset workspace to initial state.
 
