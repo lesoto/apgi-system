@@ -135,23 +135,44 @@
     - **Property 10: Somatic marker gain incorporation**
     - **Validates: Requirements 3.5**
 
-- [ ] 7. Implement ignition dynamics unit tests
+- [x] 7. Implement ignition dynamics unit tests
+
+
+
+
+
 
   - Write unit tests for IgnitionThreshold (specific threshold scenarios)
   - Write unit tests for GlobalWorkspace (broadcasting mechanics)
   - Write unit tests for IgnitionTimeline (temporal orchestration)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. Implement interoception and allostasis property-based tests
+-
+
+- [x] 8. Implement interoception and allostasis property-based tests
+
+
+
 
   - Create tests/property/test_properties_interoception.py
   - Use body_state_strategy for generating valid physiological states
-  - [ ] 8.1 Write property test for homeostatic bounds invariant
+  - [x] 8.1 Write property test for homeostatic bounds invariant
+
+
     - **Property 11: Homeostatic bounds invariant**
     - **Validates: Requirements 4.1**
+
+
     - Test: For any extended simulation, all homeostatic variables remain within physiological bounds
-  - [ ] 8.2 Write property test for allostatic load accumulation
+
+
+  - [x] 8.2 Write property test for allostatic load accumulation
+
+
     - **Property 12: Allostatic load accumulation**
+
+
+
     - **Validates: Requirements 4.2**
   - [ ] 8.3 Write property test for somatic marker storage completeness
     - **Property 13: Somatic marker storage completeness**
@@ -164,6 +185,7 @@
     - **Validates: Requirements 4.5**
 
 - [ ] 9. Implement interoception and allostasis unit tests
+
 
   - Write unit tests for BodyModel (specific physiological scenarios)
   - Write unit tests for AllostaticRegulator (homeostatic control)
@@ -249,12 +271,16 @@
     - **Property 24: Intervention application**
     - **Validates: Requirements 6.5**
 
-- [ ]* 18. Implement GUI unit tests
+- [ ] 18. Implement GUI unit tests
+
   - Write unit tests for GUI initialization (test_gui_launches_without_errors)
   - Write unit tests for plot update mechanisms
   - Write unit tests for slider parameter updates
   - Write unit tests for manual intervention buttons
   - _Requirements: 6.1, 6.2, 6.4, 6.5_
+
+
+
 
 - [ ] 19. Implement experimental task property-based tests
   - Create tests/property/test_properties_tasks.py
