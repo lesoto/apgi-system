@@ -270,13 +270,3 @@
   6. Export data (Ctrl+E)
   7. Generate report: Analysis → Generate Report
 
-
-═══════════════════════════════════════════════════════════════════════════
-
-              🧠 APGI System - Modeling Consciousness
-                 Built with Active Inference &
-              Predictive Processing Principles
-
-         For detailed information: See GUI_README.md
-
-═══════════════════════════════════════════════════════════════════════════
