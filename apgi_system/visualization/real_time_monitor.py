@@ -9,14 +9,72 @@ from collections import deque
 
 class RealTimeMonitor:
     """
-    Real-time visualization of APGI system state.
+    Real-time visualization dashboard for APGI system dynamics.
 
-    Displays:
-    - Ignition events
-    - Prediction errors
-    - Precision dynamics
-    - Energy budget
-    - Oscillations
+    Provides live monitoring and visualization of key APGI system metrics
+    during simulation. The monitor displays multiple synchronized time series
+    to reveal the temporal dynamics of consciousness-related processes.
+
+    **Visualization Panels**:
+    - **Ignition Events**: Scatter plot showing when global ignition occurs
+    - **Free Energy**: Time series of prediction error magnitude
+    - **Precision Dynamics**: Evolution of attention/precision weights
+    - **Energy Reserves**: Metabolic budget and depletion status
+
+    **Key Features**:
+    - Real-time updating during simulation
+    - Configurable time window for display
+    - Automatic axis scaling and formatting
+    - Event detection and highlighting
+    - Export capabilities for analysis
+
+    **Use Cases**:
+    - Monitoring system behavior during experiments
+    - Debugging parameter settings and dynamics
+    - Visualizing consciousness-related phenomena
+    - Recording system trajectories for analysis
+    - Educational demonstration of APGI principles
+
+    The monitor uses matplotlib for rendering and maintains circular buffers
+    for efficient memory usage during long simulations.
+
+    Parameters
+    ----------
+    window_size : int, optional
+        Number of timepoints to display in the visualization window, by default 1000
+
+    Attributes
+    ----------
+    window_size : int
+        Maximum number of timepoints displayed
+    time_buffer : deque
+        Circular buffer storing timestamps
+    ignition_buffer : deque
+        Buffer storing ignition event indicators (0/1)
+    fe_buffer : deque
+        Buffer storing free energy / prediction error values
+    precision_buffer : deque
+        Buffer storing precision weight values
+    energy_buffer : deque
+        Buffer storing energy reserve levels
+    fig : matplotlib.figure.Figure
+        Main figure object
+    axes : List[matplotlib.axes.Axes]
+        List of subplot axes
+    lines : List[matplotlib.lines.Line2D]
+        Line plot objects for each metric
+    ignition_scatter : matplotlib.collections.PathCollection
+        Scatter plot for ignition events
+
+    Examples
+    --------
+    >>> monitor = RealTimeMonitor(window_size=500)
+    >>> # During simulation loop:
+    >>> state = apgi_system.step(observation)
+    >>> monitor.update(state)
+    >>> monitor.render()  # Update display
+    >>> # After simulation:
+    >>> monitor.save('simulation_results.png')
     """
 
     def __init__(self, window_size: int = 1000):
@@ -57,10 +115,20 @@ class RealTimeMonitor:
 
     def update(self, state: Dict[str, Any]):
         """
-        Update monitor with new state.
+        Update monitor buffers with new system state.
 
-        Args:
-            state: Current system state
+        Extracts relevant metrics from the system state and adds them to
+        the circular buffers for visualization. The buffers automatically
+        maintain the configured window size.
+
+        Parameters
+        ----------
+        state : Dict[str, Any]
+            Current APGI system state dictionary containing:
+            - 'time': Current simulation time
+            - 'ignition': Dict with 'ignition_occurred' and 'total_signal'
+            - 'precision': Dict with 'exteroceptive' precision value
+            - 'metabolism': Dict with 'reserves' energy level
         """
         self.time_buffer.append(state['time'])
 
@@ -75,7 +143,22 @@ class RealTimeMonitor:
         self.energy_buffer.append(state['metabolism']['reserves'])
 
     def render(self):
-        """Render current state."""
+        """
+        Render current visualization state.
+
+        Updates all plot elements with current buffer contents and refreshes
+        the display. Automatically scales axes and handles ignition event
+        highlighting.
+
+        The rendering process:
+        1. Updates ignition scatter plot with event times
+        2. Updates line plots for all continuous metrics
+        3. Automatically scales axes based on data ranges
+        4. Refreshes the display with minimal delay
+
+        This method should be called after each update() to maintain
+        real-time visualization.
+        """
         if len(self.time_buffer) == 0:
             return
 
@@ -120,6 +203,22 @@ class RealTimeMonitor:
         plt.show()
 
     def save(self, filename: str = 'apgi_monitor.png'):
-        """Save current view to file."""
+        """
+        Save current visualization to file.
+
+        Exports the current state of the monitor to an image file for
+        documentation, analysis, or presentation purposes.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Output filename with extension, by default 'apgi_monitor.png'.
+            Supported formats: PNG, PDF, SVG, EPS (determined by extension)
+
+        Examples
+        --------
+        >>> monitor.save('experiment_1_results.png')
+        >>> monitor.save('high_res_figure.pdf')
+        """
         self.fig.savefig(filename, dpi=150, bbox_inches='tight')
         print(f"Monitor saved to {filename}")

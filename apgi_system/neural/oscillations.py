@@ -21,16 +21,68 @@ class OscillationBand:
 
 class OscillationEngine:
     """
-    Multi-band neural oscillation generator.
+    Multi-band neural oscillation generator with phase-amplitude coupling.
 
-    Implements:
-    - Delta (1-4 Hz): Slow allostatic cycles
-    - Theta (4-8 Hz): Long-range coordination
-    - Alpha (8-12 Hz): Inhibition and gating
-    - Beta (12-30 Hz): Top-down prediction signaling
-    - Gamma (30-80 Hz): Feature binding, local coherence
+    Generates neural oscillations across multiple frequency bands that are
+    critical for consciousness and cognitive processing. Each band serves
+    specific computational functions:
 
-    Includes phase-amplitude coupling (e.g., theta-gamma).
+    - **Delta (1-4 Hz)**: Slow allostatic cycles and deep sleep rhythms
+    - **Theta (4-8 Hz)**: Long-range coordination and memory encoding
+    - **Alpha (8-12 Hz)**: Inhibition, gating, and attention control
+    - **Beta (12-30 Hz)**: Top-down prediction signaling and motor control
+    - **Gamma (30-80 Hz)**: Feature binding, local coherence, conscious access
+
+    The engine implements phase-amplitude coupling (PAC), particularly:
+    - Theta-gamma coupling: Gamma amplitude modulated by theta phase
+    - Alpha-gamma coupling: Attention-related gamma modulation
+
+    Each oscillation band maintains its own phase, amplitude, and power
+    estimates. The system supports dynamic frequency modulation and
+    amplitude control for experimental manipulations.
+
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary containing oscillation settings:
+        - oscillations.bands: Dictionary of band configurations with
+          'range' (frequency range in Hz) and 'amplitude' (base amplitude)
+        - oscillations.coupling_strength: Strength of cross-frequency coupling (default: 0.3)
+        - oscillations.criticality_parameter: Criticality parameter (default: 1.0)
+        - system.timestep_ms: System timestep in milliseconds (default: 1.0)
+
+    Attributes
+    ----------
+    bands : Dict[str, OscillationBand]
+        Dictionary of oscillation bands with their current states
+    coupling_strength : float
+        Strength of phase-amplitude coupling between bands
+    criticality_param : float
+        Parameter controlling criticality dynamics
+    time : float
+        Current simulation time in seconds
+    dt_sec : float
+        Timestep in seconds
+    signal_history : List[float]
+        Recent history of total oscillatory signal for analysis
+    max_history : int
+        Maximum length of signal history buffer
+
+    Examples
+    --------
+    >>> config = {
+    ...     'oscillations': {
+    ...         'bands': {
+    ...             'gamma': {'range': [30, 80], 'amplitude': 0.5},
+    ...             'theta': {'range': [4, 8], 'amplitude': 0.3}
+    ...         },
+    ...         'coupling_strength': 0.4
+    ...     }
+    ... }
+    >>> engine = OscillationEngine(config)
+    >>> result = engine.generate(dt=0.001)
+    >>> print(result['band_powers']['gamma'])
+    0.25
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -79,14 +131,48 @@ class OscillationEngine:
         dt: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Generate oscillatory signal.
+        Generate multi-band oscillatory signals with cross-frequency coupling.
 
-        Args:
-            modulation: Optional modulation of band amplitudes
-            dt: Time step in seconds (uses default if None)
+        Performs a complete oscillation generation cycle:
+        1. Updates phase for each oscillation band based on center frequency
+        2. Generates sinusoidal signals for each band
+        3. Applies phase-amplitude coupling (theta-gamma, alpha-gamma)
+        4. Computes power estimates using exponential smoothing
+        5. Calculates cross-frequency coupling metrics
 
-        Returns:
-            Dictionary with signals and band information
+        The total signal is the sum of all band signals. Phase-amplitude
+        coupling modulates gamma amplitude based on theta and alpha phases,
+        implementing known neural mechanisms for attention and memory.
+
+        Parameters
+        ----------
+        modulation : Optional[Dict[str, float]], optional
+            Dictionary mapping band names to amplitude modulation factors.
+            Values > 1.0 increase amplitude, < 1.0 decrease amplitude.
+            If None, uses baseline amplitudes. By default None.
+        dt : Optional[float], optional
+            Timestep in seconds. If None, uses configured system timestep.
+            By default None.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - 'total_signal': Sum of all band signals (float)
+            - 'band_signals': Dict mapping band names to current signal values
+            - 'band_powers': Dict mapping band names to power estimates
+            - 'band_phases': Dict mapping band names to current phases (radians)
+            - 'coupling_metrics': Dict with cross-frequency coupling measures
+
+        Examples
+        --------
+        >>> engine = OscillationEngine(config)
+        >>> # Generate with gamma enhancement
+        >>> result = engine.generate(modulation={'gamma': 1.5}, dt=0.001)
+        >>> print(f"Total signal: {result['total_signal']:.3f}")
+        Total signal: 0.847
+        >>> print(f"Gamma power: {result['band_powers']['gamma']:.3f}")
+        Gamma power: 0.563
         """
         if dt is None:
             dt = self.dt_sec
@@ -179,11 +265,27 @@ class OscillationEngine:
 
     def modulate_band(self, band_name: str, amplitude_factor: float):
         """
-        Modulate a specific band's amplitude.
+        Modulate a specific oscillation band's amplitude.
 
-        Args:
-            band_name: Name of band to modulate
-            amplitude_factor: Multiplicative factor
+        Multiplies the current amplitude of the specified band by the given
+        factor. This allows for dynamic control of oscillation strength,
+        useful for simulating pharmacological interventions, attention
+        modulation, or pathological states.
+
+        Parameters
+        ----------
+        band_name : str
+            Name of the oscillation band to modulate (e.g., 'gamma', 'theta')
+        amplitude_factor : float
+            Multiplicative factor applied to current amplitude.
+            Values > 1.0 increase amplitude, < 1.0 decrease amplitude.
+            Factor of 0.0 effectively silences the band.
+
+        Examples
+        --------
+        >>> engine = OscillationEngine(config)
+        >>> engine.modulate_band('gamma', 2.0)  # Double gamma amplitude
+        >>> engine.modulate_band('alpha', 0.5)  # Halve alpha amplitude
         """
         if band_name in self.bands:
             self.bands[band_name].amplitude *= amplitude_factor
@@ -215,17 +317,49 @@ class OscillationEngine:
 
     def detect_gamma_burst(self, threshold: float = 0.5) -> bool:
         """
-        Detect gamma burst (associated with conscious access).
+        Detect gamma burst events associated with conscious access.
 
-        Args:
-            threshold: Power threshold for detection
+        Gamma bursts (sudden increases in gamma power) are neural signatures
+        of conscious access and global ignition. This method detects when
+        gamma power exceeds a threshold, indicating potential conscious
+        processing of information.
 
-        Returns:
-            True if gamma burst detected
+        Parameters
+        ----------
+        threshold : float, optional
+            Power threshold for gamma burst detection, by default 0.5.
+            Higher thresholds require stronger gamma activity for detection.
+
+        Returns
+        -------
+        bool
+            True if gamma power exceeds threshold (burst detected),
+            False otherwise. Returns False if gamma band not configured.
+
+        Examples
+        --------
+        >>> engine = OscillationEngine(config)
+        >>> result = engine.generate()
+        >>> if engine.detect_gamma_burst(threshold=0.7):
+        ...     print("Conscious access event detected!")
         """
         if 'gamma' in self.bands:
             return self.bands['gamma'].power > threshold
         return False
+
+    def get_current_state(self) -> Dict[str, Any]:
+        """Get current oscillation state."""
+        return {
+            'time': self.time,
+            'band_powers': {name: band.power for name, band in self.bands.items()},
+            'band_phases': {name: band.phase for name, band in self.bands.items()},
+            'band_frequencies': {
+                name: (band.freq_range[0] + band.freq_range[1]) / 2 
+                for name, band in self.bands.items()
+            },
+            'coupling_metrics': self._compute_coupling_metrics(),
+            'gamma_burst': self.detect_gamma_burst()
+        }
 
     def reset(self):
         """Reset oscillation engine."""

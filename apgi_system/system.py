@@ -325,6 +325,71 @@ class APGISystem:
         self.time = 0.0
         self.history = {k: [] for k in self.history.keys()}
 
+    def get_state(self) -> Dict[str, Any]:
+        """
+        Get complete system state.
+        
+        Returns the full state of all subsystems, providing comprehensive
+        information about the current system configuration and dynamics.
+        
+        Returns
+        -------
+        state : Dict[str, Any]
+            Complete system state including all subsystem states
+        """
+        return {
+            'time': self.time,
+            'timestep_ms': self.timestep_ms,
+            'is_running': self.is_running,
+            'core': {
+                'active_inference': {
+                    'time': self.active_inference.time,
+                    'beliefs': [
+                        {
+                            'mean': belief.mean.copy(),
+                            'covariance': belief.covariance.copy(),
+                            'precision': belief.precision,
+                            'prediction': belief.prediction.copy(),
+                            'prediction_error': belief.prediction_error.copy()
+                        }
+                        for belief in self.active_inference.filter.beliefs
+                    ]
+                },
+                'precision': {
+                    'extero_precision': self.precision.extero_precision,
+                    'intero_precision': self.precision.intero_precision,
+                    'attention_focus': self.precision.attention_focus,
+                    'attention_gain': self.precision.attention_gain,
+                    'fatigue_level': self.precision.fatigue_level,
+                    'cognitive_load': self.precision.cognitive_load
+                }
+            },
+            'ignition': {
+                'threshold_stats': self.ignition_threshold.get_statistics(),
+                'workspace_state': 'broadcasting' if self.global_workspace.is_reportable() else 'idle',
+                'timeline_state': self.ignition_timeline.get_current_state()
+            },
+            'interoception': {
+                'body_state': self.body_model.get_current_state(),
+                'allostatic_load': self.allostasis.get_allostatic_load(),
+                'somatic_markers': self.somatic_markers.get_statistics()
+            },
+            'self_model': {
+                'minimal_self': self.minimal_self.get_current_state(),
+                'narrative_self': self.narrative_self.get_current_state(),
+                'coherence': self.coherence.get_coherence_metrics()
+            },
+            'thermodynamic': {
+                'metabolic_reserves': self.metabolism.current_reserves,
+                'entropy_stats': self.entropy.get_statistics()
+            },
+            'neural': {
+                'networks': self.networks.get_network_states(),
+                'oscillations': self.oscillations.get_current_state()
+            },
+            'history': self.history
+        }
+
     def get_state_summary(self) -> Dict[str, Any]:
         """Get high-level summary of current state."""
         return {

@@ -505,6 +505,17 @@ class IgnitionTimeline:
             if start_time <= event.time <= end_time
         ]
 
+    def get_current_state(self) -> Dict[str, Any]:
+        """
+        Get current timeline state.
+        
+        Returns
+        -------
+        Dict[str, Any]
+            Current timeline state information
+        """
+        return self._get_timeline_state()
+
     def reset(self) -> None:
         """
         Reset timeline to initial state.

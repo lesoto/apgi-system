@@ -22,13 +22,59 @@ class NetworkType(Enum):
 
 class FrontoparietalNetwork:
     """
-    Frontoparietal workspace network.
+    Frontoparietal workspace network implementing Global Workspace Theory.
 
-    Implements global workspace theory:
-    - Sparse long-range connections
-    - Recurrent amplification
-    - Winner-take-all dynamics
-    - Broadcasting mechanism
+    This network models the frontoparietal control network that serves as
+    the neural substrate for conscious access and global information
+    broadcasting. It implements key principles of Global Workspace Theory:
+
+    **Architecture**:
+    - Sparse long-range connections (5% connectivity by default)
+    - Recurrent amplification loops for signal enhancement
+    - Winner-take-all competition dynamics
+    - Global broadcasting mechanism for conscious access
+
+    **Dynamics**:
+    - Nodes compete through lateral inhibition
+    - Winning patterns are amplified through recurrent connections
+    - Ignition events trigger sustained broadcasting (300-500ms)
+    - Activity normalization prevents runaway excitation
+
+    The network maintains two key states:
+    1. **Competitive state**: Multiple patterns compete for dominance
+    2. **Broadcasting state**: Winner pattern is globally broadcast
+
+    Parameters
+    ----------
+    num_nodes : int, optional
+        Number of workspace nodes, by default 1000
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_nodes : int
+        Number of nodes in the workspace
+    activity : np.ndarray
+        Current activity pattern across nodes
+    broadcast_state : np.ndarray
+        Current broadcast pattern (active during ignition)
+    weights : np.ndarray
+        Sparse connectivity matrix between nodes
+    is_broadcasting : bool
+        Whether network is currently in broadcasting mode
+    broadcast_content : Optional[np.ndarray]
+        Pattern being broadcast (None if not broadcasting)
+    broadcast_start_time : Optional[float]
+        Time when current broadcast began
+
+    Examples
+    --------
+    >>> network = FrontoparietalNetwork(num_nodes=500)
+    >>> external_input = np.random.randn(500) * 0.1
+    >>> activity, info = network.update(external_input, ignition_signal=True)
+    >>> print(f"Broadcasting: {info['is_broadcasting']}")
+    Broadcasting: True
     """
 
     def __init__(self, num_nodes: int = 1000, config: Optional[Dict[str, Any]] = None):
@@ -163,13 +209,62 @@ class FrontoparietalNetwork:
 
 class SalienceNetwork:
     """
-    Salience network.
+    Salience network for interoceptive processing and attention switching.
 
-    Functions:
-    - Integrates interoceptive signals (insula analog)
-    - Detects salient events (ACC analog)
-    - Switches attention between networks
-    - Modulates precision
+    Models the salience network, a key brain system that integrates
+    interoceptive (body-based) and exteroceptive (external) information
+    to detect salient events and control attention switching. The network
+    consists of two main subregions:
+
+    **Insula Analog**:
+    - Processes interoceptive signals from the body
+    - Integrates physiological state information
+    - Generates interoceptive awareness
+
+    **Anterior Cingulate Cortex (ACC) Analog**:
+    - Detects conflicts and prediction errors
+    - Monitors salience of events
+    - Triggers attention switching
+
+    **Key Functions**:
+    - Integrates body state signals for interoceptive awareness
+    - Detects salient events requiring attention
+    - Switches attention between internal (interoceptive) and external focus
+    - Modulates precision weights for different information channels
+    - Controls network interactions (e.g., suppressing default mode)
+
+    Parameters
+    ----------
+    num_nodes : int, optional
+        Total number of nodes in the network, by default 200
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_nodes : int
+        Total number of nodes
+    insula_nodes : int
+        Number of nodes in insula subregion (half of total)
+    acc_nodes : int
+        Number of nodes in ACC subregion (half of total)
+    insula_activity : np.ndarray
+        Current activity in insula subregion
+    acc_activity : np.ndarray
+        Current activity in ACC subregion
+    current_attention : Optional[str]
+        Current attention target ('interoceptive' or 'exteroceptive')
+    salience_threshold : float
+        Threshold for triggering attention switching
+
+    Examples
+    --------
+    >>> network = SalienceNetwork(num_nodes=100)
+    >>> intero_input = np.array([0.8, 0.6, 0.9])  # Body signals
+    >>> extero_input = np.array([0.2, 0.3, 0.1])  # External signals
+    >>> activity, info = network.update(intero_input, extero_input, conflict_signal=0.5)
+    >>> print(f"Attention target: {info['attention_target']}")
+    Attention target: interoceptive
     """
 
     def __init__(self, num_nodes: int = 200, config: Optional[Dict[str, Any]] = None):
@@ -295,13 +390,66 @@ class SalienceNetwork:
 
 class DefaultModeNetwork:
     """
-    Default mode network.
+    Default mode network for self-referential processing and simulation.
 
-    Functions:
-    - Self-referential processing
-    - Autobiographical memory
-    - Mental simulation
-    - Narrative self-model
+    Models the default mode network (DMN), a brain system active during
+    rest and introspective tasks. The DMN is crucial for self-referential
+    thinking, autobiographical memory, and mental simulation. It shows
+    anti-correlation with task-positive networks.
+
+    **Subregions**:
+    - **Medial Prefrontal Cortex (mPFC)**: Self-referential processing,
+      theory of mind, moral reasoning
+    - **Posterior Cingulate Cortex (PCC)**: Autobiographical memory
+      integration, self-awareness
+    - **Temporoparietal Junction (TPJ)**: Perspective-taking, social
+      cognition, integration hub
+
+    **Key Functions**:
+    - Self-referential and introspective processing
+    - Autobiographical memory retrieval and integration
+    - Mental simulation and prospective thinking
+    - Narrative self-model construction and maintenance
+    - Mind-wandering and spontaneous thought
+
+    **Dynamics**:
+    - High baseline activity during rest
+    - Suppressed by external task demands
+    - Slow temporal dynamics (100ms time constant)
+    - Strong recurrent connectivity within network
+
+    Parameters
+    ----------
+    num_nodes : int, optional
+        Total number of nodes in the network, by default 300
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_nodes : int
+        Total number of nodes
+    activity : np.ndarray
+        Current overall network activity
+    mpfc_activity : np.ndarray
+        Activity in medial prefrontal cortex subregion
+    pcc_activity : np.ndarray
+        Activity in posterior cingulate cortex subregion
+    tpj_activity : np.ndarray
+        Activity in temporoparietal junction subregion
+    self_representation : np.ndarray
+        Slowly-evolving self-model representation
+    narrative_buffer : List
+        Buffer for narrative elements (currently unused)
+
+    Examples
+    --------
+    >>> network = DefaultModeNetwork(num_nodes=150)
+    >>> self_input = np.random.randn(50) * 0.1  # Self-related signals
+    >>> memory_input = np.random.randn(50) * 0.1  # Memory signals
+    >>> activity, info = network.update(self_input, memory_input, task_activity=0.2)
+    >>> print(f"DMN suppression: {info['suppression_factor']:.2f}")
+    DMN suppression: 0.86
     """
 
     def __init__(self, num_nodes: int = 300, config: Optional[Dict[str, Any]] = None):
@@ -414,12 +562,59 @@ class DefaultModeNetwork:
 
 class LargeScaleNetworkManager:
     """
-    Manages interactions between large-scale networks.
+    Coordinates interactions between large-scale brain networks.
 
-    Coordinates:
-    - Frontoparietal (workspace/consciousness)
-    - Salience (attention/interoception)
-    - Default mode (self/simulation)
+    Manages the dynamic interactions between three major brain networks
+    that are crucial for consciousness and cognitive function:
+
+    **Network Interactions**:
+    - **Frontoparietal ↔ Salience**: Salience network activates workspace
+      for conscious access when salient events are detected
+    - **Frontoparietal ↔ Default Mode**: Task-positive frontoparietal
+      activity suppresses default mode network (anti-correlation)
+    - **Salience ↔ Default Mode**: Salience network can activate default
+      mode during introspective attention
+
+    **Coordination Functions**:
+    - Routes information between networks based on attention state
+    - Implements network switching for different cognitive modes
+    - Manages competition and cooperation between networks
+    - Coordinates global brain states (focused vs. introspective)
+
+    The manager implements known principles of large-scale brain organization:
+    - Anti-correlation between task-positive and default networks
+    - Salience network as attention switch between networks
+    - Dynamic reconfiguration based on cognitive demands
+
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary containing network parameters
+
+    Attributes
+    ----------
+    frontoparietal : FrontoparietalNetwork
+        Workspace network for conscious access
+    salience : SalienceNetwork
+        Salience detection and attention switching
+    default_mode : DefaultModeNetwork
+        Self-referential and simulation network
+    fp_to_dmn : float
+        Interaction strength from frontoparietal to default mode (negative)
+    sal_to_fp : float
+        Interaction strength from salience to frontoparietal (positive)
+    dmn_to_sal : float
+        Interaction strength from default mode to salience (weak positive)
+
+    Examples
+    --------
+    >>> config = {'ignition': {'workspace_nodes': 500}}
+    >>> manager = LargeScaleNetworkManager(config)
+    >>> extero = np.random.randn(100) * 0.1
+    >>> intero = np.random.randn(6) * 0.1
+    >>> result = manager.update(extero, intero, ignition_signal=True, conflict_signal=0.3)
+    >>> print(f"Broadcasting: {result['frontoparietal']['info']['is_broadcasting']}")
+    Broadcasting: True
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -501,6 +696,26 @@ class LargeScaleNetworkManager:
             'salience': {'activity': sal_activity, 'info': sal_info},
             'default_mode': {'activity': dmn_activity, 'info': dmn_info},
             'broadcast': self.frontoparietal.get_broadcast()
+        }
+
+    def get_network_states(self) -> Dict[str, Any]:
+        """Get current states of all networks."""
+        return {
+            'frontoparietal': {
+                'activity': self.frontoparietal.activity.copy(),
+                'is_broadcasting': self.frontoparietal.is_broadcasting,
+                'mean_activity': float(np.mean(self.frontoparietal.activity))
+            },
+            'salience': {
+                'insula_activity': self.salience.insula_activity.copy(),
+                'acc_activity': self.salience.acc_activity.copy(),
+                'current_attention': self.salience.current_attention
+            },
+            'default_mode': {
+                'activity': self.default_mode.activity.copy(),
+                'self_representation': self.default_mode.self_representation.copy(),
+                'mean_activity': float(np.mean(self.default_mode.activity))
+            }
         }
 
     def reset(self):

@@ -23,15 +23,72 @@ class NeuronState:
 
 class SpikingNeuralNetwork:
     """
-    Leaky Integrate-and-Fire (LIF) spiking neural network.
+    Leaky Integrate-and-Fire (LIF) spiking neural network with STDP and energy tracking.
 
-    Dynamics:
-        τ dV/dt = -(V - V_rest) + R*I_syn + R*I_ext
+    Implements a biologically realistic spiking neural network using the
+    Leaky Integrate-and-Fire neuron model. The network includes:
+
+    **Neuron Dynamics**:
+    τ dV/dt = -(V - V_rest) + R*I_syn + R*I_ext
 
     When V ≥ V_threshold:
-        - Emit spike
-        - V := V_reset
-        - Enter refractory period
+    - Emit spike
+    - V := V_reset  
+    - Enter refractory period (2ms)
+
+    **Key Features**:
+    - **STDP Learning**: Spike-timing-dependent plasticity for synaptic learning
+    - **Energy Tracking**: ATP consumption for spikes and synaptic transmission
+    - **Landauer Cost**: Thermodynamic cost of information erasure
+    - **Dale's Principle**: 80% excitatory, 20% inhibitory neurons
+    - **Sparse Connectivity**: Configurable connection probability
+
+    **Learning Rule (STDP)**:
+    - Pre-before-post: Δw = A+ * exp(-Δt/τ+) (LTP)
+    - Post-before-pre: Δw = -A- * exp(Δt/τ-) (LTD)
+
+    **Energy Model**:
+    - Spike cost: 1.0 ATP unit per action potential
+    - Synapse cost: 0.1 ATP unit per synaptic transmission
+    - Landauer cost: kT ln(2) per bit erased (2.87e-21 J at room temperature)
+
+    Parameters
+    ----------
+    num_neurons : int
+        Number of neurons in the network
+    connection_probability : float, optional
+        Probability of connection between any two neurons, by default 0.1
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_neurons : int
+        Number of neurons
+    neurons : List[NeuronState]
+        State of each neuron (membrane potential, spike times, etc.)
+    connectivity : np.ndarray
+        Binary connectivity matrix (sparse)
+    weights : np.ndarray
+        Synaptic weight matrix
+    synaptic_currents : np.ndarray
+        Current synaptic input to each neuron
+    total_energy_consumed : float
+        Total ATP consumed (spikes + synapses)
+    bits_erased : float
+        Total information bits erased (for Landauer cost)
+    spike_times : List[float]
+        Times of all spikes
+    spike_neurons : List[int]
+        Neuron indices for all spikes
+
+    Examples
+    --------
+    >>> network = SpikingNeuralNetwork(num_neurons=1000, connection_probability=0.05)
+    >>> external_input = np.random.randn(1000) * 2.0  # External current
+    >>> spike_mask, info = network.step(external_input, dt=0.1)
+    >>> print(f"Spikes: {info['num_spikes']}, Energy: {info['energy_consumed']:.2f}")
+    Spikes: 23, Energy: 25.30
     """
 
     def __init__(

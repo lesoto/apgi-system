@@ -485,6 +485,24 @@ class BodyModel:
             'blood_pressure': float(state.blood_pressure)
         }
 
+    def get_current_state(self) -> Dict[str, Any]:
+        """
+        Get current body model state.
+        
+        Returns
+        -------
+        Dict[str, Any]
+            Current body model state including physiological variables and influences
+        """
+        return {
+            'current': self._state_to_dict(self.current_state),
+            'predicted': self._state_to_dict(self.predicted_state),
+            'arousal': self.arousal_level,
+            'activity': self.activity_level,
+            'stress': self.stress_level,
+            'interoceptive_vector': self.get_interoceptive_vector()
+        }
+
     def reset(self):
         """
         Reset to baseline physiological state.

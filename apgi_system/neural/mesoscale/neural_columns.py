@@ -13,12 +13,71 @@ from typing import Dict, Any, Optional, Tuple
 
 class NeuralColumn:
     """
-    Rate-coded neural column implementing predictive coding.
+    Rate-coded neural column implementing hierarchical predictive coding.
 
-    A column contains:
-    - Prediction neurons (generate top-down predictions)
-    - Error neurons (compute bottom-up errors)
-    - Modulatory neurons (gain control)
+    Models a cortical column as the basic computational unit for predictive
+    processing. Each column implements the core predictive coding algorithm:
+    predictions flow top-down, errors flow bottom-up, and learning minimizes
+    prediction errors through Bayesian inference.
+
+    **Neural Populations**:
+    - **Prediction neurons**: Generate top-down predictions of lower-level activity
+    - **Error neurons**: Compute bottom-up prediction errors (observation - prediction)
+    - **Modulatory neurons**: Control gain and precision of error signals
+
+    **Computational Functions**:
+    - Hierarchical predictive coding with error minimization
+    - Dendritic gain modulation for precision weighting
+    - Beta oscillation generation (12-30 Hz) for top-down signaling
+    - Adaptation mechanisms to prevent over-fitting
+    - Nonlinear dendritic computation with soft thresholding
+
+    **Dynamics**:
+    - Fast dynamics (10ms) for prediction updates
+    - Slow dynamics (100ms) for adaptation
+    - Beta oscillations for temporal coordination
+    - Gain modulation based on error magnitude
+
+    The column receives bottom-up input from lower levels and top-down
+    predictions from higher levels, computing prediction errors that
+    drive learning and inference.
+
+    Parameters
+    ----------
+    num_units : int
+        Number of units in the column
+    layer_name : str, optional
+        Name identifier for this layer, by default "column"
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_units : int
+        Number of units in the column
+    layer_name : str
+        Layer identifier
+    prediction_units : np.ndarray
+        Activity of prediction neurons (top-down)
+    error_units : np.ndarray
+        Activity of error neurons (bottom-up)
+    modulatory_units : np.ndarray
+        Gain modulation values for each unit
+    activity : np.ndarray
+        Current output activity of the column
+    adaptation : np.ndarray
+        Slow adaptation state for each unit
+    beta_phase : float
+        Current phase of beta oscillation (radians)
+
+    Examples
+    --------
+    >>> column = NeuralColumn(num_units=64, layer_name="V1")
+    >>> bottom_up = np.random.randn(64) * 0.5
+    >>> top_down = np.random.randn(64) * 0.3
+    >>> activity, info = column.update(bottom_up, top_down, dt=1.0)
+    >>> print(f"Prediction error: {info['prediction_error_magnitude']:.3f}")
+    Prediction error: 0.425
     """
 
     def __init__(
@@ -194,10 +253,56 @@ class NeuralColumn:
 
 class HierarchicalColumnNetwork:
     """
-    Network of neural columns arranged hierarchically.
+    Hierarchical network of neural columns implementing predictive coding.
 
-    Lower levels process fast, detailed information.
-    Higher levels process slow, abstract information.
+    Organizes multiple neural columns in a hierarchical architecture where
+    information flows bidirectionally: bottom-up sensory signals and
+    top-down predictions. This implements the hierarchical predictive
+    coding framework for cortical computation.
+
+    **Hierarchical Organization**:
+    - **Lower levels**: Process fast, detailed, concrete information
+    - **Higher levels**: Process slow, abstract, contextual information
+    - **Bidirectional flow**: Bottom-up signals, top-down predictions
+
+    **Information Processing**:
+    - Sensory input enters at the bottom level
+    - Each level predicts activity at the level below
+    - Prediction errors propagate upward to drive learning
+    - Higher levels provide context and priors to lower levels
+
+    **Mapping Functions**:
+    - **Bottom-up**: Compression/pooling to extract abstractions
+    - **Top-down**: Expansion/repetition to provide detailed predictions
+
+    This architecture captures key principles of cortical hierarchy:
+    receptive field size increases, temporal integration increases,
+    and abstraction level increases with hierarchical depth.
+
+    Parameters
+    ----------
+    layer_sizes : list
+        Number of units in each layer, ordered from bottom (sensory) to top (abstract)
+    config : Optional[Dict[str, Any]], optional
+        Configuration dictionary, by default None
+
+    Attributes
+    ----------
+    num_layers : int
+        Number of hierarchical levels
+    layer_sizes : list
+        Number of units in each layer
+    columns : List[NeuralColumn]
+        List of neural columns, one per hierarchical level
+
+    Examples
+    --------
+    >>> # Create 3-level hierarchy: 256 -> 128 -> 64 units
+    >>> network = HierarchicalColumnNetwork([256, 128, 64])
+    >>> sensory_input = np.random.randn(256) * 0.1
+    >>> results = network.forward(sensory_input, dt=1.0)
+    >>> print(f"Layer 0 error: {np.mean(results['layer_0']['prediction_error']):.3f}")
+    Layer 0 error: 0.087
     """
 
     def __init__(self, layer_sizes: list, config: Optional[Dict[str, Any]] = None):
