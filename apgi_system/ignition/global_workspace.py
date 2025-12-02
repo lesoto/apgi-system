@@ -9,6 +9,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from ..validation import InputValidator
 
 
 class WorkspaceState(Enum):
@@ -32,22 +33,106 @@ class BroadcastContent:
 
 class GlobalWorkspace:
     """
-    Global workspace for conscious broadcasting.
+    Global workspace for conscious broadcasting based on Global Workspace Theory.
 
-    Implements:
-    - Competition for access (winner-take-all)
-    - Recurrent amplification (100-400ms)
-    - Sustained state maintenance
-    - Gradual fade-out
-    - Reportability interface
+    The GlobalWorkspace class implements the core mechanism for conscious access
+    through global broadcasting. When ignition occurs, competing contents vie for
+    access to the workspace. The winner undergoes recurrent amplification and is
+    broadcast to all subscriber systems, making it globally available and reportable.
+
+    This implements Baars' Global Workspace Theory and Dehaene's Global Neuronal
+    Workspace model, where consciousness arises from widespread information sharing
+    across brain systems.
+
+    Key Mechanisms
+    --------------
+    1. Competition for Access (Winner-Take-All):
+       - Multiple contents compete based on priority and salience
+       - Only one content gains access at a time
+       - Competition resolves in ~50ms
+
+    2. Recurrent Amplification (100-400ms):
+       - Winner undergoes positive feedback amplification
+       - Strengthens representation through recurrent processing
+       - Corresponds to gamma-band synchronization
+
+    3. Global Broadcasting:
+       - Amplified content broadcast to all subscribers
+       - Makes information globally available
+       - Enables cross-domain integration
+
+    4. State Maintenance:
+       - Content maintained for ~1 second
+       - Enables working memory and reportability
+       - Gradual fade-out after maintenance period
+
+    Attributes
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary
+    amplification_duration_ms : float
+        Duration of recurrent amplification phase (default: 300ms)
+    maintenance_duration_ms : float
+        Duration of state maintenance phase (default: 1000ms)
+    fade_duration_ms : float
+        Duration of gradual fade-out (default: 200ms)
+    state : WorkspaceState
+        Current workspace state (IDLE, IGNITING, BROADCASTING, MAINTAINING, FADING)
+    current_content : Optional[BroadcastContent]
+        Currently broadcast content (None if idle)
+    state_time : float
+        Time spent in current state (milliseconds)
+    competing_contents : List[BroadcastContent]
+        Contents competing for workspace access
+    amplification_gain : float
+        Gain factor for recurrent amplification (default: 2.0)
+    recurrent_strength : float
+        Strength of recurrent connections (default: 0.8)
+    subscribers : List[Callable]
+        Systems subscribed to workspace broadcasts
+    broadcast_history : List[BroadcastContent]
+        History of broadcast contents
+
+    Examples
+    --------
+    >>> config = {'ignition': {'amplification_duration_ms': 300}}
+    >>> workspace = GlobalWorkspace(config)
+    >>> 
+    >>> # Subscribe a system to broadcasts
+    >>> def my_subscriber(content):
+    ...     print(f"Received broadcast: {content.source}")
+    >>> workspace.subscribe(my_subscriber)
+    >>> 
+    >>> # Update workspace with ignition
+    >>> candidate = np.random.randn(256)
+    >>> state = workspace.update(
+    ...     ignition_occurred=True,
+    ...     candidate_content=candidate,
+    ...     source="visual_cortex",
+    ...     priority=1.5,
+    ...     dt=1.0
+    ... )
+    >>> print(f"Workspace state: {state['state']}")
+    >>> print(f"Is reportable: {state['is_reportable']}")
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize global workspace.
+        Initialize global workspace system.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary with the following structure:
+            - 'ignition': Dict containing:
+                - 'amplification_duration_ms': float, optional (default: 300)
+                    Duration of recurrent amplification phase in milliseconds.
+                    Typical range: [200, 500]ms
+
+        Notes
+        -----
+        The workspace initializes in IDLE state with no content. Subscribers
+        can be added via the subscribe() method to receive broadcasts.
         """
         self.config = config
         ignition_config = config.get('ignition', {})
@@ -87,18 +172,108 @@ class GlobalWorkspace:
         dt: float = 1.0
     ) -> Dict[str, Any]:
         """
-        Update global workspace.
+        Update global workspace state and process broadcasts.
 
-        Args:
-            ignition_occurred: Whether ignition signal was triggered
-            candidate_content: Content competing for access
-            source: Source of the content
-            priority: Priority level
-            dt: Timestep in ms
+        This method implements the workspace state machine, handling competition,
+        amplification, broadcasting, maintenance, and fade-out. It should be called
+        at each simulation timestep.
 
-        Returns:
-            Workspace state information
+        Parameters
+        ----------
+        ignition_occurred : bool
+            Whether an ignition event was triggered at this timestep.
+            When True (and workspace is IDLE), initiates competition for access.
+        candidate_content : Optional[np.ndarray], optional
+            Content vector competing for workspace access, by default None.
+            Typically a neural representation (e.g., 256-dimensional vector).
+            If provided, added to competition pool.
+        source : str, optional
+            Source identifier for the content (e.g., "visual_cortex", "prefrontal"),
+            by default "unknown". Used for tracking and debugging.
+        priority : float, optional
+            Priority/salience of the content, by default 1.0.
+            Higher values increase likelihood of winning competition.
+            Typical range: [0.5, 2.0]
+        dt : float, optional
+            Timestep duration in milliseconds, by default 1.0.
+            Used for timing state transitions.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Workspace state information containing:
+            - 'state': Current state name (str)
+            - 'state_time': Time in current state (float, ms)
+            - 'is_broadcasting': Whether actively broadcasting (bool)
+            - 'is_reportable': Whether content is reportable/conscious (bool)
+            - 'num_competitors': Number of contents in competition (int)
+            - 'broadcast_content': Dict with content info (if broadcasting):
+                - 'shape': Content array shape
+                - 'magnitude': L2 norm of content
+                - 'source': Source identifier
+                - 'priority': Priority value
+
+        Notes
+        -----
+        State Machine:
+        1. IDLE: Waiting for ignition
+           - Transition: ignition_occurred → IGNITING
+        
+        2. IGNITING: Competition phase (~50ms)
+           - Select winner from competing contents
+           - Transition: after 50ms → BROADCASTING
+        
+        3. BROADCASTING: Recurrent amplification (300-500ms)
+           - Amplify content through positive feedback
+           - Broadcast to all subscribers
+           - Transition: after amplification_duration_ms → MAINTAINING
+        
+        4. MAINTAINING: Sustained state (~1000ms)
+           - Maintain content for working memory
+           - Continue broadcasting
+           - Transition: after maintenance_duration_ms → FADING
+        
+        5. FADING: Gradual fade-out (~200ms)
+           - Reduce content magnitude gradually
+           - Transition: after fade_duration_ms → IDLE
+
+        Content is reportable (conscious) during BROADCASTING and MAINTAINING states.
+
+        Examples
+        --------
+        >>> workspace = GlobalWorkspace(config)
+        >>> content = np.random.randn(256)
+        >>> 
+        >>> # First update: add candidate
+        >>> state = workspace.update(
+        ...     ignition_occurred=False,
+        ...     candidate_content=content,
+        ...     source="visual",
+        ...     priority=1.2
+        ... )
+        >>> 
+        >>> # Second update: trigger ignition
+        >>> state = workspace.update(ignition_occurred=True, dt=1.0)
+        >>> print(f"State: {state['state']}")  # "igniting"
+        >>> 
+        >>> # Continue updating to progress through states
+        >>> for _ in range(100):
+        ...     state = workspace.update(ignition_occurred=False, dt=1.0)
+        >>> print(f"Reportable: {state['is_reportable']}")
         """
+        # Input validation
+        if not isinstance(ignition_occurred, bool):
+            raise TypeError(f"ignition_occurred must be bool, got {type(ignition_occurred)}")
+        
+        if candidate_content is not None:
+            InputValidator.validate_array(candidate_content, "candidate_content")
+        
+        if not isinstance(source, str):
+            raise TypeError(f"source must be str, got {type(source)}")
+        
+        InputValidator.validate_scalar(priority, "priority", positive=True)
+        InputValidator.validate_scalar(dt, "dt", positive=True)
+        
         # Add candidate to competition if provided
         if candidate_content is not None:
             self.competing_contents.append(BroadcastContent(
@@ -236,15 +411,61 @@ class GlobalWorkspace:
 
     def subscribe(self, callback: Callable):
         """
-        Subscribe to workspace broadcasts.
+        Subscribe a system to receive workspace broadcasts.
 
-        Args:
-            callback: Function to call with broadcast content
+        Subscribers are called with broadcast content during BROADCASTING and
+        MAINTAINING states. This enables global information sharing across
+        brain systems.
+
+        Parameters
+        ----------
+        callback : Callable
+            Function to call with broadcast content.
+            Signature: callback(content: BroadcastContent) -> None
+            The callback receives a BroadcastContent object containing:
+            - content: np.ndarray (the broadcast representation)
+            - ignition_time: float (when ignition occurred)
+            - source: str (content source)
+            - priority: float (content priority)
+            - metadata: Dict (additional information)
+
+        Notes
+        -----
+        Subscriber errors are caught and logged to prevent one failing
+        subscriber from disrupting the entire broadcast mechanism.
+
+        Examples
+        --------
+        >>> workspace = GlobalWorkspace(config)
+        >>> 
+        >>> def motor_system_subscriber(content):
+        ...     print(f"Motor system received: {content.source}")
+        ...     # Use content for motor planning
+        >>> 
+        >>> def memory_system_subscriber(content):
+        ...     print(f"Memory encoding: {content.content.shape}")
+        ...     # Encode content to working memory
+        >>> 
+        >>> workspace.subscribe(motor_system_subscriber)
+        >>> workspace.subscribe(memory_system_subscriber)
         """
         self.subscribers.append(callback)
 
     def get_current_broadcast(self) -> Optional[np.ndarray]:
-        """Get currently broadcast content."""
+        """
+        Get currently broadcast content.
+
+        Returns
+        -------
+        Optional[np.ndarray]
+            Copy of current broadcast content if in BROADCASTING or MAINTAINING state,
+            None otherwise. Returns a copy to prevent external modification.
+
+        Notes
+        -----
+        This provides read-only access to the current conscious content.
+        Content is only available during active broadcasting states.
+        """
         if self.current_content is not None and \
            self.state in [WorkspaceState.BROADCASTING, WorkspaceState.MAINTAINING]:
             return self.current_content.content.copy()
@@ -254,7 +475,20 @@ class GlobalWorkspace:
         """
         Check if current content is reportable (conscious).
 
-        Content is reportable during broadcasting and maintaining phases.
+        Returns
+        -------
+        bool
+            True if content is currently reportable (conscious), False otherwise.
+
+        Notes
+        -----
+        Content is reportable during BROADCASTING and MAINTAINING states,
+        corresponding to the period when information is globally available
+        and can be verbally reported or used for decision-making.
+
+        This implements the reportability criterion for consciousness:
+        information is conscious if it can be reported and used flexibly
+        across cognitive domains.
         """
         return self.state in [WorkspaceState.BROADCASTING, WorkspaceState.MAINTAINING]
 
@@ -282,7 +516,21 @@ class GlobalWorkspace:
         return info
 
     def reset(self):
-        """Reset workspace to initial state."""
+        """
+        Reset workspace to initial state.
+
+        Clears all content, resets state to IDLE, and removes all subscribers.
+        Useful for starting new simulation runs or experiments.
+
+        Notes
+        -----
+        Resets:
+        - State to IDLE
+        - Current content to None
+        - State time to 0
+        - Competition pool (cleared)
+        - All subscribers (removed)
+        """
         self.state = WorkspaceState.IDLE
         self.current_content = None
         self.state_time = 0.0

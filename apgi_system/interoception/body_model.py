@@ -7,6 +7,7 @@ Simulates physiological states and generates interoceptive predictions.
 import numpy as np
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from apgi_system.validation import InputValidator
 
 
 @dataclass
@@ -24,22 +25,62 @@ class BodyModel:
     """
     Multi-organ physiological model for interoceptive processing.
 
-    Maintains and predicts:
-    - Cardiovascular state (heart rate, blood pressure)
-    - Respiratory state
-    - Thermoregulation
-    - Metabolic state (glucose)
-    - Stress hormones (cortisol)
+    The BodyModel simulates physiological states across multiple organ systems
+    and generates interoceptive predictions for active inference. It maintains
+    current body states and generates forward predictions to enable prediction
+    error computation for interoceptive processing.
 
-    Generates predictions 50-200ms ahead for comparison with afferent signals.
+    The model tracks six key physiological variables:
+    - Cardiovascular: heart rate (bpm) and blood pressure (mmHg)
+    - Respiratory: respiration rate (breaths per minute)
+    - Thermoregulation: body temperature (Celsius)
+    - Metabolic: blood glucose (mmol/L)
+    - Stress: cortisol levels (μg/dL)
+
+    Each variable follows simplified linear dynamics with configurable time
+    constants and is influenced by arousal, activity, and stress levels.
+    Predictions are generated 50-200ms ahead for comparison with afferent signals.
+
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary containing interoception settings including:
+        - body_states: List of state configurations with baselines and ranges
+        - prediction_lead_ms: Prediction horizon in milliseconds (default: 100)
+
+    Attributes
+    ----------
+    current_state : PhysiologicalState
+        Current physiological state across all tracked variables
+    predicted_state : PhysiologicalState
+        Predicted future state at prediction_lead_ms ahead
+    arousal_level : float
+        Current arousal level (0-1), affects heart rate and cortisol
+    activity_level : float
+        Current activity level (0-1), affects heart rate, respiration, glucose
+    stress_level : float
+        Current stress level (0-1), affects cortisol and blood pressure
+    prediction_lead_ms : float
+        Time horizon for predictions in milliseconds
+
+    Examples
+    --------
+    >>> config = {'interoception': {'prediction_lead_ms': 100}}
+    >>> body_model = BodyModel(config)
+    >>> body_model.set_arousal(0.5)
+    >>> result = body_model.update(dt=1.0)
+    >>> print(result['current']['heart_rate'])
+    75.2
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize body model.
+        Initialize body model with configuration.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary containing interoception settings
         """
         self.config = config
         intero_config = config.get('interoception', {})
@@ -86,14 +127,51 @@ class BodyModel:
 
     def update(self, dt: float = 1.0) -> Dict[str, Any]:
         """
-        Update body state and predictions.
+        Update body state and generate predictions.
 
-        Args:
-            dt: Timestep in ms
+        Performs a complete update cycle:
+        1. Updates all physiological variables using their dynamics
+        2. Generates forward predictions at prediction_lead_ms horizon
+        3. Computes prediction errors (simulated)
 
-        Returns:
-            Dictionary with current and predicted states
+        Each physiological variable evolves according to:
+        - Target value based on arousal, activity, and stress
+        - Time constant governing rate of change
+        - Gaussian noise representing natural variability
+
+        Parameters
+        ----------
+        dt : float, optional
+            Timestep in milliseconds, by default 1.0
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - 'current': Current physiological state (all variables)
+            - 'predicted': Predicted future state
+            - 'prediction_error': Prediction error vector (5D)
+            - 'arousal': Current arousal level
+            - 'activity': Current activity level
+            - 'stress': Current stress level
+
+        Examples
+        --------
+        >>> body_model = BodyModel(config)
+        >>> result = body_model.update(dt=1.0)
+        >>> print(result['current']['heart_rate'])
+        70.5
+        >>> print(result['prediction_error'].shape)
+        (5,)
         """
+        # Validate inputs
+        InputValidator.validate_scalar(
+            dt, 
+            "dt", 
+            value_range=(0.0, 10000.0),
+            positive=True
+        )
+        
         # Update current state
         self._update_heart_rate(dt)
         self._update_respiration(dt)
@@ -118,7 +196,17 @@ class BodyModel:
         }
 
     def _update_heart_rate(self, dt: float):
-        """Update heart rate dynamics."""
+        """
+        Update heart rate dynamics.
+
+        Heart rate evolves toward a target determined by arousal and activity:
+        target_hr = baseline + 30 * arousal + 50 * activity
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = self.state_configs.get('heart_rate', {}).get('baseline', 70)
 
         # Target heart rate depends on arousal and activity
@@ -137,7 +225,17 @@ class BodyModel:
         self.current_state.heart_rate += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
 
     def _update_respiration(self, dt: float):
-        """Update respiration rate."""
+        """
+        Update respiration rate dynamics.
+
+        Respiration rate evolves toward a target determined by arousal and activity:
+        target_rr = baseline + 5 * arousal + 10 * activity
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = self.state_configs.get('respiration', {}).get('baseline', 15)
         target_rr = baseline + 5 * self.arousal_level + 10 * self.activity_level
 
@@ -151,7 +249,17 @@ class BodyModel:
         self.current_state.respiration += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
 
     def _update_temperature(self, dt: float):
-        """Update body temperature."""
+        """
+        Update body temperature dynamics.
+
+        Temperature evolves slowly toward a target influenced by activity:
+        target_temp = baseline + 0.5 * activity
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = self.state_configs.get('temperature', {}).get('baseline', 37.0)
         target_temp = baseline + 0.5 * self.activity_level
 
@@ -165,7 +273,17 @@ class BodyModel:
         self.current_state.temperature += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
 
     def _update_glucose(self, dt: float):
-        """Update blood glucose."""
+        """
+        Update blood glucose dynamics.
+
+        Glucose evolves toward a target that decreases with activity:
+        target_glucose = baseline - 1.0 * activity
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = self.state_configs.get('glucose', {}).get('baseline', 5.0)
         # Activity decreases glucose, baseline otherwise
         target_glucose = baseline - 1.0 * self.activity_level
@@ -180,7 +298,17 @@ class BodyModel:
         self.current_state.glucose += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
 
     def _update_cortisol(self, dt: float):
-        """Update cortisol levels."""
+        """
+        Update cortisol level dynamics.
+
+        Cortisol evolves slowly toward a target influenced by stress and arousal:
+        target_cortisol = baseline + 15 * stress + 5 * arousal
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = self.state_configs.get('cortisol', {}).get('baseline', 10)
         target_cortisol = baseline + 15 * self.stress_level + 5 * self.arousal_level
 
@@ -194,7 +322,17 @@ class BodyModel:
         self.current_state.cortisol += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
 
     def _update_blood_pressure(self, dt: float):
-        """Update blood pressure."""
+        """
+        Update blood pressure dynamics.
+
+        Blood pressure evolves toward a target influenced by arousal and stress:
+        target_bp = baseline + 20 * arousal + 10 * stress
+
+        Parameters
+        ----------
+        dt : float
+            Timestep in milliseconds
+        """
         baseline = 120
         target_bp = baseline + 20 * self.arousal_level + 10 * self.stress_level
 
@@ -209,7 +347,13 @@ class BodyModel:
         """
         Generate prediction for future state.
 
-        Simple forward model: predict state will continue current trajectory.
+        Simple forward model that predicts the state will continue its current
+        trajectory. In a more sophisticated implementation, this would use
+        learned dynamics models to predict future states based on current
+        trends and external influences.
+
+        Currently implements a naive prediction where predicted_state equals
+        current_state (assumes stability over the prediction horizon).
         """
         # For simplicity, predict based on current trend
         # In a more sophisticated model, this would use learned dynamics
@@ -223,10 +367,17 @@ class BodyModel:
 
     def _compute_prediction_error(self) -> np.ndarray:
         """
-        Compute prediction error.
+        Compute prediction error between predicted and actual states.
 
-        In reality, this would compare predictions against actual afferent signals.
-        Here we simulate small random errors.
+        In a complete implementation, this would compare predictions against
+        actual afferent signals from the body. Here we simulate small random
+        errors to represent the natural variability in interoceptive signals.
+
+        Returns
+        -------
+        np.ndarray
+            5D prediction error vector for [heart_rate, respiration,
+            temperature, glucose, cortisol]
         """
         error = np.array([
             np.random.randn() * 2,  # Heart rate error
@@ -239,23 +390,67 @@ class BodyModel:
         return error
 
     def set_arousal(self, level: float):
-        """Set arousal level (0-1)."""
+        """
+        Set arousal level.
+
+        Arousal affects heart rate and cortisol levels. Higher arousal
+        increases both variables.
+
+        Parameters
+        ----------
+        level : float
+            Arousal level, clamped to range [0.0, 1.0]
+        """
         self.arousal_level = np.clip(level, 0.0, 1.0)
 
     def set_activity(self, level: float):
-        """Set activity level (0-1)."""
+        """
+        Set activity level.
+
+        Activity affects heart rate, respiration, temperature, and glucose.
+        Higher activity increases heart rate, respiration, and temperature
+        while decreasing glucose.
+
+        Parameters
+        ----------
+        level : float
+            Activity level, clamped to range [0.0, 1.0]
+        """
         self.activity_level = np.clip(level, 0.0, 1.0)
 
     def set_stress(self, level: float):
-        """Set stress level (0-1)."""
+        """
+        Set stress level.
+
+        Stress affects cortisol and blood pressure. Higher stress increases
+        both variables.
+
+        Parameters
+        ----------
+        level : float
+            Stress level, clamped to range [0.0, 1.0]
+        """
         self.stress_level = np.clip(level, 0.0, 1.0)
 
     def get_interoceptive_vector(self) -> np.ndarray:
         """
         Get current interoceptive state as vector.
 
-        Returns:
-            Vector representation of body state
+        Returns the current physiological state as a 6D vector suitable for
+        use in active inference computations.
+
+        Returns
+        -------
+        np.ndarray
+            6D vector containing [heart_rate, respiration, temperature,
+            glucose, cortisol, blood_pressure]
+
+        Examples
+        --------
+        >>> body_model = BodyModel(config)
+        >>> vector = body_model.get_interoceptive_vector()
+        >>> print(vector.shape)
+        (6,)
         """
         return np.array([
             self.current_state.heart_rate,
@@ -267,7 +462,19 @@ class BodyModel:
         ])
 
     def _state_to_dict(self, state: PhysiologicalState) -> Dict[str, float]:
-        """Convert state to dictionary."""
+        """
+        Convert physiological state to dictionary.
+
+        Parameters
+        ----------
+        state : PhysiologicalState
+            State object to convert
+
+        Returns
+        -------
+        Dict[str, float]
+            Dictionary mapping variable names to values
+        """
         return {
             'heart_rate': float(state.heart_rate),
             'respiration': float(state.respiration),
@@ -278,7 +485,12 @@ class BodyModel:
         }
 
     def reset(self):
-        """Reset to baseline state."""
+        """
+        Reset to baseline physiological state.
+
+        Restores all physiological variables to their configured baseline
+        values and resets arousal, activity, and stress levels to zero.
+        """
         self.current_state = PhysiologicalState(
             heart_rate=self.state_configs.get('heart_rate', {}).get('baseline', 70),
             respiration=self.state_configs.get('respiration', {}).get('baseline', 15),

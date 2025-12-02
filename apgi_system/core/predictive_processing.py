@@ -9,12 +9,51 @@ import numpy as np
 from typing import Dict, Any, Optional, Tuple, List
 from collections import deque
 
+from apgi_system.validation import InputValidator
+
 
 class PredictionErrorChannel:
     """
     Single prediction error channel with temporal accumulation.
 
-    Maintains sliding window of prediction errors for temporal integration.
+    Maintains a sliding window of prediction errors for temporal integration,
+    enabling the system to accumulate evidence over time. This is crucial for
+    detecting sustained deviations from predictions that may trigger conscious
+    access (ignition events).
+
+    Attributes
+    ----------
+    name : str
+        Channel identifier (e.g., 'exteroceptive', 'interoceptive')
+    dimension : int
+        Dimensionality of prediction error vectors
+    window_size : int
+        Number of time steps in sliding window
+    error_buffer : deque
+        Circular buffer storing recent prediction errors
+    current_error : np.ndarray
+        Most recent prediction error
+    accumulated_error : float
+        Sum of squared errors over window
+    precision : float
+        Current precision weight
+
+    Notes
+    -----
+    The sliding window enables temporal integration:
+    - Short windows (~50ms): Sensitive to transient changes
+    - Long windows (~200ms): Sensitive to sustained deviations
+    
+    Accumulated error provides a scalar measure of prediction failure
+    over the integration window.
+
+    Examples
+    --------
+    >>> channel = PredictionErrorChannel('extero', dimension=256, window_size_ms=100)
+    >>> obs = np.random.randn(256)
+    >>> pred = np.random.randn(256)
+    >>> error = channel.update(obs, pred, precision=1.5)
+    >>> signal = channel.get_accumulated_signal()
     """
 
     def __init__(
@@ -27,11 +66,25 @@ class PredictionErrorChannel:
         """
         Initialize prediction error channel.
 
-        Args:
-            name: Channel name (e.g., 'exteroceptive', 'interoceptive')
-            dimension: Dimensionality of prediction errors
-            window_size_ms: Sliding window size in milliseconds
-            timestep_ms: Timestep in milliseconds
+        Parameters
+        ----------
+        name : str
+            Channel name (e.g., 'exteroceptive', 'interoceptive')
+        dimension : int
+            Dimensionality of prediction error vectors
+        window_size_ms : float, default=100.0
+            Sliding window duration in milliseconds
+        timestep_ms : float, default=1.0
+            Time step duration in milliseconds
+
+        Examples
+        --------
+        >>> channel = PredictionErrorChannel(
+        ...     name='exteroceptive',
+        ...     dimension=256,
+        ...     window_size_ms=100.0,
+        ...     timestep_ms=1.0
+        ... )
         """
         self.name = name
         self.dimension = dimension
@@ -53,15 +106,39 @@ class PredictionErrorChannel:
         precision: float = 1.0
     ) -> np.ndarray:
         """
-        Update prediction error.
+        Update prediction error with new observation.
 
-        Args:
-            observation: Observed signal
-            prediction: Predicted signal
-            precision: Precision weight
+        Computes prediction error, adds it to the sliding window buffer,
+        and updates accumulated error statistics.
 
-        Returns:
-            Current prediction error
+        Parameters
+        ----------
+        observation : np.ndarray
+            Observed signal vector
+        prediction : np.ndarray
+            Predicted signal vector
+        precision : float, default=1.0
+            Precision weight (inverse variance)
+
+        Returns
+        -------
+        current_error : np.ndarray
+            Computed prediction error (observation - prediction)
+
+        Notes
+        -----
+        Prediction error: ε = o - μ̂
+        
+        The error is added to a circular buffer, automatically discarding
+        the oldest error when the buffer is full.
+
+        Examples
+        --------
+        >>> channel = PredictionErrorChannel('extero', 256)
+        >>> obs = np.random.randn(256)
+        >>> pred = np.zeros(256)
+        >>> error = channel.update(obs, pred, precision=1.5)
+        >>> print(f"Error magnitude: {np.linalg.norm(error):.3f}")
         """
         self.current_error = observation - prediction
         self.precision = precision
@@ -87,12 +164,40 @@ class PredictionErrorChannel:
         """
         Get precision-weighted accumulated signal.
 
-        S = Π * |ε|
+        Computes the precision-weighted magnitude of accumulated prediction
+        errors, providing a scalar measure of prediction failure.
+
+        Returns
+        -------
+        signal : float
+            Precision-weighted signal: S = Π * √(Σ ε²)
+
+        Notes
+        -----
+        This signal is used for ignition threshold computation. High signal
+        indicates sustained prediction errors that may warrant conscious access.
         """
         return self.precision * np.sqrt(self.accumulated_error)
 
     def get_statistics(self) -> Dict[str, float]:
-        """Get statistical summary of errors."""
+        """
+        Get statistical summary of prediction errors.
+
+        Returns
+        -------
+        stats : Dict[str, float]
+            Dictionary containing:
+            - 'mean_error': Mean absolute error
+            - 'std_error': Standard deviation of errors
+            - 'max_error': Maximum absolute error
+            - 'accumulated': Sum of squared errors
+            - 'current_magnitude': L2 norm of current error
+
+        Notes
+        -----
+        Statistics are computed over the sliding window, providing
+        a temporal summary of prediction performance.
+        """
         if len(self.error_buffer) == 0:
             return {
                 'mean_error': 0.0,
@@ -111,7 +216,11 @@ class PredictionErrorChannel:
         }
 
     def reset(self):
-        """Reset channel state."""
+        """
+        Reset channel to initial state.
+
+        Clears error buffer and resets all accumulated statistics.
+        """
         self.error_buffer.clear()
         self.current_error = np.zeros(self.dimension)
         self.accumulated_error = 0.0
@@ -121,19 +230,89 @@ class HierarchicalPredictor:
     """
     Hierarchical predictive processing with multiple levels and timescales.
 
-    Each level:
-    - Receives input from level below
-    - Generates predictions for level below
+    Implements a multi-level predictive coding architecture where each level:
+    - Receives input from the level below
+    - Generates predictions for the level below
     - Computes prediction errors
-    - Operates at different timescale
+    - Operates at a characteristic timescale (faster at lower levels)
+
+    The predictor maintains separate channels for exteroceptive (external sensory)
+    and interoceptive (internal body state) prediction errors, enabling the system
+    to process both external and internal information streams.
+
+    Attributes
+    ----------
+    num_levels : int
+        Number of hierarchical levels
+    levels : List[Dict]
+        Level configurations containing state, predictions, errors, and timescales
+    exteroceptive_channel : PredictionErrorChannel
+        Channel for external sensory prediction errors
+    interoceptive_channel : PredictionErrorChannel
+        Channel for internal body state prediction errors
+    learning_rates : List[float]
+        Learning rates for each level (decreasing with level)
+    intero_prediction : np.ndarray
+        Current interoceptive prediction (6D body state vector)
+
+    Notes
+    -----
+    The hierarchical structure implements temporal abstraction:
+    - Lower levels update rapidly (1-10ms) for fast sensory processing
+    - Higher levels update slowly (100-1000ms) for abstract representations
+    
+    This multi-timescale architecture enables efficient processing of both
+    fast-changing sensory details and slow-changing contextual information.
+
+    References
+    ----------
+    .. [1] Rao, R. P., & Ballard, D. H. (1999). Predictive coding in the visual cortex:
+           a functional interpretation of some extra-classical receptive-field effects.
+           Nature neuroscience, 2(1), 79-87.
+
+    Examples
+    --------
+    >>> config = load_config('config/default.yaml')
+    >>> predictor = HierarchicalPredictor(config)
+    >>> extero_input = np.random.randn(256)
+    >>> intero_input = np.random.randn(6)
+    >>> results = predictor.predict(extero_input, intero_input, dt_ms=1.0)
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize hierarchical predictor.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary containing:
+            - 'hierarchy': Hierarchical structure with num_levels and level_configs
+            - 'predictive_processing': Prediction parameters
+            - 'system': System parameters including timestep_ms
+
+        Raises
+        ------
+        KeyError
+            If required configuration keys are missing
+        ValueError
+            If level configurations are invalid
+
+        Examples
+        --------
+        >>> config = {
+        ...     'hierarchy': {
+        ...         'num_levels': 4,
+        ...         'level_configs': [
+        ...             {'name': 'sensory', 'nodes': 256, 'timescale_ms': 1},
+        ...             {'name': 'perceptual', 'nodes': 128, 'timescale_ms': 10},
+        ...             {'name': 'conceptual', 'nodes': 64, 'timescale_ms': 100},
+        ...             {'name': 'abstract', 'nodes': 32, 'timescale_ms': 500}
+        ...         ]
+        ...     },
+        ...     'system': {'timestep_ms': 1.0}
+        ... }
+        >>> predictor = HierarchicalPredictor(config)
         """
         self.config = config
 
@@ -196,16 +375,77 @@ class HierarchicalPredictor:
         dt_ms: float = 1.0
     ) -> Dict[str, Any]:
         """
-        Generate predictions and compute errors.
+        Generate predictions and compute prediction errors.
 
-        Args:
-            extero_input: Exteroceptive input (sensory)
-            intero_input: Interoceptive input (body state)
-            dt_ms: Time step in milliseconds
+        Processes both exteroceptive and interoceptive input streams,
+        computing prediction errors and updating hierarchical representations.
+        Each level generates predictions for the level below and computes
+        errors based on bottom-up input.
 
-        Returns:
-            Dictionary with predictions and errors
+        Parameters
+        ----------
+        extero_input : np.ndarray, optional
+            Exteroceptive (external sensory) input vector
+        intero_input : np.ndarray, optional
+            Interoceptive (body state) input vector of shape (6,)
+            Expected order: [heart_rate, respiration, temperature, 
+                           glucose, cortisol, blood_pressure]
+        dt_ms : float, default=1.0
+            Time step in milliseconds
+
+        Returns
+        -------
+        results : Dict[str, Any]
+            Dictionary containing:
+            - 'exteroceptive': Dict with 'error' and 'stats'
+            - 'interoceptive': Dict with 'error' and 'stats'
+            - 'hierarchical_errors': List of errors at each level
+
+        Raises
+        ------
+        TypeError
+            If inputs are not numpy arrays
+        ValueError
+            If input shapes don't match expected dimensions, contain NaN/Inf,
+            or dt_ms is not positive
+
+        Notes
+        -----
+        Prediction errors are computed as:
+        ε = observation - prediction
+        
+        These errors drive learning and belief updating throughout the hierarchy.
+
+        Examples
+        --------
+        >>> predictor = HierarchicalPredictor(config)
+        >>> extero = np.random.randn(256)
+        >>> intero = np.array([70, 15, 37.0, 5.0, 10, 120])  # Body state
+        >>> results = predictor.predict(extero, intero, dt_ms=1.0)
+        >>> print(f"Extero error: {results['exteroceptive']['stats']['mean_error']:.3f}")
         """
+        # Validate inputs
+        if extero_input is not None:
+            InputValidator.validate_array(
+                extero_input,
+                "extero_input",
+                expected_shape=(self.levels[0]['nodes'],)
+            )
+        
+        if intero_input is not None:
+            InputValidator.validate_array(
+                intero_input,
+                "intero_input",
+                expected_shape=(6,)
+            )
+        
+        InputValidator.validate_scalar(
+            dt_ms,
+            "dt_ms",
+            positive=True,
+            value_range=(0.001, 1000.0)
+        )
+        
         results = {
             'exteroceptive': {},
             'interoceptive': {},
@@ -257,7 +497,24 @@ class HierarchicalPredictor:
         """
         Update hierarchical levels with different timescales.
 
-        Lower levels update faster than higher levels.
+        Each level updates at its characteristic timescale, with lower levels
+        updating more frequently than higher levels. This implements temporal
+        abstraction in the hierarchy.
+
+        Parameters
+        ----------
+        dt_ms : float
+            Time step in milliseconds
+
+        Notes
+        -----
+        Update occurs when: update_counter >= update_interval
+        
+        This ensures each level operates at its natural timescale:
+        - Sensory level: ~1ms (fast sensory processing)
+        - Perceptual level: ~10ms (perceptual grouping)
+        - Conceptual level: ~100ms (object recognition)
+        - Abstract level: ~500ms (contextual understanding)
         """
         for i, level in enumerate(self.levels):
             level['update_counter'] += dt_ms
@@ -320,7 +577,25 @@ class HierarchicalPredictor:
             return result
 
     def get_prediction_errors(self) -> Dict[str, float]:
-        """Get current prediction errors across channels."""
+        """
+        Get current prediction errors across all channels.
+
+        Returns
+        -------
+        errors : Dict[str, float]
+            Dictionary containing:
+            - 'exteroceptive_signal': Precision-weighted extero signal
+            - 'interoceptive_signal': Precision-weighted intero signal
+            - 'exteroceptive_stats': Statistical summary of extero errors
+            - 'interoceptive_stats': Statistical summary of intero errors
+
+        Notes
+        -----
+        The precision-weighted signal is computed as:
+        S = Π * √(Σ ε²)
+        
+        where Π is precision and ε are prediction errors over a sliding window.
+        """
         return {
             'exteroceptive_signal': self.exteroceptive_channel.get_accumulated_signal(),
             'interoceptive_signal': self.interoceptive_channel.get_accumulated_signal(),
@@ -329,7 +604,12 @@ class HierarchicalPredictor:
         }
 
     def reset(self):
-        """Reset all levels and channels."""
+        """
+        Reset all hierarchical levels and prediction error channels.
+
+        Clears all state, predictions, errors, and temporal buffers.
+        Useful for starting new simulation runs or experimental trials.
+        """
         for level in self.levels:
             level['state'] = np.zeros(level['nodes'])
             level['prediction'] = np.zeros(level['nodes'])

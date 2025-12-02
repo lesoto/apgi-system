@@ -10,6 +10,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
+from apgi_system.validation import InputValidator
 
 
 @dataclass
@@ -27,7 +28,43 @@ class HierarchicalGaussianFilter:
     Hierarchical Gaussian filtering for approximate Bayesian inference.
 
     Implements predictive coding with precision-weighted prediction errors
-    propagating up the hierarchy and predictions propagating down.
+    propagating up the hierarchy and predictions propagating down. This filter
+    performs variational message passing to minimize free energy across multiple
+    hierarchical levels, each operating at different timescales.
+
+    The filter maintains belief states at each level, consisting of posterior
+    means, covariances, and precision estimates. Prediction errors flow bottom-up
+    while predictions flow top-down, implementing the core predictive coding
+    architecture.
+
+    Attributes
+    ----------
+    num_levels : int
+        Number of hierarchical levels in the filter
+    state_dims : List[int]
+        Dimensionality of state representations at each level
+    observation_dim : int
+        Dimensionality of sensory observations
+    beliefs : List[BeliefState]
+        Current belief states at each hierarchical level
+    learning_rate : float
+        Learning rate for belief updates
+    precision_min : float
+        Minimum allowed precision value
+    precision_max : float
+        Maximum allowed precision value
+
+    Notes
+    -----
+    The hierarchical structure implements the following dynamics:
+    - Bottom-up: Prediction errors propagate upward, weighted by precision
+    - Top-down: Predictions propagate downward from higher levels
+    - Precision: Dynamically updated based on prediction error statistics
+
+    References
+    ----------
+    .. [1] Friston, K. (2010). The free-energy principle: a unified brain theory?
+           Nature Reviews Neuroscience, 11(2), 127-138.
     """
 
     def __init__(
@@ -38,13 +75,30 @@ class HierarchicalGaussianFilter:
         config: Optional[Dict[str, Any]] = None
     ):
         """
-        Initialize hierarchical filter.
+        Initialize hierarchical Gaussian filter.
 
-        Args:
-            num_levels: Number of hierarchical levels
-            state_dims: Dimensionality at each level
-            observation_dim: Dimensionality of observations
-            config: Configuration dictionary
+        Parameters
+        ----------
+        num_levels : int
+            Number of hierarchical levels (typically 3-5)
+        state_dims : List[int]
+            Dimensionality at each level, from bottom (sensory) to top (abstract)
+        observation_dim : int
+            Dimensionality of sensory observations
+        config : Dict[str, Any], optional
+            Configuration dictionary containing:
+            - 'learning_rate': Learning rate for belief updates (default: 0.01)
+            - 'precision_range': [min, max] precision values (default: [0.1, 10.0])
+
+        Examples
+        --------
+        >>> filter = HierarchicalGaussianFilter(
+        ...     num_levels=3,
+        ...     state_dims=[256, 128, 64],
+        ...     observation_dim=256,
+        ...     config={'learning_rate': 0.01}
+        ... )
+        >>> beliefs, fe = filter.update(observation=np.random.randn(256))
         """
         self.num_levels = num_levels
         self.state_dims = state_dims
@@ -78,14 +132,68 @@ class HierarchicalGaussianFilter:
         """
         Update beliefs using variational message passing.
 
-        Args:
-            observation: Sensory observation
-            action: Current action (optional)
-            dt: Time step
+        Performs a complete cycle of hierarchical inference:
+        1. Bottom-up pass: Compute prediction errors at each level
+        2. Top-down pass: Update beliefs to minimize prediction errors
+        3. Precision update: Adjust precision based on error statistics
+        4. Free energy computation: Calculate total variational free energy
 
-        Returns:
-            Updated belief states and total free energy
+        Parameters
+        ----------
+        observation : np.ndarray
+            Sensory observation vector of shape (observation_dim,)
+        action : np.ndarray, optional
+            Current action vector (not currently used in update)
+        dt : float, default=0.001
+            Time step for belief integration in seconds
+
+        Returns
+        -------
+        beliefs : List[BeliefState]
+            Updated belief states at each hierarchical level
+        free_energy : float
+            Total variational free energy across all levels
+
+        Raises
+        ------
+        TypeError
+            If observation is not a numpy array
+        ValueError
+            If observation shape doesn't match expected dimensions, contains NaN/Inf,
+            or dt is not positive
+
+        Notes
+        -----
+        The update implements gradient descent on variational free energy:
+        δμ = η * (Π_below * ε_below - Π_above * ε_above)
+        
+        where μ is the belief mean, η is learning rate, Π is precision,
+        and ε is prediction error.
+
+        Examples
+        --------
+        >>> filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
+        >>> obs = np.random.randn(256)
+        >>> beliefs, fe = filter.update(obs, dt=0.001)
+        >>> print(f"Free energy: {fe:.2f}")
         """
+        # Validate inputs
+        InputValidator.validate_array(
+            observation,
+            "observation",
+            expected_shape=(self.observation_dim,)
+        )
+        
+        if action is not None:
+            InputValidator.validate_array(action, "action")
+        
+        InputValidator.validate_scalar(
+            dt,
+            "dt",
+            positive=True,
+            value_range=(1e-6, 1.0)
+        )
+        
         # Bottom-up pass: compute prediction errors
         self._bottom_up_pass(observation)
 
@@ -104,7 +212,21 @@ class HierarchicalGaussianFilter:
         """
         Bottom-up pass: compute prediction errors at each level.
 
-        Error propagates from sensory level upward.
+        Computes prediction errors by comparing observations/states with
+        predictions from the level above. Errors propagate from the sensory
+        level upward through the hierarchy.
+
+        Parameters
+        ----------
+        observation : np.ndarray
+            Sensory observation at the bottom level
+
+        Notes
+        -----
+        At level 0 (sensory): ε₀ = o - μ̂₀
+        At level i > 0: εᵢ = μᵢ₋₁ - g(μᵢ)
+        
+        where g() is the generative mapping from level i to i-1
         """
         # Level 0: sensory prediction error
         self.beliefs[0].prediction_error = observation - self.beliefs[0].prediction
@@ -121,7 +243,22 @@ class HierarchicalGaussianFilter:
         """
         Top-down pass: update beliefs using precision-weighted errors.
 
-        Beliefs are updated to minimize prediction errors.
+        Updates belief means at each level by performing gradient descent on
+        free energy. Beliefs are adjusted to minimize precision-weighted
+        prediction errors from both above and below.
+
+        Parameters
+        ----------
+        dt : float
+            Time step for integration
+
+        Notes
+        -----
+        The update rule implements:
+        dμᵢ/dt = η * (Πᵢ₋₁ * εᵢ₋₁ - Πᵢ₊₁ * εᵢ₊₁)
+        
+        This balances errors from the level below (bottom-up) with
+        errors from the level above (top-down).
         """
         # Update from top to bottom
         for level in range(self.num_levels - 1, -1, -1):
@@ -159,7 +296,17 @@ class HierarchicalGaussianFilter:
         """
         Update precision estimates based on prediction error statistics.
 
-        Precision ∝ 1 / E[ε^2]
+        Precision is inversely proportional to prediction error variance,
+        implementing adaptive gain control. High precision amplifies prediction
+        errors, while low precision attenuates them.
+
+        Notes
+        -----
+        Precision update: Π = 1 / (E[ε²] + ε_small)
+        
+        Uses exponential smoothing: Π_new = 0.9 * Π_old + 0.1 * Π_estimated
+        
+        Precision is clamped to [precision_min, precision_max] for stability.
         """
         for level in range(self.num_levels):
             # Estimate variance from squared prediction errors
@@ -178,7 +325,24 @@ class HierarchicalGaussianFilter:
             )
 
     def _generate_prediction(self, level: int) -> np.ndarray:
-        """Generate prediction at a given level from belief above."""
+        """
+        Generate prediction at a given level from belief above.
+
+        Parameters
+        ----------
+        level : int
+            Level index for which to generate prediction
+
+        Returns
+        -------
+        prediction : np.ndarray
+            Predicted state at the specified level
+
+        Notes
+        -----
+        Top level predicts itself (prior), lower levels receive predictions
+        from the level above via generative mapping.
+        """
         if level < self.num_levels - 1:
             return self._map_down(level + 1, self.beliefs[level + 1].mean)
         else:
@@ -187,9 +351,27 @@ class HierarchicalGaussianFilter:
 
     def _map_down(self, from_level: int, state: np.ndarray) -> np.ndarray:
         """
-        Map state representation down one level.
+        Map state representation down one level in the hierarchy.
 
-        Simple linear mapping for now. Can be made nonlinear.
+        Implements the generative mapping g: μᵢ → μ̂ᵢ₋₁ that projects
+        higher-level representations to lower-level predictions.
+
+        Parameters
+        ----------
+        from_level : int
+            Source level (higher in hierarchy)
+        state : np.ndarray
+            State vector at the source level
+
+        Returns
+        -------
+        mapped_state : np.ndarray
+            Projected state at the target level (one level below)
+
+        Notes
+        -----
+        Currently implements linear projection. Can be extended to nonlinear
+        mappings for more complex generative models.
         """
         target_dim = self.beliefs[from_level - 1].mean.shape[0]
         source_dim = state.shape[0]
@@ -206,7 +388,27 @@ class HierarchicalGaussianFilter:
         return self._projection_matrices[key] @ state
 
     def _compute_total_free_energy(self, observation: np.ndarray) -> float:
-        """Compute total free energy across hierarchy."""
+        """
+        Compute total variational free energy across hierarchy.
+
+        Free energy is the sum of precision-weighted squared prediction errors
+        at all levels, providing a scalar measure of model fit.
+
+        Parameters
+        ----------
+        observation : np.ndarray
+            Current sensory observation
+
+        Returns
+        -------
+        free_energy : float
+            Total free energy F = Σᵢ (0.5 * Πᵢ * ||εᵢ||²)
+
+        Notes
+        -----
+        Lower free energy indicates better model fit. The system performs
+        gradient descent on free energy to improve its internal model.
+        """
         total_fe = 0.0
 
         # Sensory level
@@ -225,18 +427,88 @@ class ActiveInferenceEngine:
     """
     Main active inference engine coordinating perception and action.
 
-    Integrates:
-    - Hierarchical Gaussian filtering for perception
-    - Expected free energy minimization for action selection
-    - Precision weighting for attention and uncertainty
+    Implements the complete active inference loop, integrating perceptual
+    inference (minimizing variational free energy) with action selection
+    (minimizing expected free energy). The engine maintains hierarchical
+    beliefs about the world and selects actions that balance exploration
+    (epistemic value) and exploitation (pragmatic value).
+
+    The engine coordinates three key processes:
+    1. Perceptual inference: Update beliefs to explain observations
+    2. Policy evaluation: Assess expected outcomes of different actions
+    3. Action selection: Choose actions that minimize expected free energy
+
+    Attributes
+    ----------
+    filter : HierarchicalGaussianFilter
+        Hierarchical Gaussian filter for perceptual inference
+    fe_calc : FreeEnergyCalculator
+        Calculator for free energy and expected free energy
+    num_policies : int
+        Number of policies to evaluate during action selection
+    planning_horizon : int
+        Number of time steps to simulate ahead
+    time : float
+        Current simulation time in seconds
+    timestep : float
+        Time step duration in seconds
+
+    Notes
+    -----
+    Active inference unifies perception and action under a single principle:
+    minimize (expected) free energy. This implements the free energy principle
+    for autonomous agents.
+
+    References
+    ----------
+    .. [1] Friston, K., FitzGerald, T., Rigoli, F., Schwartenbeck, P., & Pezzulo, G. (2017).
+           Active inference: a process theory. Neural computation, 29(1), 1-49.
+
+    Examples
+    --------
+    >>> config = load_config('config/default.yaml')
+    >>> engine = ActiveInferenceEngine(config)
+    >>> observation = np.random.randn(256)
+    >>> action, info = engine.step(observation)
+    >>> print(f"Free energy: {info['free_energy']:.2f}")
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize active inference engine.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary containing:
+            - 'hierarchy': Hierarchical structure configuration
+            - 'active_inference': Active inference parameters
+            - 'num_policies': Number of policies to evaluate (default: 10)
+            - 'planning_horizon': Planning horizon in steps (default: 3)
+            - 'system': System-level parameters including timestep
+
+        Raises
+        ------
+        KeyError
+            If required configuration keys are missing
+        ValueError
+            If configuration values are invalid
+
+        Examples
+        --------
+        >>> config = {
+        ...     'hierarchy': {
+        ...         'num_levels': 4,
+        ...         'level_configs': [
+        ...             {'nodes': 256, 'name': 'sensory'},
+        ...             {'nodes': 128, 'name': 'perceptual'},
+        ...             {'nodes': 64, 'name': 'conceptual'},
+        ...             {'nodes': 32, 'name': 'abstract'}
+        ...         ]
+        ...     },
+        ...     'system': {'timestep_ms': 1.0}
+        ... }
+        >>> engine = ActiveInferenceEngine(config)
         """
         self.config = config
 
@@ -273,19 +545,48 @@ class ActiveInferenceEngine:
         available_actions: Optional[List[np.ndarray]] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
-        Single step of active inference.
+        Execute single step of active inference loop.
 
-        1. Update beliefs (perception)
-        2. Evaluate policies (planning)
-        3. Select action (decision)
+        Performs the complete perception-action cycle:
+        1. Perceptual inference: Update beliefs to explain observation
+        2. Policy evaluation: Simulate outcomes of available actions
+        3. Action selection: Choose action minimizing expected free energy
 
-        Args:
-            observation: Current sensory input
-            available_actions: List of possible actions
+        Parameters
+        ----------
+        observation : np.ndarray
+            Current sensory observation vector of shape (observation_dim,)
+        available_actions : List[np.ndarray], optional
+            List of available action vectors. If None or empty, returns null action.
 
-        Returns:
-            selected_action: Chosen action
-            info: Dictionary with diagnostics
+        Returns
+        -------
+        selected_action : np.ndarray
+            Chosen action vector that minimizes expected free energy
+        info : Dict[str, Any]
+            Diagnostic information containing:
+            - 'time': Current simulation time
+            - 'free_energy': Variational free energy
+            - 'beliefs': Current belief states at all levels
+            - 'efe_components': Expected free energy breakdown
+            - 'precisions': Precision values at each level
+            - 'prediction_errors': Prediction errors at each level
+
+        Notes
+        -----
+        The action selection implements:
+        π* = argmin_π G(π)
+        
+        where G(π) is the expected free energy under policy π, balancing
+        epistemic value (information gain) and pragmatic value (goal achievement).
+
+        Examples
+        --------
+        >>> engine = ActiveInferenceEngine(config)
+        >>> obs = np.random.randn(256)
+        >>> actions = [np.array([0.0]), np.array([1.0]), np.array([-1.0])]
+        >>> action, info = engine.step(obs, actions)
+        >>> print(f"Selected action: {action}, FE: {info['free_energy']:.2f}")
         """
         # Update perceptual inference
         beliefs, free_energy = self.filter.update(observation, dt=self.timestep)
@@ -320,12 +621,36 @@ class ActiveInferenceEngine:
         """
         Select action by minimizing expected free energy.
 
-        Args:
-            beliefs: Current belief states
-            available_actions: Available actions
+        Evaluates each available action by simulating its expected outcomes
+        and computing the expected free energy. Selects the action with
+        lowest expected free energy, balancing exploration and exploitation.
 
-        Returns:
-            Best action and EFE components
+        Parameters
+        ----------
+        beliefs : List[BeliefState]
+            Current belief states at all hierarchical levels
+        available_actions : List[np.ndarray]
+            List of candidate action vectors to evaluate
+
+        Returns
+        -------
+        best_action : np.ndarray
+            Action with minimum expected free energy
+        best_components : Dict[str, float]
+            Expected free energy components for selected action:
+            - 'epistemic_value': Expected information gain
+            - 'pragmatic_value': Expected cost/divergence from preferences
+            - 'exploration_drive': Magnitude of exploration motivation
+            - 'exploitation_drive': Magnitude of exploitation motivation
+
+        Notes
+        -----
+        Expected free energy decomposes as:
+        G(π) = Epistemic Value + Pragmatic Value
+             = -E[Information Gain] + E[KL(p(o|π)||p*(o))]
+        
+        Lower epistemic value → more exploration
+        Lower pragmatic value → better goal achievement
         """
         best_action = available_actions[0]
         best_efe = float('inf')
@@ -381,7 +706,30 @@ class ActiveInferenceEngine:
         """
         Simulate future states under a policy.
 
-        Simplified forward model for now.
+        Uses a forward model to predict how states will evolve under a given
+        action sequence. This enables prospective planning and policy evaluation.
+
+        Parameters
+        ----------
+        beliefs : List[BeliefState]
+            Current belief states
+        action : np.ndarray
+            Action to simulate
+        horizon : int, optional
+            Number of steps to simulate ahead. If None, uses planning_horizon.
+
+        Returns
+        -------
+        future_states : List[np.ndarray]
+            Predicted state sequence of length horizon
+
+        Notes
+        -----
+        Current implementation uses simplified linear dynamics:
+        s_{t+1} = s_t + α * a + η
+        
+        where α is action gain and η is process noise.
+        Can be extended to learned nonlinear forward models.
         """
         if horizon is None:
             horizon = self.planning_horizon
@@ -400,7 +748,17 @@ class ActiveInferenceEngine:
         return future_states
 
     def reset(self):
-        """Reset the engine to initial state."""
+        """
+        Reset the engine to initial state.
+
+        Reinitializes all belief states, clears history, and resets time to zero.
+        Useful for starting new simulation runs or experimental trials.
+
+        Notes
+        -----
+        After reset, all beliefs return to prior distributions with zero mean
+        and identity covariance.
+        """
         for belief in self.filter.beliefs:
             belief.mean = np.zeros_like(belief.mean)
             belief.covariance = np.eye(len(belief.mean))

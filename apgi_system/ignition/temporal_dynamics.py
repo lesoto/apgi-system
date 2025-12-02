@@ -31,36 +31,111 @@ class TimelineEvent:
 
 class IgnitionTimeline:
     """
-    Orchestrates multi-timescale ignition dynamics.
+    Orchestrates multi-timescale ignition dynamics across pre-, peri-, and post-ignition phases.
 
-    Timeline:
-    -500 to 0 ms: Pre-ignition processing
-        - Context recognition
-        - Predictive pre-activation
-        - Precision modulation
-        - Somatic marker retrieval
-        - Thalamocortical preparation
+    The IgnitionTimeline class implements the complete temporal dynamics of conscious
+    access, from initial context processing through ignition to post-ignition integration.
+    It tracks the progression through distinct neural processing stages with realistic
+    timing based on neuroscience evidence.
 
-    0 to +500 ms: Ignition event
-        - Threshold crossing
-        - Frontoparietal recruitment
-        - Recurrent amplification
-        - Global broadcast
-        - State maintenance
+    This implements the temporal cascade model of consciousness, where conscious access
+    emerges through a sequence of neural events spanning approximately 1 second from
+    stimulus onset to full integration.
 
-    +500 ms onwards: Post-ignition
-        - Reportability
-        - Motor planning
-        - Working memory encoding
-        - Somatic marker updating
+    Timeline Phases
+    ---------------
+    
+    **Phase 1: Pre-ignition (-500 to 0 ms)**
+    Preparatory processing before threshold crossing:
+    - Context recognition (frontal cortex, immediate)
+    - Hierarchical predictive pre-activation (0-100ms)
+    - Precision modulation by ACC (50-150ms)
+    - Somatic marker retrieval (50-100ms latency)
+    - Thalamocortical gating preparation (300ms+)
+    
+    **Phase 2: Ignition Event (0 to +500 ms)**
+    Rapid global ignition and broadcasting:
+    - Threshold crossing detection (0ms)
+    - Frontoparietal network recruitment (<50ms)
+    - Recurrent amplification with gamma (50-400ms)
+    - Global workspace broadcasting (100-400ms)
+    - State maintenance (entire phase)
+    
+    **Phase 3: Post-ignition (+500 ms onwards)**
+    Integration and learning:
+    - Reportability interface activation (immediate)
+    - Motor planning for report (100-300ms)
+    - Working memory encoding (200-500ms)
+    - Somatic marker updating/learning (500-1000ms)
+
+    Attributes
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary
+    pre_ignition_duration : float
+        Duration of pre-ignition phase (default: 500ms)
+    ignition_duration : float
+        Duration of ignition event phase (default: 500ms)
+    current_phase : TimelinePhase
+        Current phase (PRE_IGNITION, IGNITION_EVENT, or POST_IGNITION)
+    phase_time : float
+        Time spent in current phase (milliseconds)
+    total_time : float
+        Total simulation time (milliseconds)
+    events : List[TimelineEvent]
+        Chronological log of timeline events
+    max_events : int
+        Maximum events to store (default: 1000)
+    
+    Phase-specific state flags:
+    - Pre-ignition: context_recognized, predictions_activated, precision_modulated,
+                    somatic_marker_retrieved, thalamus_gated
+    - Ignition: threshold_crossed, frontoparietal_recruited, amplification_active,
+                broadcasting
+    - Post-ignition: reportability_active, motor_planned, memory_encoded,
+                     markers_updated
+
+    Examples
+    --------
+    >>> config = {}
+    >>> timeline = IgnitionTimeline(config)
+    >>> 
+    >>> # Update timeline without ignition (pre-ignition processing)
+    >>> for _ in range(100):
+    ...     state = timeline.update(ignition_signal=False, dt=1.0)
+    >>> print(f"Phase: {state['phase']}")  # "pre_ignition"
+    >>> 
+    >>> # Trigger ignition
+    >>> state = timeline.update(ignition_signal=True, dt=1.0)
+    >>> print(f"Phase: {state['phase']}")  # "ignition_event"
+    >>> print(f"Ignition active: {state['ignition_active']}")
+    >>> 
+    >>> # Continue through ignition and post-ignition
+    >>> for _ in range(1000):
+    ...     state = timeline.update(ignition_signal=False, dt=1.0)
+    >>> print(f"Reportable: {state['reportable']}")
+    >>> 
+    >>> # Check recent events
+    >>> print(f"Recent events: {len(state['recent_events'])}")
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize ignition timeline.
+        Initialize ignition timeline orchestrator.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary. Currently uses default timing parameters,
+            but can be extended to include:
+            - 'pre_ignition_duration': float (default: 500ms)
+            - 'ignition_duration': float (default: 500ms)
+            - 'max_events': int (default: 1000)
+
+        Notes
+        -----
+        The timeline initializes in PRE_IGNITION phase with all state flags
+        set to False. Events are logged as processing stages complete.
         """
         self.config = config
 
@@ -103,15 +178,92 @@ class IgnitionTimeline:
         dt: float = 1.0
     ) -> Dict[str, Any]:
         """
-        Update timeline state.
+        Update timeline state and process phase-specific dynamics.
 
-        Args:
-            ignition_signal: Whether ignition threshold crossed
-            context_info: Contextual information
-            dt: Timestep in ms
+        This method advances the timeline through its phases, triggering appropriate
+        neural processing events at each stage. It should be called at each simulation
+        timestep.
 
-        Returns:
-            Timeline state and events
+        Parameters
+        ----------
+        ignition_signal : bool
+            Whether ignition threshold was crossed at this timestep.
+            When True during PRE_IGNITION phase, triggers transition to IGNITION_EVENT.
+        context_info : Optional[Dict[str, Any]], optional
+            Contextual information for pre-ignition processing, by default None.
+            Can include:
+            - 'context_id': Identifier for current context
+            - 'predictions': Pre-activated predictions
+            - 'markers': Retrieved somatic markers
+            Used for logging and debugging.
+        dt : float, optional
+            Timestep duration in milliseconds, by default 1.0.
+            Used for timing phase transitions and event scheduling.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Timeline state information containing:
+            - 'phase': Current phase name (str)
+            - 'phase_time': Time in current phase (float, ms)
+            - 'total_time': Total simulation time (float, ms)
+            - 'pre_ignition_complete': Whether all pre-ignition stages done (bool)
+            - 'ignition_active': Whether currently in active ignition (bool)
+            - 'reportable': Whether content is reportable/conscious (bool)
+            - 'recent_events': List of recent timeline events (List[Dict])
+                Each event contains: 'time', 'type', 'phase'
+
+        Notes
+        -----
+        Phase Processing:
+
+        **PRE_IGNITION Phase:**
+        - Processes preparatory stages with realistic timing
+        - Context recognition: immediate (0ms)
+        - Predictive activation: 50ms
+        - Precision modulation: 100ms
+        - Somatic marker retrieval: 150ms
+        - Thalamic gating: 300ms
+        - Transitions to IGNITION_EVENT when ignition_signal=True
+
+        **IGNITION_EVENT Phase:**
+        - Processes rapid ignition cascade
+        - Threshold crossing: immediate (0ms)
+        - Frontoparietal recruitment: 20ms
+        - Recurrent amplification: 50ms
+        - Global broadcast: 100ms
+        - Transitions to POST_IGNITION after ignition_duration (500ms)
+
+        **POST_IGNITION Phase:**
+        - Processes integration and learning
+        - Reportability: immediate (0ms)
+        - Motor planning: 200ms
+        - Memory encoding: 400ms
+        - Marker updating: 700ms
+        - Transitions back to PRE_IGNITION after 1000ms
+
+        All events are logged to the events list for analysis and debugging.
+
+        Examples
+        --------
+        >>> timeline = IgnitionTimeline(config)
+        >>> 
+        >>> # Pre-ignition processing
+        >>> context = {'context_id': 'visual_scene_1'}
+        >>> state = timeline.update(
+        ...     ignition_signal=False,
+        ...     context_info=context,
+        ...     dt=1.0
+        ... )
+        >>> print(f"Pre-ignition complete: {state['pre_ignition_complete']}")
+        >>> 
+        >>> # Trigger ignition
+        >>> state = timeline.update(ignition_signal=True, dt=1.0)
+        >>> print(f"Phase: {state['phase']}")  # "ignition_event"
+        >>> 
+        >>> # Check recent events
+        >>> for event in state['recent_events']:
+        ...     print(f"{event['time']:.0f}ms: {event['type']}")
         """
         self.phase_time += dt
         self.total_time += dt
@@ -319,14 +471,55 @@ class IgnitionTimeline:
         start_time: float,
         end_time: float
     ) -> List[TimelineEvent]:
-        """Get events within a time range."""
+        """
+        Get timeline events within a specified time range.
+
+        Parameters
+        ----------
+        start_time : float
+            Start of time range in milliseconds (inclusive).
+        end_time : float
+            End of time range in milliseconds (inclusive).
+
+        Returns
+        -------
+        List[TimelineEvent]
+            List of events that occurred within the specified time range.
+            Each TimelineEvent contains:
+            - time: float (event timestamp)
+            - phase: TimelinePhase (phase when event occurred)
+            - event_type: str (type of event)
+            - data: Dict (event-specific data)
+
+        Examples
+        --------
+        >>> timeline = IgnitionTimeline(config)
+        >>> # ... run simulation ...
+        >>> events = timeline.get_events_in_range(100.0, 500.0)
+        >>> for event in events:
+        ...     print(f"{event.time:.0f}ms: {event.event_type}")
+        """
         return [
             event for event in self.events
             if start_time <= event.time <= end_time
         ]
 
     def reset(self):
-        """Reset timeline to initial state."""
+        """
+        Reset timeline to initial state.
+
+        Clears all events, resets phase to PRE_IGNITION, and resets all state flags.
+        Useful for starting new simulation runs or experiments.
+
+        Notes
+        -----
+        Resets:
+        - Phase to PRE_IGNITION
+        - Phase time to 0
+        - Total time to 0
+        - All events (cleared)
+        - All phase-specific state flags to False
+        """
         self.current_phase = TimelinePhase.PRE_IGNITION
         self.phase_time = 0.0
         self.total_time = 0.0

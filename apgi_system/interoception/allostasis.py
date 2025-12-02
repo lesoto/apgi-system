@@ -7,6 +7,7 @@ Maintains homeostatic set points and manages allostatic load.
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
+from apgi_system.validation import InputValidator
 
 
 @dataclass
@@ -21,21 +22,63 @@ class AllostaticSetPoint:
 
 class AllostaticRegulator:
     """
-    Manages allostatic regulation and cumulative load.
+    Manages allostatic regulation and cumulative load tracking.
 
-    Allostasis: Achieving stability through change
-    - Maintains homeostatic set points
-    - Computes deviation from optimal states
-    - Tracks cumulative allostatic load
-    - Generates regulatory signals
+    Allostasis refers to achieving stability through change - the process by
+    which the body maintains homeostasis through adaptive responses to stressors.
+    This class implements allostatic regulation by:
+
+    1. Maintaining homeostatic set points for key physiological variables
+    2. Computing deviations from optimal states
+    3. Tracking cumulative allostatic load (wear-and-tear from adaptation)
+    4. Generating regulatory signals to restore homeostasis
+
+    Allostatic load accumulates when physiological variables remain outside
+    their acceptable ranges, representing the cumulative cost of adaptation.
+    High allostatic load indicates chronic stress and can modulate other
+    system processes (e.g., raising ignition thresholds).
+
+    The regulator tracks four key variables:
+    - Heart rate: Target 70 bpm, acceptable range (65-75)
+    - Temperature: Target 37.0°C, acceptable range (36.8-37.2)
+    - Glucose: Target 5.0 mmol/L, acceptable range (4.5-5.5)
+    - Cortisol: Target 10 μg/dL, acceptable range (8-12)
+
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        Configuration dictionary containing:
+        - interoception.allostatic_ranges: Range factors for regulation
+
+    Attributes
+    ----------
+    set_points : List[AllostaticSetPoint]
+        Set points for tracked physiological variables
+    total_load : float
+        Cumulative allostatic load (0-1), representing wear-and-tear
+    load_decay_rate : float
+        Rate at which load decays over time (per ms)
+    load_accumulation_rate : float
+        Rate at which deviations contribute to load
+
+    Examples
+    --------
+    >>> config = {'interoception': {'allostatic_ranges': {}}}
+    >>> regulator = AllostaticRegulator(config)
+    >>> body_state = {'heart_rate': 85, 'temperature': 37.0}
+    >>> result = regulator.update(body_state, dt=1.0)
+    >>> print(result['allostatic_load'])
+    0.05
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize allostatic regulator.
+        Initialize allostatic regulator with configuration.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary containing allostatic range settings
         """
         self.config = config
         intero_config = config.get('interoception', {})
@@ -81,15 +124,67 @@ class AllostaticRegulator:
         dt: float = 1.0
     ) -> Dict[str, Any]:
         """
-        Update allostatic regulation.
+        Update allostatic regulation and compute load.
 
-        Args:
-            body_state: Current physiological state
-            dt: Timestep in ms
+        Performs a complete regulation cycle:
+        1. Computes deviation from set points for each tracked variable
+        2. Determines if variables are within acceptable ranges
+        3. Accumulates allostatic load for out-of-range variables
+        4. Generates proportional regulatory signals
+        5. Applies decay to existing load
 
-        Returns:
-            Regulation signals and load metrics
+        Load accumulation is proportional to the magnitude of deviation
+        normalized by the acceptable range width. Larger deviations contribute
+        more to cumulative load.
+
+        Parameters
+        ----------
+        body_state : Dict[str, float]
+            Current physiological state with keys matching set point names
+            (e.g., 'heart_rate', 'temperature', 'glucose', 'cortisol')
+        dt : float, optional
+            Timestep in milliseconds, by default 1.0
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - 'regulation_signals': Dict mapping variable names to regulatory
+              signals (proportional to deviation)
+            - 'allostatic_load': Current cumulative load (0-1)
+            - 'total_deviation': Sum of absolute deviations across all variables
+            - 'set_points_status': List of status dicts for each set point
+            - 'homeostatic_stability': Overall stability metric (0-1)
+
+        Examples
+        --------
+        >>> regulator = AllostaticRegulator(config)
+        >>> body_state = {'heart_rate': 90, 'temperature': 37.5}
+        >>> result = regulator.update(body_state, dt=1.0)
+        >>> print(result['regulation_signals']['heart_rate'])
+        -2.0  # Negative signal to reduce heart rate
+        >>> print(result['homeostatic_stability'])
+        0.75
         """
+        # Validate inputs
+        if not isinstance(body_state, dict):
+            raise TypeError(f"body_state must be dict, got {type(body_state)}")
+        
+        InputValidator.validate_scalar(
+            dt,
+            "dt",
+            value_range=(0.0, 10000.0),
+            positive=True
+        )
+        
+        # Validate body_state values
+        for key, value in body_state.items():
+            InputValidator.validate_scalar(
+                value,
+                f"body_state['{key}']",
+                value_range=(-1000.0, 1000.0)  # Reasonable physiological range
+            )
+        
         regulation_signals = {}
         total_deviation = 0.0
 
@@ -143,7 +238,19 @@ class AllostaticRegulator:
         }
 
     def _get_set_points_status(self) -> List[Dict[str, Any]]:
-        """Get status of all set points."""
+        """
+        Get status of all set points.
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of status dictionaries, one per set point, containing:
+            - 'name': Variable name
+            - 'target': Target value
+            - 'deviation': Current deviation from target
+            - 'load_contribution': Contribution to allostatic load
+            - 'in_range': Boolean indicating if within acceptable range
+        """
         status = []
         for sp in self.set_points:
             status.append({
@@ -158,9 +265,18 @@ class AllostaticRegulator:
 
     def _compute_stability(self) -> float:
         """
-        Compute overall homeostatic stability (0-1).
+        Compute overall homeostatic stability.
 
-        Higher = more stable (all variables near set points).
+        Stability is computed as 1 minus the average normalized deviation
+        across all set points. Higher values indicate greater stability
+        (all variables near their set points).
+
+        Returns
+        -------
+        float
+            Stability metric in range [0, 1], where:
+            - 1.0 = perfect stability (all variables at set points)
+            - 0.0 = maximum instability (all variables far from set points)
         """
         total_normalized_deviation = 0.0
 
@@ -178,21 +294,39 @@ class AllostaticRegulator:
         return float(stability)
 
     def get_allostatic_load(self) -> float:
-        """Get current allostatic load."""
+        """
+        Get current allostatic load.
+
+        Returns
+        -------
+        float
+            Current cumulative allostatic load in range [0, 1]
+        """
         return self.total_load
 
     def trigger_stressor(self, intensity: float = 0.5):
         """
-        Simulate a stressor event.
+        Simulate an acute stressor event.
 
-        Args:
-            intensity: Stressor intensity (0-1)
+        Immediately increases allostatic load to simulate the impact of
+        an acute stressor (e.g., threat, challenge, or perturbation).
+
+        Parameters
+        ----------
+        intensity : float, optional
+            Stressor intensity in range [0, 1], by default 0.5
+            Higher intensity produces larger load increase
         """
         self.total_load += intensity * 0.2
         self.total_load = min(1.0, self.total_load)
 
     def reset(self):
-        """Reset to baseline."""
+        """
+        Reset to baseline state.
+
+        Clears all allostatic load and resets all set point deviations
+        and load contributions to zero.
+        """
         self.total_load = 0.0
         for sp in self.set_points:
             sp.current_deviation = 0.0

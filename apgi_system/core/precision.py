@@ -9,6 +9,8 @@ import numpy as np
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
+from apgi_system.validation import InputValidator
+
 
 class NeuromodulatorType(Enum):
     """Types of neuromodulators affecting precision."""
@@ -23,24 +25,97 @@ class PrecisionWeighting:
     Manages precision (inverse variance) across hierarchical levels
     and different processing streams.
 
-    Precision modulates the influence of prediction errors:
-    - High precision → errors have more influence
-    - Low precision → errors are downweighted
+    Precision controls the gain on prediction errors, determining how much
+    influence they have on belief updating and action selection. High precision
+    amplifies errors (high confidence in sensory data), while low precision
+    attenuates them (high uncertainty).
 
-    Precision is modulated by:
-    - Attention (voluntary/involuntary)
-    - Uncertainty estimates
-    - Context
-    - Neuromodulators
-    - Fatigue/resources
+    Precision is dynamically modulated by multiple factors:
+    - Attention: Voluntary and involuntary attentional allocation
+    - Uncertainty: Estimated reliability of predictions
+    - Context: Task demands and environmental conditions
+    - Neuromodulators: Norepinephrine, acetylcholine, dopamine, serotonin
+    - Resources: Fatigue and cognitive load
+
+    This implements the precision-weighting mechanism central to predictive
+    coding and active inference, providing a computational account of attention
+    and uncertainty.
+
+    Attributes
+    ----------
+    extero_precision : float
+        Current exteroceptive precision
+    intero_precision : float
+        Current interoceptive precision
+    extero_baseline : float
+        Baseline exteroceptive precision
+    intero_baseline : float
+        Baseline interoceptive precision
+    neuromodulators : Dict[NeuromodulatorType, float]
+        Current neuromodulator levels (0-1 normalized)
+    attention_focus : str or None
+        Currently attended stream ('extero', 'intero', or None)
+    attention_gain : float
+        Current attention gain multiplier
+    fatigue_level : float
+        Current fatigue level (0=fresh, 1=exhausted)
+    cognitive_load : float
+        Current cognitive load (0-1)
+    extero_uncertainty : float
+        Estimated exteroceptive uncertainty
+    intero_uncertainty : float
+        Estimated interoceptive uncertainty
+
+    Notes
+    -----
+    Precision is inversely related to variance:
+    Π = 1 / σ²
+    
+    In predictive coding, precision-weighted prediction errors drive learning:
+    Δμ ∝ Π * ε
+    
+    This provides a principled mechanism for attention: attending to a stream
+    increases its precision, amplifying its influence on inference.
+
+    References
+    ----------
+    .. [1] Feldman, H., & Friston, K. J. (2010). Attention, uncertainty, and
+           free-energy. Frontiers in human neuroscience, 4, 215.
+
+    Examples
+    --------
+    >>> config = load_config('config/default.yaml')
+    >>> precision = PrecisionWeighting(config)
+    >>> precisions = precision.update(
+    ...     extero_error_variance=2.5,
+    ...     intero_error_variance=1.0,
+    ...     attention_target='extero'
+    ... )
+    >>> print(f"Extero precision: {precisions['exteroceptive']:.2f}")
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize precision weighting system.
 
-        Args:
-            config: Configuration dictionary
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            Configuration dictionary containing:
+            - 'precision': Precision parameters including baselines and ranges
+            - 'active_inference': Active inference parameters
+
+        Examples
+        --------
+        >>> config = {
+        ...     'precision': {
+        ...         'exteroceptive_baseline': 1.0,
+        ...         'interoceptive_baseline': 0.8,
+        ...         'attention_gain_range': [0.5, 3.0],
+        ...         'volatility_sensitivity': 0.1
+        ...     }
+        ... }
+        >>> precision = PrecisionWeighting(config)
         """
         self.config = config
         precision_config = config.get('precision', {})
@@ -99,17 +174,85 @@ class PrecisionWeighting:
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, float]:
         """
-        Update precision estimates.
+        Update precision estimates based on error statistics and modulatory factors.
 
-        Args:
-            extero_error_variance: Variance of exteroceptive errors
-            intero_error_variance: Variance of interoceptive errors
-            attention_target: 'extero' or 'intero'
-            context: Context information
+        Integrates multiple sources of information to compute current precision
+        values for both exteroceptive and interoceptive streams. Precision is
+        updated based on prediction error variance, attention, neuromodulators,
+        resources, and context.
 
-        Returns:
-            Dictionary with current precisions
+        Parameters
+        ----------
+        extero_error_variance : float, optional
+            Variance of exteroceptive prediction errors
+        intero_error_variance : float, optional
+            Variance of interoceptive prediction errors
+        attention_target : str, optional
+            Target of attention: 'extero' or 'intero'
+        context : Dict[str, Any], optional
+            Contextual information that may modulate precision:
+            - 'threat_level': Threat level (0-1)
+            - 'task_demand': Task demand level (0-1)
+
+        Returns
+        -------
+        precisions : Dict[str, float]
+            Dictionary containing:
+            - 'exteroceptive': Current exteroceptive precision
+            - 'interoceptive': Current interoceptive precision
+            - 'attention_gain': Current attention gain
+            - 'fatigue_penalty': Current fatigue level
+
+        Raises
+        ------
+        TypeError
+            If error variances are not numeric
+        ValueError
+            If error variances are negative, NaN, or Inf, or if attention_target
+            is not 'extero', 'intero', or None
+
+        Notes
+        -----
+        Precision update follows:
+        Π = baseline / (uncertainty + ε)
+        
+        where uncertainty is estimated from error variance with exponential smoothing.
+        
+        Multiple modulatory factors are applied multiplicatively:
+        Π_final = Π_base * attention * neuromod * resources * context
+
+        Examples
+        --------
+        >>> precision = PrecisionWeighting(config)
+        >>> precisions = precision.update(
+        ...     extero_error_variance=2.0,
+        ...     intero_error_variance=1.5,
+        ...     attention_target='extero',
+        ...     context={'threat_level': 0.7}
+        ... )
+        >>> print(f"Extero: {precisions['exteroceptive']:.2f}")
         """
+        # Validate inputs
+        if extero_error_variance is not None:
+            InputValidator.validate_scalar(
+                extero_error_variance,
+                "extero_error_variance",
+                value_range=(0.0, 1e6)
+            )
+        
+        if intero_error_variance is not None:
+            InputValidator.validate_scalar(
+                intero_error_variance,
+                "intero_error_variance",
+                value_range=(0.0, 1e6)
+            )
+        
+        if attention_target is not None:
+            if attention_target not in ['extero', 'intero']:
+                raise ValueError(
+                    f"attention_target must be 'extero' or 'intero', got {attention_target}"
+                )
+        
         # Update uncertainty estimates from error variance
         if extero_error_variance is not None:
             self._update_uncertainty('extero', extero_error_variance)
@@ -281,30 +424,92 @@ class PrecisionWeighting:
         """
         Set neuromodulator level.
 
-        Args:
-            modulator: Neuromodulator type
-            level: Level (0-1)
+        Parameters
+        ----------
+        modulator : NeuromodulatorType
+            Type of neuromodulator (NOREPINEPHRINE, ACETYLCHOLINE, DOPAMINE, SEROTONIN)
+        level : float
+            Neuromodulator level (0-1, automatically clamped)
+
+        Notes
+        -----
+        Neuromodulator effects on precision:
+        - Norepinephrine: Increases precision (arousal, alertness)
+        - Acetylcholine: Modulates based on volatility (learning rate)
+        - Dopamine: Signals prediction errors (not directly affecting precision)
+        - Serotonin: Affects prior confidence
+
+        Examples
+        --------
+        >>> precision = PrecisionWeighting(config)
+        >>> precision.set_neuromodulator(NeuromodulatorType.NOREPINEPHRINE, 0.8)
+        >>> precisions = precision.update()
         """
         self.neuromodulators[modulator] = np.clip(level, 0.0, 1.0)
 
     def set_fatigue(self, level: float):
-        """Set fatigue level (0-1)."""
+        """
+        Set fatigue level.
+
+        Parameters
+        ----------
+        level : float
+            Fatigue level (0=fresh, 1=exhausted, automatically clamped)
+
+        Notes
+        -----
+        Fatigue reduces precision, modeling decreased sensory reliability
+        and increased noise with exhaustion.
+        """
         self.fatigue_level = np.clip(level, 0.0, 1.0)
 
     def set_cognitive_load(self, load: float):
-        """Set cognitive load (0-1)."""
+        """
+        Set cognitive load level.
+
+        Parameters
+        ----------
+        load : float
+            Cognitive load (0=minimal, 1=maximal, automatically clamped)
+
+        Notes
+        -----
+        High cognitive load reduces precision, modeling resource limitations
+        under demanding task conditions.
+        """
         self.cognitive_load = np.clip(load, 0.0, 1.0)
 
     def get_precision_matrix(self, stream: str, dimension: int) -> np.ndarray:
         """
-        Get precision matrix for a stream.
+        Get precision matrix for a processing stream.
 
-        Args:
-            stream: 'extero' or 'intero'
-            dimension: Matrix dimension
+        Constructs a diagonal precision matrix for use in free energy
+        calculations and belief updates.
 
-        Returns:
-            Precision matrix (diagonal)
+        Parameters
+        ----------
+        stream : str
+            Processing stream: 'extero' or 'intero'
+        dimension : int
+            Dimensionality of the matrix
+
+        Returns
+        -------
+        precision_matrix : np.ndarray
+            Diagonal precision matrix of shape (dimension, dimension)
+
+        Notes
+        -----
+        Returns Π * I where Π is the scalar precision and I is identity.
+        For more complex models, this could return non-diagonal matrices
+        encoding correlations.
+
+        Examples
+        --------
+        >>> precision = PrecisionWeighting(config)
+        >>> precision.update(extero_error_variance=2.0)
+        >>> P = precision.get_precision_matrix('extero', 256)
+        >>> print(P.shape)  # (256, 256)
         """
         if stream == 'extero':
             precision = self.extero_precision
@@ -314,7 +519,12 @@ class PrecisionWeighting:
         return precision * np.eye(dimension)
 
     def reset(self):
-        """Reset to baseline state."""
+        """
+        Reset precision system to baseline state.
+
+        Restores all precisions to baseline values, clears attention state,
+        resets neuromodulators to 0.5, and clears resource constraints.
+        """
         self.extero_precision = self.extero_baseline
         self.intero_precision = self.intero_baseline
         self.attention_focus = None
