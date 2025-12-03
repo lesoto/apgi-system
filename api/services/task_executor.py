@@ -10,9 +10,12 @@ from enum import Enum
 from datetime import datetime
 
 from celery.result import AsyncResult
+from sqlalchemy.orm import Session as DBSession
 
 from api.celery_app import celery_app
 from api.tasks import experimental_tasks
+from api.database.models import Task as TaskModel
+from api.database.connection import get_db
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +60,9 @@ class TaskExecutor:
         self,
         session_id: str,
         task_type: str,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
+        webhook_url: Optional[str] = None,
+        db: Optional[DBSession] = None
     ) -> str:
         """
         Submit task for async execution.
@@ -66,6 +71,8 @@ class TaskExecutor:
             session_id: Session identifier
             task_type: Type of experimental task
             parameters: Task-specific parameters
+            webhook_url: Optional webhook URL for completion notification
+            db: Database session for storing task metadata
             
         Returns:
             Task ID for tracking
@@ -98,6 +105,20 @@ class TaskExecutor:
         
         task_id = result.id
         logger.info(f"Task submitted with ID: {task_id}")
+        
+        # Store task metadata in database if db session provided
+        if db:
+            task_record = TaskModel(
+                task_id=task_id,
+                session_id=session_id,
+                task_type=task_type,
+                parameters=params,
+                status=TaskStatus.PENDING.value,
+                webhook_url=webhook_url
+            )
+            db.add(task_record)
+            db.commit()
+            logger.info(f"Task {task_id} metadata stored in database")
         
         return task_id
     

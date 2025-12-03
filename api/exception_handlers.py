@@ -11,9 +11,12 @@ from pydantic import ValidationError as PydanticValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 import uuid
+from datetime import datetime
 from typing import Union
 
 from api.exceptions import APIError
+from api.middleware.logging import error_logger
+from api.middleware.alerting import alert_manager
 
 
 logger = logging.getLogger(__name__)
@@ -45,18 +48,13 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     # Get or generate request ID
     request_id = getattr(request.state, "request_id", generate_request_id())
     
-    # Log error with context
-    logger.error(
-        f"API Error: {exc.code}",
-        extra={
-            "request_id": request_id,
-            "error_code": exc.code,
-            "status_code": exc.status_code,
-            "path": request.url.path,
-            "method": request.method,
-            "details": exc.details
-        },
-        exc_info=True
+    # Log error with structured logging
+    error_logger.log_error(
+        exc,
+        request=request,
+        error_code=exc.code,
+        status_code=exc.status_code,
+        details=exc.details
     )
     
     # Return error response
@@ -205,16 +203,22 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     # Generate unique error ID for tracking
     error_id = f"err_{uuid.uuid4().hex[:12]}"
     
-    # Log unexpected error with full stack trace
-    logger.exception(
-        f"Unhandled exception: {type(exc).__name__}",
-        extra={
+    # Log unexpected error with structured logging
+    error_logger.log_error(
+        exc,
+        request=request,
+        error_id=error_id
+    )
+    
+    # Record error for alerting
+    await alert_manager.record_error(
+        error_type=type(exc).__name__,
+        error_message=str(exc),
+        metadata={
             "request_id": request_id,
             "error_id": error_id,
             "path": request.url.path,
-            "method": request.method,
-            "exception_type": type(exc).__name__,
-            "exception_message": str(exc)
+            "method": request.method
         }
     )
     
@@ -226,7 +230,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
                 "code": "INTERNAL_SERVER_ERROR",
                 "message": "An unexpected error occurred. Please try again later.",
                 "request_id": request_id,
-                "timestamp": None,  # Will be set by middleware if available
+                "timestamp": datetime.utcnow().isoformat() + "Z",
                 "details": {
                     "error_id": error_id
                 }

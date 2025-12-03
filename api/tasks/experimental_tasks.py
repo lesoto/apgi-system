@@ -7,15 +7,85 @@ Celery tasks for executing experimental paradigms (Iowa Gambling, Masking, Atten
 import logging
 from typing import Dict, Any
 from celery import Task
+from datetime import datetime
 
 from api.celery_app import celery_app
 from apgi_system.system import APGISystem
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from api.database.connection import get_db
+from api.database.models import Task as TaskModel
+from api.services.webhook_manager import WebhookManager
 
 
 logger = logging.getLogger(__name__)
+
+
+async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
+    """
+    Trigger webhook delivery when task completes.
+    
+    Args:
+        task_id: Celery task ID
+        result: Task result data
+    """
+    try:
+        # Get database session
+        db = next(get_db())
+        
+        # Find task record
+        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        
+        if not task_record:
+            logger.warning(f"Task record not found for task {task_id}")
+            return
+        
+        # Update task status in database
+        task_record.status = result.get("status", "completed")
+        task_record.completed_at = datetime.utcnow()
+        task_record.result_data = result
+        
+        if result.get("status") == "failed":
+            task_record.error_message = result.get("error")
+        
+        db.commit()
+        
+        # Check if webhook URL is configured
+        if task_record.webhook_url:
+            logger.info(f"Triggering webhook for task {task_id} to {task_record.webhook_url}")
+            
+            # Create webhook payload
+            payload = {
+                "task_id": task_id,
+                "session_id": task_record.session_id,
+                "task_type": task_record.task_type,
+                "status": result.get("status", "completed"),
+                "completed_at": datetime.utcnow().isoformat() + "Z",
+                "result": result
+            }
+            
+            # Create webhook delivery
+            webhook_manager = WebhookManager()
+            delivery_id = await webhook_manager.create_webhook_delivery(
+                db=db,
+                task_id=task_id,
+                webhook_url=task_record.webhook_url,
+                payload=payload
+            )
+            
+            # Attempt immediate delivery
+            await webhook_manager.deliver_webhook(db, delivery_id)
+            await webhook_manager.close()
+            
+            logger.info(f"Webhook delivery {delivery_id} created for task {task_id}")
+        else:
+            logger.debug(f"No webhook URL configured for task {task_id}")
+        
+        db.close()
+        
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook for task {task_id}: {e}", exc_info=True)
 
 
 class APGITask(Task):
@@ -51,6 +121,7 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
     """
     logger.info(f"Starting Iowa Gambling Task for session {session_id}")
     
+    result = None
     try:
         # Extract parameters with defaults
         num_trials = parameters.get("num_trials", 100)
@@ -75,7 +146,7 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
         
         logger.info(f"Iowa Gambling Task completed for session {session_id}")
         
-        return {
+        result = {
             "task_type": "iowa_gambling",
             "session_id": session_id,
             "status": "completed",
@@ -84,12 +155,21 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
         
     except Exception as e:
         logger.error(f"Iowa Gambling Task failed for session {session_id}: {e}", exc_info=True)
-        return {
+        result = {
             "task_type": "iowa_gambling",
             "session_id": session_id,
             "status": "failed",
             "error": str(e)
         }
+    
+    # Trigger webhook on completion (async)
+    import asyncio
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+    
+    return result
 
 
 @celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_masking_paradigm_task")
@@ -112,6 +192,7 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
     """
     logger.info(f"Starting Masking Paradigm Task for session {session_id}")
     
+    result = None
     try:
         # Extract parameters with defaults
         target_duration_ms = parameters.get("target_duration_ms", 50.0)
@@ -136,7 +217,7 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
         
         logger.info(f"Masking Paradigm Task completed for session {session_id}")
         
-        return {
+        result = {
             "task_type": "masking_paradigm",
             "session_id": session_id,
             "status": "completed",
@@ -145,12 +226,21 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
         
     except Exception as e:
         logger.error(f"Masking Paradigm Task failed for session {session_id}: {e}", exc_info=True)
-        return {
+        result = {
             "task_type": "masking_paradigm",
             "session_id": session_id,
             "status": "failed",
             "error": str(e)
         }
+    
+    # Trigger webhook on completion (async)
+    import asyncio
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+    
+    return result
 
 
 @celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_attentional_blink_task")
@@ -172,6 +262,7 @@ def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, 
     """
     logger.info(f"Starting Attentional Blink Task for session {session_id}")
     
+    result = None
     try:
         # Extract parameters with defaults
         stream_length = parameters.get("stream_length", 15)
@@ -194,7 +285,7 @@ def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, 
         
         logger.info(f"Attentional Blink Task completed for session {session_id}")
         
-        return {
+        result = {
             "task_type": "attentional_blink",
             "session_id": session_id,
             "status": "completed",
@@ -203,9 +294,18 @@ def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, 
         
     except Exception as e:
         logger.error(f"Attentional Blink Task failed for session {session_id}: {e}", exc_info=True)
-        return {
+        result = {
             "task_type": "attentional_blink",
             "session_id": session_id,
             "status": "failed",
             "error": str(e)
         }
+    
+    # Trigger webhook on completion (async)
+    import asyncio
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+    
+    return result

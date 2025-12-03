@@ -277,12 +277,17 @@ class TaskSubmitRequest(BaseModel):
         default_factory=dict,
         description="Task-specific parameters"
     )
+    webhook_url: Optional[str] = Field(
+        None,
+        description="URL for webhook notification on task completion"
+    )
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "task_type": "iowa_gambling",
-                "parameters": {"num_trials": 100}
+                "parameters": {"num_trials": 100},
+                "webhook_url": "https://example.com/webhook"
             }
         }
     )

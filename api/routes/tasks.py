@@ -7,6 +7,7 @@ API endpoints for executing and managing experimental tasks.
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional, Dict, Any
 import logging
+from sqlalchemy.orm import Session as DBSession
 
 from api.models.schemas import (
     TaskSubmitRequest,
@@ -17,6 +18,7 @@ from api.models.schemas import (
     ErrorResponse
 )
 from api.services.task_executor import TaskExecutor
+from api.database.connection import get_db
 
 
 logger = logging.getLogger(__name__)
@@ -96,15 +98,17 @@ async def list_tasks(
 async def execute_task(
     session_id: str,
     request: TaskSubmitRequest,
-    executor: TaskExecutor = Depends(get_task_executor)
+    executor: TaskExecutor = Depends(get_task_executor),
+    db: DBSession = Depends(get_db)
 ):
     """
     Execute experimental task on a session.
     
     Args:
         session_id: Session identifier
-        request: Task submission request with task type and parameters
+        request: Task submission request with task type, parameters, and optional webhook URL
         executor: Task executor dependency
+        db: Database session dependency
         
     Returns:
         TaskSubmitResponse with task ID and status URL
@@ -117,7 +121,9 @@ async def execute_task(
         task_id = await executor.submit_task(
             session_id=session_id,
             task_type=request.task_type,
-            parameters=request.parameters
+            parameters=request.parameters,
+            webhook_url=request.webhook_url,
+            db=db
         )
         
         logger.info(f"Task {task_id} submitted for session {session_id}")

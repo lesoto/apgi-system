@@ -53,6 +53,13 @@ class Settings:
     
     # Logging Settings
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
+    
+    # Alerting Settings
+    alert_webhook_urls: List[str] = []  # Can be set via environment
+    alert_enable_log_channel: bool = True
+    alert_error_rate_threshold: int = int(os.getenv("ALERT_ERROR_RATE_THRESHOLD", "10"))
+    alert_error_rate_window_minutes: int = int(os.getenv("ALERT_ERROR_RATE_WINDOW_MINUTES", "1"))
+    alert_cooldown_minutes: int = int(os.getenv("ALERT_COOLDOWN_MINUTES", "5"))
 
 
 # Global settings instance

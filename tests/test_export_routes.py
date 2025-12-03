@@ -32,14 +32,14 @@ def mock_redis():
 def mock_session_manager():
     """Create a mock SessionManager with test data."""
     manager = Mock(spec=SessionManager)
-    
+
     # Mock get_session
     async def mock_get_session(session_id):
         if session_id == "test-session-id-123":
             mock_sim = Mock(spec=SimulationSession)
             mock_sim.session_id = session_id
             mock_sim.state = SessionLifecycleState.RUNNING
-            
+
             # Mock get_state with history data
             async def mock_get_state():
                 return {
@@ -49,20 +49,21 @@ def mock_session_manager():
                         "ignitions": [False, True, False, True, False, False],
                         "free_energy": [1.5, 1.8, 1.6, 2.0, 1.7, 1.9],
                         "metabolic_reserves": [1000.0, 980.0, 960.0, 940.0, 920.0, 900.0],
-                        "allostatic_load": [0.2, 0.3, 0.25, 0.35, 0.28, 0.32]
+                        "allostatic_load": [0.2, 0.3, 0.25, 0.35, 0.28, 0.32],
                     },
                     "ignition": {"ignition_occurred": False},
                     "workspace": {"is_broadcasting": False},
-                    "body": {"heart_rate": 70.0, "cortisol": 0.1, "temperature": 37.0}
+                    "body": {"heart_rate": 70.0, "cortisol": 0.1, "temperature": 37.0},
                 }
+
             mock_sim.get_state = AsyncMock(side_effect=mock_get_state)
-            
+
             return mock_sim
         else:
             raise ValueError(f"Session {session_id} not found")
-    
+
     manager.get_session = AsyncMock(side_effect=mock_get_session)
-    
+
     return manager
 
 
@@ -70,32 +71,29 @@ def mock_session_manager():
 def client(mock_redis, mock_session_manager):
     """Create a test client with mocked dependencies."""
     app = create_app()
-    
+
     # Override the session manager dependency
     sessions._session_manager = mock_session_manager
     sessions._redis_client = mock_redis
-    
+
     # Initialize export service with mock session manager
     export._data_export_service = DataExportService(mock_session_manager)
-    
+
     # Skip startup/shutdown events for testing
     app.router.on_startup = []
     app.router.on_shutdown = []
-    
+
     return TestClient(app)
 
 
 def test_export_session_data_json(client):
     """Test exporting session data as JSON."""
-    response = client.get(
-        "/v1/sessions/test-session-id-123/export",
-        params={"format": "json"}
-    )
-    
+    response = client.get("/v1/sessions/test-session-id-123/export", params={"format": "json"})
+
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
     assert "attachment" in response.headers.get("content-disposition", "")
-    
+
     # Verify JSON structure
     data = response.json()
     assert "session_id" in data
@@ -106,15 +104,12 @@ def test_export_session_data_json(client):
 
 def test_export_session_data_csv(client):
     """Test exporting session data as CSV."""
-    response = client.get(
-        "/v1/sessions/test-session-id-123/export",
-        params={"format": "csv"}
-    )
-    
+    response = client.get("/v1/sessions/test-session-id-123/export", params={"format": "csv"})
+
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/csv; charset=utf-8"
     assert "attachment" in response.headers.get("content-disposition", "")
-    
+
     # Verify CSV has header
     content = response.text
     assert "time" in content
@@ -125,16 +120,13 @@ def test_export_with_variable_filter(client):
     """Test exporting with variable filtering."""
     response = client.get(
         "/v1/sessions/test-session-id-123/export",
-        params={
-            "format": "json",
-            "variables": "time,free_energy"
-        }
+        params={"format": "json", "variables": "time,free_energy"},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     history = data["history"]
-    
+
     # Should include time and free_energy
     assert "time" in history
     assert "free_energy" in history
@@ -144,17 +136,13 @@ def test_export_with_time_filter(client):
     """Test exporting with time range filtering."""
     response = client.get(
         "/v1/sessions/test-session-id-123/export",
-        params={
-            "format": "json",
-            "start_time": 10.0,
-            "end_time": 40.0
-        }
+        params={"format": "json", "start_time": 10.0, "end_time": 40.0},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     history = data["history"]
-    
+
     # Verify time filtering worked
     times = history.get("time", [])
     if times:
@@ -164,11 +152,8 @@ def test_export_with_time_filter(client):
 
 def test_export_session_not_found(client):
     """Test exporting non-existent session."""
-    response = client.get(
-        "/v1/sessions/nonexistent-id/export",
-        params={"format": "json"}
-    )
-    
+    response = client.get("/v1/sessions/nonexistent-id/export", params={"format": "json"})
+
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -176,10 +161,10 @@ def test_export_session_not_found(client):
 def test_get_summary_statistics(client):
     """Test retrieving summary statistics."""
     response = client.get("/v1/sessions/test-session-id-123/summary")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Verify summary structure
     assert "session_id" in data
     assert "duration_ms" in data
@@ -187,7 +172,7 @@ def test_get_summary_statistics(client):
     assert "ignition_stats" in data
     assert "energy_stats" in data
     assert "allostasis_stats" in data
-    
+
     # Verify ignition stats
     ignition_stats = data["ignition_stats"]
     assert "total_events" in ignition_stats
@@ -198,18 +183,18 @@ def test_get_time_series_data(client):
     """Test retrieving time series data."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
-        params={"variables": "free_energy,metabolic_reserves"}
+        params={"variables": "free_energy,metabolic_reserves"},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Verify time series structure
     assert "session_id" in data
     assert "time" in data
     assert "data" in data
     assert "num_points" in data
-    
+
     # Verify requested variables are present
     assert "free_energy" in data["data"]
     assert "metabolic_reserves" in data["data"]
@@ -219,19 +204,16 @@ def test_get_time_series_with_pagination(client):
     """Test time series with pagination."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
-        params={
-            "variables": "free_energy",
-            "limit": 3
-        }
+        params={"variables": "free_energy", "limit": 3},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Should have pagination info
     assert "pagination" in data
     assert data["num_points"] <= 3
-    
+
     # Check if more data available
     pagination = data["pagination"]
     if pagination:
@@ -243,15 +225,12 @@ def test_get_time_series_with_downsampling(client):
     """Test time series with downsampling."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
-        params={
-            "variables": "free_energy",
-            "downsample": 2
-        }
+        params={"variables": "free_energy", "downsample": 2},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Downsampling should reduce number of points
     assert data["num_points"] <= 3  # Original has 6 points, downsample by 2 = 3
 
@@ -259,13 +238,12 @@ def test_get_time_series_with_downsampling(client):
 def test_get_event_analysis(client):
     """Test retrieving event analysis."""
     response = client.get(
-        "/v1/sessions/test-session-id-123/events",
-        params={"event_type": "ignition"}
+        "/v1/sessions/test-session-id-123/events", params={"event_type": "ignition"}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Verify event analysis structure
     assert "session_id" in data
     assert "event_type" in data
@@ -276,11 +254,8 @@ def test_get_event_analysis(client):
 
 def test_get_event_analysis_session_not_found(client):
     """Test event analysis for non-existent session."""
-    response = client.get(
-        "/v1/sessions/nonexistent-id/events",
-        params={"event_type": "ignition"}
-    )
-    
+    response = client.get("/v1/sessions/nonexistent-id/events", params={"event_type": "ignition"})
+
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -288,36 +263,32 @@ def test_get_event_analysis_session_not_found(client):
 def test_complete_export_workflow(client):
     """Test complete data export workflow."""
     session_id = "test-session-id-123"
-    
+
     # 1. Get summary statistics
     summary_response = client.get(f"/v1/sessions/{session_id}/summary")
     assert summary_response.status_code == 200
     summary = summary_response.json()
     assert summary["num_steps"] > 0
-    
+
     # 2. Get time series data
     timeseries_response = client.get(
         f"/v1/sessions/{session_id}/timeseries",
-        params={"variables": "free_energy,metabolic_reserves"}
+        params={"variables": "free_energy,metabolic_reserves"},
     )
     assert timeseries_response.status_code == 200
     timeseries = timeseries_response.json()
     assert len(timeseries["time"]) > 0
-    
+
     # 3. Get event analysis
     events_response = client.get(
-        f"/v1/sessions/{session_id}/events",
-        params={"event_type": "ignition"}
+        f"/v1/sessions/{session_id}/events", params={"event_type": "ignition"}
     )
     assert events_response.status_code == 200
     events = events_response.json()
     assert "total_events" in events
-    
+
     # 4. Export complete data
-    export_response = client.get(
-        f"/v1/sessions/{session_id}/export",
-        params={"format": "json"}
-    )
+    export_response = client.get(f"/v1/sessions/{session_id}/export", params={"format": "json"})
     assert export_response.status_code == 200
     export_data = export_response.json()
     assert "history" in export_data

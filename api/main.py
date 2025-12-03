@@ -12,16 +12,20 @@ import logging
 import redis.asyncio as redis
 
 from api.config import settings
-from api.routes import sessions, state, tasks, export
+from api.routes import sessions, state, tasks, export, metrics
 from api.database.connection import init_db, close_db
 from api.exception_handlers import register_exception_handlers
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+from api.middleware.logging import (
+    RequestLoggingMiddleware,
+    configure_structured_logging,
+    StructuredLogger
 )
-logger = logging.getLogger(__name__)
+from api.middleware.metrics import PrometheusMetricsMiddleware
+from api.middleware.alerting import configure_alerting
+
+# Configure structured logging
+configure_structured_logging(settings.log_level)
+logger = StructuredLogger(__name__)
 
 
 # Global Redis client
@@ -44,6 +48,12 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json"
     )
     
+    # Add metrics middleware (first, to track all requests)
+    app.add_middleware(PrometheusMetricsMiddleware)
+    
+    # Add request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
+    
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
@@ -62,12 +72,22 @@ def create_app() -> FastAPI:
         """Initialize resources on startup."""
         global redis_client
         
+        # Configure alerting system
+        configure_alerting(
+            webhook_urls=settings.alert_webhook_urls,
+            enable_log_channel=settings.alert_enable_log_channel,
+            error_rate_threshold=settings.alert_error_rate_threshold,
+            error_rate_window_minutes=settings.alert_error_rate_window_minutes,
+            alert_cooldown_minutes=settings.alert_cooldown_minutes
+        )
+        logger.info("Alerting system configured", component="alerting")
+        
         # Initialize database
         try:
             init_db()
-            logger.info("Database initialized")
+            logger.info("Database initialized", component="database")
         except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
+            logger.error("Failed to initialize database", component="database", error=str(e))
             raise
         
         # Initialize Redis client
@@ -78,23 +98,23 @@ def create_app() -> FastAPI:
                 decode_responses=True
             )
             await redis_client.ping()
-            logger.info("Redis client initialized")
+            logger.info("Redis client initialized", component="redis", url=settings.redis_url)
         except Exception as e:
-            logger.error(f"Failed to initialize Redis: {e}")
+            logger.error("Failed to initialize Redis", component="redis", error=str(e))
             raise
         
         # Initialize session routes with Redis client
         sessions.init_session_routes(redis_client)
-        logger.info("Session routes initialized")
+        logger.info("Session routes initialized", component="routes")
         
         # Initialize task routes
         tasks.init_task_routes()
-        logger.info("Task routes initialized")
+        logger.info("Task routes initialized", component="routes")
         
         # Initialize export routes with session manager
         session_mgr = sessions.get_session_manager()
         export.init_export_routes(session_mgr)
-        logger.info("Export routes initialized")
+        logger.info("Export routes initialized", component="routes")
     
     # Shutdown event
     @app.on_event("shutdown")
@@ -105,11 +125,11 @@ def create_app() -> FastAPI:
         # Close Redis connection
         if redis_client:
             await redis_client.close()
-            logger.info("Redis connection closed")
+            logger.info("Redis connection closed", component="redis")
         
         # Close database connections
         close_db()
-        logger.info("Database connections closed")
+        logger.info("Database connections closed", component="database")
     
     # Health check endpoint
     @app.get("/health", tags=["Health"])
@@ -141,8 +161,9 @@ def create_app() -> FastAPI:
     app.include_router(state.router)
     app.include_router(tasks.router)
     app.include_router(export.router)
+    app.include_router(metrics.router)
     
-    logger.info("APGI API application created successfully")
+    logger.info("APGI API application created successfully", version="1.0.0")
     return app
 
 

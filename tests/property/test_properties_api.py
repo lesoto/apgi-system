@@ -1,0 +1,531 @@
+"""
+Property-based tests for API endpoints.
+
+Tests universal properties that should hold across all valid API requests.
+"""
+
+import pytest
+from hypothesis import given, strategies as st, settings, assume
+from unittest.mock import Mock, AsyncMock, patch
+import uuid
+
+from api.services.task_executor import TaskExecutor, TaskType, TaskStatus
+
+
+# ============================================================================
+# Strategies for generating test data
+# ============================================================================
+
+
+@st.composite
+def task_type_strategy(draw):
+    """Generate valid task types."""
+    return draw(
+        st.sampled_from(
+            [
+                TaskType.IOWA_GAMBLING.value,
+                TaskType.MASKING_PARADIGM.value,
+                TaskType.ATTENTIONAL_BLINK.value,
+            ]
+        )
+    )
+
+
+@st.composite
+def task_parameters_strategy(draw, task_type):
+    """Generate valid parameters for a given task type."""
+    if task_type == TaskType.IOWA_GAMBLING.value:
+        return {
+            "num_trials": draw(st.integers(min_value=10, max_value=200)),
+            "initial_balance": draw(st.integers(min_value=1000, max_value=5000)),
+            "deck_stimulus_strength": draw(st.floats(min_value=0.5, max_value=3.0)),
+            "outcome_stimulus_strength": draw(st.floats(min_value=0.5, max_value=3.0)),
+            "interoceptive_gain": draw(st.floats(min_value=0.5, max_value=2.0)),
+            "deck_selection_strategy": draw(st.sampled_from(["balanced", "random"])),
+        }
+    elif task_type == TaskType.MASKING_PARADIGM.value:
+        return {
+            "target_duration_ms": draw(st.floats(min_value=20.0, max_value=100.0)),
+            "soas": draw(
+                st.lists(st.floats(min_value=0.0, max_value=500.0), min_size=3, max_size=10)
+            ),
+            "mask_duration_ms": draw(st.floats(min_value=50.0, max_value=200.0)),
+            "num_trials_per_condition": draw(st.integers(min_value=5, max_value=30)),
+            "target_strength": draw(st.floats(min_value=1.0, max_value=5.0)),
+            "mask_strength": draw(st.floats(min_value=1.0, max_value=5.0)),
+        }
+    elif task_type == TaskType.ATTENTIONAL_BLINK.value:
+        return {
+            "stream_length": draw(st.integers(min_value=10, max_value=20)),
+            "item_duration_ms": draw(st.floats(min_value=50.0, max_value=200.0)),
+            "num_trials_per_lag": draw(st.integers(min_value=5, max_value=30)),
+            "lags": draw(st.lists(st.integers(min_value=1, max_value=10), min_size=2, max_size=8)),
+            "target_salience": draw(st.floats(min_value=1.0, max_value=5.0)),
+        }
+    else:
+        return {}
+
+
+@st.composite
+def session_id_strategy(draw):
+    """Generate valid session IDs (UUIDs)."""
+    return str(uuid.uuid4())
+
+
+@st.composite
+def task_result_strategy(draw, task_type, session_id):
+    """Generate mock task results for a given task type."""
+    base_result = {"task_type": task_type, "session_id": session_id, "status": "completed"}
+
+    if task_type == TaskType.IOWA_GAMBLING.value:
+        base_result["results"] = {
+            "total_trials": draw(st.integers(min_value=10, max_value=200)),
+            "advantageous_ratio": draw(st.floats(min_value=0.0, max_value=1.0)),
+            "final_balance": draw(st.integers(min_value=-5000, max_value=10000)),
+        }
+    elif task_type == TaskType.MASKING_PARADIGM.value:
+        base_result["results"] = {
+            "ignition_probabilities": draw(
+                st.lists(st.floats(min_value=0.0, max_value=1.0), min_size=3, max_size=10)
+            ),
+            "mean_ignition_probability": draw(st.floats(min_value=0.0, max_value=1.0)),
+        }
+    elif task_type == TaskType.ATTENTIONAL_BLINK.value:
+        base_result["results"] = {
+            "t1_accuracy": draw(st.floats(min_value=0.0, max_value=1.0)),
+            "t2_accuracy_by_lag": draw(
+                st.lists(st.floats(min_value=0.0, max_value=1.0), min_size=2, max_size=8)
+            ),
+        }
+
+    return base_result
+
+
+# ============================================================================
+# Property Tests
+# ============================================================================
+
+
+@given(data=st.data())
+@settings(max_examples=100, deadline=None)
+@pytest.mark.asyncio
+async def test_property_task_execution_round_trip(data):
+    """
+    **Feature: api-rest-interface, Property 10: Task execution and retrieval round-trip**
+
+    For any experimental task, executing it and then retrieving results by task ID
+    should return the complete task results.
+
+    **Validates: Requirements 4.1, 4.2, 4.3, 4.5**
+    """
+    # Generate test data
+    task_type = data.draw(task_type_strategy())
+    session_id = data.draw(session_id_strategy())
+
+    # Generate parameters for this task type
+    parameters = data.draw(task_parameters_strategy(task_type))
+
+    # Generate expected result
+    expected_result = data.draw(task_result_strategy(task_type, session_id))
+
+    # Create mock Celery app and result
+    mock_celery_app = Mock()
+    mock_async_result = Mock()
+    mock_async_result.id = str(uuid.uuid4())
+    mock_async_result.state = "SUCCESS"
+    mock_async_result.successful.return_value = True
+    mock_async_result.failed.return_value = False
+    mock_async_result.ready.return_value = True
+    mock_async_result.result = expected_result
+
+    # Mock send_task to return our mock result
+    mock_celery_app.send_task.return_value = mock_async_result
+
+    # Create TaskExecutor with mocked Celery app
+    with patch("api.services.task_executor.celery_app", mock_celery_app):
+        with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
+            executor = TaskExecutor()
+
+            # Step 1: Submit task
+            task_id = await executor.submit_task(
+                session_id=session_id, task_type=task_type, parameters=parameters
+            )
+
+            # Verify task_id was returned
+            assert task_id is not None
+            assert isinstance(task_id, str)
+            assert len(task_id) > 0
+
+            # Step 2: Get task status
+            status_info = await executor.get_task_status(task_id)
+
+            # Verify status response structure
+            assert "task_id" in status_info
+            assert "status" in status_info
+            assert status_info["task_id"] == task_id
+
+            # Step 3: Get task result (for completed tasks)
+            if status_info["status"] == TaskStatus.COMPLETED.value:
+                result = await executor.get_task_result(task_id)
+
+                # Verify result structure matches what was submitted
+                assert result is not None
+                assert isinstance(result, dict)
+
+                # Verify result contains expected fields
+                assert "task_type" in result
+                assert "session_id" in result
+                assert "status" in result
+                assert "results" in result
+
+                # Verify values match
+                assert result["task_type"] == task_type
+                assert result["session_id"] == session_id
+                assert result["status"] == "completed"
+
+                # Verify results field is present and is a dict
+                assert isinstance(result["results"], dict)
+                assert len(result["results"]) > 0
+
+
+@given(data=st.data())
+@settings(max_examples=100, deadline=None)
+@pytest.mark.asyncio
+async def test_property_task_status_tracking(data):
+    """
+    Property: Task status should be trackable from submission to completion.
+
+    For any task, the status should progress through valid states and
+    always be retrievable by task ID.
+    """
+    # Generate test data
+    task_type = data.draw(task_type_strategy())
+    session_id = data.draw(session_id_strategy())
+
+    # Generate parameters
+    parameters = data.draw(task_parameters_strategy(task_type))
+
+    # Create mock Celery app
+    mock_celery_app = Mock()
+    mock_async_result = Mock()
+    task_id = str(uuid.uuid4())
+    mock_async_result.id = task_id
+
+    # Mock different states
+    mock_async_result.state = "PENDING"
+    mock_async_result.successful.return_value = False
+    mock_async_result.failed.return_value = False
+    mock_async_result.ready.return_value = False
+
+    mock_celery_app.send_task.return_value = mock_async_result
+
+    with patch("api.services.task_executor.celery_app", mock_celery_app):
+        with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
+            executor = TaskExecutor()
+
+            # Submit task
+            returned_task_id = await executor.submit_task(
+                session_id=session_id, task_type=task_type, parameters=parameters
+            )
+
+            # Verify task ID is returned
+            assert returned_task_id == task_id
+
+            # Get status for pending task
+            status_info = await executor.get_task_status(task_id)
+
+            # Verify status structure
+            assert "task_id" in status_info
+            assert "status" in status_info
+            assert "state" in status_info
+            assert status_info["task_id"] == task_id
+
+            # Verify status is one of the valid states
+            valid_statuses = [s.value for s in TaskStatus]
+            assert status_info["status"] in valid_statuses
+
+
+@given(
+    invalid_task_type=st.text(min_size=1, max_size=50).filter(
+        lambda x: x not in [t.value for t in TaskType]
+    ),
+    session_id=session_id_strategy(),
+)
+@settings(max_examples=50, deadline=None)
+@pytest.mark.asyncio
+async def test_property_invalid_task_type_rejection(invalid_task_type, session_id):
+    """
+    Property: Invalid task types should be rejected with clear error.
+
+    For any string that is not a valid task type, submitting a task
+    should raise a ValueError.
+    """
+    # Create executor
+    executor = TaskExecutor()
+
+    # Attempt to submit task with invalid type
+    with pytest.raises(ValueError) as exc_info:
+        await executor.submit_task(
+            session_id=session_id, task_type=invalid_task_type, parameters={}
+        )
+
+    # Verify error message mentions the invalid task type
+    error_message = str(exc_info.value)
+    assert "Unknown task type" in error_message or "task type" in error_message.lower()
+
+
+@given(data=st.data())
+@settings(max_examples=100, deadline=None)
+@pytest.mark.asyncio
+async def test_property_async_task_status_tracking(data):
+    """
+    **Feature: api-rest-interface, Property 25: Async task status tracking**
+
+    For any long-running task, polling the status endpoint should show progress
+    updates until completion.
+
+    **Validates: Requirements 11.1, 11.2**
+    """
+    # Generate test data upfront
+    task_type = data.draw(task_type_strategy())
+    session_id = data.draw(session_id_strategy())
+    parameters = data.draw(task_parameters_strategy(task_type))
+    progress_value = data.draw(st.integers(min_value=0, max_value=99))
+    current_trial = data.draw(st.integers(min_value=1, max_value=100))
+    task_result = data.draw(task_result_strategy(task_type, session_id))
+
+    # Create mock Celery app
+    mock_celery_app = Mock()
+    task_id = str(uuid.uuid4())
+
+    # Simulate task lifecycle: PENDING -> STARTED -> SUCCESS
+    task_states = ["PENDING", "STARTED", "SUCCESS"]
+
+    for state in task_states:
+        mock_async_result = Mock()
+        mock_async_result.id = task_id
+        mock_async_result.state = state
+
+        # Configure mock based on state
+        if state == "PENDING":
+            mock_async_result.successful.return_value = False
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = False
+            mock_async_result.info = None
+        elif state == "STARTED":
+            mock_async_result.successful.return_value = False
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = False
+            # Include progress info for running tasks
+            mock_async_result.info = {"progress": progress_value, "current_trial": current_trial}
+        elif state == "SUCCESS":
+            mock_async_result.successful.return_value = True
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = True
+            mock_async_result.result = task_result
+
+        mock_celery_app.send_task.return_value = mock_async_result
+
+        with patch("api.services.task_executor.celery_app", mock_celery_app):
+            with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
+                executor = TaskExecutor()
+
+                # For first iteration, submit the task
+                if state == "PENDING":
+                    returned_task_id = await executor.submit_task(
+                        session_id=session_id, task_type=task_type, parameters=parameters
+                    )
+                    assert returned_task_id == task_id
+
+                # Poll status
+                status_info = await executor.get_task_status(task_id)
+
+                # Verify status structure is always present
+                assert "task_id" in status_info
+                assert "status" in status_info
+                assert "state" in status_info
+                assert status_info["task_id"] == task_id
+                assert status_info["state"] == state
+
+                # Verify status is valid
+                valid_statuses = [s.value for s in TaskStatus]
+                assert status_info["status"] in valid_statuses
+
+                # Verify state-specific properties
+                if state == "PENDING":
+                    assert status_info["status"] == TaskStatus.PENDING.value
+                elif state == "STARTED":
+                    assert status_info["status"] == TaskStatus.RUNNING.value
+                    # Running tasks should include progress info
+                    if "info" in status_info:
+                        assert isinstance(status_info["info"], dict)
+                elif state == "SUCCESS":
+                    assert status_info["status"] == TaskStatus.COMPLETED.value
+                    # Completed tasks should include result
+                    assert "result" in status_info
+                    assert isinstance(status_info["result"], dict)
+
+                    # Verify result structure
+                    result = status_info["result"]
+                    assert "task_type" in result
+                    assert "session_id" in result
+                    assert "status" in result
+                    assert result["task_type"] == task_type
+                    assert result["session_id"] == session_id
+
+
+@given(data=st.data())
+@settings(max_examples=50, deadline=None)
+@pytest.mark.asyncio
+async def test_property_failed_task_status_tracking(data):
+    """
+    Property: Failed tasks should report error information.
+
+    For any task that fails, the status should show failure state
+    and include error information.
+
+    **Validates: Requirements 11.1, 11.2**
+    """
+    # Generate test data
+    task_type = data.draw(task_type_strategy())
+    session_id = data.draw(session_id_strategy())
+    parameters = data.draw(task_parameters_strategy(task_type))
+
+    # Create mock Celery app with failed task
+    mock_celery_app = Mock()
+    task_id = str(uuid.uuid4())
+
+    mock_async_result = Mock()
+    mock_async_result.id = task_id
+    mock_async_result.state = "FAILURE"
+    mock_async_result.successful.return_value = False
+    mock_async_result.failed.return_value = True
+    mock_async_result.ready.return_value = True
+
+    # Generate error message
+    error_message = data.draw(st.text(min_size=10, max_size=100))
+    mock_async_result.info = error_message
+
+    mock_celery_app.send_task.return_value = mock_async_result
+
+    with patch("api.services.task_executor.celery_app", mock_celery_app):
+        with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
+            executor = TaskExecutor()
+
+            # Submit task
+            returned_task_id = await executor.submit_task(
+                session_id=session_id, task_type=task_type, parameters=parameters
+            )
+            assert returned_task_id == task_id
+
+            # Get status
+            status_info = await executor.get_task_status(task_id)
+
+            # Verify failed status
+            assert status_info["status"] == TaskStatus.FAILED.value
+            assert status_info["state"] == "FAILURE"
+
+            # Verify error information is present
+            assert "error" in status_info
+            assert isinstance(status_info["error"], str)
+            assert len(status_info["error"]) > 0
+
+
+@given(data=st.data())
+@settings(max_examples=100, deadline=None)
+@pytest.mark.asyncio
+async def test_property_async_task_status_tracking(data):
+    """
+    **Feature: api-rest-interface, Property 25: Async task status tracking**
+
+    For any long-running task, polling the status endpoint should show progress
+    updates until completion.
+
+    **Validates: Requirements 11.1, 11.2**
+    """
+    # Generate test data upfront
+    task_type = data.draw(task_type_strategy())
+    session_id = data.draw(session_id_strategy())
+    parameters = data.draw(task_parameters_strategy(task_type))
+    progress_value = data.draw(st.integers(min_value=0, max_value=99))
+    current_trial = data.draw(st.integers(min_value=1, max_value=100))
+    task_result = data.draw(task_result_strategy(task_type, session_id))
+
+    # Create mock Celery app
+    mock_celery_app = Mock()
+    task_id = str(uuid.uuid4())
+
+    # Simulate task lifecycle: PENDING -> STARTED -> SUCCESS
+    task_states = ["PENDING", "STARTED", "SUCCESS"]
+
+    for state in task_states:
+        mock_async_result = Mock()
+        mock_async_result.id = task_id
+        mock_async_result.state = state
+
+        # Configure mock based on state
+        if state == "PENDING":
+            mock_async_result.successful.return_value = False
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = False
+            mock_async_result.info = None
+        elif state == "STARTED":
+            mock_async_result.successful.return_value = False
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = False
+            # Include progress info for running tasks
+            mock_async_result.info = {"progress": progress_value, "current_trial": current_trial}
+        elif state == "SUCCESS":
+            mock_async_result.successful.return_value = True
+            mock_async_result.failed.return_value = False
+            mock_async_result.ready.return_value = True
+            mock_async_result.result = task_result
+
+        mock_celery_app.send_task.return_value = mock_async_result
+
+        with patch("api.services.task_executor.celery_app", mock_celery_app):
+            with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
+                executor = TaskExecutor()
+
+                # For first iteration, submit the task
+                if state == "PENDING":
+                    returned_task_id = await executor.submit_task(
+                        session_id=session_id, task_type=task_type, parameters=parameters
+                    )
+                    assert returned_task_id == task_id
+
+                # Poll status
+                status_info = await executor.get_task_status(task_id)
+
+                # Verify status structure is always present
+                assert "task_id" in status_info
+                assert "status" in status_info
+                assert "state" in status_info
+                assert status_info["task_id"] == task_id
+                assert status_info["state"] == state
+
+                # Verify status is valid
+                valid_statuses = [s.value for s in TaskStatus]
+                assert status_info["status"] in valid_statuses
+
+                # Verify state-specific properties
+                if state == "PENDING":
+                    assert status_info["status"] == TaskStatus.PENDING.value
+                elif state == "STARTED":
+                    assert status_info["status"] == TaskStatus.RUNNING.value
+                    # Running tasks should include progress info
+                    if "info" in status_info:
+                        assert isinstance(status_info["info"], dict)
+                elif state == "SUCCESS":
+                    assert status_info["status"] == TaskStatus.COMPLETED.value
+                    # Completed tasks should include result
+                    assert "result" in status_info
+                    assert isinstance(status_info["result"], dict)
+
+                    # Verify result structure
+                    result = status_info["result"]
+                    assert "task_type" in result
+                    assert "session_id" in result
+                    assert "status" in result
+                    assert result["task_type"] == task_type
+                    assert result["session_id"] == session_id
