@@ -1,0 +1,59 @@
+"""
+API Configuration
+
+Configuration settings for the APGI REST API.
+"""
+
+import os
+from typing import List
+
+
+class Settings:
+    """
+    API configuration settings.
+    
+    Settings can be overridden via environment variables.
+    """
+    
+    # API Settings
+    api_title: str = "APGI System API"
+    api_version: str = "1.0.0"
+    api_description: str = "REST API for consciousness modeling"
+    
+    # Server Settings
+    host: str = "0.0.0.0"
+    port: int = 8000
+    reload: bool = True
+    
+    # Database Settings
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost/apgi_api")
+    
+    # Redis Settings
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    
+    # Celery Settings
+    celery_broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
+    celery_result_backend: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
+    
+    # Authentication Settings
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
+    
+    # Rate Limiting Settings
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 60
+    
+    # CORS Settings
+    cors_origins: List[str] = ["*"]
+    cors_allow_credentials: bool = True
+    cors_allow_methods: List[str] = ["*"]
+    cors_allow_headers: List[str] = ["*"]
+    
+    # Logging Settings
+    log_level: str = os.getenv("LOG_LEVEL", "INFO")
+
+
+# Global settings instance
+settings = Settings()

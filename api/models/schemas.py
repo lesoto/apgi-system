@@ -1,0 +1,393 @@
+"""
+Pydantic Request/Response Models
+
+Data models for API request validation and response serialization.
+"""
+
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+from enum import Enum
+
+
+# ============================================================================
+# Enums
+# ============================================================================
+
+class SessionStateEnum(str, Enum):
+    """Session lifecycle states."""
+    CREATED = "created"
+    RUNNING = "running"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+class TaskStatusEnum(str, Enum):
+    """Task execution states."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# ============================================================================
+# Session Models
+# ============================================================================
+
+class SessionCreateRequest(BaseModel):
+    """Request to create new simulation session."""
+    config_path: Optional[str] = Field(
+        None,
+        description="Path to YAML configuration file"
+    )
+    custom_config: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Custom configuration overrides"
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Human-readable description of the session"
+    )
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "config_path": "config/default.yaml",
+                "description": "Baseline simulation experiment"
+            }
+        }
+    )
+
+
+class SessionCreateResponse(BaseModel):
+    """Response with new session details."""
+    session_id: str = Field(..., description="Unique session identifier")
+    status: str = Field(..., description="Current session status")
+    created_at: datetime = Field(..., description="Session creation timestamp")
+    config: Dict[str, Any] = Field(..., description="Session configuration")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "status": "created",
+                "created_at": "2025-12-03T10:30:00Z",
+                "config": {"timestep_ms": 10.0}
+            }
+        }
+    )
+
+
+class SessionResponse(BaseModel):
+    """Detailed session information."""
+    session_id: str = Field(..., description="Unique session identifier")
+    status: str = Field(..., description="Current session status")
+    created_at: datetime = Field(..., description="Session creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    config: Dict[str, Any] = Field(..., description="Session configuration")
+    description: Optional[str] = Field(None, description="Session description")
+
+
+class SessionActionResponse(BaseModel):
+    """Response for session actions (start, pause, stop, reset)."""
+    session_id: str = Field(..., description="Session identifier")
+    status: str = Field(..., description="New session status")
+    timestamp: datetime = Field(..., description="Action timestamp")
+
+
+# ============================================================================
+# System State Models
+# ============================================================================
+
+class IgnitionState(BaseModel):
+    """Ignition subsystem state."""
+    ignition_occurred: bool = Field(..., description="Whether ignition occurred")
+    total_signal: float = Field(..., description="Total ignition signal strength")
+    threshold: float = Field(..., description="Current ignition threshold")
+    duration_ms: Optional[float] = Field(None, description="Duration of ignition event")
+
+
+class WorkspaceState(BaseModel):
+    """Global workspace state."""
+    is_broadcasting: bool = Field(..., description="Whether workspace is broadcasting")
+    content: Optional[str] = Field(None, description="Type of content being broadcast")
+    broadcast_duration_ms: Optional[float] = Field(None, description="Duration of broadcast")
+
+
+class BodyState(BaseModel):
+    """Interoceptive body state."""
+    heart_rate: float = Field(..., description="Heart rate (bpm)")
+    cortisol: float = Field(..., description="Cortisol level")
+    temperature: float = Field(..., description="Body temperature (Celsius)")
+
+
+class AllostaticState(BaseModel):
+    """Allostatic regulation state."""
+    allostatic_load: float = Field(..., description="Current allostatic load")
+
+
+class PrecisionState(BaseModel):
+    """Precision weighting state."""
+    exteroceptive: float = Field(..., description="Exteroceptive precision weight")
+    interoceptive: float = Field(..., description="Interoceptive precision weight")
+
+
+class MetabolicState(BaseModel):
+    """Metabolic reserves state."""
+    reserves: float = Field(..., description="Current metabolic reserves")
+    reserve_fraction: float = Field(..., description="Fraction of maximum reserves")
+
+
+class MinimalSelfState(BaseModel):
+    """Minimal self-model state."""
+    coherence: float = Field(..., description="Self-model coherence")
+
+
+class NarrativeSelfState(BaseModel):
+    """Narrative self-model state."""
+    active: bool = Field(..., description="Whether narrative self is active")
+
+
+class SelfModelState(BaseModel):
+    """Self-model state."""
+    minimal: MinimalSelfState
+    narrative: NarrativeSelfState
+
+
+class SystemStateResponse(BaseModel):
+    """Complete system state."""
+    time_ms: float = Field(..., description="Simulation time in milliseconds")
+    ignition: IgnitionState
+    workspace: WorkspaceState
+    body: BodyState
+    allostasis: AllostaticState
+    precision: PrecisionState
+    metabolism: MetabolicState
+    self_model: SelfModelState
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "time_ms": 5000.0,
+                "ignition": {
+                    "ignition_occurred": True,
+                    "total_signal": 2.5,
+                    "threshold": 2.0,
+                    "duration_ms": 350.0
+                },
+                "workspace": {
+                    "is_broadcasting": True,
+                    "content": "sensory",
+                    "broadcast_duration_ms": 350.0
+                },
+                "body": {
+                    "heart_rate": 75.0,
+                    "cortisol": 0.15,
+                    "temperature": 37.0
+                },
+                "allostasis": {
+                    "allostatic_load": 0.3
+                },
+                "precision": {
+                    "exteroceptive": 1.2,
+                    "interoceptive": 0.8
+                },
+                "metabolism": {
+                    "reserves": 850.0,
+                    "reserve_fraction": 0.85
+                },
+                "self_model": {
+                    "minimal": {"coherence": 0.75},
+                    "narrative": {"active": True}
+                }
+            }
+        }
+    )
+
+
+# ============================================================================
+# Task Models
+# ============================================================================
+
+class TaskDefinition(BaseModel):
+    """Definition of experimental task."""
+    task_id: str = Field(..., description="Unique task identifier")
+    task_type: str = Field(..., description="Type of experimental task")
+    session_id: str = Field(..., description="Associated session ID")
+    parameters: Dict[str, Any] = Field(..., description="Task parameters")
+    created_at: datetime = Field(..., description="Task creation timestamp")
+
+
+class TaskExecuteRequest(BaseModel):
+    """Request to execute experimental task."""
+    task_type: str = Field(..., description="Type of task to execute")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Task-specific parameters"
+    )
+    webhook_url: Optional[str] = Field(
+        None,
+        description="URL for webhook notification on completion"
+    )
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_type": "iowa_gambling",
+                "parameters": {"num_trials": 100}
+            }
+        }
+    )
+
+
+class TaskResult(BaseModel):
+    """Results from completed task."""
+    task_id: str = Field(..., description="Task identifier")
+    status: TaskStatusEnum = Field(..., description="Task execution status")
+    progress: Optional[int] = Field(None, description="Progress percentage (0-100)")
+    result_data: Optional[Dict[str, Any]] = Field(None, description="Task results")
+    started_at: Optional[datetime] = Field(None, description="Task start timestamp")
+    completed_at: Optional[datetime] = Field(None, description="Task completion timestamp")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_id": "task_7f8d9e0a1b2c",
+                "status": "completed",
+                "progress": 100,
+                "started_at": "2025-12-03T10:35:01Z",
+                "completed_at": "2025-12-03T10:36:30Z",
+                "result_data": {
+                    "trials": [],
+                    "summary": {
+                        "advantageous_deck_preference": 0.65
+                    }
+                }
+            }
+        }
+    )
+
+
+class TaskSubmitResponse(BaseModel):
+    """Response when task is submitted."""
+    task_id: str = Field(..., description="Task identifier")
+    status: str = Field(..., description="Initial task status")
+    status_url: str = Field(..., description="URL to check task status")
+    created_at: datetime = Field(..., description="Task creation timestamp")
+
+
+class TaskListResponse(BaseModel):
+    """List of available task types."""
+    tasks: List[Dict[str, Any]] = Field(..., description="Available task types")
+
+
+# ============================================================================
+# Error Models
+# ============================================================================
+
+class ErrorDetail(BaseModel):
+    """Detailed error information."""
+    field: Optional[str] = Field(None, description="Field that caused the error")
+    message: str = Field(..., description="Error message")
+    type: Optional[str] = Field(None, description="Error type")
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response format."""
+    error: Dict[str, Any] = Field(
+        ...,
+        description="Error details including code, message, request_id, timestamp, and details"
+    )
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "error": {
+                    "code": "SESSION_NOT_FOUND",
+                    "message": "Session with ID 'abc123' does not exist",
+                    "request_id": "req_7f8d9e0a1b2c",
+                    "timestamp": "2025-12-03T10:30:00Z",
+                    "details": {"session_id": "abc123"}
+                }
+            }
+        }
+    )
+
+
+# ============================================================================
+# Data Export Models
+# ============================================================================
+
+class PaginationInfo(BaseModel):
+    """Pagination information."""
+    next_cursor: Optional[str] = Field(None, description="Cursor for next page")
+    has_more: bool = Field(..., description="Whether more data is available")
+
+
+class IgnitionEvent(BaseModel):
+    """Single ignition event."""
+    time_ms: float = Field(..., description="Event timestamp in milliseconds")
+    duration_ms: float = Field(..., description="Event duration")
+    trigger_signal: float = Field(..., description="Signal that triggered ignition")
+    threshold: float = Field(..., description="Threshold at time of ignition")
+
+
+class IgnitionHistoryResponse(BaseModel):
+    """Ignition event history."""
+    events: List[IgnitionEvent] = Field(..., description="List of ignition events")
+    pagination: Optional[PaginationInfo] = Field(None, description="Pagination info")
+
+
+class SummaryStatistics(BaseModel):
+    """Summary statistics for a session."""
+    session_id: str = Field(..., description="Session identifier")
+    duration_ms: float = Field(..., description="Total simulation duration")
+    num_steps: int = Field(..., description="Number of simulation steps")
+    ignition_stats: Dict[str, Any] = Field(..., description="Ignition statistics")
+    energy_stats: Dict[str, Any] = Field(..., description="Energy statistics")
+    allostasis_stats: Dict[str, Any] = Field(..., description="Allostasis statistics")
+
+
+# ============================================================================
+# Authentication Models
+# ============================================================================
+
+class LoginRequest(BaseModel):
+    """Login request."""
+    username: str = Field(..., description="Username")
+    password: str = Field(..., description="Password")
+
+
+class TokenResponse(BaseModel):
+    """Authentication token response."""
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(..., description="Token expiration time in seconds")
+    refresh_token: Optional[str] = Field(None, description="Refresh token")
+
+
+class TokenRefreshRequest(BaseModel):
+    """Token refresh request."""
+    refresh_token: str = Field(..., description="Refresh token")
+
+
+# ============================================================================
+# Health and Version Models
+# ============================================================================
+
+class HealthCheckResponse(BaseModel):
+    """Health check response."""
+    status: str = Field(..., description="Overall health status")
+    version: str = Field(..., description="API version")
+    timestamp: datetime = Field(..., description="Check timestamp")
+    checks: Optional[Dict[str, str]] = Field(None, description="Individual component checks")
+
+
+class VersionResponse(BaseModel):
+    """API version information."""
+    current_version: str = Field(..., description="Current API version")
+    supported_versions: List[str] = Field(..., description="List of supported versions")
+    deprecated_versions: List[str] = Field(..., description="List of deprecated versions")
+    api_spec_url: str = Field(..., description="URL to OpenAPI specification")

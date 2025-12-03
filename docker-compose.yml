@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: apgi_postgres
+    environment:
+      POSTGRES_USER: apgi
+      POSTGRES_PASSWORD: apgi_password
+      POSTGRES_DB: apgi_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apgi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: apgi_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # APGI API
+  api:
+    build: .
+    container_name: apgi_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://apgi:apgi_password@postgres:5432/apgi_api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./api:/app/api
+      - ./apgi_system:/app/apgi_system
+      - ./config:/app/config
+
+  # Celery Worker
+  celery_worker:
+    build: .
+    container_name: apgi_celery_worker
+    command: celery -A api.tasks worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://apgi:apgi_password@postgres:5432/apgi_api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./api:/app/api
+      - ./apgi_system:/app/apgi_system
+      - ./config:/app/config
+
+volumes:
+  postgres_data:
+  redis_data:
