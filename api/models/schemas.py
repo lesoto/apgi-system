@@ -270,12 +270,81 @@ class TaskResult(BaseModel):
     )
 
 
+class TaskSubmitRequest(BaseModel):
+    """Request to submit a task for execution."""
+    task_type: str = Field(..., description="Type of experimental task")
+    parameters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Task-specific parameters"
+    )
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_type": "iowa_gambling",
+                "parameters": {"num_trials": 100}
+            }
+        }
+    )
+
+
 class TaskSubmitResponse(BaseModel):
     """Response when task is submitted."""
     task_id: str = Field(..., description="Task identifier")
+    session_id: str = Field(..., description="Session identifier")
+    task_type: str = Field(..., description="Task type")
     status: str = Field(..., description="Initial task status")
     status_url: str = Field(..., description="URL to check task status")
-    created_at: datetime = Field(..., description="Task creation timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_id": "task_7f8d9e0a1b2c",
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "task_type": "iowa_gambling",
+                "status": "pending",
+                "status_url": "/v1/tasks/task_7f8d9e0a1b2c"
+            }
+        }
+    )
+
+
+class TaskStatusResponse(BaseModel):
+    """Response with task status and results."""
+    task_id: str = Field(..., description="Task identifier")
+    status: str = Field(..., description="Current task status")
+    state: Optional[str] = Field(None, description="Celery task state")
+    result: Optional[Dict[str, Any]] = Field(None, description="Task results if completed")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    info: Optional[Dict[str, Any]] = Field(None, description="Progress info if running")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_id": "task_7f8d9e0a1b2c",
+                "status": "completed",
+                "state": "SUCCESS",
+                "result": {
+                    "task_type": "iowa_gambling",
+                    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "status": "completed",
+                    "results": {
+                        "total_trials": 100,
+                        "advantageous_ratio": 0.65
+                    }
+                }
+            }
+        }
+    )
+
+
+class TaskResultResponse(BaseModel):
+    """Detailed task results."""
+    task_id: str = Field(..., description="Task identifier")
+    task_type: str = Field(..., description="Task type")
+    session_id: str = Field(..., description="Session identifier")
+    status: str = Field(..., description="Task status")
+    results: Dict[str, Any] = Field(..., description="Task results")
 
 
 class TaskListResponse(BaseModel):

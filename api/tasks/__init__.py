@@ -1,0 +1,12 @@
+"""
+Celery Tasks Package
+
+Contains all Celery task definitions for asynchronous execution.
+"""
+
+# Import the module to register tasks with Celery
+from api.tasks import experimental_tasks
+
+__all__ = [
+    "experimental_tasks",
+]

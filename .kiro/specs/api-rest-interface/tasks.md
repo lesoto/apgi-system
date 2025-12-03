@@ -73,9 +73,13 @@
     - **Property 8: Session deletion invalidation**
     - **Validates: Requirements 2.5**
 
-- [ ] 4. Implement session API endpoints
+- [x] 4. Implement session API endpoints
 
-  - [ ] 4.1 Create session routes
+
+
+  - [x] 4.1 Create session routes
+
+
     - POST /v1/sessions - create session
     - GET /v1/sessions/{session_id} - get session details
     - POST /v1/sessions/{session_id}/start - start simulation
@@ -93,10 +97,15 @@
     - Test complete session lifecycle workflow
     - Test concurrent session operations
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+-
 
-- [ ] 5. Implement state access endpoints
+- [x] 5. Implement state access endpoints
 
-  - [ ] 5.1 Create state access routes
+
+
+  - [x] 5.1 Create state access routes
+
+
     - GET /v1/sessions/{session_id}/state - get complete state
     - GET /v1/sessions/{session_id}/ignition-history - get ignition events
     - GET /v1/sessions/{session_id}/interoception - get body state
@@ -108,36 +117,62 @@
     - **Property 9: State response completeness**
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
 
-- [ ] 6. Implement experimental task execution
+- [x] 6. Implement experimental task execution
 
-  - [ ] 6.1 Create TaskExecutor with Celery integration
+
+
+
+
+
+  - [x] 6.1 Create TaskExecutor with Celery integration
+
+
+
     - Set up Celery app with Redis broker
     - Implement submit_task, get_task_status, get_task_result methods
     - Create Celery tasks for Iowa Gambling, Masking Paradigm, Attentional Blink
     - _Requirements: 4.1, 4.2, 4.3, 4.5_
   
-  - [ ] 6.2 Create task API endpoints
+  - [x] 6.2 Create task API endpoints
+
+
     - GET /v1/tasks - list available tasks
     - POST /v1/sessions/{session_id}/tasks - execute task
     - GET /v1/tasks/{task_id} - get task status and results
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   
-  - [ ]* 6.3 Write property test for task execution round-trip
+  - [ ] 6.3 Write property test for task execution round-trip
+
+
+
     - **Property 10: Task execution and retrieval round-trip**
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.5**
 
-- [ ] 7. Checkpoint - Ensure core functionality works
+- [-] 7. Checkpoint - Ensure core functionality works
+
+
+
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Implement data export functionality
-  - [ ] 8.1 Create DataExportService
+- [x] 8. Implement data export functionality
+
+
+
+
+
+
+  - [x] 8.1 Create DataExportService
+
+
     - Implement export_session_data for JSON and CSV formats
     - Implement export_time_series with filtering
     - Implement generate_summary_stats
     - Add pagination support for large datasets
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
   
-  - [ ] 8.2 Create data export endpoints
+  - [x] 8.2 Create data export endpoints
+
+
     - GET /v1/sessions/{session_id}/export - export data
     - GET /v1/sessions/{session_id}/summary - get summary statistics
     - GET /v1/sessions/{session_id}/timeseries - get time series data
@@ -157,6 +192,7 @@
     - **Validates: Requirements 5.5**
 
 - [ ] 9. Implement authentication and authorization
+
   - [ ] 9.1 Create AuthManager class
     - Implement JWT token creation and verification
     - Implement password hashing with bcrypt
@@ -187,6 +223,7 @@
     - **Validates: Requirements 7.4**
 
 - [ ] 10. Implement rate limiting
+
   - [ ] 10.1 Create RateLimiter class with Redis
     - Implement sliding window rate limiting algorithm
     - Support per-user and per-endpoint limits
@@ -206,60 +243,32 @@
   - [ ]* 10.4 Write property test for rate limit headers
     - **Property 20: Rate limit header completeness**
     - **Validates: Requirements 8.3, 8.4, 8.5**
+-
 
 - [ ] 11. Implement error handling
-  - [ ] 11.1 Create custom exception classes
+
+
+  - [x] 11.1 Create custom exception classes
+
+
     - Define APIError base class and specific error types
     - Create SessionNotFoundError, ValidationError, AuthenticationError, etc.
     - _Requirements: 1.3_
   
-  - [ ] 11.2 Create exception handlers
+  - [x] 11.2 Create exception handlers
+
+
+
     - Implement global exception handler for APIError
     - Handle Pydantic validation errors
     - Handle unexpected exceptions with 500 responses
     - _Requirements: 1.3_
   
-  - [ ]* 11.3 Write property test for error response format
+  - [ ] 11.3 Write property test for error response format
+
     - **Property 3: Error response completeness**
     - **Validates: Requirements 1.3**
-
-- [ ] 12. Implement middleware and CORS
-  - [ ] 12.1 Create request ID middleware
-    - Generate unique request ID for each request
-    - Add request ID to response headers and logs
-    - _Requirements: 1.3_
-  
-  - [ ] 12.2 Configure CORS middleware
-    - Set allowed origins, methods, headers
-    - Add CORS headers to all responses
-    - _Requirements: 1.5_
-  
-  - [ ]* 12.3 Write property test for CORS headers
-    - **Property 4: CORS header presence**
-    - **Validates: Requirements 1.5**
-
-- [ ] 13. Implement API versioning
-  - [ ] 13.1 Set up versioned route prefixes
-    - Create /v1/ prefix for all endpoints
-    - Implement version detection from URL path
-    - _Requirements: 6.1_
-  
-  - [ ] 13.2 Create version info endpoint
-    - GET /v1/version - return version information
-    - _Requirements: 6.4_
-  
-  - [ ] 13.3 Implement deprecation warnings
-    - Add Deprecation header to deprecated endpoints
-    - _Requirements: 6.5_
-  
-  - [ ]* 13.4 Write property test for API versioning
-    - **Property 14: API versioning in paths**
-    - **Validates: Requirements 6.1**
-  
-  - [ ]* 13.5 Write property test for deprecation headers
-    - **Property 15: Deprecation header presence**
-    - **Validates: Requirements 6.5**
-
+    
 - [ ] 14. Implement async operations and webhooks
   - [ ] 14.1 Create webhook management
     - Implement webhook registration and validation
@@ -281,9 +290,11 @@
     - **Validates: Requirements 11.3, 11.4, 11.5**
 
 - [ ] 15. Checkpoint - Ensure all features work together
+
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 16. Implement logging and monitoring
+
   - [ ] 16.1 Set up structured logging
     - Configure Python logging with JSON formatter
     - Log all requests with method, path, status, duration, client ID
@@ -313,6 +324,8 @@
     - **Validates: Requirements 10.3**
 
 - [ ] 17. Generate API documentation
+
+
   - [ ] 17.1 Add OpenAPI annotations to endpoints
     - Add docstrings, parameter descriptions, response schemas
     - Include example requests and responses
@@ -329,6 +342,7 @@
     - **Validates: Requirements 9.3, 9.4**
 
 - [ ] 18. Implement response schema validation
+
   - [ ] 18.1 Create schema validation middleware
     - Validate all responses against OpenAPI schemas
     - Log validation failures
@@ -339,6 +353,7 @@
     - **Validates: Requirements 12.3**
 
 - [ ] 19. Create health check endpoint
+
   - [ ] 19.1 Implement health check logic
     - Check database connectivity
     - Check Redis connectivity
@@ -350,6 +365,7 @@
     - _Requirements: 13.5_
 
 - [ ] 20. Set up deployment infrastructure
+
 
   - [ ] 20.1 Create CI/CD pipeline
     - GitHub Actions workflow for test, build, deploy
@@ -370,4 +386,7 @@
     - _Requirements: 12.3_
 
 - [ ] 22. Final checkpoint - Complete system validation
+
+
+
   - Ensure all tests pass, ask the user if questions arise.
