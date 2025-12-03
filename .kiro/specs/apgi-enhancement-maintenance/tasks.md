@@ -381,20 +381,13 @@
   - Set coverage threshold to 80% and fail if not met
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 31. Create API functionality and documentation
+- [ ] 32. Implement performance monitoring utilities
 
 
 
 
 
 
-  - Generate API documentation
-  - Generate HTML documentation
-  - Create architecture diagrams using Mermaid or similar
-  - _Requirements: 1.3_
-
-
-- [-] 32. Implement performance monitoring utilities
 
 
 
@@ -404,7 +397,9 @@
   - Add performance logging to APGISystem
   - _Requirements: 9.1, 9.2, 9.4_
 
-- [ ]* 33. Implement extended analysis capabilities
+- [ ] 33. Implement extended analysis capabilities
+
+
   - Create apgi_system/analysis.py with AnalysisResults dataclass
   - Implement ignition statistics computation (rate, duration, intervals)
   - Implement energy budget summary (total consumed, average per step)
@@ -416,13 +411,15 @@
 
 
 
+
   - Create apgi_system/config_validator.py
   - Implement parameter range validation for all config sections
   - Implement config schema validation
   - Add helpful error messages for common config mistakes
   - _Requirements: 11.1, 10.3_
 
-- [-] 36. Final checkpoint - Comprehensive test run
+- [ ] 36. Final checkpoint - Comprehensive test run
+
 
 
   - Run full test suite with coverage report
@@ -430,13 +427,3 @@
   - Run mypy and ensure no type errors
   - Run linters (black, flake8) and fix any issues
   - Ensure all tests pass, ask the user if questions arise.
-
-- [ ] 37. Create usage examples and tutorials
-
-
-
-  - Create examples/testing_guide.py demonstrating test usage
-  - Create examples/property_testing_guide.py with Hypothesis examples
-  - Update README.md with testing instructions
-  - Add troubleshooting guide for common issues
-  - _Requirements: 1.3_

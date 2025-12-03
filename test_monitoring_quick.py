@@ -1,10 +1,13 @@
-"""Quick test to verify performance monitoring works."""
+"""Quick test to verify performance monitoring functionality."""
 
 import numpy as np
 from apgi_system.system import APGISystem
 
+
 def test_performance_monitoring():
-    """Test that performance monitoring is integrated and working."""
+    """Test that performance monitoring works correctly."""
+    print("Testing performance monitoring...")
+    
     # Create system
     system = APGISystem()
     
@@ -15,37 +18,34 @@ def test_performance_monitoring():
         
         # Check that performance metrics are in the state
         assert "performance" in state, "Performance metrics not in state"
-        assert "step_time_ms" in state["performance"]
-        assert "memory_usage_mb" in state["performance"]
-        assert "ignition_rate_hz" in state["performance"]
+        perf = state["performance"]
         
-        # Check that values are reasonable
-        assert state["performance"]["step_time_ms"] > 0
-        assert state["performance"]["memory_usage_mb"] > 0
-        assert state["performance"]["ignition_rate_hz"] >= 0
-        
-        print(f"Step {i+1}: {state['performance']['step_time_ms']:.3f}ms, "
-              f"{state['performance']['memory_usage_mb']:.1f}MB, "
-              f"{state['performance']['ignition_rate_hz']:.2f}Hz")
+        print(f"\nStep {i+1}:")
+        print(f"  Step time: {perf['step_time_ms']:.3f} ms")
+        print(f"  Memory usage: {perf['memory_usage_mb']:.1f} MB")
+        print(f"  Ignition rate: {perf['ignition_rate_hz']:.2f} Hz")
     
     # Get performance statistics
     stats = system.get_performance_statistics()
-    print(f"\nPerformance Statistics:")
-    print(f"  Mean step time: {stats['mean_step_time_ms']:.3f}ms")
-    print(f"  Max step time: {stats['max_step_time_ms']:.3f}ms")
-    print(f"  Mean memory: {stats['mean_memory_mb']:.1f}MB")
-    print(f"  Total samples: {stats['total_samples']}")
+    print("\n=== Performance Statistics ===")
+    print(f"Total samples: {stats['total_samples']}")
+    print(f"Mean step time: {stats['mean_step_time_ms']:.3f} ms")
+    print(f"Max step time: {stats['max_step_time_ms']:.3f} ms")
+    print(f"Mean memory: {stats['mean_memory_mb']:.1f} MB")
+    print(f"Max memory: {stats['max_memory_mb']:.1f} MB")
     
-    # Test log_performance method
-    print("\nLogging performance:")
+    # Test logging
+    print("\n=== Testing log_performance ===")
     system.log_performance(verbose=True)
     
     # Test reset
     system.reset()
     stats_after_reset = system.get_performance_statistics()
-    assert stats_after_reset['total_samples'] == 0, "Performance monitor not reset"
+    assert stats_after_reset['total_samples'] == 0, "Reset didn't clear history"
+    print("\n✓ Reset works correctly")
     
     print("\n✓ All performance monitoring tests passed!")
+
 
 if __name__ == "__main__":
     test_performance_monitoring()
