@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\neural\oscillations.py
-# hypothesis_version: 6.148.5
-
-[0.0, 0.1, 0.3, 0.5, 0.9, 1.0, 1000.0, 100, 'alpha', 'alpha_gamma_coupling', 'amplitude', 'band_frequencies', 'band_phases', 'band_powers', 'band_signals', 'bands', 'beta', 'beta_power', 'coupling_metrics', 'coupling_strength', 'gamma', 'gamma_burst', 'oscillations', 'range', 'system', 'theta', 'theta_gamma_coupling', 'time', 'timestep_ms', 'total_signal']

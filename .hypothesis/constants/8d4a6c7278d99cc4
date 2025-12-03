@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\interoception\body_model.py
-# hypothesis_version: 6.148.5
-
-[0.0, 0.1, 0.2, 0.5, 1.0, 3.0, 5.0, 8.0, 36.0, 37.0, 39.0, 1000.0, 2000.0, 5000.0, 10000.0, 30000.0, 100, 120, 160, 'activity', 'arousal', 'baseline', 'blood_pressure', 'body_states', 'cortisol', 'current', 'dt', 'glucose', 'heart_rate', 'interoception', 'interoceptive_vector', 'predicted', 'prediction_error', 'prediction_lead_ms', 'range', 'respiration', 'stress', 'temperature', 'variance']

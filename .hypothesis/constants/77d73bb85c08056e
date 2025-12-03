@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\core\predictive_processing.py
-# hypothesis_version: 6.148.5
-
-[0.0, 0.001, 0.01, 0.1, 0.9, 0.95, 1.0, 100.0, 1000.0, 100, 200, 'accumulated', 'current_magnitude', 'dt_ms', 'error', 'extero_input', 'exteroceptive', 'exteroceptive_signal', 'exteroceptive_stats', 'hierarchical_errors', 'hierarchy', 'intero_input', 'interoceptive', 'interoceptive_signal', 'interoceptive_stats', 'level', 'level_configs', 'magnitude', 'max_error', 'mean_error', 'name', 'nodes', 'num_levels', 'precision', 'prediction', 'state', 'stats', 'std_error', 'system', 'temporal_discount', 'timescale_ms', 'timestep_ms', 'update_counter', 'update_interval']

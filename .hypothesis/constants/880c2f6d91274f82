@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\ignition\threshold.py
-# hypothesis_version: 6.148.5
-
-[0.0, 0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 1000.0, 100, 200, 1000, 'baseline_threshold', 'current_probability', 'current_time', 'extero_error', 'extero_precision', 'extero_signal', 'ignition', 'ignition_occurred', 'ignition_probability', 'ignition_rate', 'inf', 'intero_error', 'intero_precision', 'intero_signal', 'mean_signal', 'mean_threshold', 'recent_ignitions', 'refractory_period_ms', 'sigmoid_alpha', 'signal', 'somatic_marker_gain', 'std_signal', 'std_threshold', 'threshold', 'threshold_range', 'time', 'total_signal']

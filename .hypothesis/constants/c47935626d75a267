@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\thermodynamic\metabolism.py
-# hypothesis_version: 6.148.5
-
-[0.0, 1.0, 5.0, 7.5, 10.0, 20.0, 27.5, 100.0, 1000.0, 'baseline_consumption', 'consumed', 'depleted', 'depletion_threshold', 'ignition_cost', 'recovery_rate', 'reserve_fraction', 'reserves', 'task_overhead', 'thermodynamic', 'total_energy_budget']

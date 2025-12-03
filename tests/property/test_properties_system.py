@@ -355,11 +355,17 @@ class TestConfigurationProperties:
         config['ignition']['baseline_threshold'] = baseline_threshold
         config['system']['timestep_ms'] = timestep_ms
         
-        # System should accept valid configuration without errors
+        # Write modified config to a temporary file
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml.dump(config, f)
+            temp_config_path = f.name
+        
         try:
-            system = APGISystem()
-            system.config = config
-            system._initialize_subsystems()
+            # System should accept valid configuration without errors
+            system = APGISystem(config_path=temp_config_path)
             
             # Verify parameters were applied correctly
             # Check active inference parameters
@@ -387,6 +393,10 @@ class TestConfigurationProperties:
             
         except (TypeError, ValueError) as e:
             pytest.fail(f"Valid configuration was rejected: {e}")
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)
 
     @given(
         invalid_learning_rate=st.one_of(
@@ -409,18 +419,23 @@ class TestConfigurationProperties:
         # Set invalid learning rate
         config['active_inference']['learning_rate'] = invalid_learning_rate
         
-        # System should validate and reject invalid parameters
-        # Note: Current implementation may not have explicit validation at init time,
-        # but should fail gracefully during operation
-        system = APGISystem()
-        system.config = config
+        # Write modified config to a temporary file
+        import tempfile
+        import os
         
-        # The system might accept the config but should produce warnings or errors
-        # during operation if the parameter is truly invalid
-        # For now, we verify that extreme values don't cause crashes
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml.dump(config, f)
+            temp_config_path = f.name
+        
         try:
-            system._initialize_subsystems()
-            # If initialization succeeds, verify system doesn't crash on step
+            # System should validate and reject invalid parameters
+            # Note: Current implementation may not have explicit validation at init time,
+            # but should fail gracefully during operation
+            system = APGISystem(config_path=temp_config_path)
+            
+            # The system might accept the config but should produce warnings or errors
+            # during operation if the parameter is truly invalid
+            # For now, we verify that extreme values don't cause crashes
             extero_input = np.random.randn(256) * 0.5
             state = system.step(extero_input)
             # System should still produce valid output even with suboptimal parameters
@@ -430,6 +445,10 @@ class TestConfigurationProperties:
             # If it fails, the error should be informative
             error_msg = str(e)
             assert len(error_msg) > 0, "Error message should not be empty"
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)
 
     @given(
         threshold_range_min=st.floats(min_value=0.5, max_value=2.0),
@@ -454,11 +473,17 @@ class TestConfigurationProperties:
         # Set threshold range
         config['ignition']['threshold_range'] = [threshold_range_min, threshold_range_max]
         
-        # System should accept valid range
+        # Write modified config to a temporary file
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml.dump(config, f)
+            temp_config_path = f.name
+        
         try:
-            system = APGISystem()
-            system.config = config
-            system._initialize_subsystems()
+            # System should accept valid range
+            system = APGISystem(config_path=temp_config_path)
             
             # Verify range was applied
             assert hasattr(system.ignition_threshold, 'threshold_range'), \
@@ -474,6 +499,10 @@ class TestConfigurationProperties:
             
         except (TypeError, ValueError) as e:
             pytest.fail(f"Valid range configuration was rejected: {e}")
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)
 
     @given(
         config_mod=config_strategy()
@@ -497,11 +526,17 @@ class TestConfigurationProperties:
             else:
                 config[key] = value
         
-        # System should accept valid configuration
+        # Write modified config to a temporary file
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml.dump(config, f)
+            temp_config_path = f.name
+        
         try:
-            system = APGISystem()
-            system.config = config
-            system._initialize_subsystems()
+            # System should accept valid configuration
+            system = APGISystem(config_path=temp_config_path)
             
             # Verify all subsystems were initialized
             assert system.active_inference is not None, "Active inference should be initialized"
@@ -532,6 +567,10 @@ class TestConfigurationProperties:
             
         except (TypeError, ValueError, KeyError) as e:
             pytest.fail(f"Valid configuration was rejected or caused error: {e}")
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)
 
     def test_property_config_parameter_types(self):
         """
@@ -549,11 +588,17 @@ class TestConfigurationProperties:
         config_wrong_type = config.copy()
         config_wrong_type['system']['timestep_ms'] = "not a number"
         
-        # System should handle type errors gracefully
+        # Write modified config to a temporary file
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml.dump(config_wrong_type, f)
+            temp_config_path = f.name
+        
         try:
-            system = APGISystem()
-            system.config = config_wrong_type
-            system._initialize_subsystems()
+            # System should handle type errors gracefully
+            system = APGISystem(config_path=temp_config_path)
             # If it doesn't raise an error, it should at least not crash
             extero_input = np.random.randn(256) * 0.5
             state = system.step(extero_input)
@@ -562,3 +607,7 @@ class TestConfigurationProperties:
             error_msg = str(e)
             assert len(error_msg) > 0, "Error message should not be empty"
             # This is expected behavior - rejecting invalid types
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)

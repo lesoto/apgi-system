@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\ignition\temporal_dynamics.py
-# hypothesis_version: 6.148.5
-
-[0.0, 1.0, 500.0, 1000.0, 100, 150, 200, 300, 400, 700, 1000, 'context', 'context_recognition', 'ignition_active', 'ignition_event', 'memory_encoding', 'motor_planning', 'phase', 'phase_time', 'phase_transition', 'post_ignition', 'pre_ignition', 'precision_modulation', 'recent_events', 'reportable', 'thalamic_gating', 'threshold_crossing', 'time', 'to', 'total_time', 'type']

@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\ignition\global_workspace.py
-# hypothesis_version: 6.148.5
-
-[0.0, 0.01, 0.1, 0.8, 1.0, 2.0, 50.0, 200.0, 1000.0, 100, 300, 'broadcast_content', 'broadcasting', 'candidate_content', 'dt', 'fading', 'idle', 'igniting', 'ignition', 'is_broadcasting', 'is_reportable', 'magnitude', 'maintaining', 'num_competitors', 'priority', 'shape', 'source', 'state', 'state_time', 'unknown']

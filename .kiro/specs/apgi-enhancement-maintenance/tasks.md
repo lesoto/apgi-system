@@ -202,7 +202,10 @@
 
 
 
-- [ ] 20. Implement experimental task property-based tests
+- [x] 20. Implement experimental task property-based tests
+
+
+
 
 
 
@@ -221,13 +224,19 @@
 
     - **Validates: Requirements 7.1**
     - Test: For any task run, system should show increasing preference for advantageous decks
-  - [ ] 20.2 Write property test for Masking SOA effect
+  - [x] 20.2 Write property test for Masking SOA effect
+
+
     - **Property 26: Masking SOA effect**
     - **Validates: Requirements 7.2**
-  - [ ] 20.3 Write property test for Attentional Blink effect
+  - [x] 20.3 Write property test for Attentional Blink effect
+
+
     - **Property 27: Attentional blink effect**
     - **Validates: Requirements 7.3**
-  - [ ] 20.4 Write property test for task result completeness
+  - [x] 20.4 Write property test for task result completeness
+
+
     - **Property 28: Task result completeness**
     - **Validates: Requirements 7.5**
 
@@ -282,11 +291,15 @@
     - **Validates: Requirements 10.1**
     - Test: For any invalid input, system should raise informative error
 
-- [-] 25. Implement configuration property-based tests
+
+- [x] 25. Implement configuration property-based tests
+
+
 
 
   - Add to tests/property/test_properties_system.py
-  - [-] 25.1 Write property test for parameter validation and application
+  - [x] 25.1 Write property test for parameter validation and application
+
 
     - **Property 33: Parameter validation and application**
     - **Validates: Requirements 11.1**
@@ -321,13 +334,9 @@
 - [ ] 28. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 29. Configure mypy for static type checking
-  - Create mypy.ini with strict type checking settings
-  - Set python_version=3.11, warn_return_any, disallow_untyped_defs, check_untyped_defs
-  - Run mypy on apgi_system package and fix type errors iteratively
-  - _Requirements: 1.2_
 
 - [ ] 30. Set up continuous integration pipeline
+
   - Create .github/workflows/ directory
   - Create .github/workflows/test.yml with pytest, coverage, and linting jobs
   - Configure CI to run black, flake8, mypy

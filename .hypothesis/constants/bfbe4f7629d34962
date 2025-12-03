@@ -1,4 +1,0 @@
-# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\stability.py
-# hypothesis_version: 6.148.5
-
-[0.0, 1e-10, 10000000000.0, 1000000000000000.0, 'actual_range', 'actual_shape', 'error_count', 'error_detected', 'has_inf', 'has_nan', 'max_abs_value', 'range_valid', 'shape_valid', 'stable', 'warning_count', 'warning_issued']
