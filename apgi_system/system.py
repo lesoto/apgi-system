@@ -103,7 +103,7 @@ class APGISystem:
 
         # Neural oscillations
         self.oscillations = OscillationEngine(self.config)
-        
+
         # Performance monitoring
         self.performance_monitor = PerformanceMonitor(self.config)
 
@@ -122,7 +122,7 @@ class APGISystem:
         """
         # Start performance monitoring
         self.performance_monitor.start_step()
-        
+
         dt = self.timestep_ms
         self.time += dt
 
@@ -227,13 +227,13 @@ class APGISystem:
         self._record_history(
             ignition_occurred, ai_info["free_energy"], precision_info, metabolic_info
         )
-        
+
         # End performance monitoring and record metrics
         perf_metrics = self.performance_monitor.end_step(
             system_time_ms=self.time,
             ignition_occurred=ignition_occurred,
             free_energy=ai_info["free_energy"],
-            precision=precision_info["exteroceptive"]
+            precision=precision_info["exteroceptive"],
         )
 
         # Compile complete state
@@ -257,7 +257,7 @@ class APGISystem:
             "oscillations": osc_info,
             "reportable": workspace_info["is_reportable"],
         }
-        
+
         # Add performance metrics if available
         if perf_metrics is not None:
             state["performance"] = {
@@ -265,7 +265,7 @@ class APGISystem:
                 "memory_usage_mb": perf_metrics.memory_usage_mb,
                 "ignition_rate_hz": perf_metrics.ignition_rate_hz,
             }
-        
+
         return state
 
     def run(
@@ -414,20 +414,20 @@ class APGISystem:
             "metabolic_reserves": self.metabolism.current_reserves,
             "somatic_markers": self.somatic_markers.get_statistics(),
         }
-    
+
     def get_performance_statistics(self) -> Dict[str, Any]:
         """Get performance monitoring statistics.
-        
+
         Returns
         -------
         stats : Dict[str, Any]
             Performance statistics including step time, memory usage, and ignition rate
         """
         return self.performance_monitor.get_statistics()
-    
+
     def log_performance(self, verbose: bool = False) -> None:
         """Log current performance statistics.
-        
+
         Parameters
         ----------
         verbose : bool, optional

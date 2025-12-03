@@ -122,7 +122,9 @@ class MetabolicBudget:
 
         # Recovery
         self.current_reserves += self.recovery_rate * dt / 1000.0
-        self.current_reserves = min(self.current_reserves, self.total_budget)
+
+        # Clamp reserves to valid range [0, max_capacity]
+        self.current_reserves = max(0.0, min(self.current_reserves, self.total_budget))
 
         depleted = self.current_reserves < self.depletion_threshold
 
