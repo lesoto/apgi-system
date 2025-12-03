@@ -12,6 +12,7 @@ from scipy.special import xlogy
 
 from apgi_system.validation import InputValidator
 from apgi_system.types import FloatArray, ConfigDict
+from apgi_system.stability import NumericalStabilityMonitor
 
 
 class FreeEnergyCalculator:
@@ -92,6 +93,7 @@ class FreeEnergyCalculator:
         """
         self.config = config or {}
         self.eps = 1e-10  # Numerical stability
+        self.stability_monitor = NumericalStabilityMonitor(config)
 
     def compute_variational_free_energy(
         self,
@@ -221,13 +223,31 @@ class FreeEnergyCalculator:
 
         accuracy = 0.5 * error.T @ precision_matrix @ error
 
+        # Check stability of accuracy term
+        self.stability_monitor.check_stability(
+            accuracy,
+            context="free_energy_accuracy_term"
+        )
+
         # KL divergence (complexity term)
         complexity = self._kl_divergence_gaussian(
             posterior_mean, posterior_cov,
             prior_mean, prior_cov
         )
 
+        # Check stability of complexity term
+        self.stability_monitor.check_stability(
+            complexity,
+            context="free_energy_complexity_term"
+        )
+
         total_fe = accuracy + complexity
+
+        # Check stability of total free energy
+        self.stability_monitor.check_stability(
+            total_fe,
+            context="total_free_energy"
+        )
 
         components = {
             'accuracy': float(accuracy),

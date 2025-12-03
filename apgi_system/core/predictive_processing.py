@@ -11,6 +11,7 @@ from collections import deque
 
 from apgi_system.validation import InputValidator
 from apgi_system.types import FloatArray, ConfigDict
+from apgi_system.stability import NumericalStabilityMonitor
 
 
 class PredictionErrorChannel:
@@ -369,6 +370,9 @@ class HierarchicalPredictor:
         # Interoceptive prediction (separate from hierarchical levels)
         self.intero_prediction = np.zeros(6)
 
+        # Stability monitoring
+        self.stability_monitor = NumericalStabilityMonitor(config)
+
     def predict(
         self,
         extero_input: Optional[FloatArray] = None,
@@ -460,6 +464,13 @@ class HierarchicalPredictor:
                 prediction=self.levels[0]['prediction'],
                 precision=self.levels[0]['precision']
             )
+
+            # Check stability of exteroceptive error
+            self.stability_monitor.check_stability(
+                extero_error,
+                context="exteroceptive_prediction_error"
+            )
+
             results['exteroceptive'] = {
                 'error': extero_error,
                 'stats': self.exteroceptive_channel.get_statistics()
@@ -472,6 +483,13 @@ class HierarchicalPredictor:
                 prediction=self.intero_prediction,  # 6-dimensional body prediction
                 precision=self.levels[0]['precision']
             )
+
+            # Check stability of interoceptive error
+            self.stability_monitor.check_stability(
+                intero_error,
+                context="interoceptive_prediction_error"
+            )
+
             results['interoceptive'] = {
                 'error': intero_error,
                 'stats': self.interoceptive_channel.get_statistics()
@@ -479,6 +497,12 @@ class HierarchicalPredictor:
 
             # Update interoceptive prediction (simple running average)
             self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input
+
+            # Check stability of updated prediction
+            self.stability_monitor.check_stability(
+                self.intero_prediction,
+                context="interoceptive_prediction_update"
+            )
 
         # Update hierarchical levels
         self._update_hierarchy(dt_ms)
@@ -544,6 +568,12 @@ class HierarchicalPredictor:
 
                 # Update state (gradient descent on prediction error)
                 level['state'] += self.learning_rates[i] * level['error']
+
+                # Check stability of updated state
+                self.stability_monitor.check_stability(
+                    level['state'],
+                    context=f"hierarchical_level_{i}_{level['name']}_state"
+                )
 
     def _map_down(self, state: FloatArray, target_dim: int) -> FloatArray:
         """Map state from higher to lower level."""

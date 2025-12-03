@@ -1,0 +1,4 @@
+# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\core\free_energy.py
+# hypothesis_version: 6.148.5
+
+[0.0, 1e-10, 0.5, 1.0, 1000000.0, 'accuracy', 'complexity', 'epistemic_value', 'exploitation_drive', 'exploration_drive', 'max_error', 'mean_absolute_error', 'observation', 'posterior_cov', 'posterior_mean', 'pragmatic_value', 'precision', 'prediction', 'prediction_error', 'prior_cov', 'prior_mean', 'raw_error', 'total_free_energy', 'weighted_error']

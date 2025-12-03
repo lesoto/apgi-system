@@ -1,0 +1,4 @@
+# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\core\active_inference.py
+# hypothesis_version: 6.148.5
+
+[0.0, 1e-06, 0.001, 0.01, 0.1, 0.5, 0.9, 1.0, 10.0, 1000.0, '_projection_matrices', 'action', 'active_inference', 'beliefs', 'dt', 'efe_components', 'free_energy', 'hierarchy', 'inf', 'learning_rate', 'level_configs', 'nodes', 'num_levels', 'num_policies', 'observation', 'planning_horizon', 'precision_range', 'precisions', 'prediction_errors', 'system', 'time', 'timestep_ms']

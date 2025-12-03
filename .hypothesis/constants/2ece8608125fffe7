@@ -1,0 +1,4 @@
+# file: C:\DIMA\PYTHON-PROD\apgi-system\apgi_system\interoception\allostasis.py
+# hypothesis_version: 6.148.5
+
+[-1000.0, -0.1, 0.0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.5, 1.0, 4.5, 5.0, 5.5, 10.0, 36.8, 37.0, 37.2, 70.0, 1000.0, 10000.0, 'allostatic_load', 'allostatic_ranges', 'cortisol', 'deviation', 'dt', 'glucose', 'heart_rate', 'in_range', 'interoception', 'load_contribution', 'moderate', 'name', 'regulation_signals', 'set_points_status', 'target', 'temperature', 'tight', 'total_deviation', 'wide']
