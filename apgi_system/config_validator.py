@@ -12,11 +12,13 @@ import warnings
 
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
+
     pass
 
 
 class ConfigValidationWarning(UserWarning):
     """Warning for non-critical configuration issues."""
+
     pass
 
 
@@ -53,14 +55,10 @@ class ConfigValidator:
                         "type": (int, float),
                         "required": True,
                         "range": (0.01, 100.0),
-                        "description": "Simulation timestep in milliseconds"
+                        "description": "Simulation timestep in milliseconds",
                     },
-                    "random_seed": {
-                        "type": int,
-                        "required": False,
-                        "range": (0, 2**31 - 1)
-                    }
-                }
+                    "random_seed": {"type": int, "required": False, "range": (0, 2**31 - 1)},
+                },
             },
             "hierarchy": {
                 "required": True,
@@ -69,14 +67,14 @@ class ConfigValidator:
                         "type": int,
                         "required": True,
                         "range": (1, 10),
-                        "description": "Number of hierarchical levels"
+                        "description": "Number of hierarchical levels",
                     },
                     "level_configs": {
                         "type": list,
                         "required": True,
-                        "description": "Configuration for each hierarchical level"
-                    }
-                }
+                        "description": "Configuration for each hierarchical level",
+                    },
+                },
             },
             "active_inference": {
                 "required": True,
@@ -85,26 +83,26 @@ class ConfigValidator:
                         "type": (int, float),
                         "required": True,
                         "range": (0.0, 1.0),
-                        "description": "Learning rate for active inference"
+                        "description": "Learning rate for active inference",
                     },
                     "precision_init": {
                         "type": (int, float),
                         "required": True,
                         "range": (0.01, 100.0),
-                        "description": "Initial precision value"
+                        "description": "Initial precision value",
                     },
                     "precision_range": {
                         "type": list,
                         "required": True,
                         "length": 2,
-                        "description": "Min and max precision values"
+                        "description": "Min and max precision values",
                     },
                     "free_energy_threshold": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 10000.0)
-                    }
-                }
+                        "range": (0.0, 10000.0),
+                    },
+                },
             },
             "predictive_processing": {
                 "required": True,
@@ -112,19 +110,19 @@ class ConfigValidator:
                     "prediction_horizon_ms": {
                         "type": (int, float),
                         "required": True,
-                        "range": (1.0, 10000.0)
+                        "range": (1.0, 10000.0),
                     },
                     "error_accumulation_window_ms": {
                         "type": (int, float),
                         "required": True,
-                        "range": (1.0, 10000.0)
+                        "range": (1.0, 10000.0),
                     },
                     "temporal_discount": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 1.0)
-                    }
-                }
+                        "range": (0.0, 1.0),
+                    },
+                },
             },
             "precision": {
                 "required": True,
@@ -132,24 +130,20 @@ class ConfigValidator:
                     "exteroceptive_baseline": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.01, 100.0)
+                        "range": (0.01, 100.0),
                     },
                     "interoceptive_baseline": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.01, 100.0)
+                        "range": (0.01, 100.0),
                     },
-                    "attention_gain_range": {
-                        "type": list,
-                        "required": True,
-                        "length": 2
-                    },
+                    "attention_gain_range": {"type": list, "required": True, "length": 2},
                     "volatility_sensitivity": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 10.0)
-                    }
-                }
+                        "range": (0.0, 10.0),
+                    },
+                },
             },
             "ignition": {
                 "required": True,
@@ -157,82 +151,52 @@ class ConfigValidator:
                     "baseline_threshold": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.1, 100.0)
+                        "range": (0.1, 100.0),
                     },
-                    "threshold_range": {
-                        "type": list,
-                        "required": True,
-                        "length": 2
-                    },
+                    "threshold_range": {"type": list, "required": True, "length": 2},
                     "sigmoid_alpha": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.1, 100.0)
+                        "range": (0.1, 100.0),
                     },
                     "amplification_duration_ms": {
                         "type": (int, float),
                         "required": True,
-                        "range": (10.0, 10000.0)
+                        "range": (10.0, 10000.0),
                     },
                     "refractory_period_ms": {
                         "type": (int, float),
                         "required": True,
-                        "range": (10.0, 10000.0)
+                        "range": (10.0, 10000.0),
                     },
-                    "workspace_nodes": {
-                        "type": int,
-                        "required": True,
-                        "range": (10, 100000)
-                    }
-                }
+                    "workspace_nodes": {"type": int, "required": True, "range": (10, 100000)},
+                },
             },
             "interoception": {
                 "required": True,
                 "fields": {
-                    "body_states": {
-                        "type": list,
-                        "required": True
-                    },
+                    "body_states": {"type": list, "required": True},
                     "prediction_lead_ms": {
                         "type": (int, float),
                         "required": True,
-                        "range": (1.0, 10000.0)
+                        "range": (1.0, 10000.0),
                     },
-                    "allostatic_ranges": {
-                        "type": dict,
-                        "required": True
-                    }
-                }
+                    "allostatic_ranges": {"type": dict, "required": True},
+                },
             },
             "somatic_markers": {
                 "required": True,
                 "fields": {
-                    "capacity": {
-                        "type": int,
-                        "required": True,
-                        "range": (1, 1000000)
-                    },
-                    "learning_rate": {
-                        "type": (int, float),
-                        "required": True,
-                        "range": (0.0, 1.0)
-                    },
-                    "decay_rate": {
-                        "type": (int, float),
-                        "required": True,
-                        "range": (0.0, 1.0)
-                    },
+                    "capacity": {"type": int, "required": True, "range": (1, 1000000)},
+                    "learning_rate": {"type": (int, float), "required": True, "range": (0.0, 1.0)},
+                    "decay_rate": {"type": (int, float), "required": True, "range": (0.0, 1.0)},
                     "retrieval_threshold": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 1.0)
+                        "range": (0.0, 1.0),
                     },
-                    "gain_modulation_range": {
-                        "type": list,
-                        "required": True,
-                        "length": 2
-                    }
-                }
+                    "gain_modulation_range": {"type": list, "required": True, "length": 2},
+                },
             },
             "thermodynamic": {
                 "required": True,
@@ -240,46 +204,34 @@ class ConfigValidator:
                     "total_energy_budget": {
                         "type": (int, float),
                         "required": True,
-                        "range": (1.0, 100000.0)
+                        "range": (1.0, 100000.0),
                     },
                     "baseline_consumption": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 100000.0)
+                        "range": (0.0, 100000.0),
                     },
                     "ignition_cost": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 100000.0)
+                        "range": (0.0, 100000.0),
                     },
                     "recovery_rate": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 100000.0)
+                        "range": (0.0, 100000.0),
                     },
                     "depletion_threshold": {
                         "type": (int, float),
                         "required": True,
-                        "range": (0.0, 100000.0)
-                    }
-                }
+                        "range": (0.0, 100000.0),
+                    },
+                },
             },
-            "self_model": {
-                "required": False,
-                "fields": {}
-            },
-            "oscillations": {
-                "required": False,
-                "fields": {}
-            },
-            "validation": {
-                "required": False,
-                "fields": {}
-            },
-            "visualization": {
-                "required": False,
-                "fields": {}
-            }
+            "self_model": {"required": False, "fields": {}},
+            "oscillations": {"required": False, "fields": {}},
+            "validation": {"required": False, "fields": {}},
+            "visualization": {"required": False, "fields": {}},
         }
 
     def validate(self, config: Dict[str, Any]) -> None:
@@ -354,16 +306,13 @@ class ConfigValidator:
                 warnings.warn(
                     f"Unknown configuration section: '{section_name}'. "
                     f"This section will be ignored.",
-                    ConfigValidationWarning
+                    ConfigValidationWarning,
                 )
 
         return errors
 
     def _validate_section(
-        self,
-        section_name: str,
-        section_config: Any,
-        section_schema: Dict[str, Any]
+        self, section_name: str, section_config: Any, section_schema: Dict[str, Any]
     ) -> List[str]:
         """Validate a configuration section."""
         errors = []
@@ -391,19 +340,14 @@ class ConfigValidator:
             # Validate field if it exists
             if field_name in section_config:
                 field_errors = self._validate_field(
-                    f"{section_name}.{field_name}",
-                    section_config[field_name],
-                    field_schema
+                    f"{section_name}.{field_name}", section_config[field_name], field_schema
                 )
                 errors.extend(field_errors)
 
         return errors
 
     def _validate_field(
-        self,
-        field_path: str,
-        field_value: Any,
-        field_schema: Dict[str, Any]
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
     ) -> List[str]:
         """Validate a configuration field."""
         errors = []
@@ -442,8 +386,7 @@ class ConfigValidator:
             for i, val in enumerate(field_value):
                 if not isinstance(val, (int, float)):
                     errors.append(
-                        f"Field '{field_path}[{i}]' must be numeric, "
-                        f"got {type(val).__name__}"
+                        f"Field '{field_path}[{i}]' must be numeric, " f"got {type(val).__name__}"
                     )
 
         # Validate range lists have min < max
@@ -500,7 +443,10 @@ class ConfigValidator:
         # Validate thermodynamic consistency
         if "thermodynamic" in config:
             thermo = config["thermodynamic"]
-            if all(k in thermo for k in ["total_energy_budget", "baseline_consumption", "ignition_cost"]):
+            if all(
+                k in thermo
+                for k in ["total_energy_budget", "baseline_consumption", "ignition_cost"]
+            ):
                 total = thermo["total_energy_budget"]
                 baseline = thermo["baseline_consumption"]
                 ignition = thermo["ignition_cost"]
@@ -667,19 +613,22 @@ to get specific error messages for your configuration.
                         suggestions["active_inference.precision_init"] = {
                             "current": prec_init,
                             "suggested": prec_range[0],
-                            "reason": "Value below minimum range"
+                            "reason": "Value below minimum range",
                         }
                     elif prec_init > prec_range[1]:
                         suggestions["active_inference.precision_init"] = {
                             "current": prec_init,
                             "suggested": prec_range[1],
-                            "reason": "Value above maximum range"
+                            "reason": "Value above maximum range",
                         }
 
         # Check thermodynamic budget
         if "thermodynamic" in config:
             thermo = config["thermodynamic"]
-            if all(k in thermo for k in ["total_energy_budget", "baseline_consumption", "ignition_cost"]):
+            if all(
+                k in thermo
+                for k in ["total_energy_budget", "baseline_consumption", "ignition_cost"]
+            ):
                 total = thermo["total_energy_budget"]
                 baseline = thermo["baseline_consumption"]
                 ignition = thermo["ignition_cost"]
@@ -689,7 +638,7 @@ to get specific error messages for your configuration.
                     suggestions["thermodynamic.total_energy_budget"] = {
                         "current": total,
                         "suggested": suggested_total,
-                        "reason": "Insufficient budget for baseline + ignition costs"
+                        "reason": "Insufficient budget for baseline + ignition costs",
                     }
 
         return suggestions
@@ -720,7 +669,7 @@ def validate_config_file(config_path: str) -> None:
     if not config_file.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-    with open(config_file, 'r') as f:
+    with open(config_file, "r") as f:
         config = yaml.safe_load(f)
 
     validator = ConfigValidator()

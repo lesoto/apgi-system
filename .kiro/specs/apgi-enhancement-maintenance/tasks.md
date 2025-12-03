@@ -415,7 +415,9 @@
   - _Requirements: 12.2_
 -
 
-- [-] 34. Add configuration validation tools
+- [x] 34. Add configuration validation tools
+
+
 
 
 
