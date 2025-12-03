@@ -9,7 +9,7 @@ import warnings
 from apgi_system.stability import (
     NumericalStabilityMonitor,
     NumericalInstabilityError,
-    NumericalStabilityWarning
+    NumericalStabilityWarning,
 )
 
 
@@ -30,10 +30,10 @@ class TestNumericalStabilityMonitor:
     def test_initialization_custom_config(self):
         """Test monitor initialization with custom config."""
         config = {
-            'stability_warning_threshold': 1e8,
-            'stability_error_threshold': 1e12,
-            'stability_underflow_threshold': 1e-8,
-            'stability_check_enabled': False
+            "stability_warning_threshold": 1e8,
+            "stability_error_threshold": 1e12,
+            "stability_underflow_threshold": 1e-8,
+            "stability_check_enabled": False,
         }
         monitor = NumericalStabilityMonitor(config)
 
@@ -49,12 +49,12 @@ class TestNumericalStabilityMonitor:
 
         status = monitor.check_stability(value, context="test")
 
-        assert status['stable'] is True
-        assert status['has_nan'] is False
-        assert status['has_inf'] is False
-        assert status['max_abs_value'] == 100.0
-        assert status['warning_issued'] is False
-        assert status['error_detected'] is False
+        assert status["stable"] is True
+        assert status["has_nan"] is False
+        assert status["has_inf"] is False
+        assert status["max_abs_value"] == 100.0
+        assert status["warning_issued"] is False
+        assert status["error_detected"] is False
 
     def test_check_stability_valid_array(self):
         """Test stability check with valid array."""
@@ -63,12 +63,12 @@ class TestNumericalStabilityMonitor:
 
         status = monitor.check_stability(values, context="test")
 
-        assert status['stable'] is True
-        assert status['has_nan'] is False
-        assert status['has_inf'] is False
-        assert status['max_abs_value'] == 4.0
-        assert status['warning_issued'] is False
-        assert status['error_detected'] is False
+        assert status["stable"] is True
+        assert status["has_nan"] is False
+        assert status["has_inf"] is False
+        assert status["max_abs_value"] == 4.0
+        assert status["warning_issued"] is False
+        assert status["error_detected"] is False
 
     def test_check_stability_nan_detection(self):
         """Test detection of NaN values."""
@@ -131,23 +131,23 @@ class TestNumericalStabilityMonitor:
             assert "Large values detected" in str(w[0].message)
             assert "warning_test" in str(w[0].message)
 
-        assert status['stable'] is True
-        assert status['warning_issued'] is True
-        assert status['error_detected'] is False
+        assert status["stable"] is True
+        assert status["warning_issued"] is True
+        assert status["error_detected"] is False
         assert monitor.warning_count == 1
 
     def test_check_stability_disabled(self):
         """Test that checking can be disabled."""
-        config = {'stability_check_enabled': False}
+        config = {"stability_check_enabled": False}
         monitor = NumericalStabilityMonitor(config)
         values = np.array([np.nan, np.inf, 1e20])  # Would normally fail
 
         status = monitor.check_stability(values, context="disabled_test")
 
         # Should return stable status without checking
-        assert status['stable'] is True
-        assert status['has_nan'] is False
-        assert status['has_inf'] is False
+        assert status["stable"] is True
+        assert status["has_nan"] is False
+        assert status["has_inf"] is False
         assert monitor.error_count == 0
 
     def test_check_stability_no_raise_on_error(self):
@@ -155,15 +155,11 @@ class TestNumericalStabilityMonitor:
         monitor = NumericalStabilityMonitor()
         values = np.array([np.nan])
 
-        status = monitor.check_stability(
-            values,
-            context="no_raise_test",
-            raise_on_error=False
-        )
+        status = monitor.check_stability(values, context="no_raise_test", raise_on_error=False)
 
-        assert status['stable'] is False
-        assert status['has_nan'] is True
-        assert status['error_detected'] is True
+        assert status["stable"] is False
+        assert status["has_nan"] is True
+        assert status["error_detected"] is True
         assert monitor.error_count == 1
 
     def test_check_array_properties_valid(self):
@@ -172,17 +168,14 @@ class TestNumericalStabilityMonitor:
         array = np.array([[1.0, 2.0], [3.0, 4.0]])
 
         status = monitor.check_array_properties(
-            array,
-            context="array_test",
-            expected_shape=(2, 2),
-            expected_range=(0.0, 10.0)
+            array, context="array_test", expected_shape=(2, 2), expected_range=(0.0, 10.0)
         )
 
-        assert status['stable'] is True
-        assert status['shape_valid'] is True
-        assert status['range_valid'] is True
-        assert status['actual_shape'] == (2, 2)
-        assert status['actual_range'] == (1.0, 4.0)
+        assert status["stable"] is True
+        assert status["shape_valid"] is True
+        assert status["range_valid"] is True
+        assert status["actual_shape"] == (2, 2)
+        assert status["actual_range"] == (1.0, 4.0)
 
     def test_check_array_properties_shape_mismatch(self):
         """Test array property checking with shape mismatch."""
@@ -190,11 +183,7 @@ class TestNumericalStabilityMonitor:
         array = np.array([[1.0, 2.0], [3.0, 4.0]])
 
         with pytest.raises(ValueError) as exc_info:
-            monitor.check_array_properties(
-                array,
-                context="shape_test",
-                expected_shape=(3, 2)
-            )
+            monitor.check_array_properties(array, context="shape_test", expected_shape=(3, 2))
 
         assert "shape mismatch" in str(exc_info.value)
         assert "expected (3, 2)" in str(exc_info.value)
@@ -206,11 +195,7 @@ class TestNumericalStabilityMonitor:
         array = np.array([1.0, 2.0, 15.0])  # 15.0 exceeds range
 
         with pytest.raises(ValueError) as exc_info:
-            monitor.check_array_properties(
-                array,
-                context="range_test",
-                expected_range=(0.0, 10.0)
-            )
+            monitor.check_array_properties(array, context="range_test", expected_range=(0.0, 10.0))
 
         assert "range violation" in str(exc_info.value)
         assert "expected [0.0, 10.0]" in str(exc_info.value)
@@ -231,8 +216,8 @@ class TestNumericalStabilityMonitor:
 
         stats = monitor.get_statistics()
 
-        assert stats['warning_count'] == 1
-        assert stats['error_count'] == 1
+        assert stats["warning_count"] == 1
+        assert stats["error_count"] == 1
 
     def test_reset_statistics(self):
         """Test resetting of monitoring statistics."""
@@ -252,16 +237,12 @@ class TestNumericalStabilityMonitor:
         monitor.reset_statistics()
         stats = monitor.get_statistics()
 
-        assert stats['warning_count'] == 0
-        assert stats['error_count'] == 0
+        assert stats["warning_count"] == 0
+        assert stats["error_count"] == 0
 
     def test_custom_exception_attributes(self):
         """Test custom exception attributes."""
-        error = NumericalInstabilityError(
-            "Test error",
-            context="test_context",
-            value=1e20
-        )
+        error = NumericalInstabilityError("Test error", context="test_context", value=1e20)
 
         assert error.message == "Test error"
         assert error.context == "test_context"
@@ -281,11 +262,11 @@ class TestNumericalStabilityMonitor:
             monitor.check_stability(7e10, context="test3")
 
         stats = monitor.get_statistics()
-        assert stats['warning_count'] == 3
+        assert stats["warning_count"] == 3
 
     def test_edge_case_exactly_at_threshold(self):
         """Test behavior when value is exactly at threshold."""
-        config = {'stability_warning_threshold': 100.0}
+        config = {"stability_warning_threshold": 100.0}
         monitor = NumericalStabilityMonitor(config)
 
         # Exactly at threshold should trigger warning
@@ -294,7 +275,7 @@ class TestNumericalStabilityMonitor:
             status = monitor.check_stability(100.1, context="threshold_test")
 
             assert len(w) == 1
-            assert status['warning_issued'] is True
+            assert status["warning_issued"] is True
 
     def test_negative_values_handled_correctly(self):
         """Test that negative values are handled using absolute value."""
@@ -306,5 +287,5 @@ class TestNumericalStabilityMonitor:
             status = monitor.check_stability(values, context="negative_test")
 
             assert len(w) == 1
-            assert status['max_abs_value'] == 6e10
-            assert status['warning_issued'] is True
+            assert status["max_abs_value"] == 6e10
+            assert status["warning_issued"] is True

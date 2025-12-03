@@ -4,7 +4,7 @@ from apgi_system.neural.macroscale.large_scale_networks import (
     FrontoparietalNetwork,
     SalienceNetwork,
     DefaultModeNetwork,
-    LargeScaleNetworkManager
+    LargeScaleNetworkManager,
 )
 
 __all__ = [

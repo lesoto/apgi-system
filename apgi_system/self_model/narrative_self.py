@@ -66,9 +66,9 @@ class NarrativeSelf:
     """
 
     def __init__(self, config: Dict[str, Any]):
-        self.config = config.get('self_model', {}).get('narrative_self', {})
-        self.memory_capacity = self.config.get('episodic_memory_capacity', 1000)
-        self.consolidation_rate = self.config.get('consolidation_rate', 0.01)
+        self.config = config.get("self_model", {}).get("narrative_self", {})
+        self.memory_capacity = self.config.get("episodic_memory_capacity", 1000)
+        self.consolidation_rate = self.config.get("consolidation_rate", 0.01)
 
         self.episodic_memory = deque(maxlen=self.memory_capacity)
         self.identity_vector = np.random.randn(64) * 0.1
@@ -104,25 +104,25 @@ class NarrativeSelf:
 
         # Gradual identity consolidation
         if len(self.episodic_memory) > 0:
-            self.identity_vector *= (1 - self.consolidation_rate * dt / 1000.0)
+            self.identity_vector *= 1 - self.consolidation_rate * dt / 1000.0
 
         coherence = 1.0 - 0.1 * np.random.rand()  # Simplified
 
         return {
-            'identity_strength': float(np.linalg.norm(self.identity_vector)),
-            'memory_count': len(self.episodic_memory),
-            'narrative_coherence': float(coherence)
+            "identity_strength": float(np.linalg.norm(self.identity_vector)),
+            "memory_count": len(self.episodic_memory),
+            "narrative_coherence": float(coherence),
         }
 
     def get_current_state(self) -> Dict[str, Any]:
         """Get current narrative self state."""
         coherence = 1.0 - 0.1 * np.random.rand()  # Simplified
-        
+
         return {
-            'identity_strength': float(np.linalg.norm(self.identity_vector)),
-            'memory_count': len(self.episodic_memory),
-            'narrative_coherence': float(coherence),
-            'identity_vector': self.identity_vector.copy()
+            "identity_strength": float(np.linalg.norm(self.identity_vector)),
+            "memory_count": len(self.episodic_memory),
+            "narrative_coherence": float(coherence),
+            "identity_vector": self.identity_vector.copy(),
         }
 
     def reset(self):

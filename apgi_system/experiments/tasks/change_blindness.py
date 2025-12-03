@@ -20,6 +20,7 @@ from enum import Enum
 
 class ChangeType(Enum):
     """Types of changes in the scene."""
+
     APPEARANCE = "appearance"  # Object appears
     DISAPPEARANCE = "disappearance"  # Object disappears
     COLOR = "color"  # Color change
@@ -29,6 +30,7 @@ class ChangeType(Enum):
 @dataclass
 class Trial:
     """Single trial configuration."""
+
     trial_number: int
     change_type: ChangeType
     change_magnitude: float  # Strength of the change (0.0-1.0)
@@ -40,6 +42,7 @@ class Trial:
 @dataclass
 class TrialResult:
     """Results from a single trial."""
+
     trial_number: int
     change_type: ChangeType
     change_magnitude: float
@@ -71,7 +74,7 @@ class ChangeBlindnessTask:
         blank_duration_ms: float = 80.0,
         max_alternations: int = 20,
         num_trials_per_condition: int = 10,
-        change_magnitudes: Optional[List[float]] = None
+        change_magnitudes: Optional[List[float]] = None,
     ):
         """Initialize change blindness task."""
         self.presentation_duration_ms = presentation_duration_ms
@@ -102,9 +105,7 @@ class ChangeBlindnessTask:
             for magnitude in self.change_magnitudes:
                 for rep in range(self.num_trials_per_condition):
                     # Generate original and modified images
-                    original, modified = self._generate_image_pair(
-                        change_type, magnitude
-                    )
+                    original, modified = self._generate_image_pair(change_type, magnitude)
 
                     trial = Trial(
                         trial_number=trial_num,
@@ -112,7 +113,7 @@ class ChangeBlindnessTask:
                         change_magnitude=magnitude,
                         original_image=original,
                         modified_image=modified,
-                        max_alternations=self.max_alternations
+                        max_alternations=self.max_alternations,
                     )
                     trials.append(trial)
                     trial_num += 1
@@ -123,9 +124,7 @@ class ChangeBlindnessTask:
         return trials
 
     def _generate_image_pair(
-        self,
-        change_type: ChangeType,
-        magnitude: float
+        self, change_type: ChangeType, magnitude: float
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generate original and modified image pair.
@@ -154,11 +153,13 @@ class ChangeBlindnessTask:
 
         if change_type == ChangeType.APPEARANCE:
             # Add new object (increase signal in region)
-            modified[change_region_start:change_region_end] += magnitude * 2.0 * np.random.randn(change_region_size)
+            modified[change_region_start:change_region_end] += (
+                magnitude * 2.0 * np.random.randn(change_region_size)
+            )
 
         elif change_type == ChangeType.DISAPPEARANCE:
             # Remove object (decrease signal in region)
-            modified[change_region_start:change_region_end] *= (1.0 - magnitude)
+            modified[change_region_start:change_region_end] *= 1.0 - magnitude
 
         elif change_type == ChangeType.COLOR:
             # Change color (shift pattern in region)
@@ -218,11 +219,7 @@ class ChangeBlindnessTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(
-        self,
-        apgi_system,
-        trial: Trial
-    ) -> TrialResult:
+    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
         """
         Run a single trial on the APGI system.
 
@@ -259,7 +256,7 @@ class ChangeBlindnessTask:
                 state = apgi_system.step(trial.original_image)
 
                 # Check for ignition during original (shouldn't happen for change detection)
-                if state['ignition']['ignition_occurred']:
+                if state["ignition"]["ignition_occurred"]:
                     # False positive - ignition during original
                     pass
 
@@ -276,14 +273,15 @@ class ChangeBlindnessTask:
                 state = apgi_system.step(trial.modified_image)
 
                 # Check for ignition during modified image
-                if state['ignition']['ignition_occurred'] and not change_detected:
+                if state["ignition"]["ignition_occurred"] and not change_detected:
                     # Change detected!
                     change_detected = True
                     alternations_to_detection = alternation + 1
-                    time_to_detection = state['time'] - (alternation * (
-                        self.presentation_duration_ms * 2 + self.blank_duration_ms * 2
-                    ))
-                    ignition_signal_strength = state['ignition']['total_signal']
+                    time_to_detection = state["time"] - (
+                        alternation
+                        * (self.presentation_duration_ms * 2 + self.blank_duration_ms * 2)
+                    )
+                    ignition_signal_strength = state["ignition"]["total_signal"]
                     break
 
             # If detected, stop alternating
@@ -302,7 +300,7 @@ class ChangeBlindnessTask:
             change_detected=change_detected,
             alternations_to_detection=alternations_to_detection,
             time_to_detection=time_to_detection,
-            ignition_signal_strength=ignition_signal_strength
+            ignition_signal_strength=ignition_signal_strength,
         )
 
         self.results.append(result)
@@ -346,18 +344,12 @@ class ChangeBlindnessTask:
             - Change blindness effects
         """
         if not self.results:
-            return {
-                'error': 'No results to analyze',
-                'total_trials': 0
-            }
+            return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize by change type and magnitude
         results_by_type = {ct: [] for ct in ChangeType}
         results_by_magnitude = {mag: [] for mag in self.change_magnitudes}
-        results_by_type_mag = {
-            ct: {mag: [] for mag in self.change_magnitudes}
-            for ct in ChangeType
-        }
+        results_by_type_mag = {ct: {mag: [] for mag in self.change_magnitudes} for ct in ChangeType}
 
         for result in self.results:
             results_by_type[result.change_type].append(result)
@@ -372,22 +364,30 @@ class ChangeBlindnessTask:
 
             detected = [r for r in type_results if r.change_detected]
 
-            avg_alternations = np.mean([
-                r.alternations_to_detection for r in detected
-                if r.alternations_to_detection is not None
-            ]) if detected else 0.0
+            avg_alternations = (
+                np.mean(
+                    [
+                        r.alternations_to_detection
+                        for r in detected
+                        if r.alternations_to_detection is not None
+                    ]
+                )
+                if detected
+                else 0.0
+            )
 
-            avg_time = np.mean([
-                r.time_to_detection for r in detected
-                if r.time_to_detection is not None
-            ]) if detected else 0.0
+            avg_time = (
+                np.mean([r.time_to_detection for r in detected if r.time_to_detection is not None])
+                if detected
+                else 0.0
+            )
 
             type_analysis[change_type.value] = {
-                'total_trials': len(type_results),
-                'detection_rate': len(detected) / len(type_results),
-                'avg_alternations_to_detection': avg_alternations,
-                'avg_time_to_detection_ms': avg_time,
-                'detections': len(detected)
+                "total_trials": len(type_results),
+                "detection_rate": len(detected) / len(type_results),
+                "avg_alternations_to_detection": avg_alternations,
+                "avg_time_to_detection_ms": avg_time,
+                "detections": len(detected),
             }
 
         # Compute metrics by magnitude
@@ -398,16 +398,23 @@ class ChangeBlindnessTask:
 
             detected = [r for r in mag_results if r.change_detected]
 
-            avg_alternations = np.mean([
-                r.alternations_to_detection for r in detected
-                if r.alternations_to_detection is not None
-            ]) if detected else 0.0
+            avg_alternations = (
+                np.mean(
+                    [
+                        r.alternations_to_detection
+                        for r in detected
+                        if r.alternations_to_detection is not None
+                    ]
+                )
+                if detected
+                else 0.0
+            )
 
             magnitude_analysis[magnitude] = {
-                'total_trials': len(mag_results),
-                'detection_rate': len(detected) / len(mag_results),
-                'avg_alternations_to_detection': avg_alternations,
-                'detections': len(detected)
+                "total_trials": len(mag_results),
+                "detection_rate": len(detected) / len(mag_results),
+                "avg_alternations_to_detection": avg_alternations,
+                "detections": len(detected),
             }
 
         # Compute metrics by type AND magnitude
@@ -422,9 +429,9 @@ class ChangeBlindnessTask:
                 detected = [r for r in results if r.change_detected]
 
                 type_mag_analysis[change_type.value][magnitude] = {
-                    'total_trials': len(results),
-                    'detection_rate': len(detected) / len(results) if results else 0.0,
-                    'detections': len(detected)
+                    "total_trials": len(results),
+                    "detection_rate": len(detected) / len(results) if results else 0.0,
+                    "detections": len(detected),
                 }
 
         # Overall statistics
@@ -432,32 +439,43 @@ class ChangeBlindnessTask:
         total_detected = sum(1 for r in self.results if r.change_detected)
         detected_results = [r for r in self.results if r.change_detected]
 
-        overall_avg_alternations = np.mean([
-            r.alternations_to_detection for r in detected_results
-            if r.alternations_to_detection is not None
-        ]) if detected_results else 0.0
+        overall_avg_alternations = (
+            np.mean(
+                [
+                    r.alternations_to_detection
+                    for r in detected_results
+                    if r.alternations_to_detection is not None
+                ]
+            )
+            if detected_results
+            else 0.0
+        )
 
-        overall_avg_time = np.mean([
-            r.time_to_detection for r in detected_results
-            if r.time_to_detection is not None
-        ]) if detected_results else 0.0
+        overall_avg_time = (
+            np.mean(
+                [r.time_to_detection for r in detected_results if r.time_to_detection is not None]
+            )
+            if detected_results
+            else 0.0
+        )
 
         summary = {
-            'total_trials': total_trials,
-            'overall_detection_rate': total_detected / total_trials if total_trials > 0 else 0.0,
-            'overall_blindness_rate': 1.0 - (total_detected / total_trials if total_trials > 0 else 0.0),
-            'overall_avg_alternations': overall_avg_alternations,
-            'overall_avg_time_ms': overall_avg_time,
-            'by_change_type': type_analysis,
-            'by_magnitude': magnitude_analysis,
-            'by_type_and_magnitude': type_mag_analysis,
-            'task_parameters': {
-                'presentation_duration_ms': self.presentation_duration_ms,
-                'blank_duration_ms': self.blank_duration_ms,
-                'max_alternations': self.max_alternations,
-                'change_magnitudes': self.change_magnitudes,
-                'trials_per_condition': self.num_trials_per_condition
-            }
+            "total_trials": total_trials,
+            "overall_detection_rate": total_detected / total_trials if total_trials > 0 else 0.0,
+            "overall_blindness_rate": 1.0
+            - (total_detected / total_trials if total_trials > 0 else 0.0),
+            "overall_avg_alternations": overall_avg_alternations,
+            "overall_avg_time_ms": overall_avg_time,
+            "by_change_type": type_analysis,
+            "by_magnitude": magnitude_analysis,
+            "by_type_and_magnitude": type_mag_analysis,
+            "task_parameters": {
+                "presentation_duration_ms": self.presentation_duration_ms,
+                "blank_duration_ms": self.blank_duration_ms,
+                "max_alternations": self.max_alternations,
+                "change_magnitudes": self.change_magnitudes,
+                "trials_per_condition": self.num_trials_per_condition,
+            },
         }
 
         return summary
@@ -483,10 +501,12 @@ class ChangeBlindnessTask:
         print(f"{'Type':<20} {'Detection Rate':<18} {'Avg Alternations':<18}")
         print("-" * 70)
 
-        for change_type, data in analysis['by_change_type'].items():
-            print(f"{change_type:<20} "
-                  f"{data['detection_rate']:<18.1%} "
-                  f"{data['avg_alternations_to_detection']:<18.1f}")
+        for change_type, data in analysis["by_change_type"].items():
+            print(
+                f"{change_type:<20} "
+                f"{data['detection_rate']:<18.1%} "
+                f"{data['avg_alternations_to_detection']:<18.1f}"
+            )
 
         print("\n" + "-" * 70)
         print("Results by Change Magnitude:")
@@ -494,11 +514,13 @@ class ChangeBlindnessTask:
         print(f"{'Magnitude':<15} {'Detection Rate':<18} {'Avg Alternations':<18}")
         print("-" * 70)
 
-        for magnitude in sorted(analysis['by_magnitude'].keys()):
-            data = analysis['by_magnitude'][magnitude]
-            print(f"{magnitude:<15.1f} "
-                  f"{data['detection_rate']:<18.1%} "
-                  f"{data['avg_alternations_to_detection']:<18.1f}")
+        for magnitude in sorted(analysis["by_magnitude"].keys()):
+            data = analysis["by_magnitude"][magnitude]
+            print(
+                f"{magnitude:<15.1f} "
+                f"{data['detection_rate']:<18.1%} "
+                f"{data['avg_alternations_to_detection']:<18.1f}"
+            )
 
         print("\n" + "-" * 70)
         print("Detection Matrix (Change Type × Magnitude):")
@@ -515,8 +537,10 @@ class ChangeBlindnessTask:
         for change_type in ChangeType:
             row = f"{change_type.value:<20}"
             for mag in sorted(self.change_magnitudes):
-                if mag in analysis['by_type_and_magnitude'].get(change_type.value, {}):
-                    rate = analysis['by_type_and_magnitude'][change_type.value][mag]['detection_rate']
+                if mag in analysis["by_type_and_magnitude"].get(change_type.value, {}):
+                    rate = analysis["by_type_and_magnitude"][change_type.value][mag][
+                        "detection_rate"
+                    ]
                     row += f"{rate:<12.1%}"
                 else:
                     row += f"{'N/A':<12}"
@@ -526,10 +550,10 @@ class ChangeBlindnessTask:
 
         # Interpretation
         print("\nInterpretation:")
-        if analysis['overall_blindness_rate'] > 0.3:
+        if analysis["overall_blindness_rate"] > 0.3:
             print("✓ Strong change blindness effect observed")
             print(f"  {analysis['overall_blindness_rate']:.1%} of changes were missed")
-        elif analysis['overall_blindness_rate'] > 0.15:
+        elif analysis["overall_blindness_rate"] > 0.15:
             print("~ Moderate change blindness effect")
         else:
             print("✗ Weak or no change blindness (high detection)")
@@ -551,22 +575,21 @@ class ChangeBlindnessTask:
         # Add individual trial data
         trial_data = []
         for result in self.results:
-            trial_data.append({
-                'trial_number': result.trial_number,
-                'change_type': result.change_type.value,
-                'change_magnitude': result.change_magnitude,
-                'change_detected': result.change_detected,
-                'alternations_to_detection': result.alternations_to_detection,
-                'time_to_detection': result.time_to_detection,
-                'ignition_signal_strength': result.ignition_signal_strength
-            })
+            trial_data.append(
+                {
+                    "trial_number": result.trial_number,
+                    "change_type": result.change_type.value,
+                    "change_magnitude": result.change_magnitude,
+                    "change_detected": result.change_detected,
+                    "alternations_to_detection": result.alternations_to_detection,
+                    "time_to_detection": result.time_to_detection,
+                    "ignition_signal_strength": result.ignition_signal_strength,
+                }
+            )
 
-        output = {
-            'summary': analysis,
-            'trials': trial_data
-        }
+        output = {"summary": analysis, "trials": trial_data}
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(output, f, indent=2)
 
         print(f"Results saved to: {filename}")

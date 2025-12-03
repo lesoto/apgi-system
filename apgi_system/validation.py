@@ -12,10 +12,10 @@ from typing import Optional, Tuple, Union
 class InputValidator:
     """
     Centralized input validation for APGI system components.
-    
+
     This class provides static methods for validating arrays and scalars,
     including shape checking, range validation, and NaN/Inf detection.
-    
+
     Examples
     --------
     >>> validator = InputValidator()
@@ -23,20 +23,20 @@ class InputValidator:
     >>> InputValidator.validate_array(arr, "test_array", expected_shape=(3,))
     >>> InputValidator.validate_scalar(1.5, "test_value", positive=True)
     """
-    
+
     @staticmethod
     def validate_array(
         arr: np.ndarray,
         name: str,
         expected_shape: Optional[Tuple[int, ...]] = None,
-        value_range: Optional[Tuple[float, float]] = None
+        value_range: Optional[Tuple[float, float]] = None,
     ) -> None:
         """
         Validate numpy array inputs.
-        
+
         Checks that the input is a numpy array, optionally validates its shape
         and value range, and ensures no NaN or Inf values are present.
-        
+
         Parameters
         ----------
         arr : np.ndarray
@@ -48,14 +48,14 @@ class InputValidator:
         value_range : Optional[Tuple[float, float]], optional
             Tuple of (min_value, max_value) for range checking.
             If None, range is not checked.
-            
+
         Raises
         ------
         TypeError
             If arr is not a numpy array
         ValueError
             If shape doesn't match, values are out of range, or NaN/Inf detected
-            
+
         Examples
         --------
         >>> arr = np.array([1.0, 2.0, 3.0])
@@ -67,8 +67,7 @@ class InputValidator:
 
         if expected_shape and arr.shape != expected_shape:
             raise ValueError(
-                f"{name} shape mismatch: expected {expected_shape}, "
-                f"got {arr.shape}"
+                f"{name} shape mismatch: expected {expected_shape}, " f"got {arr.shape}"
             )
 
         if value_range:
@@ -86,14 +85,14 @@ class InputValidator:
         value: Union[int, float, np.number],
         name: str,
         value_range: Optional[Tuple[float, float]] = None,
-        positive: bool = False
+        positive: bool = False,
     ) -> None:
         """
         Validate scalar inputs.
-        
+
         Checks that the input is numeric, optionally validates its range
         and positivity, and ensures it's not NaN or Inf.
-        
+
         Parameters
         ----------
         value : Union[int, float, np.number]
@@ -105,14 +104,14 @@ class InputValidator:
             If None, range is not checked.
         positive : bool, optional
             If True, value must be strictly positive (> 0), by default False
-            
+
         Raises
         ------
         TypeError
             If value is not numeric
         ValueError
             If value is out of range, not positive when required, or is NaN/Inf
-            
+
         Examples
         --------
         >>> InputValidator.validate_scalar(1.5, "alpha", positive=True)
@@ -129,6 +128,4 @@ class InputValidator:
 
         if value_range:
             if value < value_range[0] or value > value_range[1]:
-                raise ValueError(
-                    f"{name} must be in range {value_range}, got {value}"
-                )
+                raise ValueError(f"{name} must be in range {value_range}, got {value}")

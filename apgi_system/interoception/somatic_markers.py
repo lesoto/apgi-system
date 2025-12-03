@@ -20,6 +20,7 @@ class SomaticMarker:
 
     Stores: (context_pattern, action_pattern) -> body_outcome
     """
+
     context_pattern: np.ndarray
     action_pattern: np.ndarray
     body_outcome: float  # Valence: positive = good, negative = bad
@@ -107,14 +108,14 @@ class SomaticMarkerSystem:
             Configuration dictionary containing somatic marker settings
         """
         self.config = config
-        marker_config = config.get('somatic_markers', {})
+        marker_config = config.get("somatic_markers", {})
 
         # System parameters
-        self.capacity = marker_config.get('capacity', 10000)
-        self.learning_rate = marker_config.get('learning_rate', 0.05)
-        self.decay_rate = marker_config.get('decay_rate', 0.001)
-        self.retrieval_threshold = marker_config.get('retrieval_threshold', 0.3)
-        self.gain_range = marker_config.get('gain_modulation_range', [0.5, 2.0])
+        self.capacity = marker_config.get("capacity", 10000)
+        self.learning_rate = marker_config.get("learning_rate", 0.05)
+        self.decay_rate = marker_config.get("decay_rate", 0.001)
+        self.retrieval_threshold = marker_config.get("retrieval_threshold", 0.3)
+        self.gain_range = marker_config.get("gain_modulation_range", [0.5, 2.0])
 
         # Storage
         self.markers: List[SomaticMarker] = []
@@ -131,7 +132,7 @@ class SomaticMarkerSystem:
         context: np.ndarray,
         action: np.ndarray,
         body_outcome: float,
-        current_time: float = 0.0
+        current_time: float = 0.0,
     ):
         """
         Learn or update a somatic marker.
@@ -170,26 +171,17 @@ class SomaticMarkerSystem:
         # Validate inputs
         InputValidator.validate_array(context, "context")
         InputValidator.validate_array(action, "action")
-        InputValidator.validate_scalar(
-            body_outcome,
-            "body_outcome",
-            value_range=(-1.0, 1.0)
-        )
-        InputValidator.validate_scalar(
-            current_time,
-            "current_time",
-            value_range=(0.0, 1e10)
-        )
-        
+        InputValidator.validate_scalar(body_outcome, "body_outcome", value_range=(-1.0, 1.0))
+        InputValidator.validate_scalar(current_time, "current_time", value_range=(0.0, 1e10))
+
         # Check if similar marker exists
         existing_marker = self._find_similar_marker(context, action)
 
         if existing_marker is not None:
             # Update existing marker
             existing_marker.body_outcome = (
-                (1 - self.learning_rate) * existing_marker.body_outcome +
-                self.learning_rate * body_outcome
-            )
+                1 - self.learning_rate
+            ) * existing_marker.body_outcome + self.learning_rate * body_outcome
             existing_marker.strength = min(1.0, existing_marker.strength + 0.1)
             existing_marker.last_update_time = current_time
 
@@ -201,7 +193,7 @@ class SomaticMarkerSystem:
                     action_pattern=action.copy(),
                     body_outcome=body_outcome,
                     strength=0.5,  # Start with moderate strength
-                    last_update_time=current_time
+                    last_update_time=current_time,
                 )
                 self.markers.append(marker)
             else:
@@ -212,14 +204,10 @@ class SomaticMarkerSystem:
                     action_pattern=action.copy(),
                     body_outcome=body_outcome,
                     strength=0.5,
-                    last_update_time=current_time
+                    last_update_time=current_time,
                 )
 
-    def retrieve(
-        self,
-        context: np.ndarray,
-        action: np.ndarray
-    ) -> Tuple[float, bool]:
+    def retrieve(self, context: np.ndarray, action: np.ndarray) -> Tuple[float, bool]:
         """
         Retrieve somatic marker for a context-action pair.
 
@@ -265,7 +253,7 @@ class SomaticMarkerSystem:
         # Validate inputs
         InputValidator.validate_array(context, "context")
         InputValidator.validate_array(action, "action")
-        
+
         self.total_retrievals += 1
 
         # Find matching marker
@@ -293,10 +281,7 @@ class SomaticMarkerSystem:
             return 1.0, False
 
     def _find_similar_marker(
-        self,
-        context: np.ndarray,
-        action: np.ndarray,
-        similarity_threshold: float = 0.8
+        self, context: np.ndarray, action: np.ndarray, similarity_threshold: float = 0.8
     ) -> Optional[SomaticMarker]:
         """
         Find marker similar to given context-action pair.
@@ -389,7 +374,7 @@ class SomaticMarkerSystem:
         """
         for marker in self.markers:
             # Decay strength of infrequently accessed markers
-            marker.strength *= (1.0 - self.decay_rate * dt / 1000.0)
+            marker.strength *= 1.0 - self.decay_rate * dt / 1000.0
             marker.strength = max(0.0, marker.strength)
 
         # Remove very weak markers
@@ -412,22 +397,16 @@ class SomaticMarkerSystem:
             - 'avg_outcome': Average body outcome across markers
         """
         if len(self.markers) == 0:
-            return {
-                'num_markers': 0,
-                'retrieval_success_rate': 0.0,
-                'avg_strength': 0.0
-            }
+            return {"num_markers": 0, "retrieval_success_rate": 0.0, "avg_strength": 0.0}
 
         return {
-            'num_markers': len(self.markers),
-            'capacity_used': len(self.markers) / self.capacity,
-            'total_retrievals': self.total_retrievals,
-            'successful_retrievals': self.successful_retrievals,
-            'retrieval_success_rate': (
-                self.successful_retrievals / max(1, self.total_retrievals)
-            ),
-            'avg_strength': float(np.mean([m.strength for m in self.markers])),
-            'avg_outcome': float(np.mean([m.body_outcome for m in self.markers]))
+            "num_markers": len(self.markers),
+            "capacity_used": len(self.markers) / self.capacity,
+            "total_retrievals": self.total_retrievals,
+            "successful_retrievals": self.successful_retrievals,
+            "retrieval_success_rate": (self.successful_retrievals / max(1, self.total_retrievals)),
+            "avg_strength": float(np.mean([m.strength for m in self.markers])),
+            "avg_outcome": float(np.mean([m.body_outcome for m in self.markers])),
         }
 
     def consolidate(self):

@@ -45,7 +45,7 @@ class PredictionErrorChannel:
     The sliding window enables temporal integration:
     - Short windows (~50ms): Sensitive to transient changes
     - Long windows (~200ms): Sensitive to sustained deviations
-    
+
     Accumulated error provides a scalar measure of prediction failure
     over the integration window.
 
@@ -59,11 +59,7 @@ class PredictionErrorChannel:
     """
 
     def __init__(
-        self,
-        name: str,
-        dimension: int,
-        window_size_ms: float = 100.0,
-        timestep_ms: float = 1.0
+        self, name: str, dimension: int, window_size_ms: float = 100.0, timestep_ms: float = 1.0
     ) -> None:
         """
         Initialize prediction error channel.
@@ -102,10 +98,7 @@ class PredictionErrorChannel:
         self.precision = 1.0
 
     def update(
-        self,
-        observation: FloatArray,
-        prediction: FloatArray,
-        precision: float = 1.0
+        self, observation: FloatArray, prediction: FloatArray, precision: float = 1.0
     ) -> FloatArray:
         """
         Update prediction error with new observation.
@@ -130,7 +123,7 @@ class PredictionErrorChannel:
         Notes
         -----
         Prediction error: ε = o - μ̂
-        
+
         The error is added to a circular buffer, automatically discarding
         the oldest error when the buffer is full.
 
@@ -160,7 +153,7 @@ class PredictionErrorChannel:
         else:
             # Sum of squared errors over window
             errors = np.array(self.error_buffer)
-            self.accumulated_error = np.sum(errors ** 2)
+            self.accumulated_error = np.sum(errors**2)
 
     def get_accumulated_signal(self) -> float:
         """
@@ -201,20 +194,15 @@ class PredictionErrorChannel:
         a temporal summary of prediction performance.
         """
         if len(self.error_buffer) == 0:
-            return {
-                'mean_error': 0.0,
-                'std_error': 0.0,
-                'max_error': 0.0,
-                'accumulated': 0.0
-            }
+            return {"mean_error": 0.0, "std_error": 0.0, "max_error": 0.0, "accumulated": 0.0}
 
         errors = np.array(self.error_buffer)
         return {
-            'mean_error': float(np.mean(np.abs(errors))),
-            'std_error': float(np.std(errors)),
-            'max_error': float(np.max(np.abs(errors))),
-            'accumulated': float(self.accumulated_error),
-            'current_magnitude': float(np.linalg.norm(self.current_error))
+            "mean_error": float(np.mean(np.abs(errors))),
+            "std_error": float(np.std(errors)),
+            "max_error": float(np.max(np.abs(errors))),
+            "accumulated": float(self.accumulated_error),
+            "current_magnitude": float(np.linalg.norm(self.current_error)),
         }
 
     def reset(self) -> None:
@@ -262,7 +250,7 @@ class HierarchicalPredictor:
     The hierarchical structure implements temporal abstraction:
     - Lower levels update rapidly (1-10ms) for fast sensory processing
     - Higher levels update slowly (100-1000ms) for abstract representations
-    
+
     This multi-timescale architecture enables efficient processing of both
     fast-changing sensory details and slow-changing contextual information.
 
@@ -319,49 +307,49 @@ class HierarchicalPredictor:
         self.config = config
 
         # Extract hierarchy configuration
-        hierarchy_config = config.get('hierarchy', {})
-        self.num_levels = hierarchy_config.get('num_levels', 4)
-        level_configs = hierarchy_config.get('level_configs', [])
+        hierarchy_config = config.get("hierarchy", {})
+        self.num_levels = hierarchy_config.get("num_levels", 4)
+        level_configs = hierarchy_config.get("level_configs", [])
 
         # Predictive processing config
-        pp_config = config.get('predictive_processing', {})
-        self.prediction_horizon_ms = pp_config.get('prediction_horizon_ms', 200)
-        self.temporal_discount = pp_config.get('temporal_discount', 0.95)
+        pp_config = config.get("predictive_processing", {})
+        self.prediction_horizon_ms = pp_config.get("prediction_horizon_ms", 200)
+        self.temporal_discount = pp_config.get("temporal_discount", 0.95)
 
         # Initialize levels
         self.levels = []
         for i, level_config in enumerate(level_configs):
             level = {
-                'name': level_config['name'],
-                'nodes': level_config['nodes'],
-                'timescale_ms': level_config['timescale_ms'],
-                'state': np.zeros(level_config['nodes']),
-                'prediction': np.zeros(level_config['nodes']),
-                'error': np.zeros(level_config['nodes']),
-                'precision': 1.0,
-                'update_counter': 0,
-                'update_interval': int(level_config['timescale_ms'])
+                "name": level_config["name"],
+                "nodes": level_config["nodes"],
+                "timescale_ms": level_config["timescale_ms"],
+                "state": np.zeros(level_config["nodes"]),
+                "prediction": np.zeros(level_config["nodes"]),
+                "error": np.zeros(level_config["nodes"]),
+                "precision": 1.0,
+                "update_counter": 0,
+                "update_interval": int(level_config["timescale_ms"]),
             }
             self.levels.append(level)
 
         # Separate error channels
-        timestep_ms = config.get('system', {}).get('timestep_ms', 1.0)
-        window_size = pp_config.get('error_accumulation_window_ms', 100)
+        timestep_ms = config.get("system", {}).get("timestep_ms", 1.0)
+        window_size = pp_config.get("error_accumulation_window_ms", 100)
 
         self.exteroceptive_channel = PredictionErrorChannel(
-            name='exteroceptive',
-            dimension=self.levels[0]['nodes'],
+            name="exteroceptive",
+            dimension=self.levels[0]["nodes"],
             window_size_ms=window_size,
-            timestep_ms=timestep_ms
+            timestep_ms=timestep_ms,
         )
 
         # Interoceptive dimension is 6 (body state vector size)
         # heart_rate, respiration, temperature, glucose, cortisol, blood_pressure
         self.interoceptive_channel = PredictionErrorChannel(
-            name='interoceptive',
+            name="interoceptive",
             dimension=6,  # Body state vector size
             window_size_ms=window_size,
-            timestep_ms=timestep_ms
+            timestep_ms=timestep_ms,
         )
 
         # Learning rates per level
@@ -377,7 +365,7 @@ class HierarchicalPredictor:
         self,
         extero_input: Optional[FloatArray] = None,
         intero_input: Optional[FloatArray] = None,
-        dt_ms: float = 1.0
+        dt_ms: float = 1.0,
     ) -> Dict[str, Any]:
         """
         Generate predictions and compute prediction errors.
@@ -393,7 +381,7 @@ class HierarchicalPredictor:
             Exteroceptive (external sensory) input vector
         intero_input : np.ndarray, optional
             Interoceptive (body state) input vector of shape (6,)
-            Expected order: [heart_rate, respiration, temperature, 
+            Expected order: [heart_rate, respiration, temperature,
                            glucose, cortisol, blood_pressure]
         dt_ms : float, default=1.0
             Time step in milliseconds
@@ -418,7 +406,7 @@ class HierarchicalPredictor:
         -----
         Prediction errors are computed as:
         ε = observation - prediction
-        
+
         These errors drive learning and belief updating throughout the hierarchy.
 
         Examples
@@ -432,48 +420,32 @@ class HierarchicalPredictor:
         # Validate inputs
         if extero_input is not None:
             InputValidator.validate_array(
-                extero_input,
-                "extero_input",
-                expected_shape=(self.levels[0]['nodes'],)
+                extero_input, "extero_input", expected_shape=(self.levels[0]["nodes"],)
             )
-        
+
         if intero_input is not None:
-            InputValidator.validate_array(
-                intero_input,
-                "intero_input",
-                expected_shape=(6,)
-            )
-        
-        InputValidator.validate_scalar(
-            dt_ms,
-            "dt_ms",
-            positive=True,
-            value_range=(0.001, 1000.0)
-        )
-        
-        results = {
-            'exteroceptive': {},
-            'interoceptive': {},
-            'hierarchical_errors': []
-        }
+            InputValidator.validate_array(intero_input, "intero_input", expected_shape=(6,))
+
+        InputValidator.validate_scalar(dt_ms, "dt_ms", positive=True, value_range=(0.001, 1000.0))
+
+        results = {"exteroceptive": {}, "interoceptive": {}, "hierarchical_errors": []}
 
         # Process exteroceptive stream
         if extero_input is not None:
             extero_error = self.exteroceptive_channel.update(
                 observation=extero_input,
-                prediction=self.levels[0]['prediction'],
-                precision=self.levels[0]['precision']
+                prediction=self.levels[0]["prediction"],
+                precision=self.levels[0]["precision"],
             )
 
             # Check stability of exteroceptive error
             self.stability_monitor.check_stability(
-                extero_error,
-                context="exteroceptive_prediction_error"
+                extero_error, context="exteroceptive_prediction_error"
             )
 
-            results['exteroceptive'] = {
-                'error': extero_error,
-                'stats': self.exteroceptive_channel.get_statistics()
+            results["exteroceptive"] = {
+                "error": extero_error,
+                "stats": self.exteroceptive_channel.get_statistics(),
             }
 
         # Process interoceptive stream
@@ -481,18 +453,17 @@ class HierarchicalPredictor:
             intero_error = self.interoceptive_channel.update(
                 observation=intero_input,
                 prediction=self.intero_prediction,  # 6-dimensional body prediction
-                precision=self.levels[0]['precision']
+                precision=self.levels[0]["precision"],
             )
 
             # Check stability of interoceptive error
             self.stability_monitor.check_stability(
-                intero_error,
-                context="interoceptive_prediction_error"
+                intero_error, context="interoceptive_prediction_error"
             )
 
-            results['interoceptive'] = {
-                'error': intero_error,
-                'stats': self.interoceptive_channel.get_statistics()
+            results["interoceptive"] = {
+                "error": intero_error,
+                "stats": self.interoceptive_channel.get_statistics(),
             }
 
             # Update interoceptive prediction (simple running average)
@@ -500,8 +471,7 @@ class HierarchicalPredictor:
 
             # Check stability of updated prediction
             self.stability_monitor.check_stability(
-                self.intero_prediction,
-                context="interoceptive_prediction_update"
+                self.intero_prediction, context="interoceptive_prediction_update"
             )
 
         # Update hierarchical levels
@@ -509,12 +479,14 @@ class HierarchicalPredictor:
 
         # Collect hierarchical errors
         for level in self.levels:
-            results['hierarchical_errors'].append({
-                'level': level['name'],
-                'error': level['error'].copy(),
-                'magnitude': float(np.linalg.norm(level['error'])),
-                'precision': level['precision']
-            })
+            results["hierarchical_errors"].append(
+                {
+                    "level": level["name"],
+                    "error": level["error"].copy(),
+                    "magnitude": float(np.linalg.norm(level["error"])),
+                    "precision": level["precision"],
+                }
+            )
 
         return results
 
@@ -534,7 +506,7 @@ class HierarchicalPredictor:
         Notes
         -----
         Update occurs when: update_counter >= update_interval
-        
+
         This ensures each level operates at its natural timescale:
         - Sensory level: ~1ms (fast sensory processing)
         - Perceptual level: ~10ms (perceptual grouping)
@@ -542,37 +514,36 @@ class HierarchicalPredictor:
         - Abstract level: ~500ms (contextual understanding)
         """
         for i, level in enumerate(self.levels):
-            level['update_counter'] += dt_ms
+            level["update_counter"] += dt_ms
 
             # Only update if timescale reached
-            if level['update_counter'] >= level['update_interval']:
-                level['update_counter'] = 0
+            if level["update_counter"] >= level["update_interval"]:
+                level["update_counter"] = 0
 
                 # Get prediction from level above (top-down)
                 if i < self.num_levels - 1:
-                    higher_state = self.levels[i + 1]['state']
+                    higher_state = self.levels[i + 1]["state"]
                     # Simple mapping (could be learned transformation)
-                    level['prediction'] = self._map_down(higher_state, level['nodes'])
+                    level["prediction"] = self._map_down(higher_state, level["nodes"])
                 else:
                     # Top level predicts based on prior
-                    level['prediction'] = level['state'] * 0.9  # Drift toward zero
+                    level["prediction"] = level["state"] * 0.9  # Drift toward zero
 
                 # Compute prediction error
                 if i > 0:
-                    lower_state = self.levels[i - 1]['state']
-                    mapped_lower = self._map_up(lower_state, level['nodes'])
-                    level['error'] = mapped_lower - level['prediction']
+                    lower_state = self.levels[i - 1]["state"]
+                    mapped_lower = self._map_up(lower_state, level["nodes"])
+                    level["error"] = mapped_lower - level["prediction"]
                 else:
                     # Bottom level error comes from sensory input
-                    level['error'] = self.exteroceptive_channel.current_error
+                    level["error"] = self.exteroceptive_channel.current_error
 
                 # Update state (gradient descent on prediction error)
-                level['state'] += self.learning_rates[i] * level['error']
+                level["state"] += self.learning_rates[i] * level["error"]
 
                 # Check stability of updated state
                 self.stability_monitor.check_stability(
-                    level['state'],
-                    context=f"hierarchical_level_{i}_{level['name']}_state"
+                    level["state"], context=f"hierarchical_level_{i}_{level['name']}_state"
                 )
 
     def _map_down(self, state: FloatArray, target_dim: int) -> FloatArray:
@@ -582,7 +553,7 @@ class HierarchicalPredictor:
         elif len(state) < target_dim:
             # Upsample
             result = np.zeros(target_dim)
-            result[:len(state)] = state
+            result[: len(state)] = state
             return result
         else:
             # Downsample
@@ -604,7 +575,7 @@ class HierarchicalPredictor:
         else:
             # Expand
             result = np.zeros(target_dim)
-            result[:len(state)] = state
+            result[: len(state)] = state
             return result
 
     def get_prediction_errors(self) -> Dict[str, float]:
@@ -624,14 +595,14 @@ class HierarchicalPredictor:
         -----
         The precision-weighted signal is computed as:
         S = Π * √(Σ ε²)
-        
+
         where Π is precision and ε are prediction errors over a sliding window.
         """
         return {
-            'exteroceptive_signal': self.exteroceptive_channel.get_accumulated_signal(),
-            'interoceptive_signal': self.interoceptive_channel.get_accumulated_signal(),
-            'exteroceptive_stats': self.exteroceptive_channel.get_statistics(),
-            'interoceptive_stats': self.interoceptive_channel.get_statistics()
+            "exteroceptive_signal": self.exteroceptive_channel.get_accumulated_signal(),
+            "interoceptive_signal": self.interoceptive_channel.get_accumulated_signal(),
+            "exteroceptive_stats": self.exteroceptive_channel.get_statistics(),
+            "interoceptive_stats": self.interoceptive_channel.get_statistics(),
         }
 
     def reset(self) -> None:
@@ -642,10 +613,10 @@ class HierarchicalPredictor:
         Useful for starting new simulation runs or experimental trials.
         """
         for level in self.levels:
-            level['state'] = np.zeros(level['nodes'])
-            level['prediction'] = np.zeros(level['nodes'])
-            level['error'] = np.zeros(level['nodes'])
-            level['update_counter'] = 0
+            level["state"] = np.zeros(level["nodes"])
+            level["prediction"] = np.zeros(level["nodes"])
+            level["error"] = np.zeros(level["nodes"])
+            level["update_counter"] = 0
 
         self.exteroceptive_channel.reset()
         self.interoceptive_channel.reset()

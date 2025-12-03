@@ -6,7 +6,7 @@ from apgi_system.neural.mesoscale.neural_columns import NeuralColumn
 from apgi_system.neural.macroscale.large_scale_networks import (
     FrontoparietalNetwork,
     SalienceNetwork,
-    DefaultModeNetwork
+    DefaultModeNetwork,
 )
 
 __all__ = [

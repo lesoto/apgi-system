@@ -13,6 +13,7 @@ from apgi_system.validation import InputValidator
 @dataclass
 class AllostaticSetPoint:
     """Set point for a physiological variable."""
+
     name: str
     target: float
     acceptable_range: Tuple[float, float]
@@ -81,31 +82,15 @@ class AllostaticRegulator:
             Configuration dictionary containing allostatic range settings
         """
         self.config = config
-        intero_config = config.get('interoception', {})
-        ranges_config = intero_config.get('allostatic_ranges', {})
+        intero_config = config.get("interoception", {})
+        ranges_config = intero_config.get("allostatic_ranges", {})
 
         # Define set points for key variables
         self.set_points = [
-            AllostaticSetPoint(
-                name='heart_rate',
-                target=70.0,
-                acceptable_range=(65, 75)
-            ),
-            AllostaticSetPoint(
-                name='temperature',
-                target=37.0,
-                acceptable_range=(36.8, 37.2)
-            ),
-            AllostaticSetPoint(
-                name='glucose',
-                target=5.0,
-                acceptable_range=(4.5, 5.5)
-            ),
-            AllostaticSetPoint(
-                name='cortisol',
-                target=10.0,
-                acceptable_range=(8, 12)
-            )
+            AllostaticSetPoint(name="heart_rate", target=70.0, acceptable_range=(65, 75)),
+            AllostaticSetPoint(name="temperature", target=37.0, acceptable_range=(36.8, 37.2)),
+            AllostaticSetPoint(name="glucose", target=5.0, acceptable_range=(4.5, 5.5)),
+            AllostaticSetPoint(name="cortisol", target=10.0, acceptable_range=(8, 12)),
         ]
 
         # Allostatic load tracking
@@ -114,15 +99,11 @@ class AllostaticRegulator:
         self.load_accumulation_rate = 0.01
 
         # Regulation parameters
-        self.tight_range_factor = ranges_config.get('tight', 0.1)
-        self.moderate_range_factor = ranges_config.get('moderate', 0.2)
-        self.wide_range_factor = ranges_config.get('wide', 0.3)
+        self.tight_range_factor = ranges_config.get("tight", 0.1)
+        self.moderate_range_factor = ranges_config.get("moderate", 0.2)
+        self.wide_range_factor = ranges_config.get("wide", 0.3)
 
-    def update(
-        self,
-        body_state: Dict[str, float],
-        dt: float = 1.0
-    ) -> Dict[str, Any]:
+    def update(self, body_state: Dict[str, float], dt: float = 1.0) -> Dict[str, Any]:
         """
         Update allostatic regulation and compute load.
 
@@ -169,22 +150,17 @@ class AllostaticRegulator:
         # Validate inputs
         if not isinstance(body_state, dict):
             raise TypeError(f"body_state must be dict, got {type(body_state)}")
-        
-        InputValidator.validate_scalar(
-            dt,
-            "dt",
-            value_range=(0.0, 10000.0),
-            positive=True
-        )
-        
+
+        InputValidator.validate_scalar(dt, "dt", value_range=(0.0, 10000.0), positive=True)
+
         # Validate body_state values
         for key, value in body_state.items():
             InputValidator.validate_scalar(
                 value,
                 f"body_state['{key}']",
-                value_range=(-1000.0, 1000.0)  # Reasonable physiological range
+                value_range=(-1000.0, 1000.0),  # Reasonable physiological range
             )
-        
+
         regulation_signals = {}
         total_deviation = 0.0
 
@@ -198,22 +174,22 @@ class AllostaticRegulator:
                 set_point.current_deviation = deviation
 
                 # Check if within acceptable range
-                in_range = (set_point.acceptable_range[0] <=
-                           current_value <=
-                           set_point.acceptable_range[1])
+                in_range = (
+                    set_point.acceptable_range[0] <= current_value <= set_point.acceptable_range[1]
+                )
 
                 if not in_range:
                     # Compute load contribution
                     # Larger deviations contribute more to load
-                    range_width = (set_point.acceptable_range[1] -
-                                 set_point.acceptable_range[0])
+                    range_width = set_point.acceptable_range[1] - set_point.acceptable_range[0]
 
                     normalized_deviation = abs(deviation) / range_width
                     set_point.load_contribution = normalized_deviation
 
                     # Accumulate total load
-                    self.total_load += self.load_accumulation_rate * \
-                                      normalized_deviation * dt / 1000.0
+                    self.total_load += (
+                        self.load_accumulation_rate * normalized_deviation * dt / 1000.0
+                    )
                 else:
                     set_point.load_contribution = 0.0
 
@@ -223,18 +199,18 @@ class AllostaticRegulator:
                 total_deviation += abs(deviation)
 
         # Decay load over time
-        self.total_load *= (1.0 - self.load_decay_rate * dt / 1000.0)
+        self.total_load *= 1.0 - self.load_decay_rate * dt / 1000.0
         self.total_load = max(0.0, self.total_load)
 
         # Clamp load to [0, 1]
         self.total_load = min(1.0, self.total_load)
 
         return {
-            'regulation_signals': regulation_signals,
-            'allostatic_load': float(self.total_load),
-            'total_deviation': float(total_deviation),
-            'set_points_status': self._get_set_points_status(),
-            'homeostatic_stability': self._compute_stability()
+            "regulation_signals": regulation_signals,
+            "allostatic_load": float(self.total_load),
+            "total_deviation": float(total_deviation),
+            "set_points_status": self._get_set_points_status(),
+            "homeostatic_stability": self._compute_stability(),
         }
 
     def _get_set_points_status(self) -> List[Dict[str, Any]]:
@@ -253,14 +229,16 @@ class AllostaticRegulator:
         """
         status = []
         for sp in self.set_points:
-            status.append({
-                'name': sp.name,
-                'target': sp.target,
-                'deviation': sp.current_deviation,
-                'load_contribution': sp.load_contribution,
-                'in_range': abs(sp.current_deviation) < \
-                           (sp.acceptable_range[1] - sp.acceptable_range[0]) / 2
-            })
+            status.append(
+                {
+                    "name": sp.name,
+                    "target": sp.target,
+                    "deviation": sp.current_deviation,
+                    "load_contribution": sp.load_contribution,
+                    "in_range": abs(sp.current_deviation)
+                    < (sp.acceptable_range[1] - sp.acceptable_range[0]) / 2,
+                }
+            )
         return status
 
     def _compute_stability(self) -> float:

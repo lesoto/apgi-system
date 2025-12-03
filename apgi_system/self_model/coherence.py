@@ -53,7 +53,9 @@ class CoherenceMaintenance:
         self.config = config
         self.coherence_score = 1.0
 
-    def update(self, minimal_info: Dict[str, Any], narrative_info: Dict[str, Any]) -> Dict[str, Any]:
+    def update(
+        self, minimal_info: Dict[str, Any], narrative_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Update coherence between minimal and narrative self-models.
 
@@ -77,21 +79,21 @@ class CoherenceMaintenance:
             - 'phenomenal_unity': Boolean indicating unified self-experience (coherence > 0.7)
         """
         # Check consistency
-        minimal_coherence = minimal_info.get('coherence', 1.0)
-        narrative_coherence = narrative_info.get('narrative_coherence', 1.0)
+        minimal_coherence = minimal_info.get("coherence", 1.0)
+        narrative_coherence = narrative_info.get("narrative_coherence", 1.0)
 
         self.coherence_score = 0.6 * minimal_coherence + 0.4 * narrative_coherence
 
         return {
-            'overall_coherence': float(self.coherence_score),
-            'phenomenal_unity': self.coherence_score > 0.7
+            "overall_coherence": float(self.coherence_score),
+            "phenomenal_unity": self.coherence_score > 0.7,
         }
 
     def get_coherence_metrics(self) -> Dict[str, Any]:
         """Get current coherence metrics."""
         return {
-            'overall_coherence': float(self.coherence_score),
-            'phenomenal_unity': self.coherence_score > 0.7
+            "overall_coherence": float(self.coherence_score),
+            "phenomenal_unity": self.coherence_score > 0.7,
         }
 
     def reset(self):

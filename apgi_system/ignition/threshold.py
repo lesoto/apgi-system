@@ -120,12 +120,12 @@ class IgnitionThreshold:
         allostatic load (0.0), representing a well-rested, unstressed state.
         """
         self.config = config
-        ignition_config = config.get('ignition', {})
+        ignition_config = config.get("ignition", {})
 
         # Threshold parameters
-        self.baseline_threshold = ignition_config.get('baseline_threshold', 2.0)
-        self.threshold_range = ignition_config.get('threshold_range', [1.0, 5.0])
-        self.sigmoid_alpha = ignition_config.get('sigmoid_alpha', 5.0)
+        self.baseline_threshold = ignition_config.get("baseline_threshold", 2.0)
+        self.threshold_range = ignition_config.get("threshold_range", [1.0, 5.0])
+        self.sigmoid_alpha = ignition_config.get("sigmoid_alpha", 5.0)
 
         # Current state
         self.current_threshold = self.baseline_threshold
@@ -137,13 +137,13 @@ class IgnitionThreshold:
         self.intero_signal = 0.0
 
         # Recent ignition history
-        self.refractory_period_ms = ignition_config.get('refractory_period_ms', 200)
+        self.refractory_period_ms = ignition_config.get("refractory_period_ms", 200)
         self.recent_ignitions = deque(maxlen=100)
         self.last_ignition_time = -np.inf
 
         # Metabolic tracking
         self.metabolic_reserves = 1.0  # 0-1, starts full
-        self.allostatic_load = 0.0     # 0-1, starts at zero
+        self.allostatic_load = 0.0  # 0-1, starts at zero
 
         # Signal history for analysis
         self.signal_history = deque(maxlen=1000)
@@ -156,7 +156,7 @@ class IgnitionThreshold:
         intero_error: FloatArray,
         intero_precision: float,
         somatic_marker_gain: float = 1.0,
-        current_time: float = 0.0
+        current_time: float = 0.0,
     ) -> Tuple[bool, Dict[str, float]]:
         """
         Compute ignition signal and determine if ignition occurs.
@@ -253,18 +253,17 @@ class IgnitionThreshold:
         InputValidator.validate_array(intero_error, "intero_error")
         InputValidator.validate_scalar(intero_precision, "intero_precision", positive=True)
         InputValidator.validate_scalar(
-            somatic_marker_gain, 
-            "somatic_marker_gain", 
-            value_range=(0.5, 2.0)
+            somatic_marker_gain, "somatic_marker_gain", value_range=(0.5, 2.0)
         )
-        InputValidator.validate_scalar(current_time, "current_time", value_range=(0.0, float('inf')))
-        
+        InputValidator.validate_scalar(
+            current_time, "current_time", value_range=(0.0, float("inf"))
+        )
+
         # Exteroceptive component
         self.extero_signal = extero_precision * np.linalg.norm(extero_error)
 
         # Interoceptive component with somatic marker modulation
-        self.intero_signal = intero_precision * somatic_marker_gain * \
-                            np.linalg.norm(intero_error)
+        self.intero_signal = intero_precision * somatic_marker_gain * np.linalg.norm(intero_error)
 
         # Total accumulated signal
         self.current_signal = self.extero_signal + self.intero_signal
@@ -285,24 +284,26 @@ class IgnitionThreshold:
             if np.random.rand() < self.ignition_probability:
                 ignition_occurred = True
                 self.last_ignition_time = current_time
-                self.recent_ignitions.append({
-                    'time': current_time,
-                    'signal': self.current_signal,
-                    'threshold': self.current_threshold
-                })
+                self.recent_ignitions.append(
+                    {
+                        "time": current_time,
+                        "signal": self.current_signal,
+                        "threshold": self.current_threshold,
+                    }
+                )
 
         # Record history
         self.signal_history.append(self.current_signal)
         self.threshold_history.append(self.current_threshold)
 
         components = {
-            'total_signal': float(self.current_signal),
-            'extero_signal': float(self.extero_signal),
-            'intero_signal': float(self.intero_signal),
-            'threshold': float(self.current_threshold),
-            'ignition_probability': float(self.ignition_probability),
-            'somatic_marker_gain': float(somatic_marker_gain),
-            'ignition_occurred': ignition_occurred
+            "total_signal": float(self.current_signal),
+            "extero_signal": float(self.extero_signal),
+            "intero_signal": float(self.intero_signal),
+            "threshold": float(self.current_threshold),
+            "ignition_probability": float(self.ignition_probability),
+            "somatic_marker_gain": float(somatic_marker_gain),
+            "ignition_occurred": ignition_occurred,
         }
 
         return ignition_occurred, components
@@ -359,10 +360,13 @@ class IgnitionThreshold:
 
         # Recent ignition frequency
         # Frequent ignitions -> higher threshold (habituation)
-        recent_count = len([
-            ign for ign in self.recent_ignitions
-            if (current_time - ign['time']) < 1000.0  # Last second
-        ])
+        recent_count = len(
+            [
+                ign
+                for ign in self.recent_ignitions
+                if (current_time - ign["time"]) < 1000.0  # Last second
+            ]
+        )
 
         if recent_count > 3:
             frequency_factor = 1.0 + (recent_count - 3) * 0.1
@@ -451,20 +455,20 @@ class IgnitionThreshold:
         """
         if len(self.signal_history) == 0:
             return {
-                'mean_signal': 0.0,
-                'mean_threshold': self.baseline_threshold,
-                'ignition_rate': 0.0,
-                'recent_ignitions': 0
+                "mean_signal": 0.0,
+                "mean_threshold": self.baseline_threshold,
+                "ignition_rate": 0.0,
+                "recent_ignitions": 0,
             }
 
         return {
-            'mean_signal': float(np.mean(self.signal_history)),
-            'std_signal': float(np.std(self.signal_history)),
-            'mean_threshold': float(np.mean(self.threshold_history)),
-            'std_threshold': float(np.std(self.threshold_history)),
-            'ignition_rate': len(self.recent_ignitions) / max(len(self.signal_history), 1),
-            'recent_ignitions': len(self.recent_ignitions),
-            'current_probability': float(self.ignition_probability)
+            "mean_signal": float(np.mean(self.signal_history)),
+            "std_signal": float(np.std(self.signal_history)),
+            "mean_threshold": float(np.mean(self.threshold_history)),
+            "std_threshold": float(np.std(self.threshold_history)),
+            "ignition_rate": len(self.recent_ignitions) / max(len(self.signal_history), 1),
+            "recent_ignitions": len(self.recent_ignitions),
+            "current_probability": float(self.ignition_probability),
         }
 
     def reset(self) -> None:

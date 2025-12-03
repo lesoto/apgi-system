@@ -20,17 +20,17 @@ class FreeEnergyCalculator:
     Calculates variational free energy and expected free energy.
 
     Implements the core free energy calculations for active inference:
-    
+
     1. Variational Free Energy (F): Measures how well the current model
        explains observations. Minimizing F corresponds to perceptual inference.
-       
+
        F = E_q[log q(s) - log p(o,s)]
          = Complexity - Accuracy
          ≈ Prediction Error + Divergence from Prior
-    
+
     2. Expected Free Energy (G): Measures expected future surprise under
        a policy. Minimizing G corresponds to action selection.
-       
+
        G = Epistemic Value + Pragmatic Value
          = Expected Information Gain + Expected Cost
 
@@ -50,7 +50,7 @@ class FreeEnergyCalculator:
     Free energy provides a unified objective function for perception and action:
     - Perception: Minimize F by updating beliefs
     - Action: Minimize G by selecting policies
-    
+
     This implements the free energy principle, which states that biological
     systems act to minimize their free energy (or equivalently, surprise).
 
@@ -103,18 +103,18 @@ class FreeEnergyCalculator:
         posterior_mean: FloatArray,
         posterior_cov: FloatArray,
         prior_mean: FloatArray,
-        prior_cov: FloatArray
+        prior_cov: FloatArray,
     ) -> Tuple[float, Dict[str, float]]:
         """
         Compute variational free energy F.
 
         Free energy decomposes into accuracy and complexity:
-        
+
         F = Accuracy + Complexity
-        
+
         Accuracy = 0.5 * (o - μ̂)ᵀ Π (o - μ̂)  [Prediction error term]
         Complexity = KL[q(s)||p(s)]  [Divergence from prior]
-        
+
         Lower free energy indicates better model fit. The system performs
         gradient descent on F to improve its internal model.
 
@@ -158,7 +158,7 @@ class FreeEnergyCalculator:
         The accuracy term measures how well predictions match observations,
         weighted by precision (confidence). The complexity term penalizes
         deviations from prior beliefs, implementing Occam's razor.
-        
+
         Minimizing F balances fitting the data (accuracy) with staying close
         to prior beliefs (complexity), preventing overfitting.
 
@@ -180,14 +180,14 @@ class FreeEnergyCalculator:
         # Validate inputs
         InputValidator.validate_array(observation, "observation")
         InputValidator.validate_array(prediction, "prediction")
-        
+
         # Validate observation and prediction have same shape
         if observation.shape != prediction.shape:
             raise ValueError(
                 f"observation and prediction shapes must match: "
                 f"got {observation.shape} and {prediction.shape}"
             )
-        
+
         # Validate precision
         if np.isscalar(precision):
             InputValidator.validate_scalar(precision, "precision", positive=True)
@@ -196,20 +196,20 @@ class FreeEnergyCalculator:
             # Check precision is positive
             if np.any(precision <= 0):
                 raise ValueError("precision must be positive")
-        
+
         # Validate posterior and prior parameters
         InputValidator.validate_array(posterior_mean, "posterior_mean")
         InputValidator.validate_array(posterior_cov, "posterior_cov")
         InputValidator.validate_array(prior_mean, "prior_mean")
         InputValidator.validate_array(prior_cov, "prior_cov")
-        
+
         # Validate posterior and prior have compatible shapes
         if posterior_mean.shape != prior_mean.shape:
             raise ValueError(
                 f"posterior_mean and prior_mean shapes must match: "
                 f"got {posterior_mean.shape} and {prior_mean.shape}"
             )
-        
+
         # Prediction error (accuracy term)
         error = observation - prediction
 
@@ -224,35 +224,25 @@ class FreeEnergyCalculator:
         accuracy = 0.5 * error.T @ precision_matrix @ error
 
         # Check stability of accuracy term
-        self.stability_monitor.check_stability(
-            accuracy,
-            context="free_energy_accuracy_term"
-        )
+        self.stability_monitor.check_stability(accuracy, context="free_energy_accuracy_term")
 
         # KL divergence (complexity term)
         complexity = self._kl_divergence_gaussian(
-            posterior_mean, posterior_cov,
-            prior_mean, prior_cov
+            posterior_mean, posterior_cov, prior_mean, prior_cov
         )
 
         # Check stability of complexity term
-        self.stability_monitor.check_stability(
-            complexity,
-            context="free_energy_complexity_term"
-        )
+        self.stability_monitor.check_stability(complexity, context="free_energy_complexity_term")
 
         total_fe = accuracy + complexity
 
         # Check stability of total free energy
-        self.stability_monitor.check_stability(
-            total_fe,
-            context="total_free_energy"
-        )
+        self.stability_monitor.check_stability(total_fe, context="total_free_energy")
 
         components = {
-            'accuracy': float(accuracy),
-            'complexity': float(complexity),
-            'prediction_error': float(np.sqrt(error.T @ error))
+            "accuracy": float(accuracy),
+            "complexity": float(complexity),
+            "prediction_error": float(np.sqrt(error.T @ error)),
         }
 
         return float(total_fe), components
@@ -264,18 +254,18 @@ class FreeEnergyCalculator:
         predicted_observations: FloatArray,
         preferences: FloatArray,
         state_uncertainty: FloatArray,
-        horizon: int = 3
+        horizon: int = 3,
     ) -> Tuple[float, Dict[str, float]]:
         """
         Compute expected free energy G for a policy.
 
         Expected free energy decomposes into epistemic and pragmatic values:
-        
+
         G = Epistemic Value + Pragmatic Value
-        
+
         Epistemic Value: Expected information gain (exploration)
         Pragmatic Value: Expected divergence from preferences (exploitation)
-        
+
         Policies with lower G are preferred. This naturally balances exploration
         (seeking information) and exploitation (achieving goals).
 
@@ -309,10 +299,10 @@ class FreeEnergyCalculator:
         -----
         Epistemic value is negative (more negative = more information gain):
         Epistemic = -E[H[p(s|o)] - H[p(s)]]
-        
+
         Pragmatic value measures divergence from preferences:
         Pragmatic = E[KL(p(o|π) || p*(o))]
-        
+
         The balance between epistemic and pragmatic values implements the
         exploration-exploitation tradeoff in active inference.
 
@@ -349,20 +339,16 @@ class FreeEnergyCalculator:
         total_efe = epistemic_value + pragmatic_value
 
         components = {
-            'epistemic_value': float(epistemic_value),
-            'pragmatic_value': float(pragmatic_value),
-            'exploration_drive': float(-epistemic_value),
-            'exploitation_drive': float(-pragmatic_value)
+            "epistemic_value": float(epistemic_value),
+            "pragmatic_value": float(pragmatic_value),
+            "exploration_drive": float(-epistemic_value),
+            "exploitation_drive": float(-pragmatic_value),
         }
 
         return float(total_efe), components
 
     def _kl_divergence_gaussian(
-        self,
-        mu_q: FloatArray,
-        sigma_q: FloatArray,
-        mu_p: FloatArray,
-        sigma_p: FloatArray
+        self, mu_q: FloatArray, sigma_q: FloatArray, mu_p: FloatArray, sigma_p: FloatArray
     ) -> float:
         """
         Compute KL divergence between two Gaussian distributions.
@@ -390,12 +376,12 @@ class FreeEnergyCalculator:
         Notes
         -----
         For Gaussian distributions:
-        
+
         KL[q||p] = 0.5 * [log|Σ_p|/|Σ_q| - d + tr(Σ_p⁻¹Σ_q) +
                           (μ_p - μ_q)ᵀ Σ_p⁻¹ (μ_p - μ_q)]
-        
+
         where d is the dimensionality.
-        
+
         KL divergence is always non-negative and equals zero only when
         the distributions are identical.
 
@@ -430,8 +416,9 @@ class FreeEnergyCalculator:
         try:
             sigma_p_inv = linalg.inv(sigma_p)
 
-            log_det_ratio = np.log(linalg.det(sigma_p) + self.eps) - \
-                           np.log(linalg.det(sigma_q) + self.eps)
+            log_det_ratio = np.log(linalg.det(sigma_p) + self.eps) - np.log(
+                linalg.det(sigma_q) + self.eps
+            )
 
             trace_term = np.trace(sigma_p_inv @ sigma_q)
 
@@ -450,7 +437,7 @@ class FreeEnergyCalculator:
         self,
         observation: FloatArray,
         prediction: FloatArray,
-        precision: Optional[Union[float, FloatArray]] = None
+        precision: Optional[Union[float, FloatArray]] = None,
     ) -> Dict[str, float]:
         """
         Compute precision-weighted prediction error.
@@ -481,9 +468,9 @@ class FreeEnergyCalculator:
         Notes
         -----
         Prediction error: ε = o - μ̂
-        
+
         Precision-weighted error: ||ε||_Π = √(εᵀ Π ε)
-        
+
         This provides a scalar measure of prediction failure, weighted by
         confidence (precision).
 
@@ -513,18 +500,14 @@ class FreeEnergyCalculator:
         element_errors = np.abs(error)
 
         return {
-            'raw_error': float(raw_error),
-            'weighted_error': float(weighted_error),
-            'mean_absolute_error': float(np.mean(element_errors)),
-            'max_error': float(np.max(element_errors)),
-            'precision_weighted_elements': (precision * element_errors).tolist()
+            "raw_error": float(raw_error),
+            "weighted_error": float(weighted_error),
+            "mean_absolute_error": float(np.mean(element_errors)),
+            "max_error": float(np.max(element_errors)),
+            "precision_weighted_elements": (precision * element_errors).tolist(),
         }
 
-    def compute_surprise(
-        self,
-        observation: FloatArray,
-        generative_density: FloatArray
-    ) -> float:
+    def compute_surprise(self, observation: FloatArray, generative_density: FloatArray) -> float:
         """
         Compute surprise (negative log probability).
 
@@ -548,10 +531,10 @@ class FreeEnergyCalculator:
         -----
         Surprise is the negative log probability:
         S = -log p(o|m)
-        
+
         Free energy provides an upper bound on surprise:
         F ≥ S
-        
+
         Minimizing free energy thus minimizes an upper bound on surprise,
         implementing the free energy principle.
 

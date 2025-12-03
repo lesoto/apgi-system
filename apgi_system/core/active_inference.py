@@ -17,6 +17,7 @@ from apgi_system.types import FloatArray, ConfigDict
 @dataclass
 class BeliefState:
     """Represents beliefs at a single hierarchical level."""
+
     mean: FloatArray  # Posterior mean
     covariance: FloatArray  # Posterior covariance
     precision: float  # Precision (inverse variance)
@@ -73,7 +74,7 @@ class HierarchicalGaussianFilter:
         num_levels: int,
         state_dims: List[int],
         observation_dim: int,
-        config: Optional[ConfigDict] = None
+        config: Optional[ConfigDict] = None,
     ) -> None:
         """
         Initialize hierarchical Gaussian filter.
@@ -109,26 +110,25 @@ class HierarchicalGaussianFilter:
         # Initialize belief states
         self.beliefs: List[BeliefState] = []
         for dim in state_dims:
-            self.beliefs.append(BeliefState(
-                mean=np.zeros(dim),
-                covariance=np.eye(dim),
-                precision=1.0,
-                prediction=np.zeros(dim),
-                prediction_error=np.zeros(dim)
-            ))
+            self.beliefs.append(
+                BeliefState(
+                    mean=np.zeros(dim),
+                    covariance=np.eye(dim),
+                    precision=1.0,
+                    prediction=np.zeros(dim),
+                    prediction_error=np.zeros(dim),
+                )
+            )
 
         # Learning parameters
-        self.learning_rate = self.config.get('learning_rate', 0.01)
+        self.learning_rate = self.config.get("learning_rate", 0.01)
 
         # Precision dynamics
-        self.precision_min = self.config.get('precision_range', [0.1, 10.0])[0]
-        self.precision_max = self.config.get('precision_range', [0.1, 10.0])[1]
+        self.precision_min = self.config.get("precision_range", [0.1, 10.0])[0]
+        self.precision_max = self.config.get("precision_range", [0.1, 10.0])[1]
 
     def update(
-        self,
-        observation: FloatArray,
-        action: Optional[FloatArray] = None,
-        dt: float = 0.001
+        self, observation: FloatArray, action: Optional[FloatArray] = None, dt: float = 0.001
     ) -> Tuple[List[BeliefState], float]:
         """
         Update beliefs using variational message passing.
@@ -167,7 +167,7 @@ class HierarchicalGaussianFilter:
         -----
         The update implements gradient descent on variational free energy:
         δμ = η * (Π_below * ε_below - Π_above * ε_above)
-        
+
         where μ is the belief mean, η is learning rate, Π is precision,
         and ε is prediction error.
 
@@ -180,21 +180,14 @@ class HierarchicalGaussianFilter:
         """
         # Validate inputs
         InputValidator.validate_array(
-            observation,
-            "observation",
-            expected_shape=(self.observation_dim,)
+            observation, "observation", expected_shape=(self.observation_dim,)
         )
-        
+
         if action is not None:
             InputValidator.validate_array(action, "action")
-        
-        InputValidator.validate_scalar(
-            dt,
-            "dt",
-            positive=True,
-            value_range=(1e-6, 1.0)
-        )
-        
+
+        InputValidator.validate_scalar(dt, "dt", positive=True, value_range=(1e-6, 1.0))
+
         # Bottom-up pass: compute prediction errors
         self._bottom_up_pass(observation)
 
@@ -226,7 +219,7 @@ class HierarchicalGaussianFilter:
         -----
         At level 0 (sensory): ε₀ = o - μ̂₀
         At level i > 0: εᵢ = μᵢ₋₁ - g(μᵢ)
-        
+
         where g() is the generative mapping from level i to i-1
         """
         # Level 0: sensory prediction error
@@ -237,8 +230,7 @@ class HierarchicalGaussianFilter:
             # Prediction from level above
             higher_prediction = self._map_down(level, self.beliefs[level].mean)
             # Error is difference from current belief
-            self.beliefs[level].prediction_error = \
-                self.beliefs[level - 1].mean - higher_prediction
+            self.beliefs[level].prediction_error = self.beliefs[level - 1].mean - higher_prediction
 
     def _top_down_pass(self, dt: float) -> None:
         """
@@ -257,7 +249,7 @@ class HierarchicalGaussianFilter:
         -----
         The update rule implements:
         dμᵢ/dt = η * (Πᵢ₋₁ * εᵢ₋₁ - Πᵢ₊₁ * εᵢ₊₁)
-        
+
         This balances errors from the level below (bottom-up) with
         errors from the level above (top-down).
         """
@@ -284,8 +276,8 @@ class HierarchicalGaussianFilter:
             # Update belief mean (gradient descent on free energy)
             # δμ = η * (Π_below * ε_below - Π_above * ε_above)
             update = self.learning_rate * (
-                precision_below * error_below[:len(self.beliefs[level].mean)] -
-                precision_above * error_above[:len(self.beliefs[level].mean)]
+                precision_below * error_below[: len(self.beliefs[level].mean)]
+                - precision_above * error_above[: len(self.beliefs[level].mean)]
             )
 
             self.beliefs[level].mean += dt * update
@@ -304,9 +296,9 @@ class HierarchicalGaussianFilter:
         Notes
         -----
         Precision update: Π = 1 / (E[ε²] + ε_small)
-        
+
         Uses exponential smoothing: Π_new = 0.9 * Π_old + 0.1 * Π_estimated
-        
+
         Precision is clamped to [precision_min, precision_max] for stability.
         """
         for level in range(self.num_levels):
@@ -315,14 +307,13 @@ class HierarchicalGaussianFilter:
 
             # Update precision (with smoothing)
             new_precision = 1.0 / error_variance
-            self.beliefs[level].precision = 0.9 * self.beliefs[level].precision + \
-                                           0.1 * new_precision
+            self.beliefs[level].precision = (
+                0.9 * self.beliefs[level].precision + 0.1 * new_precision
+            )
 
             # Clamp to valid range
             self.beliefs[level].precision = np.clip(
-                self.beliefs[level].precision,
-                self.precision_min,
-                self.precision_max
+                self.beliefs[level].precision, self.precision_min, self.precision_max
             )
 
     def _generate_prediction(self, level: int) -> FloatArray:
@@ -378,7 +369,7 @@ class HierarchicalGaussianFilter:
         source_dim = state.shape[0]
 
         # Simple projection matrix (could be learned)
-        if not hasattr(self, '_projection_matrices'):
+        if not hasattr(self, "_projection_matrices"):
             self._projection_matrices = {}
 
         key = (from_level, target_dim, source_dim)
@@ -414,12 +405,12 @@ class HierarchicalGaussianFilter:
 
         # Sensory level
         error = observation - self.beliefs[0].prediction
-        total_fe += 0.5 * self.beliefs[0].precision * np.sum(error ** 2)
+        total_fe += 0.5 * self.beliefs[0].precision * np.sum(error**2)
 
         # Higher levels
         for level in range(1, self.num_levels):
             error = self.beliefs[level].prediction_error
-            total_fe += 0.5 * self.beliefs[level].precision * np.sum(error ** 2)
+            total_fe += 0.5 * self.beliefs[level].precision * np.sum(error**2)
 
         return total_fe
 
@@ -514,11 +505,11 @@ class ActiveInferenceEngine:
         self.config = config
 
         # Extract hierarchy configuration
-        hierarchy_config = config.get('hierarchy', {})
-        num_levels = hierarchy_config.get('num_levels', 4)
-        level_configs = hierarchy_config.get('level_configs', [])
+        hierarchy_config = config.get("hierarchy", {})
+        num_levels = hierarchy_config.get("num_levels", 4)
+        level_configs = hierarchy_config.get("level_configs", [])
 
-        state_dims = [lc['nodes'] for lc in level_configs]
+        state_dims = [lc["nodes"] for lc in level_configs]
         observation_dim = state_dims[0]  # Sensory level
 
         # Initialize hierarchical filter
@@ -526,24 +517,22 @@ class ActiveInferenceEngine:
             num_levels=num_levels,
             state_dims=state_dims,
             observation_dim=observation_dim,
-            config=config.get('active_inference', {})
+            config=config.get("active_inference", {}),
         )
 
         # Initialize free energy calculator
         self.fe_calc = FreeEnergyCalculator(config)
 
         # Policy evaluation
-        self.num_policies = config.get('num_policies', 10)
-        self.planning_horizon = config.get('planning_horizon', 3)
+        self.num_policies = config.get("num_policies", 10)
+        self.planning_horizon = config.get("planning_horizon", 3)
 
         # State tracking
         self.time = 0.0
-        self.timestep = config.get('system', {}).get('timestep_ms', 1.0) / 1000.0
+        self.timestep = config.get("system", {}).get("timestep_ms", 1.0) / 1000.0
 
     def step(
-        self,
-        observation: FloatArray,
-        available_actions: Optional[List[FloatArray]] = None
+        self, observation: FloatArray, available_actions: Optional[List[FloatArray]] = None
     ) -> Tuple[FloatArray, Dict[str, Any]]:
         """
         Execute single step of active inference loop.
@@ -577,7 +566,7 @@ class ActiveInferenceEngine:
         -----
         The action selection implements:
         π* = argmin_π G(π)
-        
+
         where G(π) is the expected free energy under policy π, balancing
         epistemic value (information gain) and pragmatic value (goal achievement).
 
@@ -604,20 +593,18 @@ class ActiveInferenceEngine:
 
         # Compile diagnostics
         info = {
-            'time': self.time,
-            'free_energy': free_energy,
-            'beliefs': beliefs,
-            'efe_components': efe_components,
-            'precisions': [b.precision for b in beliefs],
-            'prediction_errors': [b.prediction_error for b in beliefs]
+            "time": self.time,
+            "free_energy": free_energy,
+            "beliefs": beliefs,
+            "efe_components": efe_components,
+            "precisions": [b.precision for b in beliefs],
+            "prediction_errors": [b.prediction_error for b in beliefs],
         }
 
         return action, info
 
     def _select_action(
-        self,
-        beliefs: List[BeliefState],
-        available_actions: List[FloatArray]
+        self, beliefs: List[BeliefState], available_actions: List[FloatArray]
     ) -> Tuple[FloatArray, Dict[str, float]]:
         """
         Select action by minimizing expected free energy.
@@ -649,12 +636,12 @@ class ActiveInferenceEngine:
         Expected free energy decomposes as:
         G(π) = Epistemic Value + Pragmatic Value
              = -E[Information Gain] + E[KL(p(o|π)||p*(o))]
-        
+
         Lower epistemic value → more exploration
         Lower pragmatic value → better goal achievement
         """
         best_action = available_actions[0]
-        best_efe = float('inf')
+        best_efe = float("inf")
         best_components = {}
 
         for action in available_actions:
@@ -676,8 +663,12 @@ class ActiveInferenceEngine:
                 level_uncertainties = [0.0]
 
             if self.planning_horizon > 0:
-                repeats = max(1, (self.planning_horizon + len(level_uncertainties) - 1) // len(level_uncertainties))
-                state_uncertainty = np.tile(level_uncertainties, repeats)[:self.planning_horizon]
+                repeats = max(
+                    1,
+                    (self.planning_horizon + len(level_uncertainties) - 1)
+                    // len(level_uncertainties),
+                )
+                state_uncertainty = np.tile(level_uncertainties, repeats)[: self.planning_horizon]
             else:
                 state_uncertainty = np.array(level_uncertainties)
 
@@ -688,7 +679,7 @@ class ActiveInferenceEngine:
                 predicted_observations=predicted_observations,
                 preferences=preferences,
                 state_uncertainty=state_uncertainty,
-                horizon=self.planning_horizon
+                horizon=self.planning_horizon,
             )
 
             if efe < best_efe:
@@ -699,10 +690,7 @@ class ActiveInferenceEngine:
         return best_action, best_components
 
     def _simulate_future(
-        self,
-        beliefs: List[BeliefState],
-        action: FloatArray,
-        horizon: Optional[int] = None
+        self, beliefs: List[BeliefState], action: FloatArray, horizon: Optional[int] = None
     ) -> List[FloatArray]:
         """
         Simulate future states under a policy.
@@ -728,7 +716,7 @@ class ActiveInferenceEngine:
         -----
         Current implementation uses simplified linear dynamics:
         s_{t+1} = s_t + α * a + η
-        
+
         where α is action gain and η is process noise.
         Can be extended to learned nonlinear forward models.
         """
@@ -742,7 +730,7 @@ class ActiveInferenceEngine:
             # Simple dynamics: s_{t+1} = s_t + action + noise
             # Pad action to match state dimensionality
             action_padded = np.zeros_like(current_state)
-            action_padded[:len(action)] = action
+            action_padded[: len(action)] = action
             current_state = current_state + 0.1 * action_padded
             future_states.append(current_state.copy())
 

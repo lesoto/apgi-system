@@ -14,19 +14,9 @@ Requirements tested: 7.1, 7.2, 7.3, 7.4, 7.5
 
 import pytest
 import numpy as np
-from apgi_system.experiments.tasks.iowa_gambling import (
-    IowaGamblingTask,
-    DeckType,
-    DECK_SCHEDULES
-)
-from apgi_system.experiments.tasks.masking_paradigm import (
-    MaskingParadigmTask,
-    MaskType
-)
-from apgi_system.experiments.tasks.attentional_blink import (
-    AttentionalBlinkTask,
-    StimulusType
-)
+from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask, DeckType, DECK_SCHEDULES
+from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
+from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
 
 
 class TestIowaGamblingTask:
@@ -38,7 +28,7 @@ class TestIowaGamblingTask:
             num_trials=100,
             initial_balance=2000,
             deck_stimulus_strength=1.5,
-            outcome_stimulus_strength=2.0
+            outcome_stimulus_strength=2.0,
         )
 
         assert task.num_trials == 100
@@ -53,27 +43,24 @@ class TestIowaGamblingTask:
         for deck_type in DeckType:
             assert deck_type in DECK_SCHEDULES
             schedule = DECK_SCHEDULES[deck_type]
-            assert 'reward' in schedule
-            assert 'penalty_frequency' in schedule
-            assert 'penalties' in schedule
-            assert 'net_per_10' in schedule
+            assert "reward" in schedule
+            assert "penalty_frequency" in schedule
+            assert "penalties" in schedule
+            assert "net_per_10" in schedule
 
     def test_good_vs_bad_decks(self):
         """Test that good decks have positive net outcomes and bad decks negative."""
         # Good decks (C and D) should have positive net per 10 cards
-        assert DECK_SCHEDULES[DeckType.C]['net_per_10'] > 0
-        assert DECK_SCHEDULES[DeckType.D]['net_per_10'] > 0
+        assert DECK_SCHEDULES[DeckType.C]["net_per_10"] > 0
+        assert DECK_SCHEDULES[DeckType.D]["net_per_10"] > 0
 
         # Bad decks (A and B) should have negative net per 10 cards
-        assert DECK_SCHEDULES[DeckType.A]['net_per_10'] < 0
-        assert DECK_SCHEDULES[DeckType.B]['net_per_10'] < 0
+        assert DECK_SCHEDULES[DeckType.A]["net_per_10"] < 0
+        assert DECK_SCHEDULES[DeckType.B]["net_per_10"] < 0
 
     def test_balanced_strategy_distribution(self):
         """Test that balanced strategy creates roughly equal deck distribution."""
-        task = IowaGamblingTask(
-            num_trials=100,
-            deck_selection_strategy='balanced'
-        )
+        task = IowaGamblingTask(num_trials=100, deck_selection_strategy="balanced")
 
         # Count deck frequencies
         deck_counts = {deck: 0 for deck in DeckType}
@@ -92,18 +79,18 @@ class TestIowaGamblingTask:
             schedule = DECK_SCHEDULES[trial.deck_choice]
 
             # Reward should match schedule
-            assert trial.reward == schedule['reward']
+            assert trial.reward == schedule["reward"]
 
             # Penalty should be from the schedule's penalty list or 0
             if trial.penalty > 0:
-                assert trial.penalty in schedule['penalties']
+                assert trial.penalty in schedule["penalties"]
 
             # Net outcome should be reward - penalty
             assert trial.net_outcome == trial.reward - trial.penalty
 
     def test_deck_stimulus_generation(self):
         """Test that deck stimuli are generated with correct dimensions and patterns."""
-        task = IowaGamblingTask(num_trials=4, deck_selection_strategy='balanced')
+        task = IowaGamblingTask(num_trials=4, deck_selection_strategy="balanced")
 
         for trial in task.trials:
             # Check stimulus dimensions
@@ -159,8 +146,8 @@ class TestIowaGamblingTask:
 
         analysis = task.analyze_results()
 
-        assert 'error' in analysis
-        assert analysis['total_trials'] == 0
+        assert "error" in analysis
+        assert analysis["total_trials"] == 0
 
     def test_analysis_structure(self, apgi_system):
         """Test that analysis returns expected structure."""
@@ -173,24 +160,24 @@ class TestIowaGamblingTask:
         analysis = task.analyze_results()
 
         # Check required keys
-        assert 'total_trials' in analysis
-        assert 'initial_balance' in analysis
-        assert 'final_balance' in analysis
-        assert 'total_earnings' in analysis
-        assert 'good_deck_choices' in analysis
-        assert 'bad_deck_choices' in analysis
-        assert 'advantageous_ratio' in analysis
-        assert 'by_deck' in analysis
-        assert 'by_block' in analysis
-        assert 'somatic_markers' in analysis
+        assert "total_trials" in analysis
+        assert "initial_balance" in analysis
+        assert "final_balance" in analysis
+        assert "total_earnings" in analysis
+        assert "good_deck_choices" in analysis
+        assert "bad_deck_choices" in analysis
+        assert "advantageous_ratio" in analysis
+        assert "by_deck" in analysis
+        assert "by_block" in analysis
+        assert "somatic_markers" in analysis
 
         # Check deck analysis structure
-        for deck in ['A', 'B', 'C', 'D']:
-            assert deck in analysis['by_deck']
-            deck_data = analysis['by_deck'][deck]
-            assert 'selections' in deck_data
-            assert 'avg_net_outcome' in deck_data
-            assert 'avg_somatic_marker' in deck_data
+        for deck in ["A", "B", "C", "D"]:
+            assert deck in analysis["by_deck"]
+            deck_data = analysis["by_deck"][deck]
+            assert "selections" in deck_data
+            assert "avg_net_outcome" in deck_data
+            assert "avg_somatic_marker" in deck_data
 
     def test_task_reset(self, apgi_system):
         """Test that task reset works correctly."""
@@ -220,10 +207,7 @@ class TestMaskingParadigm:
         """Test that masking task initializes correctly."""
         soas = [0, 50, 100, 200]
         task = MaskingParadigmTask(
-            target_duration_ms=50.0,
-            soas=soas,
-            mask_duration_ms=100.0,
-            num_trials_per_condition=10
+            target_duration_ms=50.0, soas=soas, mask_duration_ms=100.0, num_trials_per_condition=10
         )
 
         assert task.target_duration_ms == 50.0
@@ -237,10 +221,7 @@ class TestMaskingParadigm:
         """Test that trials are distributed across all SOA conditions."""
         soas = [0, 50, 100]
         trials_per_condition = 5
-        task = MaskingParadigmTask(
-            soas=soas,
-            num_trials_per_condition=trials_per_condition
-        )
+        task = MaskingParadigmTask(soas=soas, num_trials_per_condition=trials_per_condition)
 
         # Count trials per SOA
         soa_counts = {soa: 0 for soa in soas}
@@ -249,8 +230,9 @@ class TestMaskingParadigm:
 
         # Each SOA should have exactly trials_per_condition trials
         for soa, count in soa_counts.items():
-            assert count == trials_per_condition, \
-                f"SOA {soa} has {count} trials, expected {trials_per_condition}"
+            assert (
+                count == trials_per_condition
+            ), f"SOA {soa} has {count} trials, expected {trials_per_condition}"
 
     def test_target_stimulus_generation(self):
         """Test that target stimuli are generated correctly."""
@@ -284,10 +266,7 @@ class TestMaskingParadigm:
 
     def test_zero_soa_trial(self):
         """Test trial with SOA=0 (simultaneous target and mask)."""
-        task = MaskingParadigmTask(
-            soas=[0],
-            num_trials_per_condition=1
-        )
+        task = MaskingParadigmTask(soas=[0], num_trials_per_condition=1)
 
         trial = task.trials[0]
         assert trial.soa_ms == 0
@@ -296,10 +275,7 @@ class TestMaskingParadigm:
 
     def test_long_soa_trial(self):
         """Test trial with long SOA (target should be detected)."""
-        task = MaskingParadigmTask(
-            soas=[300],
-            num_trials_per_condition=1
-        )
+        task = MaskingParadigmTask(soas=[300], num_trials_per_condition=1)
 
         trial = task.trials[0]
         assert trial.soa_ms == 300
@@ -307,10 +283,7 @@ class TestMaskingParadigm:
 
     def test_single_trial_execution(self, apgi_system):
         """Test running a single masking trial."""
-        task = MaskingParadigmTask(
-            soas=[100],
-            num_trials_per_condition=1
-        )
+        task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
 
         trial = task.trials[0]
         result = task.run_trial(apgi_system, trial)
@@ -335,7 +308,7 @@ class TestMaskingParadigm:
             soas=[0, 17],  # Very short SOAs
             num_trials_per_condition=3,
             target_strength=2.0,
-            mask_strength=4.0  # Strong mask
+            mask_strength=4.0,  # Strong mask
         )
 
         for trial in task.trials:
@@ -348,10 +321,7 @@ class TestMaskingParadigm:
 
     def test_analysis_structure(self, apgi_system):
         """Test that analysis returns expected structure."""
-        task = MaskingParadigmTask(
-            soas=[0, 100],
-            num_trials_per_condition=2
-        )
+        task = MaskingParadigmTask(soas=[0, 100], num_trials_per_condition=2)
 
         # Run all trials
         for trial in task.trials:
@@ -360,21 +330,21 @@ class TestMaskingParadigm:
         analysis = task.analyze_results()
 
         # Check required keys
-        assert 'total_trials' in analysis
-        assert 'overall_detection_rate' in analysis
-        assert 'overall_suppression_rate' in analysis
-        assert 'masking_effect' in analysis
-        assert 'by_soa' in analysis
-        assert 'masking_curve' in analysis
-        assert 'task_parameters' in analysis
+        assert "total_trials" in analysis
+        assert "overall_detection_rate" in analysis
+        assert "overall_suppression_rate" in analysis
+        assert "masking_effect" in analysis
+        assert "by_soa" in analysis
+        assert "masking_curve" in analysis
+        assert "task_parameters" in analysis
 
         # Check SOA analysis
         for soa in task.soas:
-            assert soa in analysis['by_soa']
-            soa_data = analysis['by_soa'][soa]
-            assert 'detection_rate' in soa_data
-            assert 'suppression_rate' in soa_data
-            assert 'avg_ignition_strength' in soa_data
+            assert soa in analysis["by_soa"]
+            soa_data = analysis["by_soa"][soa]
+            assert "detection_rate" in soa_data
+            assert "suppression_rate" in soa_data
+            assert "avg_ignition_strength" in soa_data
 
     def test_analysis_with_no_results(self):
         """Test that analysis handles empty results gracefully."""
@@ -383,8 +353,8 @@ class TestMaskingParadigm:
 
         analysis = task.analyze_results()
 
-        assert 'error' in analysis
-        assert analysis['total_trials'] == 0
+        assert "error" in analysis
+        assert analysis["total_trials"] == 0
 
     def test_task_reset(self, apgi_system):
         """Test that task reset works correctly."""
@@ -412,10 +382,7 @@ class TestAttentionalBlink:
         """Test that attentional blink task initializes correctly."""
         lags = [1, 2, 3, 8]
         task = AttentionalBlinkTask(
-            stream_length=15,
-            item_duration_ms=100.0,
-            num_trials_per_lag=10,
-            lags=lags
+            stream_length=15, item_duration_ms=100.0, num_trials_per_lag=10, lags=lags
         )
 
         assert task.stream_length == 15
@@ -429,10 +396,7 @@ class TestAttentionalBlink:
         """Test that trials are distributed across all lag conditions."""
         lags = [1, 2, 4]
         trials_per_lag = 5
-        task = AttentionalBlinkTask(
-            lags=lags,
-            num_trials_per_lag=trials_per_lag
-        )
+        task = AttentionalBlinkTask(lags=lags, num_trials_per_lag=trials_per_lag)
 
         # Count trials per lag
         lag_counts = {lag: 0 for lag in lags}
@@ -441,26 +405,23 @@ class TestAttentionalBlink:
 
         # Each lag should have exactly trials_per_lag trials
         for lag, count in lag_counts.items():
-            assert count == trials_per_lag, \
-                f"Lag {lag} has {count} trials, expected {trials_per_lag}"
+            assert (
+                count == trials_per_lag
+            ), f"Lag {lag} has {count} trials, expected {trials_per_lag}"
 
     def test_trial_structure(self):
         """Test that trials have correct structure."""
-        task = AttentionalBlinkTask(
-            stream_length=15,
-            lags=[2],
-            num_trials_per_lag=1
-        )
+        task = AttentionalBlinkTask(stream_length=15, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
 
         # Check trial attributes
-        assert hasattr(trial, 'trial_number')
-        assert hasattr(trial, 't1_position')
-        assert hasattr(trial, 't2_position')
-        assert hasattr(trial, 'lag')
-        assert hasattr(trial, 'stream')
-        assert hasattr(trial, 'stream_types')
+        assert hasattr(trial, "trial_number")
+        assert hasattr(trial, "t1_position")
+        assert hasattr(trial, "t2_position")
+        assert hasattr(trial, "lag")
+        assert hasattr(trial, "stream")
+        assert hasattr(trial, "stream_types")
 
         # Check stream length
         assert len(trial.stream) == task.stream_length
@@ -475,11 +436,7 @@ class TestAttentionalBlink:
 
     def test_target_positions_valid(self):
         """Test that target positions are within valid ranges."""
-        task = AttentionalBlinkTask(
-            stream_length=15,
-            lags=[1, 2, 3],
-            num_trials_per_lag=5
-        )
+        task = AttentionalBlinkTask(stream_length=15, lags=[1, 2, 3], num_trials_per_lag=5)
 
         for trial in task.trials:
             # T1 should not be too early or too late
@@ -524,11 +481,7 @@ class TestAttentionalBlink:
 
     def test_single_trial_execution(self, apgi_system):
         """Test running a single attentional blink trial."""
-        task = AttentionalBlinkTask(
-            stream_length=10,
-            lags=[2],
-            num_trials_per_lag=1
-        )
+        task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
         result = task.run_trial(apgi_system, trial)
@@ -562,7 +515,7 @@ class TestAttentionalBlink:
             stream_length=10,
             lags=[1],
             num_trials_per_lag=3,
-            target_salience=3.0  # High salience to increase detection
+            target_salience=3.0,  # High salience to increase detection
         )
 
         for trial in task.trials:
@@ -575,11 +528,7 @@ class TestAttentionalBlink:
 
     def test_analysis_structure(self, apgi_system):
         """Test that analysis returns expected structure."""
-        task = AttentionalBlinkTask(
-            stream_length=10,
-            lags=[1, 3],
-            num_trials_per_lag=2
-        )
+        task = AttentionalBlinkTask(stream_length=10, lags=[1, 3], num_trials_per_lag=2)
 
         # Run all trials
         for trial in task.trials:
@@ -588,23 +537,23 @@ class TestAttentionalBlink:
         analysis = task.analyze_results()
 
         # Check required keys
-        assert 'total_trials' in analysis
-        assert 'overall_t1_accuracy' in analysis
-        assert 'overall_t2_accuracy' in analysis
-        assert 'overall_blink_rate' in analysis
-        assert 'lag_analysis' in analysis
-        assert 'max_blink_lag' in analysis
-        assert 'max_blink_rate' in analysis
-        assert 'task_parameters' in analysis
+        assert "total_trials" in analysis
+        assert "overall_t1_accuracy" in analysis
+        assert "overall_t2_accuracy" in analysis
+        assert "overall_blink_rate" in analysis
+        assert "lag_analysis" in analysis
+        assert "max_blink_lag" in analysis
+        assert "max_blink_rate" in analysis
+        assert "task_parameters" in analysis
 
         # Check lag analysis
         for lag in task.lags:
-            assert lag in analysis['lag_analysis']
-            lag_data = analysis['lag_analysis'][lag]
-            assert 't1_accuracy' in lag_data
-            assert 't2_accuracy' in lag_data
-            assert 't2_given_t1_accuracy' in lag_data
-            assert 'blink_rate' in lag_data
+            assert lag in analysis["lag_analysis"]
+            lag_data = analysis["lag_analysis"][lag]
+            assert "t1_accuracy" in lag_data
+            assert "t2_accuracy" in lag_data
+            assert "t2_given_t1_accuracy" in lag_data
+            assert "blink_rate" in lag_data
 
     def test_analysis_with_no_results(self):
         """Test that analysis handles empty results gracefully."""
@@ -613,8 +562,8 @@ class TestAttentionalBlink:
 
         analysis = task.analyze_results()
 
-        assert 'error' in analysis
-        assert analysis['total_trials'] == 0
+        assert "error" in analysis
+        assert analysis["total_trials"] == 0
 
     def test_task_reset(self, apgi_system):
         """Test that task reset works correctly."""
@@ -636,11 +585,7 @@ class TestAttentionalBlink:
 
     def test_blink_detection_logic(self, apgi_system):
         """Test that blink detection logic works correctly."""
-        task = AttentionalBlinkTask(
-            stream_length=10,
-            lags=[2],
-            num_trials_per_lag=1
-        )
+        task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
         result = task.run_trial(apgi_system, trial)
@@ -663,10 +608,17 @@ class TestTaskResultCompleteness:
 
         # Check all required fields exist
         required_fields = [
-            'trial_number', 'deck_choice', 'reward', 'penalty',
-            'net_outcome', 'running_total', 'ignition_occurred',
-            'ignition_strength', 'somatic_marker_strength',
-            'decision_time', 'anticipatory_response'
+            "trial_number",
+            "deck_choice",
+            "reward",
+            "penalty",
+            "net_outcome",
+            "running_total",
+            "ignition_occurred",
+            "ignition_strength",
+            "somatic_marker_strength",
+            "decision_time",
+            "anticipatory_response",
         ]
 
         for field in required_fields:
@@ -680,9 +632,14 @@ class TestTaskResultCompleteness:
 
         # Check all required fields exist
         required_fields = [
-            'trial_number', 'soa_ms', 'mask_type', 'target_detected',
-            'detection_time', 'ignition_strength', 'ignition_count',
-            'mask_suppression_occurred'
+            "trial_number",
+            "soa_ms",
+            "mask_type",
+            "target_detected",
+            "detection_time",
+            "ignition_strength",
+            "ignition_count",
+            "mask_suppression_occurred",
         ]
 
         for field in required_fields:
@@ -696,9 +653,15 @@ class TestTaskResultCompleteness:
 
         # Check all required fields exist
         required_fields = [
-            'trial_number', 'lag', 't1_detected', 't2_detected',
-            't1_ignition_time', 't2_ignition_time', 't1_signal_strength',
-            't2_signal_strength', 'blink_occurred'
+            "trial_number",
+            "lag",
+            "t1_detected",
+            "t2_detected",
+            "t1_ignition_time",
+            "t2_ignition_time",
+            "t1_signal_strength",
+            "t2_signal_strength",
+            "blink_occurred",
         ]
 
         for field in required_fields:

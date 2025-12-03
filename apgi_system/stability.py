@@ -42,7 +42,7 @@ class NumericalInstabilityError(Exception):
         self,
         message: str,
         context: Optional[str] = None,
-        value: Optional[Union[float, FloatArray]] = None
+        value: Optional[Union[float, FloatArray]] = None,
     ) -> None:
         """
         Initialize numerical instability error.
@@ -86,6 +86,7 @@ class NumericalStabilityWarning(UserWarning):
     ...     NumericalStabilityWarning
     ... )
     """
+
     pass
 
 
@@ -157,20 +158,17 @@ class NumericalStabilityMonitor:
         self.config = config or {}
 
         # Extract thresholds from config
-        self.warning_threshold = self.config.get('stability_warning_threshold', 1e10)
-        self.error_threshold = self.config.get('stability_error_threshold', 1e15)
-        self.underflow_threshold = self.config.get('stability_underflow_threshold', 1e-10)
-        self.check_enabled = self.config.get('stability_check_enabled', True)
+        self.warning_threshold = self.config.get("stability_warning_threshold", 1e10)
+        self.error_threshold = self.config.get("stability_error_threshold", 1e15)
+        self.underflow_threshold = self.config.get("stability_underflow_threshold", 1e-10)
+        self.check_enabled = self.config.get("stability_check_enabled", True)
 
         # Statistics
         self.warning_count = 0
         self.error_count = 0
 
     def check_stability(
-        self,
-        values: Union[float, FloatArray],
-        context: str,
-        raise_on_error: bool = True
+        self, values: Union[float, FloatArray], context: str, raise_on_error: bool = True
     ) -> Dict[str, Any]:
         """
         Check numerical stability of values.
@@ -230,12 +228,12 @@ class NumericalStabilityMonitor:
         """
         if not self.check_enabled:
             return {
-                'stable': True,
-                'has_nan': False,
-                'has_inf': False,
-                'max_abs_value': 0.0,
-                'warning_issued': False,
-                'error_detected': False
+                "stable": True,
+                "has_nan": False,
+                "has_inf": False,
+                "max_abs_value": 0.0,
+                "warning_issued": False,
+                "error_detected": False,
             }
 
         # Convert scalar to array for uniform handling
@@ -246,72 +244,60 @@ class NumericalStabilityMonitor:
 
         # Initialize status
         status = {
-            'stable': True,
-            'has_nan': False,
-            'has_inf': False,
-            'max_abs_value': 0.0,
-            'warning_issued': False,
-            'error_detected': False
+            "stable": True,
+            "has_nan": False,
+            "has_inf": False,
+            "max_abs_value": 0.0,
+            "warning_issued": False,
+            "error_detected": False,
         }
 
         # Check for NaN
         has_nan = np.any(np.isnan(values_array))
-        status['has_nan'] = bool(has_nan)
+        status["has_nan"] = bool(has_nan)
 
         if has_nan:
-            status['stable'] = False
-            status['error_detected'] = True
+            status["stable"] = False
+            status["error_detected"] = True
             self.error_count += 1
 
             error_msg = f"NaN detected in {context}"
             if raise_on_error:
-                raise NumericalInstabilityError(
-                    error_msg,
-                    context=context,
-                    value=values
-                )
+                raise NumericalInstabilityError(error_msg, context=context, value=values)
             return status
 
         # Check for Inf
         has_inf = np.any(np.isinf(values_array))
-        status['has_inf'] = bool(has_inf)
+        status["has_inf"] = bool(has_inf)
 
         if has_inf:
-            status['stable'] = False
-            status['error_detected'] = True
+            status["stable"] = False
+            status["error_detected"] = True
             self.error_count += 1
 
             error_msg = f"Inf detected in {context}"
             if raise_on_error:
-                raise NumericalInstabilityError(
-                    error_msg,
-                    context=context,
-                    value=values
-                )
+                raise NumericalInstabilityError(error_msg, context=context, value=values)
             return status
 
         # Compute maximum absolute value
         max_abs_val = float(np.max(np.abs(values_array)))
-        status['max_abs_value'] = max_abs_val
+        status["max_abs_value"] = max_abs_val
 
         # Check against error threshold
         if max_abs_val > self.error_threshold:
-            status['stable'] = False
-            status['error_detected'] = True
+            status["stable"] = False
+            status["error_detected"] = True
             self.error_count += 1
 
             error_msg = f"Value overflow in {context}: max abs value = {max_abs_val:.2e}"
             if raise_on_error:
-                raise NumericalInstabilityError(
-                    error_msg,
-                    context=context,
-                    value=values
-                )
+                raise NumericalInstabilityError(error_msg, context=context, value=values)
             return status
 
         # Check against warning threshold
         if max_abs_val > self.warning_threshold:
-            status['warning_issued'] = True
+            status["warning_issued"] = True
             self.warning_count += 1
 
             warning_msg = (
@@ -328,7 +314,7 @@ class NumericalStabilityMonitor:
         array: FloatArray,
         context: str,
         expected_shape: Optional[tuple] = None,
-        expected_range: Optional[tuple] = None
+        expected_range: Optional[tuple] = None,
     ) -> Dict[str, Any]:
         """
         Check array properties including stability, shape, and value range.
@@ -380,29 +366,27 @@ class NumericalStabilityMonitor:
         status = self.check_stability(array, context)
 
         # Check shape
-        status['actual_shape'] = array.shape
+        status["actual_shape"] = array.shape
         if expected_shape is not None:
             shape_valid = array.shape == expected_shape
-            status['shape_valid'] = shape_valid
+            status["shape_valid"] = shape_valid
 
             if not shape_valid:
                 raise ValueError(
-                    f"{context}: shape mismatch - "
-                    f"expected {expected_shape}, got {array.shape}"
+                    f"{context}: shape mismatch - " f"expected {expected_shape}, got {array.shape}"
                 )
         else:
-            status['shape_valid'] = True
+            status["shape_valid"] = True
 
         # Check value range
-        if status['stable']:  # Only check range if values are stable
+        if status["stable"]:  # Only check range if values are stable
             actual_min = float(np.min(array))
             actual_max = float(np.max(array))
-            status['actual_range'] = (actual_min, actual_max)
+            status["actual_range"] = (actual_min, actual_max)
 
             if expected_range is not None:
-                range_valid = (actual_min >= expected_range[0] and
-                             actual_max <= expected_range[1])
-                status['range_valid'] = range_valid
+                range_valid = actual_min >= expected_range[0] and actual_max <= expected_range[1]
+                status["range_valid"] = range_valid
 
                 if not range_valid:
                     raise ValueError(
@@ -411,10 +395,10 @@ class NumericalStabilityMonitor:
                         f"got [{actual_min}, {actual_max}]"
                     )
             else:
-                status['range_valid'] = True
+                status["range_valid"] = True
         else:
-            status['actual_range'] = (None, None)
-            status['range_valid'] = False
+            status["actual_range"] = (None, None)
+            status["range_valid"] = False
 
         return status
 
@@ -436,10 +420,7 @@ class NumericalStabilityMonitor:
         >>> stats = monitor.get_statistics()
         >>> print(f"Warnings: {stats['warning_count']}, Errors: {stats['error_count']}")
         """
-        return {
-            'warning_count': self.warning_count,
-            'error_count': self.error_count
-        }
+        return {"warning_count": self.warning_count, "error_count": self.error_count}
 
     def reset_statistics(self) -> None:
         """

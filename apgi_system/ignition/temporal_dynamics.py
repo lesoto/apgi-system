@@ -16,6 +16,7 @@ from ..types import ConfigDict
 
 class TimelinePhase(Enum):
     """Phases of the ignition timeline."""
+
     PRE_IGNITION = "pre_ignition"
     IGNITION_EVENT = "ignition_event"
     POST_IGNITION = "post_ignition"
@@ -24,6 +25,7 @@ class TimelinePhase(Enum):
 @dataclass
 class TimelineEvent:
     """Event in the ignition timeline."""
+
     time: float
     phase: TimelinePhase
     event_type: str
@@ -45,7 +47,7 @@ class IgnitionTimeline:
 
     Timeline Phases
     ---------------
-    
+
     **Phase 1: Pre-ignition (-500 to 0 ms)**
     Preparatory processing before threshold crossing:
     - Context recognition (frontal cortex, immediate)
@@ -53,7 +55,7 @@ class IgnitionTimeline:
     - Precision modulation by ACC (50-150ms)
     - Somatic marker retrieval (50-100ms latency)
     - Thalamocortical gating preparation (300ms+)
-    
+
     **Phase 2: Ignition Event (0 to +500 ms)**
     Rapid global ignition and broadcasting:
     - Threshold crossing detection (0ms)
@@ -61,7 +63,7 @@ class IgnitionTimeline:
     - Recurrent amplification with gamma (50-400ms)
     - Global workspace broadcasting (100-400ms)
     - State maintenance (entire phase)
-    
+
     **Phase 3: Post-ignition (+500 ms onwards)**
     Integration and learning:
     - Reportability interface activation (immediate)
@@ -87,7 +89,7 @@ class IgnitionTimeline:
         Chronological log of timeline events
     max_events : int
         Maximum events to store (default: 1000)
-    
+
     Phase-specific state flags:
     - Pre-ignition: context_recognized, predictions_activated, precision_modulated,
                     somatic_marker_retrieved, thalamus_gated
@@ -100,22 +102,22 @@ class IgnitionTimeline:
     --------
     >>> config = {}
     >>> timeline = IgnitionTimeline(config)
-    >>> 
+    >>>
     >>> # Update timeline without ignition (pre-ignition processing)
     >>> for _ in range(100):
     ...     state = timeline.update(ignition_signal=False, dt=1.0)
     >>> print(f"Phase: {state['phase']}")  # "pre_ignition"
-    >>> 
+    >>>
     >>> # Trigger ignition
     >>> state = timeline.update(ignition_signal=True, dt=1.0)
     >>> print(f"Phase: {state['phase']}")  # "ignition_event"
     >>> print(f"Ignition active: {state['ignition_active']}")
-    >>> 
+    >>>
     >>> # Continue through ignition and post-ignition
     >>> for _ in range(1000):
     ...     state = timeline.update(ignition_signal=False, dt=1.0)
     >>> print(f"Reportable: {state['reportable']}")
-    >>> 
+    >>>
     >>> # Check recent events
     >>> print(f"Recent events: {len(state['recent_events'])}")
     """
@@ -142,7 +144,7 @@ class IgnitionTimeline:
 
         # Timeline parameters
         self.pre_ignition_duration = 500.0  # ms
-        self.ignition_duration = 500.0      # ms
+        self.ignition_duration = 500.0  # ms
 
         # Current state
         self.current_phase = TimelinePhase.PRE_IGNITION
@@ -173,10 +175,7 @@ class IgnitionTimeline:
         self.markers_updated = False
 
     def update(
-        self,
-        ignition_signal: bool,
-        context_info: Optional[Dict[str, Any]] = None,
-        dt: float = 1.0
+        self, ignition_signal: bool, context_info: Optional[Dict[str, Any]] = None, dt: float = 1.0
     ) -> Dict[str, Any]:
         """
         Update timeline state and process phase-specific dynamics.
@@ -248,7 +247,7 @@ class IgnitionTimeline:
         Examples
         --------
         >>> timeline = IgnitionTimeline(config)
-        >>> 
+        >>>
         >>> # Pre-ignition processing
         >>> context = {'context_id': 'visual_scene_1'}
         >>> state = timeline.update(
@@ -257,11 +256,11 @@ class IgnitionTimeline:
         ...     dt=1.0
         ... )
         >>> print(f"Pre-ignition complete: {state['pre_ignition_complete']}")
-        >>> 
+        >>>
         >>> # Trigger ignition
         >>> state = timeline.update(ignition_signal=True, dt=1.0)
         >>> print(f"Phase: {state['phase']}")  # "ignition_event"
-        >>> 
+        >>>
         >>> # Check recent events
         >>> for event in state['recent_events']:
         ...     print(f"{event['time']:.0f}ms: {event['type']}")
@@ -432,10 +431,7 @@ class IgnitionTimeline:
     def _log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Log a timeline event."""
         event = TimelineEvent(
-            time=self.total_time,
-            phase=self.current_phase,
-            event_type=event_type,
-            data=data
+            time=self.total_time, phase=self.current_phase, event_type=event_type, data=data
         )
         self.events.append(event)
 
@@ -446,32 +442,27 @@ class IgnitionTimeline:
     def _get_timeline_state(self) -> Dict[str, Any]:
         """Get current timeline state."""
         return {
-            'phase': self.current_phase.value,
-            'phase_time': float(self.phase_time),
-            'total_time': float(self.total_time),
-            'pre_ignition_complete': (
-                self.context_recognized and
-                self.predictions_activated and
-                self.precision_modulated and
-                self.somatic_marker_retrieved and
-                self.thalamus_gated
+            "phase": self.current_phase.value,
+            "phase_time": float(self.phase_time),
+            "total_time": float(self.total_time),
+            "pre_ignition_complete": (
+                self.context_recognized
+                and self.predictions_activated
+                and self.precision_modulated
+                and self.somatic_marker_retrieved
+                and self.thalamus_gated
             ),
-            'ignition_active': (
-                self.current_phase == TimelinePhase.IGNITION_EVENT and
-                self.broadcasting
+            "ignition_active": (
+                self.current_phase == TimelinePhase.IGNITION_EVENT and self.broadcasting
             ),
-            'reportable': self.reportability_active,
-            'recent_events': [
-                {'time': e.time, 'type': e.event_type, 'phase': e.phase.value}
+            "reportable": self.reportability_active,
+            "recent_events": [
+                {"time": e.time, "type": e.event_type, "phase": e.phase.value}
                 for e in self.events[-10:]  # Last 10 events
-            ]
+            ],
         }
 
-    def get_events_in_range(
-        self,
-        start_time: float,
-        end_time: float
-    ) -> List[TimelineEvent]:
+    def get_events_in_range(self, start_time: float, end_time: float) -> List[TimelineEvent]:
         """
         Get timeline events within a specified time range.
 
@@ -500,15 +491,12 @@ class IgnitionTimeline:
         >>> for event in events:
         ...     print(f"{event.time:.0f}ms: {event.event_type}")
         """
-        return [
-            event for event in self.events
-            if start_time <= event.time <= end_time
-        ]
+        return [event for event in self.events if start_time <= event.time <= end_time]
 
     def get_current_state(self) -> Dict[str, Any]:
         """
         Get current timeline state.
-        
+
         Returns
         -------
         Dict[str, Any]

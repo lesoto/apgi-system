@@ -14,6 +14,7 @@ from enum import Enum
 
 class NetworkType(Enum):
     """Types of large-scale networks."""
+
     FRONTOPARIETAL = "frontoparietal"
     SALIENCE = "salience"
     DEFAULT_MODE = "default_mode"
@@ -116,10 +117,7 @@ class FrontoparietalNetwork:
         return weights
 
     def update(
-        self,
-        external_input: np.ndarray,
-        ignition_signal: bool = False,
-        dt: float = 1.0
+        self, external_input: np.ndarray, ignition_signal: bool = False, dt: float = 1.0
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Update network activity.
@@ -161,10 +159,10 @@ class FrontoparietalNetwork:
             self._maintain_broadcast(dt)
 
         info = {
-            'mean_activity': float(np.mean(self.activity)),
-            'max_activity': float(np.max(self.activity)),
-            'active_nodes': int(np.sum(self.activity > 0.1)),
-            'is_broadcasting': self.is_broadcasting
+            "mean_activity": float(np.mean(self.activity)),
+            "max_activity": float(np.max(self.activity)),
+            "active_nodes": int(np.sum(self.activity > 0.1)),
+            "is_broadcasting": self.is_broadcasting,
         }
 
         return self.activity.copy(), info
@@ -280,7 +278,7 @@ class SalienceNetwork:
 
         # Subregions
         self.insula_nodes = num_nodes // 2  # Interoceptive processing
-        self.acc_nodes = num_nodes // 2     # Conflict/salience detection
+        self.acc_nodes = num_nodes // 2  # Conflict/salience detection
 
         self.insula_activity = np.zeros(self.insula_nodes)
         self.acc_activity = np.zeros(self.acc_nodes)
@@ -297,7 +295,7 @@ class SalienceNetwork:
         interoceptive_input: np.ndarray,
         exteroceptive_input: np.ndarray,
         conflict_signal: float = 0.0,
-        dt: float = 1.0
+        dt: float = 1.0,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         """
         Update salience network.
@@ -315,8 +313,9 @@ class SalienceNetwork:
         # Insula processes interoceptive signals
         # Pad interoceptive input to match insula nodes
         intero_padded = np.zeros(self.insula_nodes)
-        intero_padded[:min(len(interoceptive_input), self.insula_nodes)] = \
-            interoceptive_input[:min(len(interoceptive_input), self.insula_nodes)]
+        intero_padded[: min(len(interoceptive_input), self.insula_nodes)] = interoceptive_input[
+            : min(len(interoceptive_input), self.insula_nodes)
+        ]
 
         target_insula = intero_padded
         dinsula = (dt / self.tau) * (target_insula - self.insula_activity)
@@ -325,14 +324,14 @@ class SalienceNetwork:
 
         # ACC processes conflict and prediction errors
         # Pad interoceptive input for ACC processing
-        intero_acc_padded = np.zeros(self.acc_nodes//2)
-        intero_acc_padded[:min(len(interoceptive_input), self.acc_nodes//2)] = \
-            interoceptive_input[:min(len(interoceptive_input), self.acc_nodes//2)]
+        intero_acc_padded = np.zeros(self.acc_nodes // 2)
+        intero_acc_padded[: min(len(interoceptive_input), self.acc_nodes // 2)] = (
+            interoceptive_input[: min(len(interoceptive_input), self.acc_nodes // 2)]
+        )
 
-        combined_signal = np.concatenate([
-            exteroceptive_input[:self.acc_nodes//2],
-            intero_acc_padded
-        ])[:self.acc_nodes]
+        combined_signal = np.concatenate(
+            [exteroceptive_input[: self.acc_nodes // 2], intero_acc_padded]
+        )[: self.acc_nodes]
 
         # Add conflict signal
         conflict_component = conflict_signal * np.ones(self.acc_nodes)
@@ -348,21 +347,18 @@ class SalienceNetwork:
         # Attention switching
         if salience > self.salience_threshold:
             # High interoceptive activity -> attend inward
-            if np.mean(self.insula_activity) > np.mean(exteroceptive_input[:self.num_nodes]):
+            if np.mean(self.insula_activity) > np.mean(exteroceptive_input[: self.num_nodes]):
                 self.current_attention = "interoceptive"
             else:
                 self.current_attention = "exteroceptive"
 
-        activity = {
-            'insula': self.insula_activity.copy(),
-            'acc': self.acc_activity.copy()
-        }
+        activity = {"insula": self.insula_activity.copy(), "acc": self.acc_activity.copy()}
 
         info = {
-            'salience': float(salience),
-            'attention_target': self.current_attention,
-            'insula_activity': float(np.mean(self.insula_activity)),
-            'acc_activity': float(np.mean(self.acc_activity))
+            "salience": float(salience),
+            "attention_target": self.current_attention,
+            "insula_activity": float(np.mean(self.insula_activity)),
+            "acc_activity": float(np.mean(self.acc_activity)),
         }
 
         return activity, info
@@ -377,8 +373,8 @@ class SalienceNetwork:
         extero_modulation = 1.0 + 0.3 * np.mean(self.acc_activity)
 
         return {
-            'interoceptive': float(intero_modulation),
-            'exteroceptive': float(extero_modulation)
+            "interoceptive": float(intero_modulation),
+            "exteroceptive": float(extero_modulation),
         }
 
     def reset(self):
@@ -468,8 +464,8 @@ class DefaultModeNetwork:
 
         # Subregions
         self.mpfc_activity = np.zeros(num_nodes // 3)  # Self-referential
-        self.pcc_activity = np.zeros(num_nodes // 3)   # Memory integration
-        self.tpj_activity = np.zeros(num_nodes // 3)   # Perspective-taking
+        self.pcc_activity = np.zeros(num_nodes // 3)  # Memory integration
+        self.tpj_activity = np.zeros(num_nodes // 3)  # Perspective-taking
 
         # Parameters
         self.tau = 100.0  # Slow dynamics
@@ -484,7 +480,7 @@ class DefaultModeNetwork:
         self_related_input: np.ndarray,
         memory_input: np.ndarray,
         task_activity: float = 0.0,
-        dt: float = 1.0
+        dt: float = 1.0,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Update default mode network.
@@ -505,8 +501,9 @@ class DefaultModeNetwork:
         # Update subregions
         # Pad self-related input to match mpfc size
         self_padded = np.zeros(len(self.mpfc_activity))
-        self_padded[:min(len(self_related_input), len(self.mpfc_activity))] = \
-            self_related_input[:min(len(self_related_input), len(self.mpfc_activity))]
+        self_padded[: min(len(self_related_input), len(self.mpfc_activity))] = self_related_input[
+            : min(len(self_related_input), len(self.mpfc_activity))
+        ]
 
         target_mpfc = self_padded * suppression
         dmpfc = (dt / self.tau) * (target_mpfc - self.mpfc_activity)
@@ -514,23 +511,26 @@ class DefaultModeNetwork:
 
         # Pad memory input to match pcc size
         memory_padded = np.zeros(len(self.pcc_activity))
-        memory_padded[:min(len(memory_input), len(self.pcc_activity))] = \
-            memory_input[:min(len(memory_input), len(self.pcc_activity))]
+        memory_padded[: min(len(memory_input), len(self.pcc_activity))] = memory_input[
+            : min(len(memory_input), len(self.pcc_activity))
+        ]
 
         target_pcc = memory_padded * suppression
         dpcc = (dt / self.tau) * (target_pcc - self.pcc_activity)
         self.pcc_activity += dpcc
 
         # TPJ integrates
-        target_tpj = 0.5 * (self.mpfc_activity[:len(self.tpj_activity)] +
-                           self.pcc_activity[:len(self.tpj_activity)])
+        target_tpj = 0.5 * (
+            self.mpfc_activity[: len(self.tpj_activity)]
+            + self.pcc_activity[: len(self.tpj_activity)]
+        )
         dtpj = (dt / self.tau) * (target_tpj - self.tpj_activity)
         self.tpj_activity += dtpj
 
         # Combine into overall activity
-        self.activity[:len(self.mpfc_activity)] = self.mpfc_activity
-        self.activity[len(self.mpfc_activity):2*len(self.mpfc_activity)] = self.pcc_activity
-        self.activity[2*len(self.mpfc_activity):] = self.tpj_activity
+        self.activity[: len(self.mpfc_activity)] = self.mpfc_activity
+        self.activity[len(self.mpfc_activity) : 2 * len(self.mpfc_activity)] = self.pcc_activity
+        self.activity[2 * len(self.mpfc_activity) :] = self.tpj_activity
 
         # Apply nonlinearity
         self.activity = np.maximum(0, self.activity)
@@ -539,10 +539,10 @@ class DefaultModeNetwork:
         self.self_representation = 0.99 * self.self_representation + 0.01 * self.activity
 
         info = {
-            'mean_activity': float(np.mean(self.activity)),
-            'mpfc_activity': float(np.mean(self.mpfc_activity)),
-            'pcc_activity': float(np.mean(self.pcc_activity)),
-            'suppression_factor': float(suppression)
+            "mean_activity": float(np.mean(self.activity)),
+            "mpfc_activity": float(np.mean(self.mpfc_activity)),
+            "pcc_activity": float(np.mean(self.pcc_activity)),
+            "suppression_factor": float(suppression),
         }
 
         return self.activity.copy(), info
@@ -627,19 +627,16 @@ class LargeScaleNetworkManager:
         self.config = config
 
         # Initialize networks
-        ignition_config = config.get('ignition', {})
-        workspace_nodes = ignition_config.get('workspace_nodes', 1000)
+        ignition_config = config.get("ignition", {})
+        workspace_nodes = ignition_config.get("workspace_nodes", 1000)
 
-        self.frontoparietal = FrontoparietalNetwork(
-            num_nodes=workspace_nodes,
-            config=config
-        )
+        self.frontoparietal = FrontoparietalNetwork(num_nodes=workspace_nodes, config=config)
         self.salience = SalienceNetwork(num_nodes=200, config=config)
         self.default_mode = DefaultModeNetwork(num_nodes=300, config=config)
 
         # Interaction strengths
         self.fp_to_dmn = -0.5  # Frontoparietal suppresses DMN
-        self.sal_to_fp = 0.8   # Salience activates frontoparietal
+        self.sal_to_fp = 0.8  # Salience activates frontoparietal
         self.dmn_to_sal = 0.3  # DMN weakly activates salience
 
     def update(
@@ -648,7 +645,7 @@ class LargeScaleNetworkManager:
         intero_input: np.ndarray,
         ignition_signal: bool,
         conflict_signal: float,
-        dt: float = 1.0
+        dt: float = 1.0,
     ) -> Dict[str, Any]:
         """
         Update all networks and their interactions.
@@ -668,18 +665,16 @@ class LargeScaleNetworkManager:
             interoceptive_input=intero_input,
             exteroceptive_input=extero_input,
             conflict_signal=conflict_signal,
-            dt=dt
+            dt=dt,
         )
 
         # Frontoparietal input (from salience)
-        sal_mean = np.mean(sal_activity['acc'])
+        sal_mean = np.mean(sal_activity["acc"])
         fp_input = sal_mean * self.sal_to_fp * np.random.rand(self.frontoparietal.num_nodes)
 
         # Update frontoparietal network
         fp_activity, fp_info = self.frontoparietal.update(
-            external_input=fp_input,
-            ignition_signal=ignition_signal,
-            dt=dt
+            external_input=fp_input, ignition_signal=ignition_signal, dt=dt
         )
 
         # Default mode (suppressed by task/frontoparietal activity)
@@ -688,34 +683,34 @@ class LargeScaleNetworkManager:
             self_related_input=intero_input,
             memory_input=extero_input,
             task_activity=task_activity,
-            dt=dt
+            dt=dt,
         )
 
         return {
-            'frontoparietal': {'activity': fp_activity, 'info': fp_info},
-            'salience': {'activity': sal_activity, 'info': sal_info},
-            'default_mode': {'activity': dmn_activity, 'info': dmn_info},
-            'broadcast': self.frontoparietal.get_broadcast()
+            "frontoparietal": {"activity": fp_activity, "info": fp_info},
+            "salience": {"activity": sal_activity, "info": sal_info},
+            "default_mode": {"activity": dmn_activity, "info": dmn_info},
+            "broadcast": self.frontoparietal.get_broadcast(),
         }
 
     def get_network_states(self) -> Dict[str, Any]:
         """Get current states of all networks."""
         return {
-            'frontoparietal': {
-                'activity': self.frontoparietal.activity.copy(),
-                'is_broadcasting': self.frontoparietal.is_broadcasting,
-                'mean_activity': float(np.mean(self.frontoparietal.activity))
+            "frontoparietal": {
+                "activity": self.frontoparietal.activity.copy(),
+                "is_broadcasting": self.frontoparietal.is_broadcasting,
+                "mean_activity": float(np.mean(self.frontoparietal.activity)),
             },
-            'salience': {
-                'insula_activity': self.salience.insula_activity.copy(),
-                'acc_activity': self.salience.acc_activity.copy(),
-                'current_attention': self.salience.current_attention
+            "salience": {
+                "insula_activity": self.salience.insula_activity.copy(),
+                "acc_activity": self.salience.acc_activity.copy(),
+                "current_attention": self.salience.current_attention,
             },
-            'default_mode': {
-                'activity': self.default_mode.activity.copy(),
-                'self_representation': self.default_mode.self_representation.copy(),
-                'mean_activity': float(np.mean(self.default_mode.activity))
-            }
+            "default_mode": {
+                "activity": self.default_mode.activity.copy(),
+                "self_representation": self.default_mode.self_representation.copy(),
+                "mean_activity": float(np.mean(self.default_mode.activity)),
+            },
         }
 
     def reset(self):

@@ -13,7 +13,7 @@ from apgi_system.core import PrecisionWeighting
 def config():
     """Load default configuration."""
     config_path = Path(__file__).parent.parent / "config" / "default.yaml"
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
 
@@ -31,14 +31,12 @@ def test_free_energy_calculator():
     prior_cov = np.eye(3)
 
     fe, components = calc.compute_variational_free_energy(
-        obs, pred, precision,
-        posterior_mean, posterior_cov,
-        prior_mean, prior_cov
+        obs, pred, precision, posterior_mean, posterior_cov, prior_mean, prior_cov
     )
 
     assert fe > 0
-    assert 'accuracy' in components
-    assert 'complexity' in components
+    assert "accuracy" in components
+    assert "complexity" in components
 
 
 def test_precision_weighting(config):
@@ -47,15 +45,13 @@ def test_precision_weighting(config):
 
     # Update with error variance
     result = precision.update(
-        extero_error_variance=1.0,
-        intero_error_variance=0.5,
-        attention_target='extero'
+        extero_error_variance=1.0, intero_error_variance=0.5, attention_target="extero"
     )
 
-    assert 'exteroceptive' in result
-    assert 'interoceptive' in result
-    assert result['exteroceptive'] > 0
-    assert result['interoceptive'] > 0
+    assert "exteroceptive" in result
+    assert "interoceptive" in result
+    assert result["exteroceptive"] > 0
+    assert result["interoceptive"] > 0
 
 
 def test_active_inference_engine(config):
@@ -66,8 +62,8 @@ def test_active_inference_engine(config):
     action, info = engine.step(obs)
 
     assert action is not None
-    assert 'free_energy' in info
-    assert 'beliefs' in info
+    assert "free_energy" in info
+    assert "beliefs" in info
 
 
 def test_system_initialization(config):
@@ -88,11 +84,11 @@ def test_system_step(config):
 
     state = system.step(extero_input)
 
-    assert 'time' in state
-    assert 'ignition' in state
-    assert 'workspace' in state
-    assert 'body' in state
+    assert "time" in state
+    assert "ignition" in state
+    assert "workspace" in state
+    assert "body" in state
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

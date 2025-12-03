@@ -95,23 +95,23 @@ class RealTimeMonitor:
 
         # Setup figure
         self.fig, self.axes = plt.subplots(4, 1, figsize=(12, 10))
-        self.fig.suptitle('APGI System Real-Time Monitor')
+        self.fig.suptitle("APGI System Real-Time Monitor")
 
         # Configure axes
-        self.axes[0].set_ylabel('Ignition')
-        self.axes[1].set_ylabel('Free Energy')
-        self.axes[2].set_ylabel('Precision')
-        self.axes[3].set_ylabel('Energy Reserves')
-        self.axes[3].set_xlabel('Time (ms)')
+        self.axes[0].set_ylabel("Ignition")
+        self.axes[1].set_ylabel("Free Energy")
+        self.axes[2].set_ylabel("Precision")
+        self.axes[3].set_ylabel("Energy Reserves")
+        self.axes[3].set_xlabel("Time (ms)")
 
         # Initialize line plots
         self.lines = []
         for ax in self.axes:
-            line, = ax.plot([], [], 'b-')
+            (line,) = ax.plot([], [], "b-")
             self.lines.append(line)
 
         # Ignition events as scatter
-        self.ignition_scatter = self.axes[0].scatter([], [], c='red', s=50, alpha=0.6)
+        self.ignition_scatter = self.axes[0].scatter([], [], c="red", s=50, alpha=0.6)
 
     def update(self, state: Dict[str, Any]):
         """
@@ -130,17 +130,17 @@ class RealTimeMonitor:
             - 'precision': Dict with 'exteroceptive' precision value
             - 'metabolism': Dict with 'reserves' energy level
         """
-        self.time_buffer.append(state['time'])
+        self.time_buffer.append(state["time"])
 
         # Extract metrics
-        ignition = 1 if state['ignition']['ignition_occurred'] else 0
+        ignition = 1 if state["ignition"]["ignition_occurred"] else 0
         self.ignition_buffer.append(ignition)
 
         # Free energy (might not be directly available, use placeholder)
-        self.fe_buffer.append(state['ignition']['total_signal'])
+        self.fe_buffer.append(state["ignition"]["total_signal"])
 
-        self.precision_buffer.append(state['precision']['exteroceptive'])
-        self.energy_buffer.append(state['metabolism']['reserves'])
+        self.precision_buffer.append(state["precision"]["exteroceptive"])
+        self.energy_buffer.append(state["metabolism"]["reserves"])
 
     def render(self):
         """
@@ -169,9 +169,7 @@ class RealTimeMonitor:
         ignition_times = time_data[ignitions > 0]
         ignition_values = ignitions[ignitions > 0]
 
-        self.ignition_scatter.set_offsets(
-            np.column_stack([ignition_times, ignition_values])
-        )
+        self.ignition_scatter.set_offsets(np.column_stack([ignition_times, ignition_values]))
         self.axes[0].set_xlim(time_data[0], time_data[-1])
         self.axes[0].set_ylim(-0.1, 1.1)
 
@@ -180,7 +178,7 @@ class RealTimeMonitor:
             self.ignition_buffer,
             self.fe_buffer,
             self.precision_buffer,
-            self.energy_buffer
+            self.energy_buffer,
         ]
 
         for i, (line, data) in enumerate(zip(self.lines, data_buffers)):
@@ -202,7 +200,7 @@ class RealTimeMonitor:
         """Display monitor window."""
         plt.show()
 
-    def save(self, filename: str = 'apgi_monitor.png'):
+    def save(self, filename: str = "apgi_monitor.png"):
         """
         Save current visualization to file.
 
@@ -220,5 +218,5 @@ class RealTimeMonitor:
         >>> monitor.save('experiment_1_results.png')
         >>> monitor.save('high_res_figure.pdf')
         """
-        self.fig.savefig(filename, dpi=150, bbox_inches='tight')
+        self.fig.savefig(filename, dpi=150, bbox_inches="tight")
         print(f"Monitor saved to {filename}")

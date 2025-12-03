@@ -15,6 +15,7 @@ from ..types import FloatArray, ConfigDict
 
 class WorkspaceState(Enum):
     """States of the global workspace."""
+
     IDLE = "idle"
     IGNITING = "igniting"
     BROADCASTING = "broadcasting"
@@ -25,6 +26,7 @@ class WorkspaceState(Enum):
 @dataclass
 class BroadcastContent:
     """Content being broadcast in the global workspace."""
+
     content: FloatArray
     ignition_time: float
     source: str
@@ -98,12 +100,12 @@ class GlobalWorkspace:
     --------
     >>> config = {'ignition': {'amplification_duration_ms': 300}}
     >>> workspace = GlobalWorkspace(config)
-    >>> 
+    >>>
     >>> # Subscribe a system to broadcasts
     >>> def my_subscriber(content):
     ...     print(f"Received broadcast: {content.source}")
     >>> workspace.subscribe(my_subscriber)
-    >>> 
+    >>>
     >>> # Update workspace with ignition
     >>> candidate = np.random.randn(256)
     >>> state = workspace.update(
@@ -136,12 +138,10 @@ class GlobalWorkspace:
         can be added via the subscribe() method to receive broadcasts.
         """
         self.config = config
-        ignition_config = config.get('ignition', {})
+        ignition_config = config.get("ignition", {})
 
         # Workspace parameters
-        self.amplification_duration_ms = ignition_config.get(
-            'amplification_duration_ms', 300
-        )
+        self.amplification_duration_ms = ignition_config.get("amplification_duration_ms", 300)
         self.maintenance_duration_ms = 1000.0  # How long to maintain after amp
         self.fade_duration_ms = 200.0  # Gradual fade
 
@@ -170,7 +170,7 @@ class GlobalWorkspace:
         candidate_content: Optional[FloatArray] = None,
         source: str = "unknown",
         priority: float = 1.0,
-        dt: float = 1.0
+        dt: float = 1.0,
     ) -> Dict[str, Any]:
         """
         Update global workspace state and process broadcasts.
@@ -219,21 +219,21 @@ class GlobalWorkspace:
         State Machine:
         1. IDLE: Waiting for ignition
            - Transition: ignition_occurred → IGNITING
-        
+
         2. IGNITING: Competition phase (~50ms)
            - Select winner from competing contents
            - Transition: after 50ms → BROADCASTING
-        
+
         3. BROADCASTING: Recurrent amplification (300-500ms)
            - Amplify content through positive feedback
            - Broadcast to all subscribers
            - Transition: after amplification_duration_ms → MAINTAINING
-        
+
         4. MAINTAINING: Sustained state (~1000ms)
            - Maintain content for working memory
            - Continue broadcasting
            - Transition: after maintenance_duration_ms → FADING
-        
+
         5. FADING: Gradual fade-out (~200ms)
            - Reduce content magnitude gradually
            - Transition: after fade_duration_ms → IDLE
@@ -244,7 +244,7 @@ class GlobalWorkspace:
         --------
         >>> workspace = GlobalWorkspace(config)
         >>> content = np.random.randn(256)
-        >>> 
+        >>>
         >>> # First update: add candidate
         >>> state = workspace.update(
         ...     ignition_occurred=False,
@@ -252,11 +252,11 @@ class GlobalWorkspace:
         ...     source="visual",
         ...     priority=1.2
         ... )
-        >>> 
+        >>>
         >>> # Second update: trigger ignition
         >>> state = workspace.update(ignition_occurred=True, dt=1.0)
         >>> print(f"State: {state['state']}")  # "igniting"
-        >>> 
+        >>>
         >>> # Continue updating to progress through states
         >>> for _ in range(100):
         ...     state = workspace.update(ignition_occurred=False, dt=1.0)
@@ -265,24 +265,26 @@ class GlobalWorkspace:
         # Input validation
         if not isinstance(ignition_occurred, bool):
             raise TypeError(f"ignition_occurred must be bool, got {type(ignition_occurred)}")
-        
+
         if candidate_content is not None:
             InputValidator.validate_array(candidate_content, "candidate_content")
-        
+
         if not isinstance(source, str):
             raise TypeError(f"source must be str, got {type(source)}")
-        
+
         InputValidator.validate_scalar(priority, "priority", positive=True)
         InputValidator.validate_scalar(dt, "dt", positive=True)
-        
+
         # Add candidate to competition if provided
         if candidate_content is not None:
-            self.competing_contents.append(BroadcastContent(
-                content=candidate_content.copy(),
-                ignition_time=self.state_time,
-                source=source,
-                priority=priority
-            ))
+            self.competing_contents.append(
+                BroadcastContent(
+                    content=candidate_content.copy(),
+                    ignition_time=self.state_time,
+                    source=source,
+                    priority=priority,
+                )
+            )
 
         # State machine
         if self.state == WorkspaceState.IDLE:
@@ -367,10 +369,7 @@ class GlobalWorkspace:
             return
 
         # Compute scores (priority + random noise for tie-breaking)
-        scores = [
-            content.priority + 0.1 * np.random.rand()
-            for content in self.competing_contents
-        ]
+        scores = [content.priority + 0.1 * np.random.rand() for content in self.competing_contents]
 
         # Winner takes all
         winner_idx = np.argmax(scores)
@@ -389,8 +388,9 @@ class GlobalWorkspace:
             return
 
         # Recurrent amplification (increases magnitude)
-        amplification = 1.0 + (self.amplification_gain - 1.0) * \
-                       (self.state_time / self.amplification_duration_ms)
+        amplification = 1.0 + (self.amplification_gain - 1.0) * (
+            self.state_time / self.amplification_duration_ms
+        )
 
         self.current_content.content *= amplification
 
@@ -438,15 +438,15 @@ class GlobalWorkspace:
         Examples
         --------
         >>> workspace = GlobalWorkspace(config)
-        >>> 
+        >>>
         >>> def motor_system_subscriber(content):
         ...     print(f"Motor system received: {content.source}")
         ...     # Use content for motor planning
-        >>> 
+        >>>
         >>> def memory_system_subscriber(content):
         ...     print(f"Memory encoding: {content.content.shape}")
         ...     # Encode content to working memory
-        >>> 
+        >>>
         >>> workspace.subscribe(motor_system_subscriber)
         >>> workspace.subscribe(memory_system_subscriber)
         """
@@ -467,8 +467,10 @@ class GlobalWorkspace:
         This provides read-only access to the current conscious content.
         Content is only available during active broadcasting states.
         """
-        if self.current_content is not None and \
-           self.state in [WorkspaceState.BROADCASTING, WorkspaceState.MAINTAINING]:
+        if self.current_content is not None and self.state in [
+            WorkspaceState.BROADCASTING,
+            WorkspaceState.MAINTAINING,
+        ]:
             return self.current_content.content.copy()
         return None
 
@@ -496,22 +498,20 @@ class GlobalWorkspace:
     def _get_state_info(self) -> Dict[str, Any]:
         """Get current state information."""
         info = {
-            'state': self.state.value,
-            'state_time': float(self.state_time),
-            'is_broadcasting': self.state in [
-                WorkspaceState.BROADCASTING,
-                WorkspaceState.MAINTAINING
-            ],
-            'is_reportable': self.is_reportable(),
-            'num_competitors': len(self.competing_contents)
+            "state": self.state.value,
+            "state_time": float(self.state_time),
+            "is_broadcasting": self.state
+            in [WorkspaceState.BROADCASTING, WorkspaceState.MAINTAINING],
+            "is_reportable": self.is_reportable(),
+            "num_competitors": len(self.competing_contents),
         }
 
         if self.current_content is not None:
-            info['broadcast_content'] = {
-                'shape': self.current_content.content.shape,
-                'magnitude': float(np.linalg.norm(self.current_content.content)),
-                'source': self.current_content.source,
-                'priority': float(self.current_content.priority)
+            info["broadcast_content"] = {
+                "shape": self.current_content.content.shape,
+                "magnitude": float(np.linalg.norm(self.current_content.content)),
+                "source": self.current_content.source,
+                "priority": float(self.current_content.priority),
             }
 
         return info

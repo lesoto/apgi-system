@@ -15,10 +15,11 @@ from apgi_system.types import FloatArray, ConfigDict
 
 class NeuromodulatorType(Enum):
     """Types of neuromodulators affecting precision."""
+
     NOREPINEPHRINE = "norepinephrine"  # Increases precision
-    ACETYLCHOLINE = "acetylcholine"     # Volatility sensitivity
-    DOPAMINE = "dopamine"               # Prediction error signaling
-    SEROTONIN = "serotonin"             # Prior confidence
+    ACETYLCHOLINE = "acetylcholine"  # Volatility sensitivity
+    DOPAMINE = "dopamine"  # Prediction error signaling
+    SEROTONIN = "serotonin"  # Prior confidence
 
 
 class PrecisionWeighting:
@@ -71,10 +72,10 @@ class PrecisionWeighting:
     -----
     Precision is inversely related to variance:
     Π = 1 / σ²
-    
+
     In predictive coding, precision-weighted prediction errors drive learning:
     Δμ ∝ Π * ε
-    
+
     This provides a principled mechanism for attention: attending to a stream
     increases its precision, amplifying its influence on inference.
 
@@ -119,35 +120,35 @@ class PrecisionWeighting:
         >>> precision = PrecisionWeighting(config)
         """
         self.config = config
-        precision_config = config.get('precision', {})
+        precision_config = config.get("precision", {})
 
         # Baseline precisions
-        self.extero_baseline = precision_config.get('exteroceptive_baseline', 1.0)
-        self.intero_baseline = precision_config.get('interoceptive_baseline', 0.8)
+        self.extero_baseline = precision_config.get("exteroceptive_baseline", 1.0)
+        self.intero_baseline = precision_config.get("interoceptive_baseline", 0.8)
 
         # Current precisions
         self.extero_precision = self.extero_baseline
         self.intero_precision = self.intero_baseline
 
         # Precision parameters
-        self.gain_range = precision_config.get('attention_gain_range', [0.5, 3.0])
-        self.volatility_sensitivity = precision_config.get('volatility_sensitivity', 0.1)
+        self.gain_range = precision_config.get("attention_gain_range", [0.5, 3.0])
+        self.volatility_sensitivity = precision_config.get("volatility_sensitivity", 0.1)
 
         # Neuromodulator levels (0-1 normalized)
         self.neuromodulators = {
             NeuromodulatorType.NOREPINEPHRINE: 0.5,
             NeuromodulatorType.ACETYLCHOLINE: 0.5,
             NeuromodulatorType.DOPAMINE: 0.5,
-            NeuromodulatorType.SEROTONIN: 0.5
+            NeuromodulatorType.SEROTONIN: 0.5,
         }
 
         # Neuromodulator effects from config
-        nm_effects = precision_config.get('neuromodulator_effects', {})
+        nm_effects = precision_config.get("neuromodulator_effects", {})
         self.nm_gain = {
-            NeuromodulatorType.NOREPINEPHRINE: nm_effects.get('norepinephrine', 1.5),
-            NeuromodulatorType.ACETYLCHOLINE: nm_effects.get('acetylcholine', 1.2),
+            NeuromodulatorType.NOREPINEPHRINE: nm_effects.get("norepinephrine", 1.5),
+            NeuromodulatorType.ACETYLCHOLINE: nm_effects.get("acetylcholine", 1.2),
             NeuromodulatorType.DOPAMINE: 1.0,
-            NeuromodulatorType.SEROTONIN: 1.0
+            NeuromodulatorType.SEROTONIN: 1.0,
         }
 
         # Attention state
@@ -172,7 +173,7 @@ class PrecisionWeighting:
         extero_error_variance: Optional[float] = None,
         intero_error_variance: Optional[float] = None,
         attention_target: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, float]:
         """
         Update precision estimates based on error statistics and modulatory factors.
@@ -216,9 +217,9 @@ class PrecisionWeighting:
         -----
         Precision update follows:
         Π = baseline / (uncertainty + ε)
-        
+
         where uncertainty is estimated from error variance with exponential smoothing.
-        
+
         Multiple modulatory factors are applied multiplicatively:
         Π_final = Π_base * attention * neuromod * resources * context
 
@@ -236,30 +237,26 @@ class PrecisionWeighting:
         # Validate inputs
         if extero_error_variance is not None:
             InputValidator.validate_scalar(
-                extero_error_variance,
-                "extero_error_variance",
-                value_range=(0.0, 1e6)
+                extero_error_variance, "extero_error_variance", value_range=(0.0, 1e6)
             )
-        
+
         if intero_error_variance is not None:
             InputValidator.validate_scalar(
-                intero_error_variance,
-                "intero_error_variance",
-                value_range=(0.0, 1e6)
+                intero_error_variance, "intero_error_variance", value_range=(0.0, 1e6)
             )
-        
+
         if attention_target is not None:
-            if attention_target not in ['extero', 'intero']:
+            if attention_target not in ["extero", "intero"]:
                 raise ValueError(
                     f"attention_target must be 'extero' or 'intero', got {attention_target}"
                 )
-        
+
         # Update uncertainty estimates from error variance
         if extero_error_variance is not None:
-            self._update_uncertainty('extero', extero_error_variance)
+            self._update_uncertainty("extero", extero_error_variance)
 
         if intero_error_variance is not None:
-            self._update_uncertainty('intero', intero_error_variance)
+            self._update_uncertainty("intero", intero_error_variance)
 
         # Update volatility
         self._update_volatility()
@@ -282,10 +279,10 @@ class PrecisionWeighting:
         self._clamp_precisions()
 
         return {
-            'exteroceptive': self.extero_precision,
-            'interoceptive': self.intero_precision,
-            'attention_gain': self.attention_gain,
-            'fatigue_penalty': self.fatigue_level
+            "exteroceptive": self.extero_precision,
+            "interoceptive": self.intero_precision,
+            "attention_gain": self.attention_gain,
+            "fatigue_penalty": self.fatigue_level,
         }
 
     def _update_uncertainty(self, stream: str, error_variance: float) -> None:
@@ -296,14 +293,12 @@ class PrecisionWeighting:
         """
         # Smooth update
         alpha = 0.1
-        if stream == 'extero':
-            self.extero_uncertainty = (1 - alpha) * self.extero_uncertainty + \
-                                      alpha * error_variance
+        if stream == "extero":
+            self.extero_uncertainty = (1 - alpha) * self.extero_uncertainty + alpha * error_variance
             # Update precision (inverse uncertainty)
             self.extero_precision = self.extero_baseline / (self.extero_uncertainty + 1e-6)
         else:
-            self.intero_uncertainty = (1 - alpha) * self.intero_uncertainty + \
-                                     alpha * error_variance
+            self.intero_uncertainty = (1 - alpha) * self.intero_uncertainty + alpha * error_variance
             self.intero_precision = self.intero_baseline / (self.intero_uncertainty + 1e-6)
 
     def _update_volatility(self) -> None:
@@ -312,10 +307,12 @@ class PrecisionWeighting:
 
         Volatility = rate of change of uncertainty
         """
-        self.volatility_window.append({
-            'extero_uncertainty': self.extero_uncertainty,
-            'intero_uncertainty': self.intero_uncertainty
-        })
+        self.volatility_window.append(
+            {
+                "extero_uncertainty": self.extero_uncertainty,
+                "intero_uncertainty": self.intero_uncertainty,
+            }
+        )
 
         # Keep window size limited
         if len(self.volatility_window) > 10:
@@ -323,8 +320,8 @@ class PrecisionWeighting:
 
         # Compute volatility as variance of uncertainty
         if len(self.volatility_window) > 2:
-            extero_unc = [w['extero_uncertainty'] for w in self.volatility_window]
-            intero_unc = [w['intero_uncertainty'] for w in self.volatility_window]
+            extero_unc = [w["extero_uncertainty"] for w in self.volatility_window]
+            intero_unc = [w["intero_uncertainty"] for w in self.volatility_window]
 
             self.extero_volatility = np.var(extero_unc)
             self.intero_volatility = np.var(intero_unc)
@@ -337,11 +334,11 @@ class PrecisionWeighting:
         """
         self.attention_focus = target
 
-        if target == 'extero':
+        if target == "extero":
             self.attention_gain = self.gain_range[1]  # High gain
             self.extero_precision *= self.attention_gain
             self.intero_precision *= 0.5  # Reduce unattended
-        elif target == 'intero':
+        elif target == "intero":
             self.attention_gain = self.gain_range[1]
             self.intero_precision *= self.attention_gain
             self.extero_precision *= 0.5
@@ -396,29 +393,25 @@ class PrecisionWeighting:
         Different contexts may prioritize different streams.
         """
         # Example: threat context increases interoceptive precision
-        if context.get('threat_level', 0) > 0.5:
+        if context.get("threat_level", 0) > 0.5:
             self.intero_precision *= 1.5
 
         # Example: task context increases exteroceptive precision
-        if context.get('task_demand', 0) > 0.5:
+        if context.get("task_demand", 0) > 0.5:
             self.extero_precision *= 1.3
 
     def _clamp_precisions(self) -> None:
         """Clamp precisions to valid range."""
-        precision_range = self.config.get('active_inference', {}).get(
-            'precision_range', [0.1, 10.0]
+        precision_range = self.config.get("active_inference", {}).get(
+            "precision_range", [0.1, 10.0]
         )
 
         self.extero_precision = np.clip(
-            self.extero_precision,
-            precision_range[0],
-            precision_range[1]
+            self.extero_precision, precision_range[0], precision_range[1]
         )
 
         self.intero_precision = np.clip(
-            self.intero_precision,
-            precision_range[0],
-            precision_range[1]
+            self.intero_precision, precision_range[0], precision_range[1]
         )
 
     def set_neuromodulator(self, modulator: NeuromodulatorType, level: float) -> None:
@@ -512,7 +505,7 @@ class PrecisionWeighting:
         >>> P = precision.get_precision_matrix('extero', 256)
         >>> print(P.shape)  # (256, 256)
         """
-        if stream == 'extero':
+        if stream == "extero":
             precision = self.extero_precision
         else:
             precision = self.intero_precision

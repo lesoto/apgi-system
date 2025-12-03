@@ -22,6 +22,7 @@ from enum import Enum
 
 class StimulusType(Enum):
     """Types of competing stimuli."""
+
     PATTERN_A = "pattern_a"  # First stimulus pattern
     PATTERN_B = "pattern_b"  # Second stimulus pattern
     MIXED = "mixed"  # Mixed/transitional state
@@ -30,6 +31,7 @@ class StimulusType(Enum):
 @dataclass
 class PerceptualState:
     """State of perception at a given time point."""
+
     time_ms: float
     dominant_stimulus: Optional[StimulusType]
     ignition_occurred: bool
@@ -41,6 +43,7 @@ class PerceptualState:
 @dataclass
 class DominancePeriod:
     """Period of perceptual dominance."""
+
     stimulus: StimulusType
     start_time: float
     end_time: float
@@ -50,6 +53,7 @@ class DominancePeriod:
 @dataclass
 class Trial:
     """Single rivalry trial configuration."""
+
     trial_number: int
     pattern_a: np.ndarray  # First competing pattern
     pattern_b: np.ndarray  # Second competing pattern
@@ -61,6 +65,7 @@ class Trial:
 @dataclass
 class TrialResult:
     """Results from a single rivalry trial."""
+
     trial_number: int
     pattern_a_strength: float
     pattern_b_strength: float
@@ -95,7 +100,7 @@ class BinocularRivalryTask:
         num_trials: int = 10,
         strength_ratios: Optional[List[Tuple[float, float]]] = None,
         sampling_interval_ms: float = 100.0,
-        dominance_threshold: float = 2.0
+        dominance_threshold: float = 2.0,
     ):
         """Initialize binocular rivalry task."""
         self.trial_duration_ms = trial_duration_ms
@@ -122,8 +127,8 @@ class BinocularRivalryTask:
         for strength_a, strength_b in self.strength_ratios:
             for rep in range(self.num_trials):
                 # Generate two competing patterns
-                pattern_a = self._generate_pattern(pattern_type='A')
-                pattern_b = self._generate_pattern(pattern_type='B')
+                pattern_a = self._generate_pattern(pattern_type="A")
+                pattern_b = self._generate_pattern(pattern_type="B")
 
                 trial = Trial(
                     trial_number=trial_num,
@@ -131,7 +136,7 @@ class BinocularRivalryTask:
                     pattern_b=pattern_b,
                     pattern_a_strength=strength_a,
                     pattern_b_strength=strength_b,
-                    duration_ms=self.trial_duration_ms
+                    duration_ms=self.trial_duration_ms,
                 )
                 trials.append(trial)
                 trial_num += 1
@@ -157,33 +162,33 @@ class BinocularRivalryTask:
         """
         pattern = np.zeros(self.stim_dim)
 
-        if pattern_type == 'A':
+        if pattern_type == "A":
             # Pattern A: Strong signal in first third of vector
             # Represents, e.g., horizontal grating or red color
             region_size = self.stim_dim // 3
             pattern[:region_size] = 2.0 * np.sin(np.linspace(0, 8 * np.pi, region_size))
             # Add spatial structure
-            pattern[region_size:2*region_size] = 0.5 * np.cos(np.linspace(0, 4 * np.pi, region_size))
+            pattern[region_size : 2 * region_size] = 0.5 * np.cos(
+                np.linspace(0, 4 * np.pi, region_size)
+            )
 
         else:  # Pattern B
             # Pattern B: Strong signal in second third of vector
             # Represents, e.g., vertical grating or green color
             region_size = self.stim_dim // 3
-            pattern[region_size:2*region_size] = 2.0 * np.sin(np.linspace(0, 8 * np.pi, region_size))
+            pattern[region_size : 2 * region_size] = 2.0 * np.sin(
+                np.linspace(0, 8 * np.pi, region_size)
+            )
             # Add spatial structure (calculate actual size of third region)
             third_region_size = self.stim_dim - 2 * region_size
-            pattern[2*region_size:] = 0.5 * np.cos(np.linspace(0, 4 * np.pi, third_region_size))
+            pattern[2 * region_size :] = 0.5 * np.cos(np.linspace(0, 4 * np.pi, third_region_size))
 
         # Add some shared components (background)
         pattern += 0.3 * np.random.randn(self.stim_dim)
 
         return pattern
 
-    def _create_rivalry_stimulus(
-        self,
-        trial: Trial,
-        time_ms: float
-    ) -> np.ndarray:
+    def _create_rivalry_stimulus(self, trial: Trial, time_ms: float) -> np.ndarray:
         """
         Create the rivalry stimulus at a given time point.
 
@@ -201,12 +206,12 @@ class BinocularRivalryTask:
         # Add slight temporal modulation to create dynamic competition
         # This simulates the continuous rivalry between the two percepts
         phase_a = 0.1 * np.sin(2 * np.pi * time_ms / 5000.0)  # 0.2 Hz modulation
-        phase_b = 0.1 * np.sin(2 * np.pi * time_ms / 5000.0 + np.pi/2)  # 90° phase shift
+        phase_b = 0.1 * np.sin(2 * np.pi * time_ms / 5000.0 + np.pi / 2)  # 90° phase shift
 
         # Combine patterns with relative strengths and phase modulation
         stimulus = (
-            trial.pattern_a_strength * (1.0 + phase_a) * trial.pattern_a +
-            trial.pattern_b_strength * (1.0 + phase_b) * trial.pattern_b
+            trial.pattern_a_strength * (1.0 + phase_a) * trial.pattern_a
+            + trial.pattern_b_strength * (1.0 + phase_b) * trial.pattern_b
         )
 
         # Normalize to prevent extreme values
@@ -215,9 +220,7 @@ class BinocularRivalryTask:
         return stimulus
 
     def _determine_dominant_pattern(
-        self,
-        state: Dict[str, Any],
-        trial: Trial
+        self, state: Dict[str, Any], trial: Trial
     ) -> Tuple[Optional[StimulusType], float, float]:
         """
         Determine which pattern is currently dominant based on system state.
@@ -232,9 +235,9 @@ class BinocularRivalryTask:
             Tuple of (dominant_stimulus, pattern_a_strength, pattern_b_strength)
         """
         # Get workspace state
-        workspace_active = state.get('workspace', {}).get('is_broadcasting', False)
+        workspace_active = state.get("workspace", {}).get("is_broadcasting", False)
 
-        if not workspace_active or not state['ignition']['ignition_occurred']:
+        if not workspace_active or not state["ignition"]["ignition_occurred"]:
             return None, 0.0, 0.0
 
         # Analyze which pattern is represented in the workspace
@@ -246,11 +249,11 @@ class BinocularRivalryTask:
 
         # For this simulation, we estimate based on the temporal dynamics
         # and the relative contributions of each pattern
-        workspace_signal = state['ignition'].get('total_signal', 0.0)
+        workspace_signal = state["ignition"].get("total_signal", 0.0)
 
         # Simple heuristic: use the phase of oscillation to estimate dominance
         # In a full implementation, this would be based on actual pattern matching
-        time_ms = state['time']
+        time_ms = state["time"]
         phase = (time_ms % 10000) / 10000.0  # 10-second cycle
 
         # Bias by relative strengths
@@ -273,11 +276,7 @@ class BinocularRivalryTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(
-        self,
-        apgi_system,
-        trial: Trial
-    ) -> TrialResult:
+    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
         """
         Run a single rivalry trial on the APGI system.
 
@@ -321,12 +320,12 @@ class BinocularRivalryTask:
                 )
 
                 perceptual_state = PerceptualState(
-                    time_ms=state['time'],
+                    time_ms=state["time"],
                     dominant_stimulus=dominant,
-                    ignition_occurred=state['ignition']['ignition_occurred'],
-                    signal_strength=state['ignition'].get('total_signal', 0.0),
+                    ignition_occurred=state["ignition"]["ignition_occurred"],
+                    signal_strength=state["ignition"].get("total_signal", 0.0),
                     pattern_a_strength=pattern_a_str,
-                    pattern_b_strength=pattern_b_str
+                    pattern_b_strength=pattern_b_str,
                 )
                 perceptual_states.append(perceptual_state)
 
@@ -334,25 +333,29 @@ class BinocularRivalryTask:
                 if dominant is not None and dominant != current_dominant:
                     # End previous dominance period
                     if current_dominant is not None:
-                        dominance_periods.append(DominancePeriod(
-                            stimulus=current_dominant,
-                            start_time=current_dominance_start,
-                            end_time=state['time'],
-                            duration=state['time'] - current_dominance_start
-                        ))
+                        dominance_periods.append(
+                            DominancePeriod(
+                                stimulus=current_dominant,
+                                start_time=current_dominance_start,
+                                end_time=state["time"],
+                                duration=state["time"] - current_dominance_start,
+                            )
+                        )
 
                     # Start new dominance period
                     current_dominant = dominant
-                    current_dominance_start = state['time']
+                    current_dominance_start = state["time"]
 
         # Close final dominance period
         if current_dominant is not None:
-            dominance_periods.append(DominancePeriod(
-                stimulus=current_dominant,
-                start_time=current_dominance_start,
-                end_time=trial.duration_ms,
-                duration=trial.duration_ms - current_dominance_start
-            ))
+            dominance_periods.append(
+                DominancePeriod(
+                    stimulus=current_dominant,
+                    start_time=current_dominance_start,
+                    end_time=trial.duration_ms,
+                    duration=trial.duration_ms - current_dominance_start,
+                )
+            )
 
         # Analyze dominance periods
         pattern_a_periods = [p for p in dominance_periods if p.stimulus == StimulusType.PATTERN_A]
@@ -365,8 +368,12 @@ class BinocularRivalryTask:
         pattern_a_ratio = pattern_a_total / total_dominance if total_dominance > 0 else 0.0
 
         num_alternations = len(dominance_periods) - 1 if dominance_periods else 0
-        avg_dominance = np.mean([p.duration for p in dominance_periods]) if dominance_periods else 0.0
-        alternation_rate = num_alternations / (trial.duration_ms / 1000.0) if trial.duration_ms > 0 else 0.0
+        avg_dominance = (
+            np.mean([p.duration for p in dominance_periods]) if dominance_periods else 0.0
+        )
+        alternation_rate = (
+            num_alternations / (trial.duration_ms / 1000.0) if trial.duration_ms > 0 else 0.0
+        )
 
         result = TrialResult(
             trial_number=trial.trial_number,
@@ -379,7 +386,7 @@ class BinocularRivalryTask:
             pattern_b_total_duration=pattern_b_total,
             pattern_a_dominance_ratio=pattern_a_ratio,
             average_dominance_duration=avg_dominance,
-            alternation_rate=alternation_rate
+            alternation_rate=alternation_rate,
         )
 
         self.results.append(result)
@@ -423,10 +430,7 @@ class BinocularRivalryTask:
             - Effects of stimulus strength
         """
         if not self.results:
-            return {
-                'error': 'No results to analyze',
-                'total_trials': 0
-            }
+            return {"error": "No results to analyze", "total_trials": 0}
 
         # Overall statistics
         total_trials = len(self.results)
@@ -449,12 +453,12 @@ class BinocularRivalryTask:
             avg_ratio = np.mean([r.pattern_a_dominance_ratio for r in strength_results])
 
             strength_analysis[f"{strength_key[0]:.1f}:{strength_key[1]:.1f}"] = {
-                'pattern_a_strength': strength_key[0],
-                'pattern_b_strength': strength_key[1],
-                'num_trials': len(strength_results),
-                'avg_dominance_duration_ms': avg_dom_dur,
-                'avg_alternation_rate': avg_alt_rate,
-                'pattern_a_dominance_ratio': avg_ratio
+                "pattern_a_strength": strength_key[0],
+                "pattern_b_strength": strength_key[1],
+                "num_trials": len(strength_results),
+                "avg_dominance_duration_ms": avg_dom_dur,
+                "avg_alternation_rate": avg_alt_rate,
+                "pattern_a_dominance_ratio": avg_ratio,
             }
 
         # Distribution of dominance durations
@@ -463,26 +467,28 @@ class BinocularRivalryTask:
             all_dominance_durations.extend([p.duration for p in result.dominance_periods])
 
         summary = {
-            'total_trials': total_trials,
-            'avg_dominance_duration_ms': avg_dominance_duration,
-            'std_dominance_duration_ms': np.std([r.average_dominance_duration for r in self.results]),
-            'avg_alternation_rate': avg_alternation_rate,
-            'avg_pattern_a_dominance_ratio': avg_pattern_a_ratio,
-            'total_alternations': sum(r.num_alternations for r in self.results),
-            'by_strength_ratio': strength_analysis,
-            'dominance_duration_distribution': {
-                'mean': np.mean(all_dominance_durations) if all_dominance_durations else 0.0,
-                'median': np.median(all_dominance_durations) if all_dominance_durations else 0.0,
-                'std': np.std(all_dominance_durations) if all_dominance_durations else 0.0,
-                'min': np.min(all_dominance_durations) if all_dominance_durations else 0.0,
-                'max': np.max(all_dominance_durations) if all_dominance_durations else 0.0
+            "total_trials": total_trials,
+            "avg_dominance_duration_ms": avg_dominance_duration,
+            "std_dominance_duration_ms": np.std(
+                [r.average_dominance_duration for r in self.results]
+            ),
+            "avg_alternation_rate": avg_alternation_rate,
+            "avg_pattern_a_dominance_ratio": avg_pattern_a_ratio,
+            "total_alternations": sum(r.num_alternations for r in self.results),
+            "by_strength_ratio": strength_analysis,
+            "dominance_duration_distribution": {
+                "mean": np.mean(all_dominance_durations) if all_dominance_durations else 0.0,
+                "median": np.median(all_dominance_durations) if all_dominance_durations else 0.0,
+                "std": np.std(all_dominance_durations) if all_dominance_durations else 0.0,
+                "min": np.min(all_dominance_durations) if all_dominance_durations else 0.0,
+                "max": np.max(all_dominance_durations) if all_dominance_durations else 0.0,
             },
-            'task_parameters': {
-                'trial_duration_ms': self.trial_duration_ms,
-                'num_trials': self.num_trials,
-                'strength_ratios': self.strength_ratios,
-                'sampling_interval_ms': self.sampling_interval_ms
-            }
+            "task_parameters": {
+                "trial_duration_ms": self.trial_duration_ms,
+                "num_trials": self.num_trials,
+                "strength_ratios": self.strength_ratios,
+                "sampling_interval_ms": self.sampling_interval_ms,
+            },
         }
 
         return summary
@@ -498,15 +504,17 @@ class BinocularRivalryTask:
 
         print(f"\nTotal Trials: {analysis['total_trials']}")
         print(f"Total Alternations: {analysis['total_alternations']}")
-        print(f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms "
-              f"(±{analysis['std_dominance_duration_ms']:.0f})")
+        print(
+            f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms "
+            f"(±{analysis['std_dominance_duration_ms']:.0f})"
+        )
         print(f"Avg Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second")
         print(f"Pattern A Dominance Ratio: {analysis['avg_pattern_a_dominance_ratio']:.1%}")
 
         print("\n" + "-" * 70)
         print("Dominance Duration Distribution:")
         print("-" * 70)
-        dist = analysis['dominance_duration_distribution']
+        dist = analysis["dominance_duration_distribution"]
         print(f"Mean:   {dist['mean']:.0f} ms")
         print(f"Median: {dist['median']:.0f} ms")
         print(f"Std:    {dist['std']:.0f} ms")
@@ -515,28 +523,32 @@ class BinocularRivalryTask:
         print("\n" + "-" * 70)
         print("Results by Stimulus Strength Ratio (A:B):")
         print("-" * 70)
-        print(f"{'Ratio':<12} {'Avg Dom. Dur (ms)':<20} {'Alt. Rate (/s)':<18} {'A Dom. Ratio':<15}")
+        print(
+            f"{'Ratio':<12} {'Avg Dom. Dur (ms)':<20} {'Alt. Rate (/s)':<18} {'A Dom. Ratio':<15}"
+        )
         print("-" * 70)
 
-        for ratio_key in sorted(analysis['by_strength_ratio'].keys()):
-            data = analysis['by_strength_ratio'][ratio_key]
-            print(f"{ratio_key:<12} "
-                  f"{data['avg_dominance_duration_ms']:<20.0f} "
-                  f"{data['avg_alternation_rate']:<18.2f} "
-                  f"{data['pattern_a_dominance_ratio']:<15.1%}")
+        for ratio_key in sorted(analysis["by_strength_ratio"].keys()):
+            data = analysis["by_strength_ratio"][ratio_key]
+            print(
+                f"{ratio_key:<12} "
+                f"{data['avg_dominance_duration_ms']:<20.0f} "
+                f"{data['avg_alternation_rate']:<18.2f} "
+                f"{data['pattern_a_dominance_ratio']:<15.1%}"
+            )
 
         print("=" * 70)
 
         # Interpretation
         print("\nInterpretation:")
-        if 1000 < analysis['avg_dominance_duration_ms'] < 5000:
+        if 1000 < analysis["avg_dominance_duration_ms"] < 5000:
             print("✓ Dominance durations in typical range (1-5 seconds)")
-        elif analysis['avg_dominance_duration_ms'] < 1000:
+        elif analysis["avg_dominance_duration_ms"] < 1000:
             print("~ Short dominance durations (< 1 second) - rapid alternation")
         else:
             print("~ Long dominance durations (> 5 seconds) - slow alternation")
 
-        if 0.1 < analysis['avg_alternation_rate'] < 1.0:
+        if 0.1 < analysis["avg_alternation_rate"] < 1.0:
             print("✓ Alternation rate in typical range (0.1-1.0 per second)")
 
         print("\nExpected pattern:")
@@ -558,34 +570,33 @@ class BinocularRivalryTask:
         for result in self.results:
             dominance_periods_data = [
                 {
-                    'stimulus': p.stimulus.value,
-                    'start_time': p.start_time,
-                    'end_time': p.end_time,
-                    'duration': p.duration
+                    "stimulus": p.stimulus.value,
+                    "start_time": p.start_time,
+                    "end_time": p.end_time,
+                    "duration": p.duration,
                 }
                 for p in result.dominance_periods
             ]
 
-            trial_data.append({
-                'trial_number': result.trial_number,
-                'pattern_a_strength': result.pattern_a_strength,
-                'pattern_b_strength': result.pattern_b_strength,
-                'total_duration_ms': result.total_duration_ms,
-                'num_alternations': result.num_alternations,
-                'pattern_a_total_duration': result.pattern_a_total_duration,
-                'pattern_b_total_duration': result.pattern_b_total_duration,
-                'pattern_a_dominance_ratio': result.pattern_a_dominance_ratio,
-                'average_dominance_duration': result.average_dominance_duration,
-                'alternation_rate': result.alternation_rate,
-                'dominance_periods': dominance_periods_data
-            })
+            trial_data.append(
+                {
+                    "trial_number": result.trial_number,
+                    "pattern_a_strength": result.pattern_a_strength,
+                    "pattern_b_strength": result.pattern_b_strength,
+                    "total_duration_ms": result.total_duration_ms,
+                    "num_alternations": result.num_alternations,
+                    "pattern_a_total_duration": result.pattern_a_total_duration,
+                    "pattern_b_total_duration": result.pattern_b_total_duration,
+                    "pattern_a_dominance_ratio": result.pattern_a_dominance_ratio,
+                    "average_dominance_duration": result.average_dominance_duration,
+                    "alternation_rate": result.alternation_rate,
+                    "dominance_periods": dominance_periods_data,
+                }
+            )
 
-        output = {
-            'summary': analysis,
-            'trials': trial_data
-        }
+        output = {"summary": analysis, "trials": trial_data}
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(output, f, indent=2)
 
         print(f"Results saved to: {filename}")

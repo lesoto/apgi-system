@@ -30,7 +30,7 @@ def main():
         deck_stimulus_strength=1.5,
         outcome_stimulus_strength=2.0,
         interoceptive_gain=1.0,
-        deck_selection_strategy='balanced'
+        deck_selection_strategy="balanced",
     )
 
     print("\nRunning task...")
@@ -41,7 +41,7 @@ def main():
     task.print_results(results)
 
     # Save results
-    task.save_results('test_iowa_gambling_results.json')
+    task.save_results("test_iowa_gambling_results.json")
 
     print("\n" + "=" * 80)
     print("Test completed successfully!")

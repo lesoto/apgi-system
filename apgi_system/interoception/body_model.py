@@ -14,6 +14,7 @@ from apgi_system.types import FloatArray, ConfigDict, BodyState
 @dataclass
 class PhysiologicalState:
     """Complete physiological state."""
+
     heart_rate: float  # bpm
     respiration: float  # breaths per minute
     temperature: float  # Celsius
@@ -84,8 +85,8 @@ class BodyModel:
             Configuration dictionary containing interoception settings
         """
         self.config = config
-        intero_config = config.get('interoception', {})
-        body_states_config = intero_config.get('body_states', [])
+        intero_config = config.get("interoception", {})
+        body_states_config = intero_config.get("body_states", [])
 
         # Parse body state configurations
         self.state_configs = {}
@@ -95,23 +96,23 @@ class BodyModel:
 
         # Current state
         self.current_state = PhysiologicalState(
-            heart_rate=self.state_configs.get('heart_rate', {}).get('baseline', 70),
-            respiration=self.state_configs.get('respiration', {}).get('baseline', 15),
-            temperature=self.state_configs.get('temperature', {}).get('baseline', 37.0),
-            glucose=self.state_configs.get('glucose', {}).get('baseline', 5.0),
-            cortisol=self.state_configs.get('cortisol', {}).get('baseline', 10),
-            blood_pressure=120  # Default
+            heart_rate=self.state_configs.get("heart_rate", {}).get("baseline", 70),
+            respiration=self.state_configs.get("respiration", {}).get("baseline", 15),
+            temperature=self.state_configs.get("temperature", {}).get("baseline", 37.0),
+            glucose=self.state_configs.get("glucose", {}).get("baseline", 5.0),
+            cortisol=self.state_configs.get("cortisol", {}).get("baseline", 10),
+            blood_pressure=120,  # Default
         )
 
         # Predicted state (prediction_lead_ms ahead)
-        self.prediction_lead_ms = intero_config.get('prediction_lead_ms', 100)
+        self.prediction_lead_ms = intero_config.get("prediction_lead_ms", 100)
         self.predicted_state = PhysiologicalState(
             heart_rate=self.current_state.heart_rate,
             respiration=self.current_state.respiration,
             temperature=self.current_state.temperature,
             glucose=self.current_state.glucose,
             cortisol=self.current_state.cortisol,
-            blood_pressure=self.current_state.blood_pressure
+            blood_pressure=self.current_state.blood_pressure,
         )
 
         # Dynamics parameters (simplified linear dynamics)
@@ -166,13 +167,8 @@ class BodyModel:
         (5,)
         """
         # Validate inputs
-        InputValidator.validate_scalar(
-            dt, 
-            "dt", 
-            value_range=(0.0, 10000.0),
-            positive=True
-        )
-        
+        InputValidator.validate_scalar(dt, "dt", value_range=(0.0, 10000.0), positive=True)
+
         # Update current state
         self._update_heart_rate(dt)
         self._update_respiration(dt)
@@ -188,12 +184,12 @@ class BodyModel:
         prediction_error = self._compute_prediction_error()
 
         return {
-            'current': self._state_to_dict(self.current_state),
-            'predicted': self._state_to_dict(self.predicted_state),
-            'prediction_error': prediction_error,
-            'arousal': self.arousal_level,
-            'activity': self.activity_level,
-            'stress': self.stress_level
+            "current": self._state_to_dict(self.current_state),
+            "predicted": self._state_to_dict(self.predicted_state),
+            "prediction_error": prediction_error,
+            "arousal": self.arousal_level,
+            "activity": self.activity_level,
+            "stress": self.stress_level,
         }
 
     def _update_heart_rate(self, dt: float):
@@ -208,13 +204,13 @@ class BodyModel:
         dt : float
             Timestep in milliseconds
         """
-        baseline = self.state_configs.get('heart_rate', {}).get('baseline', 70)
+        baseline = self.state_configs.get("heart_rate", {}).get("baseline", 70)
 
         # Target heart rate depends on arousal and activity
         target_hr = baseline + 30 * self.arousal_level + 50 * self.activity_level
 
         # Clamp to range
-        hr_range = self.state_configs.get('heart_rate', {}).get('range', [50, 120])
+        hr_range = self.state_configs.get("heart_rate", {}).get("range", [50, 120])
         target_hr = np.clip(target_hr, hr_range[0], hr_range[1])
 
         # Update with time constant
@@ -222,8 +218,8 @@ class BodyModel:
         self.current_state.heart_rate += dhr
 
         # Add noise
-        noise_std = self.state_configs.get('heart_rate', {}).get('variance', 5)
-        self.current_state.heart_rate += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
+        noise_std = self.state_configs.get("heart_rate", {}).get("variance", 5)
+        self.current_state.heart_rate += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
     def _update_respiration(self, dt: float):
         """
@@ -237,17 +233,17 @@ class BodyModel:
         dt : float
             Timestep in milliseconds
         """
-        baseline = self.state_configs.get('respiration', {}).get('baseline', 15)
+        baseline = self.state_configs.get("respiration", {}).get("baseline", 15)
         target_rr = baseline + 5 * self.arousal_level + 10 * self.activity_level
 
-        rr_range = self.state_configs.get('respiration', {}).get('range', [10, 30])
+        rr_range = self.state_configs.get("respiration", {}).get("range", [10, 30])
         target_rr = np.clip(target_rr, rr_range[0], rr_range[1])
 
         drr = (dt / self.tau_respiration) * (target_rr - self.current_state.respiration)
         self.current_state.respiration += drr
 
-        noise_std = self.state_configs.get('respiration', {}).get('variance', 2)
-        self.current_state.respiration += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
+        noise_std = self.state_configs.get("respiration", {}).get("variance", 2)
+        self.current_state.respiration += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
     def _update_temperature(self, dt: float):
         """
@@ -261,17 +257,17 @@ class BodyModel:
         dt : float
             Timestep in milliseconds
         """
-        baseline = self.state_configs.get('temperature', {}).get('baseline', 37.0)
+        baseline = self.state_configs.get("temperature", {}).get("baseline", 37.0)
         target_temp = baseline + 0.5 * self.activity_level
 
-        temp_range = self.state_configs.get('temperature', {}).get('range', [36.0, 39.0])
+        temp_range = self.state_configs.get("temperature", {}).get("range", [36.0, 39.0])
         target_temp = np.clip(target_temp, temp_range[0], temp_range[1])
 
         dtemp = (dt / self.tau_temperature) * (target_temp - self.current_state.temperature)
         self.current_state.temperature += dtemp
 
-        noise_std = self.state_configs.get('temperature', {}).get('variance', 0.2)
-        self.current_state.temperature += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
+        noise_std = self.state_configs.get("temperature", {}).get("variance", 0.2)
+        self.current_state.temperature += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
     def _update_glucose(self, dt: float):
         """
@@ -285,18 +281,18 @@ class BodyModel:
         dt : float
             Timestep in milliseconds
         """
-        baseline = self.state_configs.get('glucose', {}).get('baseline', 5.0)
+        baseline = self.state_configs.get("glucose", {}).get("baseline", 5.0)
         # Activity decreases glucose, baseline otherwise
         target_glucose = baseline - 1.0 * self.activity_level
 
-        glucose_range = self.state_configs.get('glucose', {}).get('range', [3.0, 8.0])
+        glucose_range = self.state_configs.get("glucose", {}).get("range", [3.0, 8.0])
         target_glucose = np.clip(target_glucose, glucose_range[0], glucose_range[1])
 
         dglucose = (dt / self.tau_glucose) * (target_glucose - self.current_state.glucose)
         self.current_state.glucose += dglucose
 
-        noise_std = self.state_configs.get('glucose', {}).get('variance', 0.5)
-        self.current_state.glucose += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
+        noise_std = self.state_configs.get("glucose", {}).get("variance", 0.5)
+        self.current_state.glucose += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
     def _update_cortisol(self, dt: float):
         """
@@ -310,17 +306,17 @@ class BodyModel:
         dt : float
             Timestep in milliseconds
         """
-        baseline = self.state_configs.get('cortisol', {}).get('baseline', 10)
+        baseline = self.state_configs.get("cortisol", {}).get("baseline", 10)
         target_cortisol = baseline + 15 * self.stress_level + 5 * self.arousal_level
 
-        cortisol_range = self.state_configs.get('cortisol', {}).get('range', [5, 30])
+        cortisol_range = self.state_configs.get("cortisol", {}).get("range", [5, 30])
         target_cortisol = np.clip(target_cortisol, cortisol_range[0], cortisol_range[1])
 
         dcortisol = (dt / self.tau_cortisol) * (target_cortisol - self.current_state.cortisol)
         self.current_state.cortisol += dcortisol
 
-        noise_std = self.state_configs.get('cortisol', {}).get('variance', 3)
-        self.current_state.cortisol += np.random.randn() * noise_std * np.sqrt(dt/1000.0)
+        noise_std = self.state_configs.get("cortisol", {}).get("variance", 3)
+        self.current_state.cortisol += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
     def _update_blood_pressure(self, dt: float):
         """
@@ -342,7 +338,7 @@ class BodyModel:
         dbp = (dt / self.tau_heart) * (target_bp - self.current_state.blood_pressure)
         self.current_state.blood_pressure += dbp
 
-        self.current_state.blood_pressure += np.random.randn() * 5 * np.sqrt(dt/1000.0)
+        self.current_state.blood_pressure += np.random.randn() * 5 * np.sqrt(dt / 1000.0)
 
     def _generate_prediction(self):
         """
@@ -380,13 +376,15 @@ class BodyModel:
             5D prediction error vector for [heart_rate, respiration,
             temperature, glucose, cortisol]
         """
-        error = np.array([
-            np.random.randn() * 2,  # Heart rate error
-            np.random.randn() * 1,  # Respiration error
-            np.random.randn() * 0.1,  # Temperature error
-            np.random.randn() * 0.2,  # Glucose error
-            np.random.randn() * 1,  # Cortisol error
-        ])
+        error = np.array(
+            [
+                np.random.randn() * 2,  # Heart rate error
+                np.random.randn() * 1,  # Respiration error
+                np.random.randn() * 0.1,  # Temperature error
+                np.random.randn() * 0.2,  # Glucose error
+                np.random.randn() * 1,  # Cortisol error
+            ]
+        )
 
         return error
 
@@ -453,14 +451,16 @@ class BodyModel:
         >>> print(vector.shape)
         (6,)
         """
-        return np.array([
-            self.current_state.heart_rate,
-            self.current_state.respiration,
-            self.current_state.temperature,
-            self.current_state.glucose,
-            self.current_state.cortisol,
-            self.current_state.blood_pressure
-        ])
+        return np.array(
+            [
+                self.current_state.heart_rate,
+                self.current_state.respiration,
+                self.current_state.temperature,
+                self.current_state.glucose,
+                self.current_state.cortisol,
+                self.current_state.blood_pressure,
+            ]
+        )
 
     def _state_to_dict(self, state: PhysiologicalState) -> Dict[str, float]:
         """
@@ -477,30 +477,30 @@ class BodyModel:
             Dictionary mapping variable names to values
         """
         return {
-            'heart_rate': float(state.heart_rate),
-            'respiration': float(state.respiration),
-            'temperature': float(state.temperature),
-            'glucose': float(state.glucose),
-            'cortisol': float(state.cortisol),
-            'blood_pressure': float(state.blood_pressure)
+            "heart_rate": float(state.heart_rate),
+            "respiration": float(state.respiration),
+            "temperature": float(state.temperature),
+            "glucose": float(state.glucose),
+            "cortisol": float(state.cortisol),
+            "blood_pressure": float(state.blood_pressure),
         }
 
     def get_current_state(self) -> Dict[str, Any]:
         """
         Get current body model state.
-        
+
         Returns
         -------
         Dict[str, Any]
             Current body model state including physiological variables and influences
         """
         return {
-            'current': self._state_to_dict(self.current_state),
-            'predicted': self._state_to_dict(self.predicted_state),
-            'arousal': self.arousal_level,
-            'activity': self.activity_level,
-            'stress': self.stress_level,
-            'interoceptive_vector': self.get_interoceptive_vector()
+            "current": self._state_to_dict(self.current_state),
+            "predicted": self._state_to_dict(self.predicted_state),
+            "arousal": self.arousal_level,
+            "activity": self.activity_level,
+            "stress": self.stress_level,
+            "interoceptive_vector": self.get_interoceptive_vector(),
         }
 
     def reset(self):
@@ -511,12 +511,12 @@ class BodyModel:
         values and resets arousal, activity, and stress levels to zero.
         """
         self.current_state = PhysiologicalState(
-            heart_rate=self.state_configs.get('heart_rate', {}).get('baseline', 70),
-            respiration=self.state_configs.get('respiration', {}).get('baseline', 15),
-            temperature=self.state_configs.get('temperature', {}).get('baseline', 37.0),
-            glucose=self.state_configs.get('glucose', {}).get('baseline', 5.0),
-            cortisol=self.state_configs.get('cortisol', {}).get('baseline', 10),
-            blood_pressure=120
+            heart_rate=self.state_configs.get("heart_rate", {}).get("baseline", 70),
+            respiration=self.state_configs.get("respiration", {}).get("baseline", 15),
+            temperature=self.state_configs.get("temperature", {}).get("baseline", 37.0),
+            glucose=self.state_configs.get("glucose", {}).get("baseline", 5.0),
+            cortisol=self.state_configs.get("cortisol", {}).get("baseline", 10),
+            blood_pressure=120,
         )
 
         self.predicted_state = PhysiologicalState(
@@ -525,7 +525,7 @@ class BodyModel:
             temperature=self.current_state.temperature,
             glucose=self.current_state.glucose,
             cortisol=self.current_state.cortisol,
-            blood_pressure=self.current_state.blood_pressure
+            blood_pressure=self.current_state.blood_pressure,
         )
 
         self.arousal_level = 0.0

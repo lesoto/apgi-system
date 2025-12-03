@@ -30,6 +30,7 @@ from enum import Enum
 
 class MaskType(Enum):
     """Types of visual masks."""
+
     PATTERN = "pattern"  # High-contrast random pattern
     METACONTRAST = "metacontrast"  # Surrounding contour
     BACKWARD = "backward"  # Overlapping pattern
@@ -38,6 +39,7 @@ class MaskType(Enum):
 @dataclass
 class Trial:
     """Configuration for a single masking trial."""
+
     trial_number: int
     target_stimulus: np.ndarray
     mask_stimulus: np.ndarray
@@ -50,6 +52,7 @@ class Trial:
 @dataclass
 class TrialResult:
     """Results from a single masking trial."""
+
     trial_number: int
     soa_ms: float
     mask_type: MaskType
@@ -91,7 +94,7 @@ class MaskingParadigmTask:
         mask_duration_ms: float = 100.0,
         num_trials_per_condition: int = 20,
         target_strength: float = 2.0,
-        mask_strength: float = 3.0
+        mask_strength: float = 3.0,
     ):
         """Initialize masking paradigm task."""
         self.target_duration_ms = target_duration_ms
@@ -134,7 +137,7 @@ class MaskingParadigmTask:
                     soa_ms=soa,
                     mask_type=MaskType.PATTERN,
                     target_duration_ms=self.target_duration_ms,
-                    mask_duration_ms=self.mask_duration_ms
+                    mask_duration_ms=self.mask_duration_ms,
                 )
                 trials.append(trial)
                 trial_num += 1
@@ -155,14 +158,14 @@ class MaskingParadigmTask:
         # Create structured patterns in different frequency bands
         # Low frequency component (broad feature)
         freq1 = 2 * np.pi * 3
-        target[:self.stim_dim//2] += self.target_strength * np.sin(
-            np.linspace(0, freq1, self.stim_dim//2)
+        target[: self.stim_dim // 2] += self.target_strength * np.sin(
+            np.linspace(0, freq1, self.stim_dim // 2)
         )
 
         # Mid frequency component (detail)
         freq2 = 2 * np.pi * 8
-        target[self.stim_dim//4:3*self.stim_dim//4] += 0.5 * self.target_strength * np.cos(
-            np.linspace(0, freq2, self.stim_dim//2)
+        target[self.stim_dim // 4 : 3 * self.stim_dim // 4] += (
+            0.5 * self.target_strength * np.cos(np.linspace(0, freq2, self.stim_dim // 2))
         )
 
         # Add minimal noise to prevent exact repetition
@@ -183,15 +186,11 @@ class MaskingParadigmTask:
         # Add some structure to make it more mask-like
         # (pure noise is less effective as a mask)
         for i in range(0, self.stim_dim, 32):
-            mask[i:min(i+16, self.stim_dim)] += self.mask_strength * 0.5
+            mask[i : min(i + 16, self.stim_dim)] += self.mask_strength * 0.5
 
         return mask
 
-    def run_trial(
-        self,
-        apgi_system,
-        trial: Trial
-    ) -> TrialResult:
+    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
         """
         Run a single masking trial.
 
@@ -231,13 +230,13 @@ class MaskingParadigmTask:
             state = apgi_system.step(trial.target_stimulus)
 
             # Check for ignition during target presentation
-            if state['ignition']['ignition_occurred']:
+            if state["ignition"]["ignition_occurred"]:
                 ignition_count += 1
                 if not target_detected:
                     target_detected = True
-                    detection_time = state['time'] - target_start_time
+                    detection_time = state["time"] - target_start_time
 
-                ignition_strength = state['ignition']['total_signal']
+                ignition_strength = state["ignition"]["total_signal"]
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
@@ -253,13 +252,13 @@ class MaskingParadigmTask:
                 state = apgi_system.step(blank)
 
                 # Check if ignition occurs during ISI (late target processing)
-                if state['ignition']['ignition_occurred']:
+                if state["ignition"]["ignition_occurred"]:
                     ignition_count += 1
                     if not target_detected:
                         target_detected = True
-                        detection_time = state['time'] - target_start_time
+                        detection_time = state["time"] - target_start_time
 
-                    ignition_strength = state['ignition']['total_signal']
+                    ignition_strength = state["ignition"]["total_signal"]
                     if ignition_strength > max_ignition_strength:
                         max_ignition_strength = ignition_strength
 
@@ -272,9 +271,9 @@ class MaskingParadigmTask:
             state = apgi_system.step(trial.mask_stimulus)
 
             # Check if ignition occurs during mask (unusual, indicates mask failure)
-            if state['ignition']['ignition_occurred']:
+            if state["ignition"]["ignition_occurred"]:
                 ignition_count += 1
-                ignition_strength = state['ignition']['total_signal']
+                ignition_strength = state["ignition"]["total_signal"]
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
@@ -292,7 +291,7 @@ class MaskingParadigmTask:
             detection_time=detection_time,
             ignition_strength=max_ignition_strength,
             ignition_count=ignition_count,
-            mask_suppression_occurred=mask_suppression_occurred
+            mask_suppression_occurred=mask_suppression_occurred,
         )
 
         self.results.append(result)
@@ -346,10 +345,7 @@ class MaskingParadigmTask:
             - Task parameters
         """
         if not self.results:
-            return {
-                'error': 'No results to analyze',
-                'total_trials': 0
-            }
+            return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize results by SOA
         results_by_soa = {soa: [] for soa in self.soas}
@@ -371,30 +367,27 @@ class MaskingParadigmTask:
             # Average detection time (only for detected trials)
             avg_detection_time = (
                 np.mean([r.detection_time for r in detected_trials if r.detection_time is not None])
-                if detected_trials else 0.0
+                if detected_trials
+                else 0.0
             )
 
             # Average ignition strength
             avg_ignition_strength = (
-                np.mean([r.ignition_strength for r in soa_results])
-                if soa_results else 0.0
+                np.mean([r.ignition_strength for r in soa_results]) if soa_results else 0.0
             )
 
             soa_analysis[soa] = {
-                'total_trials': len(soa_results),
-                'detections': len(detected_trials),
-                'detection_rate': detection_rate,
-                'suppression_rate': suppression_rate,
-                'avg_detection_time_ms': float(avg_detection_time),
-                'avg_ignition_strength': float(avg_ignition_strength),
-                'total_ignitions': sum(r.ignition_count for r in soa_results)
+                "total_trials": len(soa_results),
+                "detections": len(detected_trials),
+                "detection_rate": detection_rate,
+                "suppression_rate": suppression_rate,
+                "avg_detection_time_ms": float(avg_detection_time),
+                "avg_ignition_strength": float(avg_ignition_strength),
+                "total_ignitions": sum(r.ignition_count for r in soa_results),
             }
 
             # Build masking curve (for plotting)
-            masking_curve.append({
-                'soa_ms': soa,
-                'detection_rate': detection_rate
-            })
+            masking_curve.append({"soa_ms": soa, "detection_rate": detection_rate})
 
         # Overall statistics
         total_detected = sum(1 for r in self.results if r.target_detected)
@@ -405,27 +398,26 @@ class MaskingParadigmTask:
             min_soa = min(self.soas)
             max_soa = max(self.soas)
             masking_effect = (
-                soa_analysis[max_soa]['detection_rate'] -
-                soa_analysis[min_soa]['detection_rate']
+                soa_analysis[max_soa]["detection_rate"] - soa_analysis[min_soa]["detection_rate"]
             )
         else:
             masking_effect = 0.0
 
         return {
-            'total_trials': len(self.results),
-            'overall_detection_rate': total_detected / len(self.results),
-            'overall_suppression_rate': total_suppressed / len(self.results),
-            'masking_effect': masking_effect,
-            'by_soa': soa_analysis,
-            'masking_curve': masking_curve,
-            'task_parameters': {
-                'target_duration_ms': self.target_duration_ms,
-                'soas': self.soas,
-                'mask_duration_ms': self.mask_duration_ms,
-                'trials_per_condition': self.num_trials_per_condition,
-                'target_strength': self.target_strength,
-                'mask_strength': self.mask_strength
-            }
+            "total_trials": len(self.results),
+            "overall_detection_rate": total_detected / len(self.results),
+            "overall_suppression_rate": total_suppressed / len(self.results),
+            "masking_effect": masking_effect,
+            "by_soa": soa_analysis,
+            "masking_curve": masking_curve,
+            "task_parameters": {
+                "target_duration_ms": self.target_duration_ms,
+                "soas": self.soas,
+                "mask_duration_ms": self.mask_duration_ms,
+                "trials_per_condition": self.num_trials_per_condition,
+                "target_strength": self.target_strength,
+                "mask_strength": self.mask_strength,
+            },
         }
 
     def print_results(self, analysis: Optional[Dict[str, Any]] = None):
@@ -440,7 +432,7 @@ class MaskingParadigmTask:
         if analysis is None:
             analysis = self.analyze_results()
 
-        if 'error' in analysis:
+        if "error" in analysis:
             print(f"Error: {analysis['error']}")
             return
 
@@ -450,24 +442,30 @@ class MaskingParadigmTask:
         print(f"\nTotal Trials: {analysis['total_trials']}")
         print(f"Overall Detection Rate: {analysis['overall_detection_rate']:.1%}")
         print(f"Overall Suppression Rate: {analysis['overall_suppression_rate']:.1%}")
-        print(f"Masking Effect: {analysis['masking_effect']:.1%} "
-              "(difference between longest and shortest SOA)")
+        print(
+            f"Masking Effect: {analysis['masking_effect']:.1%} "
+            "(difference between longest and shortest SOA)"
+        )
 
         print("\n" + "-" * 80)
         print("Results by SOA (Stimulus Onset Asynchrony):")
         print("-" * 80)
-        print(f"{'SOA (ms)':<10} {'Detection':<12} {'Suppression':<14} "
-              f"{'Avg Det Time':<14} {'Ignitions':<12}")
+        print(
+            f"{'SOA (ms)':<10} {'Detection':<12} {'Suppression':<14} "
+            f"{'Avg Det Time':<14} {'Ignitions':<12}"
+        )
         print(f"{'':10} {'Rate':<12} {'Rate':<14} {'(ms)':<14} {'Total':<12}")
         print("-" * 80)
 
-        for soa in sorted(analysis['by_soa'].keys()):
-            data = analysis['by_soa'][soa]
-            print(f"{soa:<10.0f} "
-                  f"{data['detection_rate']:<12.1%} "
-                  f"{data['suppression_rate']:<14.1%} "
-                  f"{data['avg_detection_time_ms']:<14.1f} "
-                  f"{data['total_ignitions']:<12}")
+        for soa in sorted(analysis["by_soa"].keys()):
+            data = analysis["by_soa"][soa]
+            print(
+                f"{soa:<10.0f} "
+                f"{data['detection_rate']:<12.1%} "
+                f"{data['suppression_rate']:<14.1%} "
+                f"{data['avg_detection_time_ms']:<14.1f} "
+                f"{data['total_ignitions']:<12}"
+            )
 
         print("=" * 80)
         print("\nInterpretation:")
@@ -476,7 +474,7 @@ class MaskingParadigmTask:
         print("  • Masking curve should be monotonically increasing with SOA")
         print("  • High suppression rates at short SOAs indicate effective masking")
         print("\nTask Parameters:")
-        params = analysis['task_parameters']
+        params = analysis["task_parameters"]
         print(f"  • Target duration: {params['target_duration_ms']} ms")
         print(f"  • Mask duration: {params['mask_duration_ms']} ms")
         print(f"  • Target strength: {params['target_strength']}")
@@ -500,27 +498,29 @@ class MaskingParadigmTask:
         # Prepare detailed trial data
         trial_data = []
         for result in self.results:
-            trial_data.append({
-                'trial_number': result.trial_number,
-                'soa_ms': result.soa_ms,
-                'mask_type': result.mask_type.value,
-                'target_detected': result.target_detected,
-                'detection_time': result.detection_time,
-                'ignition_strength': result.ignition_strength,
-                'ignition_count': result.ignition_count,
-                'mask_suppression_occurred': result.mask_suppression_occurred
-            })
+            trial_data.append(
+                {
+                    "trial_number": result.trial_number,
+                    "soa_ms": result.soa_ms,
+                    "mask_type": result.mask_type.value,
+                    "target_detected": result.target_detected,
+                    "detection_time": result.detection_time,
+                    "ignition_strength": result.ignition_strength,
+                    "ignition_count": result.ignition_count,
+                    "mask_suppression_occurred": result.mask_suppression_occurred,
+                }
+            )
 
         # Compile full output
         output = {
-            'experiment': 'Masking Paradigm',
-            'timestamp': datetime.now().isoformat(),
-            'summary': analysis,
-            'trials': trial_data
+            "experiment": "Masking Paradigm",
+            "timestamp": datetime.now().isoformat(),
+            "summary": analysis,
+            "trials": trial_data,
         }
 
         # Save to file
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(output, f, indent=2)
 
         print(f"Results saved to: {filename}")

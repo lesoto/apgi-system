@@ -4,6 +4,7 @@
 from apgi_system.system import APGISystem
 from apgi_system.experiments import MaskingParadigmTask
 
+
 def test_masking_paradigm():
     """Test the masking paradigm task."""
     print("=" * 80)
@@ -23,7 +24,7 @@ def test_masking_paradigm():
         mask_duration_ms=100.0,
         num_trials_per_condition=5,  # Reduced trials for testing
         target_strength=2.0,
-        mask_strength=3.0
+        mask_strength=3.0,
     )
     print("   ✓ Task created")
 
@@ -38,7 +39,7 @@ def test_masking_paradigm():
 
     # Save results
     print("\n5. Saving results...")
-    task.save_results('test_masking_results.json')
+    task.save_results("test_masking_results.json")
     print("   ✓ Results saved")
 
     print("\n" + "=" * 80)
@@ -46,6 +47,7 @@ def test_masking_paradigm():
     print("=" * 80)
 
     return results
+
 
 if __name__ == "__main__":
     test_masking_paradigm()

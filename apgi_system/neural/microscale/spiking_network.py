@@ -15,6 +15,7 @@ from dataclasses import dataclass
 @dataclass
 class NeuronState:
     """State of a single neuron."""
+
     membrane_potential: float = -65.0  # mV
     spike_time: float = -np.inf
     refractory_until: float = 0.0
@@ -33,7 +34,7 @@ class SpikingNeuralNetwork:
 
     When V ≥ V_threshold:
     - Emit spike
-    - V := V_reset  
+    - V := V_reset
     - Enter refractory period (2ms)
 
     **Key Features**:
@@ -95,7 +96,7 @@ class SpikingNeuralNetwork:
         self,
         num_neurons: int,
         connection_probability: float = 0.1,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize spiking network.
@@ -182,9 +183,7 @@ class SpikingNeuralNetwork:
         return weights
 
     def step(
-        self,
-        external_input: np.ndarray,
-        dt: float = 0.1
+        self, external_input: np.ndarray, dt: float = 0.1
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Simulate one timestep.
@@ -210,9 +209,7 @@ class SpikingNeuralNetwork:
             i_total = external_input[i] + self.synaptic_currents[i]
 
             # Update membrane potential
-            dv = dt / self.tau_membrane * (
-                -(neuron.membrane_potential - self.v_rest) + i_total
-            )
+            dv = dt / self.tau_membrane * (-(neuron.membrane_potential - self.v_rest) + i_total)
             neuron.membrane_potential += dv
 
             # Check for spike
@@ -245,11 +242,11 @@ class SpikingNeuralNetwork:
 
         # Compute metrics
         info = {
-            'num_spikes': int(np.sum(spike_mask)),
-            'mean_potential': float(np.mean([n.membrane_potential for n in self.neurons])),
-            'energy_consumed': self.total_energy_consumed,
-            'landauer_cost': self.bits_erased * self.landauer_cost_per_bit,
-            'firing_rate': len(self.spike_times) / (self.num_neurons * max(current_time, 1))
+            "num_spikes": int(np.sum(spike_mask)),
+            "mean_potential": float(np.mean([n.membrane_potential for n in self.neurons])),
+            "energy_consumed": self.total_energy_consumed,
+            "landauer_cost": self.bits_erased * self.landauer_cost_per_bit,
+            "firing_rate": len(self.spike_times) / (self.num_neurons * max(current_time, 1)),
         }
 
         return spike_mask, info
@@ -301,13 +298,9 @@ class SpikingNeuralNetwork:
 
                     # Clamp weights
                     if self.weights[pre_idx, post_idx] > 0:
-                        self.weights[pre_idx, post_idx] = min(
-                            self.weights[pre_idx, post_idx], 2.0
-                        )
+                        self.weights[pre_idx, post_idx] = min(self.weights[pre_idx, post_idx], 2.0)
                     else:
-                        self.weights[pre_idx, post_idx] = max(
-                            self.weights[pre_idx, post_idx], -2.0
-                        )
+                        self.weights[pre_idx, post_idx] = max(self.weights[pre_idx, post_idx], -2.0)
 
     def get_firing_rates(self, window_ms: float = 100.0) -> np.ndarray:
         """

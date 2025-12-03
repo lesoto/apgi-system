@@ -34,6 +34,7 @@ from enum import Enum
 
 class DeckType(Enum):
     """Types of decks in the Iowa Gambling Task."""
+
     A = "A"  # Bad deck: High reward, very high penalty (net -250 per 10 cards)
     B = "B"  # Bad deck: High reward, very high penalty (net -250 per 10 cards)
     C = "C"  # Good deck: Low reward, low penalty (net +250 per 10 cards)
@@ -43,35 +44,36 @@ class DeckType(Enum):
 # Standard IGT reward/penalty schedules
 DECK_SCHEDULES = {
     DeckType.A: {
-        'reward': 100,  # Every card gives $100
-        'penalty_frequency': 0.5,  # 50% of cards have penalty
-        'penalties': [150, 200, 250, 300, 350],  # Variable penalties
-        'net_per_10': -250  # Net loss over 10 cards
+        "reward": 100,  # Every card gives $100
+        "penalty_frequency": 0.5,  # 50% of cards have penalty
+        "penalties": [150, 200, 250, 300, 350],  # Variable penalties
+        "net_per_10": -250,  # Net loss over 10 cards
     },
     DeckType.B: {
-        'reward': 100,  # Every card gives $100
-        'penalty_frequency': 0.1,  # 10% of cards have penalty
-        'penalties': [1250],  # One large penalty
-        'net_per_10': -250  # Net loss over 10 cards
+        "reward": 100,  # Every card gives $100
+        "penalty_frequency": 0.1,  # 10% of cards have penalty
+        "penalties": [1250],  # One large penalty
+        "net_per_10": -250,  # Net loss over 10 cards
     },
     DeckType.C: {
-        'reward': 50,  # Every card gives $50
-        'penalty_frequency': 0.5,  # 50% of cards have penalty
-        'penalties': [25, 50, 75],  # Small penalties
-        'net_per_10': 250  # Net gain over 10 cards
+        "reward": 50,  # Every card gives $50
+        "penalty_frequency": 0.5,  # 50% of cards have penalty
+        "penalties": [25, 50, 75],  # Small penalties
+        "net_per_10": 250,  # Net gain over 10 cards
     },
     DeckType.D: {
-        'reward': 50,  # Every card gives $50
-        'penalty_frequency': 0.1,  # 10% of cards have penalty
-        'penalties': [250],  # Occasional penalty
-        'net_per_10': 250  # Net gain over 10 cards
-    }
+        "reward": 50,  # Every card gives $50
+        "penalty_frequency": 0.1,  # 10% of cards have penalty
+        "penalties": [250],  # Occasional penalty
+        "net_per_10": 250,  # Net gain over 10 cards
+    },
 }
 
 
 @dataclass
 class Trial:
     """Configuration for a single Iowa Gambling Task trial."""
+
     trial_number: int
     deck_choice: DeckType
     deck_stimulus: np.ndarray  # Visual representation of chosen deck
@@ -83,6 +85,7 @@ class Trial:
 @dataclass
 class TrialResult:
     """Results from a single IGT trial."""
+
     trial_number: int
     deck_choice: DeckType
     reward: int
@@ -128,7 +131,7 @@ class IowaGamblingTask:
         deck_stimulus_strength: float = 1.5,
         outcome_stimulus_strength: float = 2.0,
         interoceptive_gain: float = 1.0,
-        deck_selection_strategy: str = 'balanced'
+        deck_selection_strategy: str = "balanced",
     ):
         """Initialize Iowa Gambling Task."""
         self.num_trials = num_trials
@@ -172,9 +175,9 @@ class IowaGamblingTask:
             penalties = []
 
             for i in range(max_cards):
-                if np.random.random() < schedule['penalty_frequency']:
+                if np.random.random() < schedule["penalty_frequency"]:
                     # Select a random penalty from the list
-                    penalty = np.random.choice(schedule['penalties'])
+                    penalty = np.random.choice(schedule["penalties"])
                     penalties.append(penalty)
                 else:
                     penalties.append(0)
@@ -185,14 +188,14 @@ class IowaGamblingTask:
         """Generate all trial configurations."""
         trials = []
 
-        if self.deck_selection_strategy == 'balanced':
+        if self.deck_selection_strategy == "balanced":
             # Equal exposure to all decks
             decks_per_type = self.num_trials // 4
             deck_sequence = (
-                [DeckType.A] * decks_per_type +
-                [DeckType.B] * decks_per_type +
-                [DeckType.C] * decks_per_type +
-                [DeckType.D] * decks_per_type
+                [DeckType.A] * decks_per_type
+                + [DeckType.B] * decks_per_type
+                + [DeckType.C] * decks_per_type
+                + [DeckType.D] * decks_per_type
             )
             # Add remaining trials if num_trials not divisible by 4
             remaining = self.num_trials - len(deck_sequence)
@@ -202,7 +205,7 @@ class IowaGamblingTask:
             # Randomize order
             np.random.shuffle(deck_sequence)
 
-        elif self.deck_selection_strategy == 'random':
+        elif self.deck_selection_strategy == "random":
             # Completely random deck selection
             deck_sequence = [np.random.choice(list(DeckType)) for _ in range(self.num_trials)]
 
@@ -223,11 +226,13 @@ class IowaGamblingTask:
             schedule = DECK_SCHEDULES[deck_choice]
 
             # Get reward (always given)
-            reward = schedule['reward']
+            reward = schedule["reward"]
 
             # Get penalty from pre-generated schedule
             deck_card_num = self.deck_frequencies[deck_choice]
-            penalty = self.penalty_schedules[deck_choice][deck_card_num % len(self.penalty_schedules[deck_choice])]
+            penalty = self.penalty_schedules[deck_choice][
+                deck_card_num % len(self.penalty_schedules[deck_choice])
+            ]
 
             # Net outcome
             net_outcome = reward - penalty
@@ -241,7 +246,7 @@ class IowaGamblingTask:
                 deck_stimulus=deck_stimulus,
                 reward=reward,
                 penalty=penalty,
-                net_outcome=net_outcome
+                net_outcome=net_outcome,
             )
             trials.append(trial)
 
@@ -262,26 +267,26 @@ class IowaGamblingTask:
         if deck_type == DeckType.A:
             # Deck A: Low frequency pattern
             freq = 2 * np.pi * 2
-            stimulus[:self.stim_dim//2] = self.deck_stimulus_strength * np.sin(
-                np.linspace(0, freq, self.stim_dim//2)
+            stimulus[: self.stim_dim // 2] = self.deck_stimulus_strength * np.sin(
+                np.linspace(0, freq, self.stim_dim // 2)
             )
         elif deck_type == DeckType.B:
             # Deck B: Mid-low frequency pattern
             freq = 2 * np.pi * 4
-            stimulus[:self.stim_dim//2] = self.deck_stimulus_strength * np.sin(
-                np.linspace(0, freq, self.stim_dim//2)
+            stimulus[: self.stim_dim // 2] = self.deck_stimulus_strength * np.sin(
+                np.linspace(0, freq, self.stim_dim // 2)
             )
         elif deck_type == DeckType.C:
             # Deck C: Mid-high frequency pattern
             freq = 2 * np.pi * 6
-            stimulus[self.stim_dim//4:3*self.stim_dim//4] = self.deck_stimulus_strength * np.sin(
-                np.linspace(0, freq, self.stim_dim//2)
+            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
+                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
             )
         else:  # DeckType.D
             # Deck D: High frequency pattern
             freq = 2 * np.pi * 8
-            stimulus[self.stim_dim//4:3*self.stim_dim//4] = self.deck_stimulus_strength * np.sin(
-                np.linspace(0, freq, self.stim_dim//2)
+            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
+                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
             )
 
         # Add small noise for variability
@@ -320,11 +325,7 @@ class IowaGamblingTask:
 
         return stimulus
 
-    def run_trial(
-        self,
-        apgi_system,
-        trial: Trial
-    ) -> TrialResult:
+    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
         """
         Run a single Iowa Gambling Task trial.
 
@@ -364,15 +365,15 @@ class IowaGamblingTask:
 
             # Monitor anticipatory somatic markers (bodily responses before outcome)
             # These emerge from interoceptive precision signals
-            if 'interoception' in state:
-                intero_signal = state['interoception'].get('interoceptive_precision', 0.0)
+            if "interoception" in state:
+                intero_signal = state["interoception"].get("interoceptive_precision", 0.0)
                 if intero_signal > anticipatory_response:
                     anticipatory_response = intero_signal
 
             # Check for ignition during deck viewing
-            if state['ignition']['ignition_occurred']:
+            if state["ignition"]["ignition_occurred"]:
                 ignition_occurred = True
-                ignition_strength = state['ignition']['total_signal']
+                ignition_strength = state["ignition"]["total_signal"]
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
@@ -396,15 +397,15 @@ class IowaGamblingTask:
             state = apgi_system.step(outcome_stimulus)
 
             # Monitor somatic marker (interoceptive response to outcome)
-            if 'interoception' in state:
-                intero_signal = state['interoception'].get('interoceptive_precision', 0.0)
+            if "interoception" in state:
+                intero_signal = state["interoception"].get("interoceptive_precision", 0.0)
                 if intero_signal > somatic_marker_strength:
                     somatic_marker_strength = intero_signal
 
             # Check for ignition during outcome processing
-            if state['ignition']['ignition_occurred']:
+            if state["ignition"]["ignition_occurred"]:
                 ignition_occurred = True
-                ignition_strength = state['ignition']['total_signal']
+                ignition_strength = state["ignition"]["total_signal"]
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
@@ -423,7 +424,7 @@ class IowaGamblingTask:
             ignition_strength=max_ignition_strength,
             somatic_marker_strength=somatic_marker_strength,
             decision_time=decision_time,
-            anticipatory_response=anticipatory_response
+            anticipatory_response=anticipatory_response,
         )
 
         self.results.append(result)
@@ -478,14 +479,13 @@ class IowaGamblingTask:
             - Somatic marker analysis
         """
         if not self.results:
-            return {
-                'error': 'No results to analyze',
-                'total_trials': 0
-            }
+            return {"error": "No results to analyze", "total_trials": 0}
 
         # Overall statistics
         total_earnings = self.current_balance - self.initial_balance
-        good_deck_choices = sum(1 for r in self.results if r.deck_choice in [DeckType.C, DeckType.D])
+        good_deck_choices = sum(
+            1 for r in self.results if r.deck_choice in [DeckType.C, DeckType.D]
+        )
         bad_deck_choices = sum(1 for r in self.results if r.deck_choice in [DeckType.A, DeckType.B])
         advantageous_ratio = good_deck_choices / len(self.results) if self.results else 0.0
 
@@ -506,11 +506,11 @@ class IowaGamblingTask:
                 avg_anticipatory = 0.0
 
             deck_analysis[deck_type.value] = {
-                'selections': total_selections,
-                'selection_percentage': (total_selections / len(self.results)) * 100,
-                'avg_net_outcome': float(avg_outcome),
-                'avg_somatic_marker': float(avg_somatic),
-                'avg_anticipatory_response': float(avg_anticipatory)
+                "selections": total_selections,
+                "selection_percentage": (total_selections / len(self.results)) * 100,
+                "avg_net_outcome": float(avg_outcome),
+                "avg_somatic_marker": float(avg_somatic),
+                "avg_anticipatory_response": float(avg_anticipatory),
             }
 
         # Block analysis (learning over time)
@@ -524,35 +524,53 @@ class IowaGamblingTask:
             end_idx = min(start_idx + block_size, len(self.results))
             block_results = self.results[start_idx:end_idx]
 
-            good_choices = sum(1 for r in block_results if r.deck_choice in [DeckType.C, DeckType.D])
+            good_choices = sum(
+                1 for r in block_results if r.deck_choice in [DeckType.C, DeckType.D]
+            )
             bad_choices = sum(1 for r in block_results if r.deck_choice in [DeckType.A, DeckType.B])
-            net_score = (good_choices - bad_choices)  # Net advantageous choices
+            net_score = good_choices - bad_choices  # Net advantageous choices
 
             block_earnings = sum(r.net_outcome for r in block_results)
             avg_somatic = np.mean([r.somatic_marker_strength for r in block_results])
 
-            block_analysis.append({
-                'block': block_idx + 1,
-                'trials': f"{start_idx+1}-{end_idx}",
-                'good_deck_choices': good_choices,
-                'bad_deck_choices': bad_choices,
-                'net_score': net_score,
-                'block_earnings': block_earnings,
-                'avg_somatic_marker': float(avg_somatic),
-                'good_deck_percentage': (good_choices / len(block_results)) * 100
-            })
+            block_analysis.append(
+                {
+                    "block": block_idx + 1,
+                    "trials": f"{start_idx+1}-{end_idx}",
+                    "good_deck_choices": good_choices,
+                    "bad_deck_choices": bad_choices,
+                    "net_score": net_score,
+                    "block_earnings": block_earnings,
+                    "avg_somatic_marker": float(avg_somatic),
+                    "good_deck_percentage": (good_choices / len(block_results)) * 100,
+                }
+            )
 
         # Somatic marker analysis
         # Check if somatic markers correlate with deck quality
-        good_deck_somatic = np.mean([
-            r.somatic_marker_strength for r in self.results
-            if r.deck_choice in [DeckType.C, DeckType.D]
-        ]) if good_deck_choices > 0 else 0.0
+        good_deck_somatic = (
+            np.mean(
+                [
+                    r.somatic_marker_strength
+                    for r in self.results
+                    if r.deck_choice in [DeckType.C, DeckType.D]
+                ]
+            )
+            if good_deck_choices > 0
+            else 0.0
+        )
 
-        bad_deck_somatic = np.mean([
-            r.somatic_marker_strength for r in self.results
-            if r.deck_choice in [DeckType.A, DeckType.B]
-        ]) if bad_deck_choices > 0 else 0.0
+        bad_deck_somatic = (
+            np.mean(
+                [
+                    r.somatic_marker_strength
+                    for r in self.results
+                    if r.deck_choice in [DeckType.A, DeckType.B]
+                ]
+            )
+            if bad_deck_choices > 0
+            else 0.0
+        )
 
         # Learning metrics
         # Compare first 20 vs last 20 trials
@@ -568,27 +586,27 @@ class IowaGamblingTask:
             learning_improvement = 0
 
         return {
-            'total_trials': len(self.results),
-            'initial_balance': self.initial_balance,
-            'final_balance': self.current_balance,
-            'total_earnings': total_earnings,
-            'good_deck_choices': good_deck_choices,
-            'bad_deck_choices': bad_deck_choices,
-            'advantageous_ratio': advantageous_ratio,
-            'net_score': good_deck_choices - bad_deck_choices,
-            'by_deck': deck_analysis,
-            'by_block': block_analysis,
-            'somatic_markers': {
-                'good_decks_avg': float(good_deck_somatic),
-                'bad_decks_avg': float(bad_deck_somatic),
-                'differential': float(abs(good_deck_somatic - bad_deck_somatic))
+            "total_trials": len(self.results),
+            "initial_balance": self.initial_balance,
+            "final_balance": self.current_balance,
+            "total_earnings": total_earnings,
+            "good_deck_choices": good_deck_choices,
+            "bad_deck_choices": bad_deck_choices,
+            "advantageous_ratio": advantageous_ratio,
+            "net_score": good_deck_choices - bad_deck_choices,
+            "by_deck": deck_analysis,
+            "by_block": block_analysis,
+            "somatic_markers": {
+                "good_decks_avg": float(good_deck_somatic),
+                "bad_decks_avg": float(bad_deck_somatic),
+                "differential": float(abs(good_deck_somatic - bad_deck_somatic)),
             },
-            'learning_improvement': learning_improvement,
-            'task_parameters': {
-                'num_trials': self.num_trials,
-                'initial_balance': self.initial_balance,
-                'strategy': self.deck_selection_strategy
-            }
+            "learning_improvement": learning_improvement,
+            "task_parameters": {
+                "num_trials": self.num_trials,
+                "initial_balance": self.initial_balance,
+                "strategy": self.deck_selection_strategy,
+            },
         }
 
     def print_results(self, analysis: Optional[Dict[str, Any]] = None):
@@ -603,7 +621,7 @@ class IowaGamblingTask:
         if analysis is None:
             analysis = self.analyze_results()
 
-        if 'error' in analysis:
+        if "error" in analysis:
             print(f"Error: {analysis['error']}")
             return
 
@@ -615,50 +633,62 @@ class IowaGamblingTask:
         print(f"Final Balance: ${analysis['final_balance']}")
         print(f"Total Earnings: ${analysis['total_earnings']}")
         print(f"\nDeck Choices:")
-        print(f"  Good Decks (C & D): {analysis['good_deck_choices']} ({analysis['advantageous_ratio']:.1%})")
+        print(
+            f"  Good Decks (C & D): {analysis['good_deck_choices']} ({analysis['advantageous_ratio']:.1%})"
+        )
         print(f"  Bad Decks (A & B): {analysis['bad_deck_choices']}")
         print(f"  Net Score: {analysis['net_score']} (good - bad)")
 
         print("\n" + "-" * 80)
         print("Performance by Deck:")
         print("-" * 80)
-        print(f"{'Deck':<6} {'Type':<8} {'Selections':<12} {'%':<8} {'Avg Outcome':<14} {'Somatic Marker'}")
+        print(
+            f"{'Deck':<6} {'Type':<8} {'Selections':<12} {'%':<8} {'Avg Outcome':<14} {'Somatic Marker'}"
+        )
         print("-" * 80)
 
-        deck_types = {'A': 'Bad', 'B': 'Bad', 'C': 'Good', 'D': 'Good'}
-        for deck in ['A', 'B', 'C', 'D']:
-            data = analysis['by_deck'][deck]
-            print(f"{deck:<6} {deck_types[deck]:<8} "
-                  f"{data['selections']:<12} "
-                  f"{data['selection_percentage']:<8.1f} "
-                  f"${data['avg_net_outcome']:<13.1f} "
-                  f"{data['avg_somatic_marker']:.3f}")
+        deck_types = {"A": "Bad", "B": "Bad", "C": "Good", "D": "Good"}
+        for deck in ["A", "B", "C", "D"]:
+            data = analysis["by_deck"][deck]
+            print(
+                f"{deck:<6} {deck_types[deck]:<8} "
+                f"{data['selections']:<12} "
+                f"{data['selection_percentage']:<8.1f} "
+                f"${data['avg_net_outcome']:<13.1f} "
+                f"{data['avg_somatic_marker']:.3f}"
+            )
 
         print("\n" + "-" * 80)
         print("Learning Curve (by Block):")
         print("-" * 80)
-        print(f"{'Block':<8} {'Trials':<12} {'Good':<8} {'Bad':<8} {'Net':<8} {'Earnings':<12} {'Good %'}")
+        print(
+            f"{'Block':<8} {'Trials':<12} {'Good':<8} {'Bad':<8} {'Net':<8} {'Earnings':<12} {'Good %'}"
+        )
         print("-" * 80)
 
-        for block in analysis['by_block']:
-            print(f"{block['block']:<8} "
-                  f"{block['trials']:<12} "
-                  f"{block['good_deck_choices']:<8} "
-                  f"{block['bad_deck_choices']:<8} "
-                  f"{block['net_score']:<8} "
-                  f"${block['block_earnings']:<11} "
-                  f"{block['good_deck_percentage']:.1f}%")
+        for block in analysis["by_block"]:
+            print(
+                f"{block['block']:<8} "
+                f"{block['trials']:<12} "
+                f"{block['good_deck_choices']:<8} "
+                f"{block['bad_deck_choices']:<8} "
+                f"{block['net_score']:<8} "
+                f"${block['block_earnings']:<11} "
+                f"{block['good_deck_percentage']:.1f}%"
+            )
 
         print("\n" + "-" * 80)
         print("Somatic Marker Analysis:")
         print("-" * 80)
-        sm = analysis['somatic_markers']
+        sm = analysis["somatic_markers"]
         print(f"  Good Decks Average: {sm['good_decks_avg']:.4f}")
         print(f"  Bad Decks Average: {sm['bad_decks_avg']:.4f}")
         print(f"  Differential: {sm['differential']:.4f}")
 
         print("\n" + "-" * 80)
-        print(f"Learning Improvement: {analysis['learning_improvement']} more good deck choices in last 20 vs first 20")
+        print(
+            f"Learning Improvement: {analysis['learning_improvement']} more good deck choices in last 20 vs first 20"
+        )
         print("-" * 80)
 
         print("\n" + "=" * 80)
@@ -701,30 +731,32 @@ class IowaGamblingTask:
         # Prepare detailed trial data
         trial_data = []
         for result in self.results:
-            trial_data.append({
-                'trial_number': int(result.trial_number),
-                'deck_choice': result.deck_choice.value,
-                'reward': int(result.reward),
-                'penalty': int(result.penalty),
-                'net_outcome': int(result.net_outcome),
-                'running_total': int(result.running_total),
-                'ignition_occurred': bool(result.ignition_occurred),
-                'ignition_strength': float(result.ignition_strength),
-                'somatic_marker_strength': float(result.somatic_marker_strength),
-                'decision_time': float(result.decision_time),
-                'anticipatory_response': float(result.anticipatory_response)
-            })
+            trial_data.append(
+                {
+                    "trial_number": int(result.trial_number),
+                    "deck_choice": result.deck_choice.value,
+                    "reward": int(result.reward),
+                    "penalty": int(result.penalty),
+                    "net_outcome": int(result.net_outcome),
+                    "running_total": int(result.running_total),
+                    "ignition_occurred": bool(result.ignition_occurred),
+                    "ignition_strength": float(result.ignition_strength),
+                    "somatic_marker_strength": float(result.somatic_marker_strength),
+                    "decision_time": float(result.decision_time),
+                    "anticipatory_response": float(result.anticipatory_response),
+                }
+            )
 
         # Compile full output
         output = {
-            'experiment': 'Iowa Gambling Task',
-            'timestamp': datetime.now().isoformat(),
-            'summary': convert_to_native(analysis),
-            'trials': trial_data
+            "experiment": "Iowa Gambling Task",
+            "timestamp": datetime.now().isoformat(),
+            "summary": convert_to_native(analysis),
+            "trials": trial_data,
         }
 
         # Save to file
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(output, f, indent=2)
 
         print(f"Results saved to: {filename}")

@@ -81,10 +81,7 @@ class NeuralColumn:
     """
 
     def __init__(
-        self,
-        num_units: int,
-        layer_name: str = "column",
-        config: Optional[Dict[str, Any]] = None
+        self, num_units: int, layer_name: str = "column", config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize neural column.
@@ -100,8 +97,8 @@ class NeuralColumn:
 
         # Neural populations
         self.prediction_units = np.zeros(num_units)  # Top-down
-        self.error_units = np.zeros(num_units)       # Bottom-up
-        self.modulatory_units = np.ones(num_units)   # Gain control
+        self.error_units = np.zeros(num_units)  # Bottom-up
+        self.modulatory_units = np.ones(num_units)  # Gain control
 
         # State variables
         self.activity = np.zeros(num_units)
@@ -130,7 +127,7 @@ class NeuralColumn:
         bottom_up_input: np.ndarray,
         top_down_prediction: np.ndarray,
         gain_modulation: float = 1.0,
-        dt: float = 1.0
+        dt: float = 1.0,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Update column activity.
@@ -150,8 +147,8 @@ class NeuralColumn:
 
         # Update prediction units (blend input and top-down)
         target_prediction = (
-            self.prediction_strength * top_down_prediction +
-            (1 - self.prediction_strength) * bottom_up_input
+            self.prediction_strength * top_down_prediction
+            + (1 - self.prediction_strength) * bottom_up_input
         )
 
         # Fast dynamics
@@ -186,19 +183,15 @@ class NeuralColumn:
 
         # Compile info
         info = {
-            'prediction_error_magnitude': float(error_magnitude),
-            'mean_gain': float(np.mean(self.modulatory_units)),
-            'mean_activity': float(np.mean(self.activity)),
-            'beta_phase': float(self.beta_phase)
+            "prediction_error_magnitude": float(error_magnitude),
+            "mean_gain": float(np.mean(self.modulatory_units)),
+            "mean_activity": float(np.mean(self.activity)),
+            "beta_phase": float(self.beta_phase),
         }
 
         return self.activity.copy(), info
 
-    def _compute_gain(
-        self,
-        error_magnitude: float,
-        global_modulation: float
-    ) -> np.ndarray:
+    def _compute_gain(self, error_magnitude: float, global_modulation: float) -> np.ndarray:
         """
         Compute gain modulation.
 
@@ -225,11 +218,7 @@ class NeuralColumn:
         threshold = self.dendritic_threshold
         gain = 2.0
 
-        output = np.where(
-            activity > threshold,
-            threshold + gain * (activity - threshold),
-            activity
-        )
+        output = np.where(activity > threshold, threshold + gain * (activity - threshold), activity)
 
         return output
 
@@ -320,18 +309,10 @@ class HierarchicalColumnNetwork:
         # Create columns
         self.columns = []
         for i, size in enumerate(layer_sizes):
-            column = NeuralColumn(
-                num_units=size,
-                layer_name=f"layer_{i}",
-                config=config
-            )
+            column = NeuralColumn(num_units=size, layer_name=f"layer_{i}", config=config)
             self.columns.append(column)
 
-    def forward(
-        self,
-        sensory_input: np.ndarray,
-        dt: float = 1.0
-    ) -> Dict[str, Any]:
+    def forward(self, sensory_input: np.ndarray, dt: float = 1.0) -> Dict[str, Any]:
         """
         Forward pass through hierarchy.
 
@@ -349,25 +330,20 @@ class HierarchicalColumnNetwork:
         for i, column in enumerate(self.columns):
             # Get top-down prediction (from layer above or prior)
             if i < self.num_layers - 1:
-                top_down = self._map_down(
-                    self.columns[i + 1].prediction_units,
-                    self.layer_sizes[i]
-                )
+                top_down = self._map_down(self.columns[i + 1].prediction_units, self.layer_sizes[i])
             else:
                 # Top layer has no higher prediction
                 top_down = np.zeros(self.layer_sizes[i])
 
             # Update column
             activity, info = column.update(
-                bottom_up_input=bottom_up,
-                top_down_prediction=top_down,
-                dt=dt
+                bottom_up_input=bottom_up, top_down_prediction=top_down, dt=dt
             )
 
-            results[f'layer_{i}'] = {
-                'activity': activity,
-                'prediction_error': column.get_prediction_error(),
-                'info': info
+            results[f"layer_{i}"] = {
+                "activity": activity,
+                "prediction_error": column.get_prediction_error(),
+                "info": info,
             }
 
             # Propagate to next layer
@@ -392,7 +368,7 @@ class HierarchicalColumnNetwork:
         else:
             # Upsample if needed
             result = np.zeros(target_size)
-            result[:len(activity)] = activity
+            result[: len(activity)] = activity
             return result
 
     def _map_down(self, activity: np.ndarray, target_size: int) -> np.ndarray:

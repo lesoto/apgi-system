@@ -32,12 +32,12 @@ class TestStabilityIntegrationFreeEnergy:
         )
 
         assert fe >= 0
-        assert 'accuracy' in components
-        assert 'complexity' in components
+        assert "accuracy" in components
+        assert "complexity" in components
 
     def test_free_energy_detects_overflow(self):
         """Test that free energy calculator detects overflow conditions."""
-        config = {'stability_error_threshold': 1e3}  # Low threshold for testing
+        config = {"stability_error_threshold": 1e3}  # Low threshold for testing
         calc = FreeEnergyCalculator(config)
 
         # Create inputs that will produce very large free energy
@@ -59,7 +59,7 @@ class TestStabilityIntegrationFreeEnergy:
 
     def test_free_energy_stability_statistics(self):
         """Test that stability monitor tracks statistics correctly."""
-        config = {'stability_warning_threshold': 10.0}  # Low threshold for testing
+        config = {"stability_warning_threshold": 10.0}  # Low threshold for testing
         calc = FreeEnergyCalculator(config)
 
         obs = np.array([1.0, 2.0, 3.0])
@@ -83,8 +83,8 @@ class TestStabilityIntegrationFreeEnergy:
 
         stats = calc.stability_monitor.get_statistics()
         # Statistics should be tracked (may have warnings)
-        assert 'warning_count' in stats
-        assert 'error_count' in stats
+        assert "warning_count" in stats
+        assert "error_count" in stats
 
 
 class TestStabilityIntegrationHierarchicalPredictor:
@@ -100,14 +100,14 @@ class TestStabilityIntegrationHierarchicalPredictor:
         # Should complete without errors
         results = predictor.predict(extero_input, intero_input, dt_ms=1.0)
 
-        assert 'exteroceptive' in results
-        assert 'interoceptive' in results
-        assert 'hierarchical_errors' in results
+        assert "exteroceptive" in results
+        assert "interoceptive" in results
+        assert "hierarchical_errors" in results
 
     def test_predictor_detects_unstable_errors(self, config):
         """Test that predictor detects unstable prediction errors."""
         # Configure with low threshold for testing
-        config['stability_error_threshold'] = 1e3
+        config["stability_error_threshold"] = 1e3
         predictor = HierarchicalPredictor(config)
 
         # Create extreme input that will produce large errors
@@ -118,12 +118,15 @@ class TestStabilityIntegrationHierarchicalPredictor:
         with pytest.raises(NumericalInstabilityError) as exc_info:
             predictor.predict(extero_input, intero_input, dt_ms=1.0)
 
-        assert "overflow" in str(exc_info.value).lower() or "exteroceptive" in str(exc_info.value).lower()
+        assert (
+            "overflow" in str(exc_info.value).lower()
+            or "exteroceptive" in str(exc_info.value).lower()
+        )
 
     def test_predictor_detects_unstable_state_updates(self, config):
         """Test that predictor detects unstable hierarchical state updates."""
         # Configure with low threshold
-        config['stability_error_threshold'] = 1e2
+        config["stability_error_threshold"] = 1e2
         predictor = HierarchicalPredictor(config)
 
         # Set learning rates very high to cause instability
@@ -143,14 +146,14 @@ class TestStabilityIntegrationHierarchicalPredictor:
 
         # If no error raised, check that monitor tracked something
         stats = predictor.stability_monitor.get_statistics()
-        assert 'warning_count' in stats
-        assert 'error_count' in stats
+        assert "warning_count" in stats
+        assert "error_count" in stats
 
     def test_predictor_stability_with_warnings(self, config):
         """Test that predictor issues warnings for large but not critical values."""
         # Configure with moderate thresholds
-        config['stability_warning_threshold'] = 10.0
-        config['stability_error_threshold'] = 1e10
+        config["stability_warning_threshold"] = 10.0
+        config["stability_error_threshold"] = 1e10
         predictor = HierarchicalPredictor(config)
 
         # Create moderately large input
@@ -165,11 +168,11 @@ class TestStabilityIntegrationHierarchicalPredictor:
                 results = predictor.predict(extero_input, intero_input, dt_ms=1.0)
 
             # May issue warnings but should complete
-            assert 'exteroceptive' in results
+            assert "exteroceptive" in results
 
         # Check statistics
         stats = predictor.stability_monitor.get_statistics()
-        assert stats['error_count'] == 0  # No errors, just warnings
+        assert stats["error_count"] == 0  # No errors, just warnings
 
     def test_predictor_reset_clears_stability_stats(self, config):
         """Test that resetting predictor also resets stability statistics."""
@@ -187,8 +190,8 @@ class TestStabilityIntegrationHierarchicalPredictor:
         predictor.stability_monitor.reset_statistics()
 
         stats = predictor.stability_monitor.get_statistics()
-        assert stats['warning_count'] == 0
-        assert stats['error_count'] == 0
+        assert stats["warning_count"] == 0
+        assert stats["error_count"] == 0
 
 
 class TestStabilityDisabling:
@@ -196,7 +199,7 @@ class TestStabilityDisabling:
 
     def test_disabled_stability_allows_invalid_values(self):
         """Test that disabling stability checks allows invalid computations."""
-        config = {'stability_check_enabled': False}
+        config = {"stability_check_enabled": False}
         calc = FreeEnergyCalculator(config)
 
         # Create inputs with NaN (would normally fail)

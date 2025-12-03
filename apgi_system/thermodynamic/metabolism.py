@@ -71,13 +71,13 @@ class MetabolicBudget:
     """
 
     def __init__(self, config: Dict[str, Any]):
-        thermo_config = config.get('thermodynamic', {})
-        self.total_budget = thermo_config.get('total_energy_budget', 100.0)
-        self.baseline_rate = thermo_config.get('baseline_consumption', 20.0)
-        self.ignition_cost = thermo_config.get('ignition_cost', 7.5)
-        self.task_overhead = thermo_config.get('task_overhead', 27.5)
-        self.recovery_rate = thermo_config.get('recovery_rate', 5.0)
-        self.depletion_threshold = thermo_config.get('depletion_threshold', 10.0)
+        thermo_config = config.get("thermodynamic", {})
+        self.total_budget = thermo_config.get("total_energy_budget", 100.0)
+        self.baseline_rate = thermo_config.get("baseline_consumption", 20.0)
+        self.ignition_cost = thermo_config.get("ignition_cost", 7.5)
+        self.task_overhead = thermo_config.get("task_overhead", 27.5)
+        self.recovery_rate = thermo_config.get("recovery_rate", 5.0)
+        self.depletion_threshold = thermo_config.get("depletion_threshold", 10.0)
 
         self.current_reserves = self.total_budget
         self.total_consumed = 0.0
@@ -127,10 +127,10 @@ class MetabolicBudget:
         depleted = self.current_reserves < self.depletion_threshold
 
         return {
-            'reserves': float(self.current_reserves),
-            'consumed': float(self.total_consumed),
-            'depleted': depleted,
-            'reserve_fraction': float(self.current_reserves / self.total_budget)
+            "reserves": float(self.current_reserves),
+            "consumed": float(self.total_consumed),
+            "depleted": depleted,
+            "reserve_fraction": float(self.current_reserves / self.total_budget),
         }
 
     def reset(self):

@@ -20,6 +20,7 @@ from enum import Enum
 
 class StimulusType(Enum):
     """Types of stimuli in RSVP stream."""
+
     DISTRACTOR = "distractor"
     TARGET_1 = "target_1"
     TARGET_2 = "target_2"
@@ -28,6 +29,7 @@ class StimulusType(Enum):
 @dataclass
 class Trial:
     """Single trial configuration."""
+
     trial_number: int
     t1_position: int  # Position in stream (0-indexed)
     t2_position: int  # Position in stream
@@ -39,6 +41,7 @@ class Trial:
 @dataclass
 class TrialResult:
     """Results from a single trial."""
+
     trial_number: int
     lag: int
     t1_detected: bool  # Whether T1 triggered ignition
@@ -68,7 +71,7 @@ class AttentionalBlinkTask:
         item_duration_ms: float = 100.0,
         num_trials_per_lag: int = 20,
         lags: Optional[List[int]] = None,
-        target_salience: float = 2.0
+        target_salience: float = 2.0,
     ):
         """Initialize attentional blink task."""
         self.stream_length = stream_length
@@ -122,7 +125,7 @@ class AttentionalBlinkTask:
                     t2_position=t2_pos,
                     lag=lag,
                     stream=stream,
-                    stream_types=stream_types
+                    stream_types=stream_types,
                 )
                 trials.append(trial)
                 trial_num += 1
@@ -167,11 +170,7 @@ class AttentionalBlinkTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(
-        self,
-        apgi_system,
-        trial: Trial
-    ) -> TrialResult:
+    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
         """
         Run a single trial on the APGI system.
 
@@ -219,8 +218,8 @@ class AttentionalBlinkTask:
                 state = apgi_system.step(stimulus)
 
                 # Check for ignition
-                if state['ignition']['ignition_occurred']:
-                    ignition_time = state['time']
+                if state["ignition"]["ignition_occurred"]:
+                    ignition_time = state["time"]
 
                     # Determine which target this ignition is for
                     # Within 400ms window after target presentation
@@ -230,7 +229,7 @@ class AttentionalBlinkTask:
                             if 0 <= time_since_t1 <= 400:  # 400ms window
                                 t1_detected = True
                                 t1_ignition_time = ignition_time
-                                t1_signal_strength = state['ignition']['total_signal']
+                                t1_signal_strength = state["ignition"]["total_signal"]
 
                     if seen_t2 and not t2_detected:
                         if t2_presentation_time is not None:
@@ -238,7 +237,7 @@ class AttentionalBlinkTask:
                             if 0 <= time_since_t2 <= 400:  # 400ms window
                                 t2_detected = True
                                 t2_ignition_time = ignition_time
-                                t2_signal_strength = state['ignition']['total_signal']
+                                t2_signal_strength = state["ignition"]["total_signal"]
 
             current_position = position
 
@@ -254,7 +253,7 @@ class AttentionalBlinkTask:
             t2_ignition_time=t2_ignition_time,
             t1_signal_strength=t1_signal_strength,
             t2_signal_strength=t2_signal_strength,
-            blink_occurred=blink_occurred
+            blink_occurred=blink_occurred,
         )
 
         self.results.append(result)
@@ -298,10 +297,7 @@ class AttentionalBlinkTask:
             - Timing statistics
         """
         if not self.results:
-            return {
-                'error': 'No results to analyze',
-                'total_trials': 0
-            }
+            return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize by lag
         results_by_lag = {lag: [] for lag in self.lags}
@@ -323,14 +319,14 @@ class AttentionalBlinkTask:
             blink_count = sum(1 for r in lag_results if r.blink_occurred)
 
             lag_analysis[lag] = {
-                'total_trials': total,
-                't1_accuracy': t1_correct / total if total > 0 else 0.0,
-                't2_accuracy': t2_correct / total if total > 0 else 0.0,
-                't2_given_t1_accuracy': t2_given_t1_rate,
-                'blink_rate': blink_count / total if total > 0 else 0.0,
-                't1_detections': t1_correct,
-                't2_detections': t2_correct,
-                'blink_occurrences': blink_count
+                "total_trials": total,
+                "t1_accuracy": t1_correct / total if total > 0 else 0.0,
+                "t2_accuracy": t2_correct / total if total > 0 else 0.0,
+                "t2_given_t1_accuracy": t2_given_t1_rate,
+                "blink_rate": blink_count / total if total > 0 else 0.0,
+                "t1_detections": t1_correct,
+                "t2_detections": t2_correct,
+                "blink_occurrences": blink_count,
             }
 
         # Overall statistics
@@ -340,22 +336,22 @@ class AttentionalBlinkTask:
         total_blinks = sum(1 for r in self.results if r.blink_occurred)
 
         # Find the lag with maximum blink (typically lag 2-3)
-        max_blink_lag = max(lag_analysis.items(), key=lambda x: x[1]['blink_rate'])
+        max_blink_lag = max(lag_analysis.items(), key=lambda x: x[1]["blink_rate"])
 
         summary = {
-            'total_trials': total_trials,
-            'overall_t1_accuracy': total_t1 / total_trials if total_trials > 0 else 0.0,
-            'overall_t2_accuracy': total_t2 / total_trials if total_trials > 0 else 0.0,
-            'overall_blink_rate': total_blinks / total_trials if total_trials > 0 else 0.0,
-            'lag_analysis': lag_analysis,
-            'max_blink_lag': max_blink_lag[0],
-            'max_blink_rate': max_blink_lag[1]['blink_rate'],
-            'task_parameters': {
-                'stream_length': self.stream_length,
-                'item_duration_ms': self.item_duration_ms,
-                'lags_tested': self.lags,
-                'trials_per_lag': self.num_trials_per_lag
-            }
+            "total_trials": total_trials,
+            "overall_t1_accuracy": total_t1 / total_trials if total_trials > 0 else 0.0,
+            "overall_t2_accuracy": total_t2 / total_trials if total_trials > 0 else 0.0,
+            "overall_blink_rate": total_blinks / total_trials if total_trials > 0 else 0.0,
+            "lag_analysis": lag_analysis,
+            "max_blink_lag": max_blink_lag[0],
+            "max_blink_rate": max_blink_lag[1]["blink_rate"],
+            "task_parameters": {
+                "stream_length": self.stream_length,
+                "item_duration_ms": self.item_duration_ms,
+                "lags_tested": self.lags,
+                "trials_per_lag": self.num_trials_per_lag,
+            },
         }
 
         return summary
@@ -374,7 +370,9 @@ class AttentionalBlinkTask:
         print(f"Overall T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}")
         print(f"Overall Blink Rate: {analysis['overall_blink_rate']:.1%}")
 
-        print(f"\nMaximum Blink at Lag {analysis['max_blink_lag']}: {analysis['max_blink_rate']:.1%}")
+        print(
+            f"\nMaximum Blink at Lag {analysis['max_blink_lag']}: {analysis['max_blink_rate']:.1%}"
+        )
 
         print("\n" + "-" * 70)
         print("Results by Lag:")
@@ -382,22 +380,26 @@ class AttentionalBlinkTask:
         print(f"{'Lag':<6} {'T1 Acc':<10} {'T2 Acc':<10} {'T2|T1 Acc':<12} {'Blink Rate':<12}")
         print("-" * 70)
 
-        for lag in sorted(analysis['lag_analysis'].keys()):
-            lag_data = analysis['lag_analysis'][lag]
-            print(f"{lag:<6} "
-                  f"{lag_data['t1_accuracy']:<10.1%} "
-                  f"{lag_data['t2_accuracy']:<10.1%} "
-                  f"{lag_data['t2_given_t1_accuracy']:<12.1%} "
-                  f"{lag_data['blink_rate']:<12.1%}")
+        for lag in sorted(analysis["lag_analysis"].keys()):
+            lag_data = analysis["lag_analysis"][lag]
+            print(
+                f"{lag:<6} "
+                f"{lag_data['t1_accuracy']:<10.1%} "
+                f"{lag_data['t2_accuracy']:<10.1%} "
+                f"{lag_data['t2_given_t1_accuracy']:<12.1%} "
+                f"{lag_data['blink_rate']:<12.1%}"
+            )
 
         print("=" * 70)
 
         # Interpretation
         print("\nInterpretation:")
-        if analysis['max_blink_rate'] > 0.3:
+        if analysis["max_blink_rate"] > 0.3:
             print("✓ Strong attentional blink observed")
-            print(f"  Peak blink at lag {analysis['max_blink_lag']} ({analysis['max_blink_rate']:.1%})")
-        elif analysis['max_blink_rate'] > 0.15:
+            print(
+                f"  Peak blink at lag {analysis['max_blink_lag']} ({analysis['max_blink_rate']:.1%})"
+            )
+        elif analysis["max_blink_rate"] > 0.15:
             print("~ Moderate attentional blink observed")
         else:
             print("✗ Weak or no attentional blink")
@@ -418,24 +420,23 @@ class AttentionalBlinkTask:
         # Add individual trial data
         trial_data = []
         for result in self.results:
-            trial_data.append({
-                'trial_number': result.trial_number,
-                'lag': result.lag,
-                't1_detected': result.t1_detected,
-                't2_detected': result.t2_detected,
-                't1_ignition_time': result.t1_ignition_time,
-                't2_ignition_time': result.t2_ignition_time,
-                't1_signal_strength': result.t1_signal_strength,
-                't2_signal_strength': result.t2_signal_strength,
-                'blink_occurred': result.blink_occurred
-            })
+            trial_data.append(
+                {
+                    "trial_number": result.trial_number,
+                    "lag": result.lag,
+                    "t1_detected": result.t1_detected,
+                    "t2_detected": result.t2_detected,
+                    "t1_ignition_time": result.t1_ignition_time,
+                    "t2_ignition_time": result.t2_ignition_time,
+                    "t1_signal_strength": result.t1_signal_strength,
+                    "t2_signal_strength": result.t2_signal_strength,
+                    "blink_occurred": result.blink_occurred,
+                }
+            )
 
-        output = {
-            'summary': analysis,
-            'trials': trial_data
-        }
+        output = {"summary": analysis, "trials": trial_data}
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(output, f, indent=2)
 
         print(f"Results saved to: {filename}")

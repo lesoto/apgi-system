@@ -68,16 +68,18 @@ class MinimalSelf:
     """
 
     def __init__(self, config: Dict[str, Any]):
-        self.config = config.get('self_model', {}).get('minimal_self', {})
-        self.update_rate_ms = self.config.get('update_rate_ms', 50)
-        self.coherence_threshold = self.config.get('coherence_threshold', 0.7)
+        self.config = config.get("self_model", {}).get("minimal_self", {})
+        self.update_rate_ms = self.config.get("update_rate_ms", 50)
+        self.coherence_threshold = self.config.get("coherence_threshold", 0.7)
 
         self.body_schema = np.zeros(6)  # Body state representation
         self.temporal_continuity = 1.0
         self.sense_of_agency = 1.0
         self.update_counter = 0.0
 
-    def update(self, body_state: np.ndarray, prediction_accuracy: float, dt: float = 1.0) -> Dict[str, Any]:
+    def update(
+        self, body_state: np.ndarray, prediction_accuracy: float, dt: float = 1.0
+    ) -> Dict[str, Any]:
         """
         Update minimal self representation.
 
@@ -115,27 +117,27 @@ class MinimalSelf:
         self.temporal_continuity = prediction_accuracy
 
         coherence = min(self.sense_of_agency, self.temporal_continuity)
-        depersonalization = coherence < self.config.get('depersonalization_threshold', 0.4)
+        depersonalization = coherence < self.config.get("depersonalization_threshold", 0.4)
 
         return {
-            'body_schema': self.body_schema.copy(),
-            'coherence': float(coherence),
-            'agency': float(self.sense_of_agency),
-            'continuity': float(self.temporal_continuity),
-            'depersonalization': depersonalization
+            "body_schema": self.body_schema.copy(),
+            "coherence": float(coherence),
+            "agency": float(self.sense_of_agency),
+            "continuity": float(self.temporal_continuity),
+            "depersonalization": depersonalization,
         }
 
     def get_current_state(self) -> Dict[str, Any]:
         """Get current minimal self state."""
         coherence = min(self.sense_of_agency, self.temporal_continuity)
-        depersonalization = coherence < self.config.get('depersonalization_threshold', 0.4)
-        
+        depersonalization = coherence < self.config.get("depersonalization_threshold", 0.4)
+
         return {
-            'body_schema': self.body_schema.copy(),
-            'coherence': float(coherence),
-            'agency': float(self.sense_of_agency),
-            'continuity': float(self.temporal_continuity),
-            'depersonalization': depersonalization
+            "body_schema": self.body_schema.copy(),
+            "coherence": float(coherence),
+            "agency": float(self.sense_of_agency),
+            "continuity": float(self.temporal_continuity),
+            "depersonalization": depersonalization,
         }
 
     def reset(self):
