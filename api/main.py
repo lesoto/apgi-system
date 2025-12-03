@@ -22,6 +22,7 @@ from api.middleware.logging import (
 )
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.alerting import configure_alerting
+from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -53,6 +54,13 @@ def create_app() -> FastAPI:
     
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
+    
+    # Add response schema validation middleware
+    app.add_middleware(
+        ResponseSchemaValidationMiddleware,
+        enabled=settings.schema_validation_enabled,
+        fail_on_error=settings.schema_validation_fail_on_error
+    )
     
     # Configure CORS
     app.add_middleware(

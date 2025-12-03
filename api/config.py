@@ -54,6 +54,10 @@ class Settings:
     # Logging Settings
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     
+    # Schema Validation Settings
+    schema_validation_enabled: bool = os.getenv("SCHEMA_VALIDATION_ENABLED", "true").lower() == "true"
+    schema_validation_fail_on_error: bool = os.getenv("SCHEMA_VALIDATION_FAIL_ON_ERROR", "false").lower() == "true"
+    
     # Alerting Settings
     alert_webhook_urls: List[str] = []  # Can be set via environment
     alert_enable_log_channel: bool = True

@@ -22,6 +22,9 @@ from api.middleware.alerting import (
     alert_manager,
     configure_alerting
 )
+from api.middleware.schema_validation import (
+    ResponseSchemaValidationMiddleware
+)
 
 __all__ = [
     "RequestLoggingMiddleware",
@@ -35,5 +38,6 @@ __all__ = [
     "AlertManager",
     "AlertSeverity",
     "alert_manager",
-    "configure_alerting"
+    "configure_alerting",
+    "ResponseSchemaValidationMiddleware"
 ]
