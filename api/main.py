@@ -12,7 +12,7 @@ import logging
 import redis.asyncio as redis
 
 from api.config import settings
-from api.routes import sessions, state, tasks, export, metrics
+from api.routes import sessions, state, tasks, export, metrics, health, auth
 from api.database.connection import init_db, close_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.logging import (
@@ -23,6 +23,8 @@ from api.middleware.logging import (
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.alerting import configure_alerting
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
+from api.middleware.authentication import AuthenticationMiddleware
+from api.middleware.rate_limiting import RateLimitingMiddleware
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -55,12 +57,17 @@ def create_app() -> FastAPI:
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
     
+    # Add authentication middleware (extracts and verifies JWT tokens)
+    app.add_middleware(AuthenticationMiddleware)
+    
     # Add response schema validation middleware
     app.add_middleware(
         ResponseSchemaValidationMiddleware,
         enabled=settings.schema_validation_enabled,
         fail_on_error=settings.schema_validation_fail_on_error
     )
+    
+    # Note: Rate limiting middleware will be added in startup event after Redis is initialized
     
     # Configure CORS
     app.add_middleware(
@@ -107,6 +114,14 @@ def create_app() -> FastAPI:
             )
             await redis_client.ping()
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+            
+            # Add rate limiting middleware now that Redis is available
+            app.add_middleware(
+                RateLimitingMiddleware,
+                redis_client=redis_client,
+                enabled=settings.rate_limit_enabled
+            )
+            logger.info("Rate limiting middleware initialized", component="rate_limiting")
         except Exception as e:
             logger.error("Failed to initialize Redis", component="redis", error=str(e))
             raise
@@ -123,6 +138,10 @@ def create_app() -> FastAPI:
         session_mgr = sessions.get_session_manager()
         export.init_export_routes(session_mgr)
         logger.info("Export routes initialized", component="routes")
+        
+        # Initialize health routes with Redis client
+        health.init_health_routes(redis_client)
+        logger.info("Health routes initialized", component="routes")
     
     # Shutdown event
     @app.on_event("shutdown")
@@ -165,11 +184,13 @@ def create_app() -> FastAPI:
         }
     
     # Include routers
+    app.include_router(auth.router)
     app.include_router(sessions.router)
     app.include_router(state.router)
     app.include_router(tasks.router)
     app.include_router(export.router)
     app.include_router(metrics.router)
+    app.include_router(health.router)
     
     logger.info("APGI API application created successfully", version="1.0.0")
     return app

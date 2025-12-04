@@ -132,3 +132,35 @@ def random_body_state():
         "respiration": np.random.uniform(12, 18),
         "systolic_bp": np.random.uniform(110, 130),
     }
+
+
+# Database fixtures for API tests
+@pytest.fixture
+def db():
+    """
+    Provide a test database session.
+    
+    Creates an in-memory SQLite database for testing.
+    
+    Yields
+    ------
+    Session
+        SQLAlchemy database session for testing.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from api.database.models import Base
+    
+    # Create in-memory SQLite database for testing
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    
+    # Create session
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+    
+    yield session
+    
+    # Cleanup
+    session.close()
+    Base.metadata.drop_all(engine)

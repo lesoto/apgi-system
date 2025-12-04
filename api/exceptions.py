@@ -251,12 +251,12 @@ class AuthenticationError(APIError):
 
 class InvalidTokenError(APIError):
     """
-    Exception raised when JWT token is invalid or expired.
+    Exception raised when JWT token is invalid.
     
     HTTP Status: 401 Unauthorized
     """
     
-    def __init__(self, reason: str = "Token is invalid or expired"):
+    def __init__(self, reason: str = "Token is invalid"):
         """
         Initialize invalid token error.
         
@@ -268,6 +268,28 @@ class InvalidTokenError(APIError):
             message=reason,
             status_code=401,
             details={"reason": reason}
+        )
+
+
+class ExpiredTokenError(APIError):
+    """
+    Exception raised when JWT token has expired.
+    
+    HTTP Status: 401 Unauthorized
+    """
+    
+    def __init__(self, message: str = "Token has expired"):
+        """
+        Initialize expired token error.
+        
+        Args:
+            message: Error message
+        """
+        super().__init__(
+            code="TOKEN_EXPIRED",
+            message=message,
+            status_code=401,
+            details={}
         )
 
 
