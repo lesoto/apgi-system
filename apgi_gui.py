@@ -22,6 +22,7 @@ import threading
 import time
 
 from apgi_system.system import APGISystem
+from apgi_system.platform_utils import get_resource_path, get_data_dir
 
 
 class APGIGui:
@@ -38,7 +39,7 @@ class APGIGui:
         self.is_running = False
         self.is_paused = False
         self.simulation_thread = None
-        self.config_path = Path(__file__).parent / "config" / "default.yaml"
+        self.config_path = get_resource_path("config/default.yaml")
 
         # Data buffers for plotting
         self.buffer_size = 1000
@@ -953,8 +954,13 @@ class APGIGui:
             messagebox.showwarning("No Data", "No simulation data to export")
             return
 
+        # Use platform-appropriate data directory as initial directory
+        initial_dir = get_data_dir()
+        initial_dir.mkdir(parents=True, exist_ok=True)
+        
         filename = filedialog.asksaveasfilename(
             title="Export Data",
+            initialdir=str(initial_dir),
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")]
         )
@@ -1001,7 +1007,9 @@ class APGIGui:
     def _auto_save_data(self):
         """Auto-save data to file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"apgi_autosave_{timestamp}.json"
+        data_dir = get_data_dir()
+        data_dir.mkdir(parents=True, exist_ok=True)
+        filename = data_dir / f"apgi_autosave_{timestamp}.json"
         try:
             with open(filename, 'w') as f:
                 json.dump(self.log_data, f)

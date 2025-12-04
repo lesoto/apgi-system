@@ -26,7 +26,8 @@ def test_apgi_system():
     print("\nTesting APGI System...")
     try:
         from apgi_system.system import APGISystem
-        system = APGISystem(config_path="config/default.yaml")
+        from apgi_system.platform_utils import get_resource_path
+        system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         print("✓ APGI System initialized successfully")
         return True
     except Exception as e:
@@ -40,8 +41,9 @@ def test_system_step():
     try:
         import numpy as np
         from apgi_system.system import APGISystem
+        from apgi_system.platform_utils import get_resource_path
         
-        system = APGISystem(config_path="config/default.yaml")
+        system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         extero_input = np.random.randn(256)
         state = system.step(extero_input)
         
@@ -84,8 +86,9 @@ def test_config_file():
     try:
         import yaml
         from pathlib import Path
+        from apgi_system.platform_utils import get_resource_path
         
-        config_path = Path("config/default.yaml")
+        config_path = get_resource_path("config/default.yaml")
         if not config_path.exists():
             print(f"✗ Config file not found: {config_path}")
             return False

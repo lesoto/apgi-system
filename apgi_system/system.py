@@ -9,6 +9,7 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from apgi_system.platform_utils import get_resource_path
 from apgi_system.core import (
     ActiveInferenceEngine,
     FreeEnergyCalculator,
@@ -46,11 +47,18 @@ class APGISystem:
         Initialize APGI system.
 
         Args:
-            config_path: Path to YAML configuration file
+            config_path: Path to YAML configuration file (relative to project root or absolute)
         """
         # Load configuration
         if config_path is None:
-            config_path = Path(__file__).parent.parent / "config" / "default.yaml"
+            config_path = get_resource_path("config/default.yaml")
+        else:
+            # If provided path is relative, resolve it using get_resource_path
+            config_path_obj = Path(config_path)
+            if not config_path_obj.is_absolute():
+                config_path = get_resource_path(config_path)
+            else:
+                config_path = config_path_obj
 
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)

@@ -11,6 +11,7 @@ from datetime import datetime
 
 from api.celery_app import celery_app
 from apgi_system.system import APGISystem
+from apgi_system.platform_utils import get_resource_path
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
@@ -97,7 +98,8 @@ class APGITask(Task):
     def apgi_system(self):
         """Lazy initialization of APGI system."""
         if self._apgi_system is None:
-            self._apgi_system = APGISystem(config_path="config/default.yaml")
+            # Use platform-aware resource path resolution
+            self._apgi_system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         return self._apgi_system
 
 

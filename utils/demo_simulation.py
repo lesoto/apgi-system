@@ -5,6 +5,7 @@ Runs a short simulation and displays results
 
 import numpy as np
 from apgi_system.system import APGISystem
+from apgi_system.platform_utils import get_resource_path
 
 def main():
     print("=" * 70)
@@ -14,7 +15,7 @@ def main():
     
     # Initialize system
     print("Initializing APGI System...")
-    system = APGISystem(config_path="config/default.yaml")
+    system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
     print("✓ System initialized successfully")
     print()
     
