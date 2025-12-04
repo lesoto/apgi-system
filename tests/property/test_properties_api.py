@@ -1115,6 +1115,13 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
     import redis.asyncio as redis
     from api.config import settings
     import asyncio
+    import time
+
+    # Create unique client_id to avoid collisions between parallel test runs
+    # Use both test run ID and timestamp to ensure uniqueness across Hypothesis examples
+    test_run_id = str(uuid.uuid4())[:8]
+    timestamp_id = str(time.time()).replace(".", "_")
+    unique_client_id = f"test_{test_run_id}_{timestamp_id}_{client_id}"
 
     # Create Redis client
     redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
@@ -1123,11 +1130,16 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
         # Create rate limiter
         rate_limiter = RateLimiter(redis_client)
 
-        # Reset any existing rate limits for this client/endpoint
-        await rate_limiter.reset_rate_limit(client_id, endpoint)
+        # Aggressively clean up any existing state
+        key = rate_limiter._get_redis_key(unique_client_id, endpoint)
+        await redis_client.delete(key)
+        await asyncio.sleep(0.01)  # Give Redis time to process
 
-        # Add a small delay to ensure Redis has processed the reset
-        await asyncio.sleep(0.01)
+        # Verify Redis state is clean before starting
+        existing_count = await redis_client.zcard(key)
+        assert (
+            existing_count == 0
+        ), f"Redis state not clean: found {existing_count} existing entries"
 
         # Get the configured limit for this endpoint
         limit, window_seconds = rate_limiter._get_limit_config(endpoint)
@@ -1142,7 +1154,9 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
 
         # Make requests
         for i in range(num_requests):
-            result = await rate_limiter.check_rate_limit(client_id=client_id, endpoint=endpoint)
+            result = await rate_limiter.check_rate_limit(
+                client_id=unique_client_id, endpoint=endpoint
+            )
 
             if result.allowed:
                 allowed_count += 1
@@ -1155,23 +1169,30 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
                 assert result.retry_after > 0
                 assert result.remaining == 0
 
+        # Debug: Check actual Redis state
+        final_count = await redis_client.zcard(key)
+
         # Verify rate limiting behavior
         if num_requests <= max_allowed_requests:
             # All requests should be allowed
-            assert allowed_count == num_requests
+            assert (
+                allowed_count == num_requests
+            ), f"Expected {num_requests} allowed, got {allowed_count}. Final Redis count: {final_count}"
             assert denied_count == 0
         else:
             # Some requests should be allowed, rest denied
             # The allowed count should be exactly max_allowed_requests
             assert (
                 allowed_count == max_allowed_requests
-            ), f"Expected {max_allowed_requests} allowed requests, got {allowed_count}"
+            ), f"Expected {max_allowed_requests} allowed requests (limit={limit}, weight={weight}), but got {allowed_count}. Final Redis count: {final_count}, Redis key: {key}"
             assert denied_count == num_requests - allowed_count
             assert denied_count > 0
 
     finally:
-        # Clean up
-        await rate_limiter.reset_rate_limit(client_id, endpoint)
+        # Clean up - ensure we remove the test data
+        await rate_limiter.reset_rate_limit(unique_client_id, endpoint)
+        # Wait for Redis to process the cleanup
+        await asyncio.sleep(0.05)
         await redis_client.close()
 
 

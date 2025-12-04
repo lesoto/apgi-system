@@ -75,7 +75,7 @@ async def list_tasks(
         TaskListResponse with available tasks and their parameters
     """
     try:
-        tasks_info = executor.list_available_tasks()
+        tasks_info = await executor.list_available_tasks()
         
         return TaskListResponse(
             tasks=tasks_info["tasks"]

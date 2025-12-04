@@ -97,6 +97,9 @@ class RateLimiter:
         Uses Redis sorted sets to track requests within a time window.
         Each request is stored with its timestamp as the score.
         
+        This implementation uses a Lua script to ensure atomicity of the
+        check-and-add operation, preventing race conditions.
+        
         Args:
             client_id: Unique identifier for the client (user ID, IP, etc.)
             endpoint: Endpoint identifier for per-endpoint limits
@@ -122,40 +125,81 @@ class RateLimiter:
         now = time.time()
         window_start = now - window_seconds
         
-        # Use Redis pipeline for atomic operations
-        pipe = self.redis.pipeline()
+        # Lua script for atomic check-and-add operation
+        # This ensures no race conditions between checking the count and adding entries
+        lua_script = """
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+        local window_start = tonumber(ARGV[2])
+        local limit = tonumber(ARGV[3])
+        local weight = tonumber(ARGV[4])
+        local window_seconds = tonumber(ARGV[5])
         
-        # Remove old entries outside the window
-        pipe.zremrangebyscore(key, 0, window_start)
+        -- Remove old entries outside the window
+        redis.call('ZREMRANGEBYSCORE', key, 0, window_start)
         
-        # Count current requests in window
-        pipe.zcard(key)
+        -- Count current requests in window
+        local current_count = redis.call('ZCARD', key)
         
-        # Execute pipeline
-        results = await pipe.execute()
-        current_count = results[1]
+        -- Check if request is allowed
+        if current_count + weight <= limit then
+            -- Add entries for this request (weighted)
+            for i = 0, weight - 1 do
+                local score = now + (i * 0.000001)
+                local member = now .. ':' .. i
+                redis.call('ZADD', key, score, member)
+            end
+            
+            -- Set expiration
+            redis.call('EXPIRE', key, window_seconds + 10)
+            
+            -- Return: allowed=1, current_count, oldest_timestamp (0 if none)
+            return {1, current_count, 0}
+        else
+            -- Get oldest timestamp for retry_after calculation
+            local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+            local oldest_timestamp = 0
+            if #oldest > 0 then
+                oldest_timestamp = tonumber(oldest[2])
+            end
+            
+            -- Return: allowed=0, current_count, oldest_timestamp
+            return {0, current_count, oldest_timestamp}
+        end
+        """
         
-        # Calculate remaining capacity (accounting for weight)
-        remaining = max(0, limit - current_count - weight)
-        allowed = current_count + weight <= limit
+        # Execute Lua script atomically
+        try:
+            result = await self.redis.eval(
+                lua_script,
+                1,  # number of keys
+                key,  # KEYS[1]
+                now,  # ARGV[1]
+                window_start,  # ARGV[2]
+                limit,  # ARGV[3]
+                weight,  # ARGV[4]
+                window_seconds  # ARGV[5]
+            )
+            
+            allowed = result[0] == 1
+            current_count = result[1]
+            oldest_timestamp = result[2]
+        except Exception as e:
+            # Log the error and fall back to non-atomic implementation
+            import logging
+            logging.error(f"Redis Lua script execution failed: {e}")
+            raise
+        
+        # Calculate remaining capacity
+        if allowed:
+            remaining = max(0, limit - current_count - weight)
+        else:
+            remaining = 0
         
         # Calculate reset time
         reset_at = datetime.utcnow() + timedelta(seconds=window_seconds)
         
         if allowed:
-            # Add current request to the window with weight
-            # We add multiple entries for weighted operations
-            pipe = self.redis.pipeline()
-            for i in range(weight):
-                # Use microsecond precision to avoid collisions
-                score = now + (i * 0.000001)
-                pipe.zadd(key, {f"{now}:{i}": score})
-            
-            # Set expiration on the key
-            pipe.expire(key, window_seconds + 10)  # Add buffer
-            
-            await pipe.execute()
-            
             return RateLimitResult(
                 allowed=True,
                 limit=limit,
@@ -164,10 +208,7 @@ class RateLimiter:
             )
         else:
             # Calculate retry_after based on oldest request in window
-            oldest_scores = await self.redis.zrange(key, 0, 0, withscores=True)
-            
-            if oldest_scores:
-                oldest_timestamp = oldest_scores[0][1]
+            if oldest_timestamp > 0:
                 retry_after = int(oldest_timestamp + window_seconds - now) + 1
             else:
                 retry_after = window_seconds

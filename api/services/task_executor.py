@@ -222,7 +222,7 @@ class TaskExecutor:
                 "message": f"Task cannot be cancelled (state: {result.state})"
             }
     
-    def list_available_tasks(self) -> Dict[str, Any]:
+    async def list_available_tasks(self) -> Dict[str, Any]:
         """
         List all available experimental tasks with descriptions.
         
