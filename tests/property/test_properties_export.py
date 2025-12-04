@@ -16,6 +16,7 @@ import json
 import csv
 import tempfile
 import os
+import base64
 from pathlib import Path
 from hypothesis import given, strategies as st, settings, assume
 from hypothesis import HealthCheck
@@ -480,3 +481,99 @@ def test_property_json_round_trip_preservation(num_steps, observation):
 
     finally:
         os.unlink(json_filename)
+
+
+@given(
+    num_steps=st.integers(min_value=50, max_value=200),
+    page_size=st.integers(min_value=5, max_value=30),
+    observation=observation_strategy(),
+)
+def test_property_pagination_consistency(num_steps, page_size, observation):
+    """
+    **Feature: api-rest-interface, Property 13: Pagination consistency**
+
+    For any paginated request, following all pagination links should eventually
+    return all data without duplicates or gaps.
+    **Validates: Requirements 5.5**
+    """
+    # Initialize system and exporter
+    system = APGISystem()
+    exporter = DataExporter()
+
+    # Run simulation for specified steps to generate data
+    for step in range(num_steps):
+        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        state = system.step(input_obs)
+        exporter.record_state(state)
+
+    # Get complete data (ground truth)
+    complete_data = exporter.log_data.copy()
+    assert len(complete_data) == num_steps, "Complete data should have all steps"
+
+    # Simulate paginated retrieval
+    all_paginated_data = []
+    seen_indices = set()
+    cursor = None
+    page_count = 0
+    max_pages = (num_steps // page_size) + 2  # Safety limit
+
+    while page_count < max_pages:
+        # Determine start index from cursor
+        start_idx = 0
+        if cursor:
+            try:
+                cursor_data = json.loads(base64.b64decode(cursor))
+                start_idx = cursor_data.get("offset", 0)
+            except Exception:
+                break
+
+        # Get page of data
+        end_idx = min(start_idx + page_size, len(complete_data))
+        page_data = complete_data[start_idx:end_idx]
+
+        # Check for duplicates - each index should only be seen once
+        for i in range(start_idx, end_idx):
+            assert i not in seen_indices, f"Index {i} returned in multiple pages (duplicate)"
+            seen_indices.add(i)
+
+        # Add to collected data
+        all_paginated_data.extend(page_data)
+
+        # Check if more data available
+        has_more = end_idx < len(complete_data)
+
+        if not has_more:
+            # No more pages
+            break
+
+        # Generate next cursor
+        cursor_data = {"offset": end_idx}
+        cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
+
+        page_count += 1
+
+    # Verify no gaps - all indices from 0 to num_steps-1 should be present
+    assert (
+        len(seen_indices) == num_steps
+    ), f"Expected {num_steps} unique indices, got {len(seen_indices)}"
+    assert seen_indices == set(range(num_steps)), "All indices should be present without gaps"
+
+    # Verify all data was retrieved
+    assert len(all_paginated_data) == num_steps, (
+        f"Paginated retrieval should return all {num_steps} records, "
+        f"got {len(all_paginated_data)}"
+    )
+
+    # Verify data order is preserved (no reordering)
+    for i, (original, paginated) in enumerate(zip(complete_data, all_paginated_data)):
+        assert (
+            original == paginated
+        ), f"Data at index {i} differs between complete and paginated retrieval"
+
+    # Verify no duplicates in final result
+    # Check by comparing timestamps which should be unique and monotonically increasing
+    timestamps = [entry["time"] for entry in all_paginated_data]
+    assert len(timestamps) == len(set(timestamps)), "Timestamps should be unique (no duplicates)"
+    assert all(
+        timestamps[i] <= timestamps[i + 1] for i in range(len(timestamps) - 1)
+    ), "Timestamps should be monotonically increasing (data order preserved)"

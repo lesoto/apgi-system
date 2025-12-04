@@ -139,9 +139,9 @@ def random_body_state():
 def db():
     """
     Provide a test database session.
-    
+
     Creates an in-memory SQLite database for testing.
-    
+
     Yields
     ------
     Session
@@ -150,17 +150,17 @@ def db():
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from api.database.models import Base
-    
+
     # Create in-memory SQLite database for testing
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    
+
     # Create session
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
-    
+
     yield session
-    
+
     # Cleanup
     session.close()
     Base.metadata.drop_all(engine)

@@ -12,7 +12,7 @@ import logging
 import redis.asyncio as redis
 
 from api.config import settings
-from api.routes import sessions, state, tasks, export, metrics, health, auth
+from api.routes import sessions, state, tasks, export, metrics, health, auth, version
 from api.database.connection import init_db, close_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.logging import (
@@ -25,6 +25,7 @@ from api.middleware.alerting import configure_alerting
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from api.middleware.authentication import AuthenticationMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
+from api.middleware.deprecation import DeprecationMiddleware
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -66,6 +67,9 @@ def create_app() -> FastAPI:
         enabled=settings.schema_validation_enabled,
         fail_on_error=settings.schema_validation_fail_on_error
     )
+    
+    # Add deprecation middleware
+    app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
     
     # Note: Rate limiting middleware will be added in startup event after Redis is initialized
     
@@ -191,6 +195,7 @@ def create_app() -> FastAPI:
     app.include_router(export.router)
     app.include_router(metrics.router)
     app.include_router(health.router)
+    app.include_router(version.router)
     
     logger.info("APGI API application created successfully", version="1.0.0")
     return app
