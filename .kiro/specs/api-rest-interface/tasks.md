@@ -368,7 +368,9 @@
     - **Property 25: Async task status tracking**
     - **Validates: Requirements 11.1, 11.2**
   
-  - [-] 13.4 Write property test for webhook delivery
+  - [x] 13.4 Write property test for webhook delivery
+
+
 
 
 
@@ -453,22 +455,6 @@
     - **Property 4: CORS header presence**
     - **Validates: Requirements 1.5**
 
-- [-] 20. Set up deployment infrastructure
-
-
-
-
-
-
-  
-  - [ ] 20.1 Create CI/CD pipeline
-
-
-    - GitHub Actions workflow for test, build, deploy
-    - Automated testing on commit
-    - Docker image building and pushing
-    - Deployment to staging and production
-    - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
 - [x] 21. Write integration tests
 
@@ -495,5 +481,6 @@
     - _Requirements: 12.3_
 
 - [ ] 22. Final checkpoint - Complete system validation
+
 
   - Ensure all tests pass, ask the user if questions arise.
