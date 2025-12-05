@@ -68,6 +68,13 @@
 
 
 
+
+
+
+
+
+
+
   - Create `build/build_windows.py` with Windows-specific build logic
   - Add virtual environment creation
   - Add dependency installation
@@ -106,14 +113,20 @@
   - **Property 9: File I/O correctness**
   - **Validates: Requirements 9.3**
 
-- [ ] 6. Implement macOS build system
+- [x] 6. Implement macOS build system
+
+
+
+
   - Create `build/build_macos.py` with macOS-specific build logic
   - Reuse common utilities from `build_common.py`
   - Implement .app bundle structure creation
   - Implement Info.plist generation
   - _Requirements: 6.1, 8.1, 8.2_
 
-- [ ] 6.1 Create py2app configuration
+
+- [x] 6.1 Create py2app configuration
+
   - Create `build/setup_py2app.py` setup script
   - Configure entry point to `apgi_gui.py`
   - Add packages list from requirements.txt
@@ -122,7 +135,9 @@
   - Set icon path
   - _Requirements: 6.2, 6.3, 6.5_
 
-- [ ] 6.2 Implement macOS build script execution
+- [x] 6.2 Implement macOS build script execution
+
+
   - Add virtual environment creation
   - Add dependency installation
   - Add py2app execution
@@ -130,11 +145,19 @@
   - Add error handling with clear messages
   - _Requirements: 6.1, 6.4, 8.3, 8.4, 8.5_
 
-- [ ] 6.3 Write property test for resource bundling completeness
+- [x] 6.3 Write property test for resource bundling completeness
+
+
   - **Property 5: Resource bundling completeness**
   - **Validates: Requirements 4.1, 4.3, 7.5**
 
-- [ ] 7. Test macOS application bundle
+
+- [x] 7. Test macOS application bundle
+
+
+
+
+
   - Build macOS .app on macOS machine
   - Test .app bundle opens without errors
   - Test all GUI controls and menu items
@@ -143,6 +166,11 @@
   - Verify icon displays in Dock
   - Test on clean macOS without Python installed
   - _Requirements: 2.1, 2.2, 2.3, 9.1, 9.2, 9.3, 9.4_
+
+
+
+
+
 
 - [ ] 7.1 Write property test for configuration persistence
   - **Property 10: Configuration persistence**
@@ -165,20 +193,27 @@
 - [x] 8.1 Write unit tests for installer script generation
   - Test version string extraction
   - Test path configuration
+
   - Test registry entry generation
   - _Requirements: 13.1, 13.2_
 
-- [ ] 9. Create macOS disk image (.dmg)
+
+- [x] 9. Create macOS disk image (.dmg)
+
+
+
   - Install create-dmg or use hdiutil
   - Create `build/create_dmg.sh` script
   - Configure DMG with custom background image
   - Add Applications folder symlink
+
   - Set window size and icon positions
   - Build .dmg file
   - Test .dmg on clean macOS
   - _Requirements: 14.1, 14.2, 14.3, 14.4_
 
-- [ ] 9.1 Write unit tests for DMG creation script
+- [x] 9.1 Write unit tests for DMG creation script
+
   - Test DMG structure validation
   - Test symlink creation
   - Test file permissions
@@ -223,7 +258,9 @@
   - Add examples for different build configurations
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [-] 13. Create distribution documentation
+- [x] 13. Create distribution documentation
+
+
 
 
 
@@ -232,10 +269,19 @@
   - Document macOS installation process
   - Document system requirements
   - Add troubleshooting section for common user issues
+
+
+
   - Add screenshots of installation process
+
+
+
   - _Requirements: 10.1, 10.4_
 
-- [ ] 14. Final integration testing
+- [x] 14. Final integration testing
+
+
+
 
   - Build executables for both platforms
   - Run complete manual testing checklist (from design doc)
@@ -264,6 +310,7 @@
 
   - Create `build/release.py` script to automate full release process
   - Implement version bumping
+
   - Implement changelog generation
   - Implement building for both platforms
   - Implement creating distribution packages
@@ -271,6 +318,3 @@
   - Add dry-run mode for testing
   - _Requirements: 8.1, 8.2, 8.4_
 
-- [ ] 16. Checkpoint - Ensure all tests pass
-
-  - Ensure all tests pass, ask the user if questions arise.

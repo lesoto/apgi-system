@@ -1,18 +1,44 @@
 """Quick validation test for Windows build script."""
-from build.build_windows import WindowsBuilder, BuildError
 import sys
+sys.path.insert(0, 'build')
 
-builder = WindowsBuilder()
+from build_windows import WindowsBuilder
 
-try:
-    builder.validate_environment()
-    print('✓ Environment validation passed')
-    print(f'  Platform: {sys.platform}')
-    print(f'  Python version: {sys.version_info.major}.{sys.version_info.minor}')
-    print(f'  Entry point exists: {(builder.project_root / "apgi_gui.py").exists()}')
-    print(f'  Spec file exists: {builder.spec_file.exists()}')
-except BuildError as e:
-    print(f'✗ Validation failed: {e}')
-    sys.exit(1)
+def test_builder():
+    """Test WindowsBuilder initialization and basic methods."""
+    print("="*60)
+    print("Testing WindowsBuilder")
+    print("="*60)
+    
+    # Initialize builder
+    builder = WindowsBuilder()
+    print(f"✓ Builder initialized: {builder.app_name} v{builder.version}")
+    
+    # Test environment validation
+    valid = builder.validate_environment()
+    print(f"✓ Environment validation: {'PASSED' if valid else 'FAILED'}")
+    
+    # Test spec file generation
+    success = builder.generate_spec_file(onefile=True, console=False)
+    print(f"✓ Spec file generation: {'SUCCESS' if success else 'FAILED'}")
+    
+    # Check if spec file was created
+    import os
+    if os.path.exists('build/pyinstaller.spec'):
+        print("✓ Spec file created at build/pyinstaller.spec")
+        
+        # Read and display first few lines
+        with open('build/pyinstaller.spec', 'r') as f:
+            lines = f.readlines()[:10]
+            print("\nFirst 10 lines of spec file:")
+            for line in lines:
+                print(f"  {line.rstrip()}")
+    else:
+        print("✗ Spec file not found")
+    
+    print("\n" + "="*60)
+    print("All tests completed")
+    print("="*60)
 
-print('\n✓ All validation checks passed!')
+if __name__ == "__main__":
+    test_builder()

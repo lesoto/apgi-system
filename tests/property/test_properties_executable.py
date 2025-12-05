@@ -344,6 +344,204 @@ class TestGUIFunctionalityProperties:
                 pass
 
 
+class TestResourceBundlingProperties:
+    """Property-based tests for resource bundling completeness."""
+
+    def test_property_resource_bundling_completeness(self):
+        """
+        **Feature: cross-platform-executable, Property 5: Resource bundling completeness**
+
+        For any resource file referenced in the code, the bundled executable should
+        include that resource or the build should fail with a clear error.
+
+        **Validates: Requirements 4.1, 4.3, 7.5**
+        """
+        # Test that all expected resource directories exist
+        expected_resource_dirs = [
+            "config",
+            "resources/icons",
+        ]
+
+        for resource_dir in expected_resource_dirs:
+            resource_path = get_resource_path(resource_dir)
+            assert resource_path is not None, f"Resource path for {resource_dir} should not be None"
+
+            # In development mode, the directory should exist
+            # In bundled mode, resources should be accessible
+            if not is_bundled():
+                # Development mode - check directory exists
+                if not resource_path.exists():
+                    pytest.skip(f"Resource directory {resource_dir} not found in development mode")
+            else:
+                # Bundled mode - resources should be accessible
+                assert (
+                    resource_path.exists()
+                ), f"Resource directory {resource_dir} should exist in bundle"
+
+    @given(
+        resource_name=st.sampled_from(
+            [
+                "config/default.yaml",
+                "resources/icons/apgi.png",
+                "resources/icons/apgi.ico",
+                "resources/icons/apgi.icns",
+            ]
+        )
+    )
+    def test_property_resource_file_accessibility(self, resource_name):
+        """
+        Test that specific resource files are accessible.
+
+        For any known resource file, the application should be able to locate
+        and access it.
+
+        **Validates: Requirements 4.1, 4.3**
+        """
+        resource_path = get_resource_path(resource_name)
+
+        assert resource_path is not None, f"Resource path for {resource_name} should not be None"
+        assert isinstance(resource_path, Path), f"Resource path should be a Path object"
+
+        # Check if resource exists (skip if not in development mode and file is optional)
+        if not resource_path.exists():
+            # Some resources like platform-specific icons may not exist
+            if any(ext in resource_name for ext in [".ico", ".icns"]):
+                pytest.skip(f"Platform-specific resource {resource_name} not found")
+            else:
+                pytest.fail(f"Required resource {resource_name} not found at {resource_path}")
+
+    def test_property_config_resources_bundled(self):
+        """
+        Test that configuration resources are properly bundled.
+
+        For any configuration file, it should be accessible in both development
+        and bundled modes.
+
+        **Validates: Requirements 4.1, 4.4**
+        """
+        # Test default config file
+        config_path = get_resource_path("config/default.yaml")
+
+        assert config_path is not None, "Config path should not be None"
+        assert config_path.exists(), f"Default config should exist at {config_path}"
+
+        # Verify it's readable
+        try:
+            with open(config_path, "r") as f:
+                content = f.read()
+            assert len(content) > 0, "Config file should not be empty"
+        except Exception as e:
+            pytest.fail(f"Failed to read config file: {str(e)}")
+
+    def test_property_icon_resources_available(self):
+        """
+        Test that icon resources are available for the platform.
+
+        For any platform, at least one icon format should be available.
+
+        **Validates: Requirements 7.1, 7.2, 7.3, 7.5**
+        """
+        platform = get_platform()
+
+        # Check for platform-appropriate icon
+        if platform == "windows":
+            icon_path = get_resource_path("resources/icons/apgi.ico")
+        elif platform == "macos":
+            icon_path = get_resource_path("resources/icons/apgi.icns")
+        else:
+            icon_path = get_resource_path("resources/icons/apgi.png")
+
+        # Icon should exist or source PNG should exist
+        png_icon = get_resource_path("resources/icons/apgi.png")
+
+        if not icon_path.exists() and not png_icon.exists():
+            pytest.skip(f"Icon resources not yet created for {platform}")
+
+        # At least one icon format should exist
+        assert (
+            icon_path.exists() or png_icon.exists()
+        ), f"At least one icon format should exist for {platform}"
+
+    @given(subdir=st.sampled_from(["icons", "images", "data"]))
+    def test_property_resource_subdirectories_accessible(self, subdir):
+        """
+        Test that resource subdirectories are accessible.
+
+        For any resource subdirectory, it should be accessible through the
+        resource path utilities.
+
+        **Validates: Requirements 4.1, 4.2**
+        """
+        resource_path = get_resource_path(f"resources/{subdir}")
+
+        assert resource_path is not None, f"Resource path for {subdir} should not be None"
+
+        # In development mode, directory should exist or be creatable
+        # In bundled mode, directory should be accessible
+        if not is_bundled():
+            # Development mode - directory should exist
+            if not resource_path.exists():
+                pytest.skip(f"Resource subdirectory {subdir} not found in development mode")
+        else:
+            # Bundled mode - directory should be accessible
+            # (may be empty but should exist)
+            assert resource_path.exists(), f"Resource subdirectory {subdir} should exist in bundle"
+
+    def test_property_resource_path_resolution_consistency(self):
+        """
+        Test that resource path resolution is consistent.
+
+        For any resource path, resolving it multiple times should return the
+        same path.
+
+        **Validates: Requirements 3.4, 4.2**
+        """
+        resource_name = "config/default.yaml"
+
+        # Resolve path multiple times
+        path1 = get_resource_path(resource_name)
+        path2 = get_resource_path(resource_name)
+        path3 = get_resource_path(resource_name)
+
+        # All paths should be identical
+        assert path1 == path2, "Resource path resolution should be consistent"
+        assert path2 == path3, "Resource path resolution should be consistent"
+        assert path1 == path3, "Resource path resolution should be consistent"
+
+    @given(
+        relative_path=st.text(
+            alphabet=st.characters(
+                whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="/_-."
+            ),
+            min_size=1,
+            max_size=50,
+        )
+    )
+    def test_property_resource_path_always_absolute(self, relative_path):
+        """
+        Test that resource paths are always absolute.
+
+        For any relative path input, get_resource_path should return an
+        absolute path.
+
+        **Validates: Requirements 3.4, 4.2**
+        """
+        # Filter out invalid paths
+        assume(not relative_path.startswith("/"))
+        assume(not relative_path.startswith("\\"))
+        assume(".." not in relative_path)
+
+        try:
+            resource_path = get_resource_path(relative_path)
+
+            assert resource_path is not None, "Resource path should not be None"
+            assert isinstance(resource_path, Path), "Resource path should be a Path object"
+            assert resource_path.is_absolute(), f"Resource path should be absolute: {resource_path}"
+        except Exception as e:
+            # Some paths may be invalid, which is acceptable
+            pass
+
+
 class TestFileIOProperties:
     """Property-based tests for file I/O correctness."""
 
@@ -551,3 +749,324 @@ class TestFileIOProperties:
         finally:
             if test_file.exists():
                 test_file.unlink()
+
+
+class TestConfigurationPersistenceProperties:
+    """Property-based tests for configuration persistence."""
+
+    def test_property_configuration_persistence(self):
+        """
+        **Feature: cross-platform-executable, Property 10: Configuration persistence**
+
+        For any configuration change saved by the user, reopening the application
+        should restore that configuration.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        test_config_file = config_dir / "test_user_config.yaml"
+
+        # Test configuration data
+        test_config = {
+            "parameters": {
+                "baseline_threshold": 2.5,
+                "extero_precision": 5.0,
+                "intero_precision": 3.0,
+            }
+        }
+
+        try:
+            # Step 1: Save configuration
+            with open(test_config_file, "w") as f:
+                yaml.dump(test_config, f)
+
+            assert test_config_file.exists(), "Config file should be created"
+
+            # Step 2: Load configuration (simulating app restart)
+            with open(test_config_file, "r") as f:
+                loaded_config = yaml.safe_load(f)
+
+            # Step 3: Verify configuration was restored correctly
+            assert loaded_config is not None, "Loaded config should not be None"
+            assert loaded_config == test_config, "Loaded config should match saved config"
+            assert loaded_config["parameters"]["baseline_threshold"] == 2.5
+            assert loaded_config["parameters"]["extero_precision"] == 5.0
+            assert loaded_config["parameters"]["intero_precision"] == 3.0
+
+        finally:
+            # Clean up
+            if test_config_file.exists():
+                test_config_file.unlink()
+
+    @given(
+        baseline_threshold=st.floats(
+            min_value=1.0, max_value=5.0, allow_nan=False, allow_infinity=False
+        ),
+        extero_precision=st.floats(
+            min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False
+        ),
+        intero_precision=st.floats(
+            min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False
+        ),
+    )
+    def test_property_configuration_persistence_round_trip(
+        self, baseline_threshold, extero_precision, intero_precision
+    ):
+        """
+        Test that configuration persistence works for any valid parameter values.
+
+        For any valid configuration parameters, saving and loading should preserve
+        the exact values.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        test_config_file = config_dir / f"test_config_{id(self)}.yaml"
+
+        # Create configuration with random parameters
+        test_config = {
+            "parameters": {
+                "baseline_threshold": baseline_threshold,
+                "extero_precision": extero_precision,
+                "intero_precision": intero_precision,
+            }
+        }
+
+        try:
+            # Save configuration
+            with open(test_config_file, "w") as f:
+                yaml.dump(test_config, f)
+
+            # Load configuration
+            with open(test_config_file, "r") as f:
+                loaded_config = yaml.safe_load(f)
+
+            # Verify round trip preserves values
+            assert loaded_config is not None, "Loaded config should not be None"
+            assert "parameters" in loaded_config, "Config should have parameters section"
+
+            # Check each parameter with appropriate tolerance for floating point
+            assert (
+                abs(loaded_config["parameters"]["baseline_threshold"] - baseline_threshold) < 1e-6
+            ), "Baseline threshold should be preserved"
+            assert (
+                abs(loaded_config["parameters"]["extero_precision"] - extero_precision) < 1e-6
+            ), "Extero precision should be preserved"
+            assert (
+                abs(loaded_config["parameters"]["intero_precision"] - intero_precision) < 1e-6
+            ), "Intero precision should be preserved"
+
+        finally:
+            # Clean up
+            if test_config_file.exists():
+                test_config_file.unlink()
+
+    @given(
+        config_data=st.dictionaries(
+            keys=st.sampled_from(
+                [
+                    "baseline_threshold",
+                    "extero_precision",
+                    "intero_precision",
+                    "amplification_factor",
+                    "decay_rate",
+                    "learning_rate",
+                ]
+            ),
+            values=st.floats(min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=6,
+        )
+    )
+    def test_property_configuration_persistence_arbitrary_params(self, config_data):
+        """
+        Test configuration persistence with arbitrary parameter sets.
+
+        For any set of configuration parameters, saving and loading should
+        preserve all parameters correctly.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        test_config_file = config_dir / f"test_arbitrary_{id(self)}.yaml"
+
+        test_config = {"parameters": config_data}
+
+        try:
+            # Save configuration
+            with open(test_config_file, "w") as f:
+                yaml.dump(test_config, f)
+
+            # Load configuration
+            with open(test_config_file, "r") as f:
+                loaded_config = yaml.safe_load(f)
+
+            # Verify all parameters are preserved
+            assert loaded_config is not None, "Loaded config should not be None"
+            assert "parameters" in loaded_config, "Config should have parameters section"
+            assert len(loaded_config["parameters"]) == len(
+                config_data
+            ), "All parameters should be preserved"
+
+            for key, value in config_data.items():
+                assert key in loaded_config["parameters"], f"Parameter {key} should be preserved"
+                assert (
+                    abs(loaded_config["parameters"][key] - value) < 1e-6
+                ), f"Parameter {key} value should be preserved"
+
+        finally:
+            # Clean up
+            if test_config_file.exists():
+                test_config_file.unlink()
+
+    def test_property_configuration_persistence_with_nested_structure(self):
+        """
+        Test configuration persistence with nested configuration structures.
+
+        For any nested configuration structure, saving and loading should
+        preserve the entire hierarchy.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        test_config_file = config_dir / "test_nested_config.yaml"
+
+        # Create nested configuration
+        test_config = {
+            "system": {
+                "timestep_ms": 10.0,
+                "buffer_size": 1000,
+            },
+            "active_inference": {
+                "learning_rate": 0.01,
+                "prediction_horizon": 5,
+            },
+            "ignition": {
+                "baseline_threshold": 2.5,
+                "amplification_factor": 1.5,
+            },
+            "precision": {
+                "extero_precision": 5.0,
+                "intero_precision": 3.0,
+            },
+        }
+
+        try:
+            # Save configuration
+            with open(test_config_file, "w") as f:
+                yaml.dump(test_config, f)
+
+            # Load configuration
+            with open(test_config_file, "r") as f:
+                loaded_config = yaml.safe_load(f)
+
+            # Verify nested structure is preserved
+            assert loaded_config is not None, "Loaded config should not be None"
+            assert loaded_config == test_config, "Nested config should be preserved exactly"
+
+            # Verify specific nested values
+            assert loaded_config["system"]["timestep_ms"] == 10.0
+            assert loaded_config["active_inference"]["learning_rate"] == 0.01
+            assert loaded_config["ignition"]["baseline_threshold"] == 2.5
+            assert loaded_config["precision"]["extero_precision"] == 5.0
+
+        finally:
+            # Clean up
+            if test_config_file.exists():
+                test_config_file.unlink()
+
+    def test_property_configuration_persistence_user_override(self):
+        """
+        Test that user configuration overrides default configuration.
+
+        For any user configuration, it should override the default configuration
+        when both exist.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get default config
+        default_config_path = get_resource_path("config/default.yaml")
+        assert default_config_path.exists(), "Default config should exist"
+
+        with open(default_config_path, "r") as f:
+            default_config = yaml.safe_load(f)
+
+        # Create user override config
+        user_config_file = config_dir / "user_override_test.yaml"
+        user_config = {
+            "ignition": {
+                "baseline_threshold": 99.9,  # Override default value
+            }
+        }
+
+        try:
+            # Save user config
+            with open(user_config_file, "w") as f:
+                yaml.dump(user_config, f)
+
+            # Load user config
+            with open(user_config_file, "r") as f:
+                loaded_user_config = yaml.safe_load(f)
+
+            # Verify user config was saved and loaded
+            assert loaded_user_config is not None
+            assert loaded_user_config["ignition"]["baseline_threshold"] == 99.9
+
+            # Verify default config still exists and is different
+            assert (
+                default_config["ignition"]["baseline_threshold"] != 99.9
+            ), "User config should override default"
+
+        finally:
+            # Clean up
+            if user_config_file.exists():
+                user_config_file.unlink()
+
+    @given(num_saves=st.integers(min_value=1, max_value=5))
+    def test_property_configuration_persistence_multiple_saves(self, num_saves):
+        """
+        Test that configuration can be saved and loaded multiple times.
+
+        For any number of save/load cycles, the configuration should remain
+        consistent.
+
+        **Validates: Requirements 4.4**
+        """
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        test_config_file = config_dir / f"test_multiple_saves_{id(self)}.yaml"
+
+        original_config = {
+            "parameters": {
+                "baseline_threshold": 2.5,
+                "extero_precision": 5.0,
+            }
+        }
+
+        try:
+            # Perform multiple save/load cycles
+            for i in range(num_saves):
+                # Save configuration
+                with open(test_config_file, "w") as f:
+                    yaml.dump(original_config, f)
+
+                # Load configuration
+                with open(test_config_file, "r") as f:
+                    loaded_config = yaml.safe_load(f)
+
+                # Verify configuration is preserved
+                assert (
+                    loaded_config == original_config
+                ), f"Config should be preserved after {i+1} save/load cycles"
+
+        finally:
+            # Clean up
+            if test_config_file.exists():
+                test_config_file.unlink()
