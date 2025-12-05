@@ -22,7 +22,25 @@ import threading
 import time
 
 from apgi_system.system import APGISystem
-from apgi_system.platform_utils import get_resource_path, get_data_dir
+from apgi_system.platform_utils import (
+    get_resource_path, 
+    get_data_dir,
+    load_resource_with_fallback,
+    safe_write_file,
+    check_required_libraries
+)
+import logging
+
+# Configure logging for GUI
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('apgi_gui.log'),
+        logging.StreamHandler()
+    ]
+)
 
 
 class APGIGui:

@@ -405,11 +405,13 @@ class TestFileIOProperties:
         test_file = data_dir / f"{filename}.txt"
 
         try:
-            # Write content with UTF-8 encoding
-            test_file.write_text(content, encoding="utf-8")
+            # Write content with UTF-8 encoding and preserve line endings
+            with open(test_file, "w", encoding="utf-8", newline="") as f:
+                f.write(content)
 
-            # Read content with UTF-8 encoding
-            read_content = test_file.read_text(encoding="utf-8")
+            # Read content with UTF-8 encoding and preserve line endings
+            with open(test_file, "r", encoding="utf-8", newline="") as f:
+                read_content = f.read()
 
             # Verify round trip
             assert read_content == content, "Content should be preserved in round trip"
