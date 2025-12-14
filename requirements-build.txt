@@ -2,17 +2,17 @@
 # These are only needed during the build process, not at runtime
 
 # Windows executable builder
-pyinstaller==6.3.0
+pyinstaller>=6.15.0
 
 # Windows-specific (only install on Windows)
-pywin32==306; sys_platform == 'win32'
+pywin32==306; sys_platform == "win32"
 
 # macOS executable builder (only install on macOS)
-py2app==0.28.7; sys_platform == 'darwin'
+py2app>=0.28.7; sys_platform == "darwin"
 
 # Icon conversion and manipulation
-Pillow==10.1.0
+Pillow>=10.1.0
 
 # Build utilities
-setuptools>=65.0
+setuptools>=69.0.0
 wheel

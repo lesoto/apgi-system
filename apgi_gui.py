@@ -235,7 +235,7 @@ class APGIGui:
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.speed_label = ttk.Label(speed_frame, text="1.0x")
         self.speed_label.pack(side=tk.LEFT)
-        self.speed_var.trace('w', lambda *args: self.speed_label.config(text=f"{self.speed_var.get():.1f}x"))
+        self.speed_var.trace_add('write', lambda *args: self.speed_label.config(text=f"{self.speed_var.get():.1f}x"))
 
         # System Status
         status_frame = ttk.LabelFrame(parent, text="System Status", padding=10)
@@ -305,7 +305,7 @@ class APGIGui:
             val_label = ttk.Label(frame, text=f"{default:.2f}", width=6)
             val_label.pack(side=tk.LEFT)
 
-            var.trace('w', lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.2f}"))
+            var.trace_add('write', lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.2f}"))
 
         # Event Log
         log_frame = ttk.LabelFrame(parent, text="Event Log", padding=10)
@@ -1193,7 +1193,7 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
                         progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}")
+                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
                     ))
 
                     # Run trial
@@ -1317,7 +1317,7 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
                         progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}")
+                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
                     ))
 
                     # Run trial
@@ -1445,7 +1445,7 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
                         progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}")
+                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
                     ))
 
                     # Run trial
@@ -1558,7 +1558,7 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100 if total_trials else 0
                     self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
                         progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}")
+                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
                     ))
 
                     result = task.run_trial(self.apgi_system, trial)
@@ -1674,7 +1674,7 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
                         progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}")
+                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
                     ))
 
                     # Run trial

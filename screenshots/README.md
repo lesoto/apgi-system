@@ -130,10 +130,6 @@ convert -size 1280x720 xc:lightgray -pointsize 48 -fill black \
   windows_download.png
 ```
 
-Or use online tools like:
-- https://placeholder.com/
-- https://via.placeholder.com/
-
 ## Checklist
 
 Before finalizing documentation:
