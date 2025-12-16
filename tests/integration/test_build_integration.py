@@ -4,11 +4,6 @@ Integration tests for the build process.
 Tests end-to-end build workflows for Windows and macOS executables,
 including dependency analysis, resource collection, and build validation.
 
-Requirements tested:
-- 9.1: Executable launches without errors
-- 9.2: GUI functionality preservation
-- 9.3: File I/O correctness
-
 Feature: cross-platform-executable
 """
 
@@ -23,7 +18,7 @@ import os
 
 
 # Import build modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "build"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from build_common import (
     analyze_dependencies,
     collect_resources,

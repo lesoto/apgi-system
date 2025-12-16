@@ -34,7 +34,7 @@ api/
 ├── Dockerfile              # Multi-stage Docker build configuration
 ├── docker-compose.yml      # Full stack deployment (API, PostgreSQL, Redis, Celery)
 ├── Makefile                # Common development tasks
-├── API_SETUP_GUIDE.md      # Comprehensive setup and deployment guide
+├── docs/api/API_SETUP_GUIDE.md      # Comprehensive setup and deployment guide
 └── tests/
     └── test_api_setup.py   # Basic API setup verification tests
 ```
@@ -121,7 +121,7 @@ api/
 
 ### 5. Documentation
 - API README with quick start guide
-- Comprehensive setup guide (API_SETUP_GUIDE.md)
+- Comprehensive setup guide (docs/api/API_SETUP_GUIDE.md)
 - Environment configuration template (.env.example)
 - Inline code documentation
 

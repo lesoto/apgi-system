@@ -14,8 +14,8 @@ from pathlib import Path
 from hypothesis import given, strategies as st, settings, assume
 import pytest
 
-# Add build directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "build"))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from build_common import (
     get_version,

@@ -1938,7 +1938,7 @@ Key Features:
 - Metabolic constraints
 - Self-model maintenance
 
-For detailed documentation, see README.md in the project directory.
+For detailed documentation, see APGI-System-README.md in the project directory.
 """
 
         dialog = tk.Toplevel(self.root)

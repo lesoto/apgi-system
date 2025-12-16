@@ -7,7 +7,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Method 1 (Recommended):
-    $ python run_gui.py
+    $ python apgi_gui.py
 
   Method 2:
     $ python apgi_gui.py
@@ -250,8 +250,8 @@
 📚 DOCUMENTATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Full GUI Documentation:    GUI_README.md (400+ lines)
-  Main System Documentation: README.md
+  Full GUI Documentation:    docs/gui/GUI_README.md (400+ lines)
+  Main System Documentation: APGI-System-README.md
   Example Scripts:           examples/
   Tests:                     tests/
   Configuration:             config/default.yaml

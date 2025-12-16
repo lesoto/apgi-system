@@ -22,20 +22,10 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 # Import release module
-build_path = Path(__file__).parent.parent.parent / "build"
-sys.path.insert(0, str(build_path))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-try:
-    from release import ReleaseManager, ReleaseError
-except ImportError:
-    # If running from different location, try alternative import
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("release", build_path / "release.py")
-    release_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(release_module)
-    ReleaseManager = release_module.ReleaseManager
-    ReleaseError = release_module.ReleaseError
+from release import ReleaseManager, ReleaseError
 
 
 class TestVersionValidation:

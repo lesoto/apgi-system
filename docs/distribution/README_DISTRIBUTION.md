@@ -2,7 +2,7 @@
 
 Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This guide will help you install and run the application on your computer.
 
-> **Note about Screenshots:** This guide includes placeholder references for screenshots. To complete the documentation, capture actual screenshots during the installation process on each platform and save them to the `screenshots/` directory with the filenames indicated in this document.
+> **Note about Screenshots:** This guide includes placeholder references for screenshots. To complete the documentation, capture actual screenshots during the installation process on each platform and save them to the `docs/assets/screenshots/` directory with the filenames indicated in this document.
 
 ## Table of Contents
 
@@ -45,7 +45,7 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - Download `APGI_System_Setup.exe` from the official distribution source
    - Save it to your Downloads folder
 
-   ![Windows Download](screenshots/windows_download.png)
+   ![Windows Download](../assets/screenshots/windows_download.png)
    *Screenshot: Downloading the installer*
 
 2. **Run the Installer**
@@ -53,7 +53,7 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - If Windows SmartScreen appears, click "More info" then "Run anyway"
    - The installer wizard will open
 
-   ![Windows SmartScreen](screenshots/windows_smartscreen.png)
+   ![Windows SmartScreen](../assets/screenshots/windows_smartscreen.png)
    *Screenshot: Windows SmartScreen warning (if applicable)*
 
 3. **Follow the Installation Wizard**
@@ -65,7 +65,7 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
      - ✓ Create a Start Menu entry (recommended)
    - Click "Install" to begin installation
 
-   ![Windows Installer Wizard](screenshots/windows_installer_wizard.png)
+   ![Windows Installer Wizard](../assets/screenshots/windows_installer_wizard.png)
    *Screenshot: Installation wizard showing options*
 
 4. **Complete Installation**
@@ -73,14 +73,14 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - Click "Finish" to exit the installer
    - Optionally, check "Launch APGI System" to start immediately
 
-   ![Windows Installation Complete](screenshots/windows_install_complete.png)
+   ![Windows Installation Complete](../assets/screenshots/windows_install_complete.png)
    *Screenshot: Installation completion screen*
 
 5. **Launch the Application**
    - From Desktop: Double-click the "APGI System" icon
    - From Start Menu: Search for "APGI System" and click to launch
 
-   ![Windows Application Running](screenshots/windows_app_running.png)
+   ![Windows Application Running](../assets/screenshots/windows_app_running.png)
    *Screenshot: APGI System main window on Windows*
 
 ### Method 2: Standalone Executable
@@ -111,14 +111,14 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - Download `APGI_System.dmg` from the official distribution source
    - Save it to your Downloads folder
 
-   ![macOS Download](screenshots/macos_download.png)
+   ![macOS Download](../assets/screenshots/macos_download.png)
    *Screenshot: Downloading the .dmg file*
 
 2. **Open the Disk Image**
    - Double-click `APGI_System.dmg` to mount it
    - A new window will open showing the APGI System icon and an Applications folder shortcut
 
-   ![macOS DMG Window](screenshots/macos_dmg_window.png)
+   ![macOS DMG Window](../assets/screenshots/macos_dmg_window.png)
    *Screenshot: DMG window with drag-to-install interface*
 
 3. **Install the Application**
@@ -126,7 +126,7 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - Wait for the copy to complete (usually a few seconds)
    - You can now eject the disk image by right-clicking it in Finder and selecting "Eject"
 
-   ![macOS Drag to Install](screenshots/macos_drag_install.png)
+   ![macOS Drag to Install](../assets/screenshots/macos_drag_install.png)
    *Screenshot: Dragging application to Applications folder*
 
 4. **First Launch**
@@ -134,7 +134,7 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
    - Find "APGI System" in the list
    - Double-click to launch
 
-   ![macOS Applications Folder](screenshots/macos_applications.png)
+   ![macOS Applications Folder](../assets/screenshots/macos_applications.png)
    *Screenshot: APGI System in Applications folder*
 
 5. **Security Prompt (First Launch Only)**
@@ -147,15 +147,15 @@ Welcome to the APGI System (Allostatic Precision-Gated Ignition Framework)! This
      - Confirm by clicking "Open" in the dialog
    - The application will now launch and won't require this step again
 
-   ![macOS Gatekeeper](screenshots/macos_gatekeeper.png)
+   ![macOS Gatekeeper](../assets/screenshots/macos_gatekeeper.png)
    *Screenshot: macOS Gatekeeper security prompt*
 
-   ![macOS Privacy Settings](screenshots/macos_privacy_settings.png)
+   ![macOS Privacy Settings](../assets/screenshots/macos_privacy_settings.png)
    *Screenshot: Privacy & Security settings with "Open Anyway" button*
 
 **Alternative Method:** Right-click (or Control-click) the application and select "Open" from the menu. This bypasses Gatekeeper for the first launch.
 
-   ![macOS Application Running](screenshots/macos_app_running.png)
+   ![macOS Application Running](../assets/screenshots/macos_app_running.png)
    *Screenshot: APGI System main window on macOS*
 
 ---
@@ -409,8 +409,8 @@ xattr -cr /Applications/APGI\ System.app
 ### Documentation
 
 - **Build Documentation:** See `build/README_BUILD.md` for developer information
-- **Configuration Guide:** See `docs/CONFIG_VALIDATION.md` for configuration details
-- **API Documentation:** See `API_SETUP_GUIDE.md` for REST API usage
+- **Configuration Guide:** See `docs/config/CONFIG_VALIDATION.md` for configuration details
+- **API Documentation:** See `docs/api/API_SETUP_GUIDE.md` for REST API usage
 
 ### Support
 

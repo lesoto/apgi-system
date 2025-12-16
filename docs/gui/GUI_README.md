@@ -420,7 +420,7 @@ Planned features:
 
 ## Support & Resources
 
-- **Documentation**: See main README.md
+- **Documentation**: See main APGI-System-README.md
 - **Examples**: /examples directory
 - **Tests**: /tests directory
 - **Configuration**: /config directory

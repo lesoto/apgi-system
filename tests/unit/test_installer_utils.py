@@ -8,7 +8,7 @@ Requirements: 13.1, 13.2
 import pytest
 import tempfile
 from pathlib import Path
-from build.installer_utils import (
+from installer_utils import (
     extract_version_from_pyproject,
     normalize_path_for_inno,
     generate_registry_entries,
