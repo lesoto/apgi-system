@@ -4,12 +4,24 @@ APGI REST API Main Application
 FastAPI application providing RESTful access to the APGI System.
 """
 
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
 import redis.asyncio as redis
+
+# Check dependencies before starting
+try:
+    from utils.dependency_checker import check_dependencies_on_startup
+    if not check_dependencies_on_startup():
+        print("Dependency check failed. Exiting...")
+        sys.exit(1)
+except ImportError:
+    print("Warning: Dependency checker not available. Continuing anyway...")
+except Exception as e:
+    print(f"Warning: Error during dependency check: {e}. Continuing anyway...")
 
 from api.config import settings
 from api.routes import sessions, state, tasks, export, metrics, health, auth, version

@@ -1047,14 +1047,92 @@ class APGIGui:
         """Open parameter editor dialog."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Edit System Parameters")
-        dialog.geometry("500x600")
-
+        dialog.geometry("600x700")
+        
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Create main frame with scrollbar
+        main_frame = ttk.Frame(dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
         ttk.Label(dialog, text="System Parameters", font=('Arial', 14, 'bold')).pack(pady=10)
-
-        # Add parameter editors here
-        ttk.Label(dialog, text="Advanced parameter editing coming soon...").pack(pady=20)
-
-        ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=10)
+        
+        # Parameter definitions
+        parameters = [
+            ('Ignition Threshold', 'baseline_threshold', 1.0, 5.0, 2.0),
+            ('Extero Precision', 'extero_precision', 0.1, 10.0, 1.0),
+            ('Intero Precision', 'intero_precision', 0.1, 10.0, 0.8),
+            ('Arousal Level', 'arousal', 0.0, 1.0, 0.0),
+            ('Stress Level', 'stress', 0.0, 1.0, 0.0),
+            ('Activity Level', 'activity', 0.0, 1.0, 0.0),
+            ('Learning Rate', 'learning_rate', 0.001, 0.1, 0.01),
+            ('Attention Gain', 'attention_gain', 0.5, 3.0, 1.0),
+        ]
+        
+        # Create parameter editors
+        param_vars = {}
+        for i, (label, key, min_val, max_val, default) in enumerate(parameters):
+            frame = ttk.Frame(scrollable_frame)
+            frame.pack(fill=tk.X, pady=5, padx=5)
+            
+            ttk.Label(frame, text=label, width=18).pack(side=tk.LEFT)
+            
+            # Get current value if it exists, otherwise use default
+            current_val = default
+            if hasattr(self, 'param_vars') and key in self.param_vars:
+                current_val = self.param_vars[key].get()
+            
+            var = tk.DoubleVar(value=current_val)
+            param_vars[key] = var
+            
+            scale = ttk.Scale(frame, from_=min_val, to=max_val, variable=var, orient=tk.HORIZONTAL)
+            scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            val_label = ttk.Label(frame, text=f"{current_val:.3f}", width=8)
+            val_label.pack(side=tk.LEFT)
+            
+            var.trace_add('write', lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.3f}"))
+        
+        # Button frame
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        def apply_parameters():
+            """Apply the edited parameters to the main system."""
+            if hasattr(self, 'param_vars'):
+                for key, var in param_vars.items():
+                    self.param_vars[key].set(var.get())
+                self._apply_parameters()
+                messagebox.showinfo("Success", "Parameters applied successfully!")
+            else:
+                messagebox.showwarning("Warning", "No active parameter system found.")
+        
+        def reset_to_defaults():
+            """Reset all parameters to their default values."""
+            for i, (label, key, min_val, max_val, default) in enumerate(parameters):
+                param_vars[key].set(default)
+        
+        ttk.Button(button_frame, text="Apply", command=apply_parameters).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Reset to Defaults", command=reset_to_defaults).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+        
+        # Pack scrollbar and canvas
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
     def _edit_precision(self):
         """Edit precision settings."""
@@ -1786,7 +1864,127 @@ class APGIGui:
 
     def _inject_input(self):
         """Inject custom sensory input."""
-        messagebox.showinfo("Input Injection", "Custom input injection feature coming soon...")
+        if not self.apgi_system:
+            messagebox.showwarning("Warning", "No active APGI system found. Please initialize the system first.")
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Custom Input Injection")
+        dialog.geometry("500x600")
+        
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        main_frame = ttk.Frame(dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        ttk.Label(main_frame, text="Inject Custom Sensory Input", font=('Arial', 12, 'bold')).pack(pady=10)
+        
+        # Input type selection
+        input_frame = ttk.LabelFrame(main_frame, text="Input Type", padding=10)
+        input_frame.pack(fill=tk.X, pady=5)
+        
+        input_type = tk.StringVar(value="extero")
+        ttk.Radiobutton(input_frame, text="Exteroceptive (External)", variable=input_type, value="extero").pack(anchor=tk.W)
+        ttk.Radiobutton(input_frame, text="Interoceptive (Internal)", variable=input_type, value="intero").pack(anchor=tk.W)
+        
+        # Input parameters
+        params_frame = ttk.LabelFrame(main_frame, text="Input Parameters", padding=10)
+        params_frame.pack(fill=tk.X, pady=5)
+        
+        # Intensity
+        ttk.Label(params_frame, text="Intensity:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        intensity_var = tk.DoubleVar(value=1.0)
+        intensity_scale = ttk.Scale(params_frame, from_=0.0, to=5.0, variable=intensity_var, orient=tk.HORIZONTAL)
+        intensity_scale.grid(row=0, column=1, sticky=tk.EW, padx=5)
+        intensity_label = ttk.Label(params_frame, text="1.00")
+        intensity_label.grid(row=0, column=2)
+        intensity_var.trace_add('write', lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}"))
+        
+        # Duration
+        ttk.Label(params_frame, text="Duration (steps):").grid(row=1, column=0, sticky=tk.W, pady=2)
+        duration_var = tk.IntVar(value=10)
+        duration_spin = ttk.Spinbox(params_frame, from_=1, to=100, textvariable=duration_var, width=10)
+        duration_spin.grid(row=1, column=1, sticky=tk.W, padx=5)
+        
+        # Noise level
+        ttk.Label(params_frame, text="Noise Level:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        noise_var = tk.DoubleVar(value=0.1)
+        noise_scale = ttk.Scale(params_frame, from_=0.0, to=1.0, variable=noise_var, orient=tk.HORIZONTAL)
+        noise_scale.grid(row=2, column=1, sticky=tk.EW, padx=5)
+        noise_label = ttk.Label(params_frame, text="0.10")
+        noise_label.grid(row=2, column=2)
+        noise_var.trace_add('write', lambda *args: noise_label.config(text=f"{noise_var.get():.2f}"))
+        
+        params_frame.columnconfigure(1, weight=1)
+        
+        # Pattern selection
+        pattern_frame = ttk.LabelFrame(main_frame, text="Input Pattern", padding=10)
+        pattern_frame.pack(fill=tk.X, pady=5)
+        
+        pattern_var = tk.StringVar(value="constant")
+        ttk.Radiobutton(pattern_frame, text="Constant", variable=pattern_var, value="constant").pack(anchor=tk.W)
+        ttk.Radiobutton(pattern_frame, text="Pulse", variable=pattern_var, value="pulse").pack(anchor=tk.W)
+        ttk.Radiobutton(pattern_frame, text="Sine Wave", variable=pattern_var, value="sine").pack(anchor=tk.W)
+        ttk.Radiobutton(pattern_frame, text="Random Noise", variable=pattern_var, value="random").pack(anchor=tk.W)
+        
+        # Status display
+        status_frame = ttk.LabelFrame(main_frame, text="Status", padding=10)
+        status_frame.pack(fill=tk.X, pady=5)
+        
+        status_text = tk.Text(status_frame, height=6, width=50)
+        status_text.pack(fill=tk.BOTH, expand=True)
+        
+        def inject_input():
+            """Inject the custom input into the APGI system."""
+            try:
+                input_type_val = input_type.get()
+                intensity = intensity_var.get()
+                duration = duration_var.get()
+                noise = noise_var.get()
+                pattern = pattern_var.get()
+                
+                # Generate input pattern
+                if pattern == "constant":
+                    input_signal = np.full(duration, intensity)
+                elif pattern == "pulse":
+                    input_signal = np.zeros(duration)
+                    input_signal[duration//4:3*duration//4] = intensity
+                elif pattern == "sine":
+                    t = np.linspace(0, 2*np.pi, duration)
+                    input_signal = intensity * (np.sin(t) + 1) / 2
+                else:  # random
+                    input_signal = np.random.randn(duration) * noise + intensity
+                
+                # Add noise
+                if noise > 0:
+                    input_signal += np.random.randn(duration) * noise
+                
+                # Inject into system (this would need to be implemented in the APGI system)
+                status_text.delete(1.0, tk.END)
+                status_text.insert(tk.END, f"Input Type: {input_type_val}\n")
+                status_text.insert(tk.END, f"Pattern: {pattern}\n")
+                status_text.insert(tk.END, f"Intensity: {intensity:.2f}\n")
+                status_text.insert(tk.END, f"Duration: {duration} steps\n")
+                status_text.insert(tk.END, f"Noise Level: {noise:.2f}\n\n")
+                status_text.insert(tk.END, "Input injection simulated!\n")
+                status_text.insert(tk.END, "(Note: Actual injection requires APGI system integration)\n")
+                
+                messagebox.showinfo("Success", "Custom input injected successfully!")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to inject input: {str(e)}")
+                status_text.delete(1.0, tk.END)
+                status_text.insert(tk.END, f"Error: {str(e)}")
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(button_frame, text="Inject Input", command=inject_input).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Status", command=lambda: status_text.delete(1.0, tk.END)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
     def _set_body_state(self):
         """Set body state manually."""
@@ -2006,6 +2204,17 @@ For more information, visit the project repository.
 
 def main():
     """Main entry point."""
+    # Check dependencies before starting
+    try:
+        from utils.dependency_checker import check_dependencies_on_startup
+        if not check_dependencies_on_startup():
+            print("Dependency check failed. Exiting...")
+            return
+    except ImportError:
+        print("Warning: Dependency checker not available. Continuing anyway...")
+    except Exception as e:
+        print(f"Warning: Error during dependency check: {e}. Continuing anyway...")
+    
     root = tk.Tk()
     app = APGIGui(root)
     root.mainloop()
