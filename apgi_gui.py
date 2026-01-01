@@ -140,9 +140,9 @@ class APGIGui:
         view_menu.add_checkbutton(label="Interoception", variable=tk.BooleanVar(value=True))
         view_menu.add_checkbutton(label="System Metrics", variable=tk.BooleanVar(value=True))
         view_menu.add_separator()
-        view_menu.add_command(label="Zoom In", accelerator="Ctrl++")
-        view_menu.add_command(label="Zoom Out", accelerator="Ctrl+-")
-        view_menu.add_command(label="Fit to Window", accelerator="Ctrl+0")
+        view_menu.add_command(label="Zoom In", accelerator="Ctrl++", command=self._zoom_in)
+        view_menu.add_command(label="Zoom Out", accelerator="Ctrl+-", command=self._zoom_out)
+        view_menu.add_command(label="Fit to Window", accelerator="Ctrl+0", command=self._zoom_fit)
 
         # Tools Menu
         tools_menu = tk.Menu(menubar, tearoff=0)
@@ -692,7 +692,8 @@ class APGIGui:
             self.apgi_system.ignition_threshold.baseline_threshold = self.param_vars['baseline_threshold'].get()
 
         except Exception as e:
-            pass  # Silently ignore parameter application errors
+            self._log_event(f"Error applying parameters: {str(e)}")
+            logger.error(f"Parameter application error: {str(e)}", exc_info=True)
 
     def _record_state(self, state):
         """Record state data."""
@@ -758,7 +759,8 @@ class APGIGui:
             self.status_labels['Allostatic Load'].config(text=f"{load:.1f}%")
 
         except Exception as e:
-            pass  # Silently ignore update errors
+            self._log_event(f"Error updating status labels: {str(e)}")
+            logger.error(f"Status update error: {str(e)}", exc_info=True)
 
     def _update_plots(self):
         """Update all plot canvases."""
@@ -787,7 +789,8 @@ class APGIGui:
             self._update_state_space()
 
         except Exception as e:
-            pass  # Silently ignore plot update errors
+            self._log_event(f"Error updating plots: {str(e)}")
+            logger.error(f"Plot update error: {str(e)}", exc_info=True)
 
     def _update_neural_plots(self, time_data):
         """Update neural activity plots."""
@@ -1823,6 +1826,103 @@ class APGIGui:
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
             traceback.print_exc()
+
+    def _zoom_in(self):
+        """Zoom in on all matplotlib plots."""
+        try:
+            # Zoom in on neural plots
+            if hasattr(self, 'neural_axes'):
+                for ax in self.neural_axes.values():
+                    xlim = ax.get_xlim()
+                    ylim = ax.get_ylim()
+                    x_center = (xlim[0] + xlim[1]) / 2
+                    y_center = (ylim[0] + ylim[1]) / 2
+                    x_range = (xlim[1] - xlim[0]) * 0.8  # Zoom in by 20%
+                    y_range = (ylim[1] - ylim[0]) * 0.8
+                    ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                    ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                self.neural_canvas.draw_idle()
+            
+            # Zoom in on other plot canvases if they exist
+            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+                if hasattr(self, canvas_attr):
+                    canvas = getattr(self, canvas_attr)
+                    if hasattr(canvas, 'figure'):
+                        for ax in canvas.figure.get_axes():
+                            xlim = ax.get_xlim()
+                            ylim = ax.get_ylim()
+                            x_center = (xlim[0] + xlim[1]) / 2
+                            y_center = (ylim[0] + ylim[1]) / 2
+                            x_range = (xlim[1] - xlim[0]) * 0.8
+                            y_range = (ylim[1] - ylim[0]) * 0.8
+                            ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                            ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                        canvas.draw_idle()
+                        
+        except Exception as e:
+            self._log_event(f"Error zooming in: {str(e)}")
+
+    def _zoom_out(self):
+        """Zoom out on all matplotlib plots."""
+        try:
+            # Zoom out on neural plots
+            if hasattr(self, 'neural_axes'):
+                for ax in self.neural_axes.values():
+                    xlim = ax.get_xlim()
+                    ylim = ax.get_ylim()
+                    x_center = (xlim[0] + xlim[1]) / 2
+                    y_center = (ylim[0] + ylim[1]) / 2
+                    x_range = (xlim[1] - xlim[0]) * 1.25  # Zoom out by 25%
+                    y_range = (ylim[1] - ylim[0]) * 1.25
+                    ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                    ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                self.neural_canvas.draw_idle()
+            
+            # Zoom out on other plot canvases if they exist
+            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+                if hasattr(self, canvas_attr):
+                    canvas = getattr(self, canvas_attr)
+                    if hasattr(canvas, 'figure'):
+                        for ax in canvas.figure.get_axes():
+                            xlim = ax.get_xlim()
+                            ylim = ax.get_ylim()
+                            x_center = (xlim[0] + xlim[1]) / 2
+                            y_center = (ylim[0] + ylim[1]) / 2
+                            x_range = (xlim[1] - xlim[0]) * 1.25
+                            y_range = (ylim[1] - ylim[0]) * 1.25
+                            ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                            ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                        canvas.draw_idle()
+                        
+        except Exception as e:
+            self._log_event(f"Error zooming out: {str(e)}")
+
+    def _zoom_fit(self):
+        """Reset zoom to fit all data on all matplotlib plots."""
+        try:
+            # Force a plot update to recalculate limits
+            if len(self.time_buffer) > 0:
+                self._update_plots()
+            
+            # Reset neural plots to auto-scale
+            if hasattr(self, 'neural_axes'):
+                for ax in self.neural_axes.values():
+                    ax.relim()
+                    ax.autoscale_view()
+                self.neural_canvas.draw_idle()
+            
+            # Reset other plot canvases if they exist
+            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+                if hasattr(self, canvas_attr):
+                    canvas = getattr(self, canvas_attr)
+                    if hasattr(canvas, 'figure'):
+                        for ax in canvas.figure.get_axes():
+                            ax.relim()
+                            ax.autoscale_view()
+                        canvas.draw_idle()
+                        
+        except Exception as e:
+            self._log_event(f"Error fitting to window: {str(e)}")
 
     def _trigger_ignition(self):
         """Manually trigger ignition event."""

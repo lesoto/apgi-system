@@ -41,6 +41,24 @@ class Settings:
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
     
+    def __post_init__(self):
+        """Validate critical security settings after initialization."""
+        # Validate JWT secret key is not the default insecure value
+        if self.jwt_secret_key == "your-secret-key-change-in-production":
+            raise ValueError(
+                "CRITICAL: JWT_SECRET_KEY is not configured. "
+                "Set a secure JWT_SECRET_KEY environment variable before starting the API. "
+                "The default value is insecure and must not be used in production."
+            )
+        
+        # Validate CORS origins are explicitly configured
+        if self.cors_origins == ["*"]:
+            raise ValueError(
+                "SECURITY WARNING: CORS origins are set to wildcard [*]. "
+                "This allows any origin to access the API. "
+                "Set CORS_ORIGINS environment variable to specific allowed origins for production."
+            )
+    
     # Rate Limiting Settings
     rate_limit_enabled: bool = True
     rate_limit_per_minute: int = 60
@@ -68,3 +86,4 @@ class Settings:
 
 # Global settings instance
 settings = Settings()
+settings.__post_init__()

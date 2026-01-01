@@ -70,7 +70,7 @@ class DependencyChecker:
             ('scipy', 'scipy'),
             ('matplotlib', 'matplotlib'),
             ('pandas', 'pandas'),
-            ('sklearn', 'scikit-learn'),
+            ('sklearn', 'sklearn'),
             ('networkx', 'networkx'),
             ('torch', 'torch'),
             ('jax', 'jax'),

@@ -343,7 +343,6 @@ class AuthManager:
         payload = self.verify_token(refresh_token, expected_type="refresh")
         
         # Check if token exists in database and is not revoked
-        token_hash = self.hash_password(refresh_token)
         db_token = self.db.query(RefreshToken).filter(
             and_(
                 RefreshToken.user_id == payload.user_id,
@@ -353,6 +352,10 @@ class AuthManager:
         
         if not db_token:
             raise AuthenticationError("Refresh token has been revoked")
+        
+        # Verify the token hash matches the stored hash
+        if not self.verify_password(refresh_token, db_token.token_hash):
+            raise AuthenticationError("Invalid refresh token")
         
         # Check expiration in database
         if datetime.utcnow() > db_token.expires_at:
