@@ -4,29 +4,22 @@ Session Management Routes
 API endpoints for creating, controlling, and managing APGI simulation sessions.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Optional
 import logging
-import redis.asyncio as redis
+from typing import Optional
 
+import redis.asyncio as redis
+from fastapi import APIRouter, Depends, status
+
+from api.database.connection import SessionLocal
+from api.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from api.models.schemas import (
+    ErrorResponse,
+    SessionActionResponse,
     SessionCreateRequest,
     SessionCreateResponse,
     SessionResponse,
-    SessionActionResponse,
-    ErrorResponse
 )
-from api.services.session_manager import SessionManager, SessionLifecycleState
-from api.database.connection import get_db, SessionLocal
-from api.config import settings
-from api.exceptions import (
-    SessionNotFoundError,
-    SessionStateConflictError,
-    ServiceUnavailableError,
-    InternalServerError
-)
-
+from api.services.session_manager import SessionLifecycleState, SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +30,8 @@ router = APIRouter(
     tags=["Sessions"],
     responses={
         404: {"model": ErrorResponse, "description": "Session not found"},
-        500: {"model": ErrorResponse, "description": "Internal server error"}
-    }
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
 )
 
 
@@ -64,7 +57,7 @@ def get_session_manager() -> SessionManager:
 def init_session_routes(redis_client: redis.Redis):
     """
     Initialize session routes with Redis client.
-    
+
     Args:
         redis_client: Async Redis client instance
     """
@@ -79,38 +72,37 @@ def init_session_routes(redis_client: redis.Redis):
     response_model=SessionCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create new simulation session",
-    description="Initialize a new APGI simulation session with the provided configuration"
+    description="Initialize a new APGI simulation session with the provided configuration",
 )
 async def create_session(
-    request: SessionCreateRequest,
-    manager: SessionManager = Depends(get_session_manager)
+    request: SessionCreateRequest, manager: SessionManager = Depends(get_session_manager)
 ):
     """
     Create new simulation session.
-    
+
     Args:
         request: Session creation request with configuration
         manager: Session manager dependency
-        
+
     Returns:
         SessionCreateResponse with session ID and details
-        
+
     Raises:
         HTTPException: If session creation fails
     """
     # Create session
     session_id = await manager.create_session(request)
-    
+
     # Get session details
     sim_session = await manager.get_session(session_id)
-    
+
     logger.info(f"Session {session_id} created successfully")
-    
+
     return SessionCreateResponse(
         session_id=session_id,
         status=sim_session.state.value,
         created_at=sim_session.created_at,
-        config=sim_session.config
+        config=sim_session.config,
     )
 
 
@@ -118,22 +110,19 @@ async def create_session(
     "/{session_id}",
     response_model=SessionResponse,
     summary="Get session details",
-    description="Retrieve detailed information about a specific simulation session"
+    description="Retrieve detailed information about a specific simulation session",
 )
-async def get_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def get_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Get session details.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         SessionResponse with session details
-        
+
     Raises:
         HTTPException: If session not found
     """
@@ -141,14 +130,14 @@ async def get_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     return SessionResponse(
         session_id=session_id,
         status=sim_session.state.value,
         created_at=sim_session.created_at,
         updated_at=sim_session.updated_at,
         config=sim_session.config,
-        description=sim_session.config.get("description")
+        description=sim_session.config.get("description"),
     )
 
 
@@ -156,22 +145,19 @@ async def get_session(
     "/{session_id}/start",
     response_model=SessionActionResponse,
     summary="Start simulation",
-    description="Start or resume the simulation for the specified session"
+    description="Start or resume the simulation for the specified session",
 )
-async def start_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def start_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Start simulation.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         SessionActionResponse with updated status
-        
+
     Raises:
         HTTPException: If session not found or cannot be started
     """
@@ -179,22 +165,20 @@ async def start_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     try:
         result = await sim_session.start()
-    except ValueError as e:
+    except ValueError:
         # State conflict - trying to start session in invalid state
         raise SessionStateConflictError(session_id, sim_session.state.value, "start")
-    
+
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.RUNNING)
-    
+
     logger.info(f"Session {session_id} started")
-    
+
     return SessionActionResponse(
-        session_id=session_id,
-        status=result["status"],
-        timestamp=sim_session.updated_at
+        session_id=session_id, status=result["status"], timestamp=sim_session.updated_at
     )
 
 
@@ -202,22 +186,19 @@ async def start_session(
     "/{session_id}/pause",
     response_model=SessionActionResponse,
     summary="Pause simulation",
-    description="Pause the simulation while preserving current state"
+    description="Pause the simulation while preserving current state",
 )
-async def pause_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def pause_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Pause simulation.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         SessionActionResponse with updated status
-        
+
     Raises:
         HTTPException: If session not found or cannot be paused
     """
@@ -225,22 +206,20 @@ async def pause_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     try:
         result = await sim_session.pause()
-    except ValueError as e:
+    except ValueError:
         # State conflict - trying to pause session in invalid state
         raise SessionStateConflictError(session_id, sim_session.state.value, "pause")
-    
+
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.PAUSED)
-    
+
     logger.info(f"Session {session_id} paused")
-    
+
     return SessionActionResponse(
-        session_id=session_id,
-        status=result["status"],
-        timestamp=sim_session.updated_at
+        session_id=session_id, status=result["status"], timestamp=sim_session.updated_at
     )
 
 
@@ -248,22 +227,19 @@ async def pause_session(
     "/{session_id}/stop",
     response_model=SessionActionResponse,
     summary="Stop simulation",
-    description="Stop the simulation for the specified session"
+    description="Stop the simulation for the specified session",
 )
-async def stop_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def stop_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Stop simulation.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         SessionActionResponse with updated status
-        
+
     Raises:
         HTTPException: If session not found
     """
@@ -271,18 +247,16 @@ async def stop_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     result = await sim_session.stop()
-    
+
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.STOPPED)
-    
+
     logger.info(f"Session {session_id} stopped")
-    
+
     return SessionActionResponse(
-        session_id=session_id,
-        status=result["status"],
-        timestamp=sim_session.updated_at
+        session_id=session_id, status=result["status"], timestamp=sim_session.updated_at
     )
 
 
@@ -290,22 +264,19 @@ async def stop_session(
     "/{session_id}/reset",
     response_model=SessionActionResponse,
     summary="Reset simulation",
-    description="Reset the simulation to initial conditions"
+    description="Reset the simulation to initial conditions",
 )
-async def reset_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def reset_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Reset simulation to initial state.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         SessionActionResponse with updated status
-        
+
     Raises:
         HTTPException: If session not found
     """
@@ -313,18 +284,16 @@ async def reset_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     result = await sim_session.reset()
-    
+
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.CREATED)
-    
+
     logger.info(f"Session {session_id} reset")
-    
+
     return SessionActionResponse(
-        session_id=session_id,
-        status=result["status"],
-        timestamp=sim_session.updated_at
+        session_id=session_id, status=result["status"], timestamp=sim_session.updated_at
     )
 
 
@@ -332,22 +301,19 @@ async def reset_session(
     "/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete session",
-    description="Delete the session and clean up all associated resources"
+    description="Delete the session and clean up all associated resources",
 )
-async def delete_session(
-    session_id: str,
-    manager: SessionManager = Depends(get_session_manager)
-):
+async def delete_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
     """
     Delete session and clean up resources.
-    
+
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
-        
+
     Returns:
         No content (204)
-        
+
     Raises:
         HTTPException: If session not found or deletion fails
     """
@@ -356,10 +322,10 @@ async def delete_session(
         await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
-    
+
     # Delete session
     await manager.delete_session(session_id)
-    
+
     logger.info(f"Session {session_id} deleted")
-    
+
     return None

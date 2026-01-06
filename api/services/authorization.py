@@ -4,23 +4,25 @@ Authorization Service
 Role-Based Access Control (RBAC) for API endpoints.
 """
 
-from typing import List, Dict, Set
 from enum import Enum
-from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Dict, List, Set
 
-from api.services.auth_manager import AuthManager, TokenPayload
-from api.exceptions import AuthorizationError, InvalidTokenError
-from api.database.connection import get_db
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from api.database.connection import get_db
+from api.exceptions import AuthorizationError, InvalidTokenError
+from api.services.auth_manager import AuthManager, TokenPayload
 
 # ============================================================================
 # Roles and Permissions
 # ============================================================================
 
+
 class Role(str, Enum):
     """User roles for RBAC."""
+
     ADMIN = "admin"
     RESEARCHER = "researcher"
     VIEWER = "viewer"
@@ -28,22 +30,23 @@ class Role(str, Enum):
 
 class Permission(str, Enum):
     """System permissions."""
+
     # Session permissions
     SESSION_CREATE = "session:create"
     SESSION_READ = "session:read"
     SESSION_UPDATE = "session:update"
     SESSION_DELETE = "session:delete"
     SESSION_CONTROL = "session:control"  # start, pause, stop, reset
-    
+
     # Task permissions
     TASK_CREATE = "task:create"
     TASK_READ = "task:read"
     TASK_DELETE = "task:delete"
-    
+
     # Data permissions
     DATA_EXPORT = "data:export"
     DATA_READ = "data:read"
-    
+
     # System permissions
     SYSTEM_ADMIN = "system:admin"
     USER_MANAGE = "user:manage"
@@ -92,13 +95,14 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
 # Authorization Functions
 # ============================================================================
 
+
 def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
     """
     Get all permissions for a list of roles.
-    
+
     Args:
         roles: List of role names
-        
+
     Returns:
         Set of permissions granted by these roles
     """
@@ -116,11 +120,11 @@ def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
 def has_permission(user_roles: List[str], required_permission: Permission) -> bool:
     """
     Check if user has a specific permission.
-    
+
     Args:
         user_roles: List of user's roles
         required_permission: Permission to check
-        
+
     Returns:
         True if user has the permission, False otherwise
     """
@@ -131,11 +135,11 @@ def has_permission(user_roles: List[str], required_permission: Permission) -> bo
 def has_any_role(user_roles: List[str], required_roles: List[Role]) -> bool:
     """
     Check if user has any of the required roles.
-    
+
     Args:
         user_roles: List of user's roles
         required_roles: List of required roles
-        
+
     Returns:
         True if user has at least one of the required roles
     """
@@ -153,17 +157,17 @@ def check_permission(
     user_roles: List[str],
     required_permission: Permission,
     resource: str = "resource",
-    action: str = "access"
+    action: str = "access",
 ) -> None:
     """
     Check if user has permission, raise exception if not.
-    
+
     Args:
         user_roles: List of user's roles
         required_permission: Permission to check
         resource: Resource being accessed (for error message)
         action: Action being performed (for error message)
-        
+
     Raises:
         AuthorizationError: If user lacks the required permission
     """
@@ -174,12 +178,8 @@ def check_permission(
             if required_permission in perms:
                 required_role = role.value
                 break
-        
-        raise AuthorizationError(
-            resource=resource,
-            action=action,
-            required_role=required_role
-        )
+
+        raise AuthorizationError(resource=resource, action=action, required_role=required_role)
 
 
 # ============================================================================
@@ -191,25 +191,24 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)
 ) -> TokenPayload:
     """
     FastAPI dependency to get current authenticated user from JWT token.
-    
+
     Args:
         credentials: HTTP authorization credentials
         db: Database session
-        
+
     Returns:
         TokenPayload with user information
-        
+
     Raises:
         InvalidTokenError: If token is invalid or expired
     """
     token = credentials.credentials
     auth_manager = AuthManager(db)
-    
+
     try:
         payload = auth_manager.verify_token(token, expected_type="access")
         return payload
@@ -220,86 +219,81 @@ async def get_current_user(
 def require_permission(permission: Permission):
     """
     Create a FastAPI dependency that requires a specific permission.
-    
+
     Args:
         permission: Required permission
-        
+
     Returns:
         FastAPI dependency function
-        
+
     Example:
         @app.get("/sessions", dependencies=[Depends(require_permission(Permission.SESSION_READ))])
         async def list_sessions():
             ...
     """
+
     async def permission_checker(
-        current_user: TokenPayload = Depends(get_current_user)
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
         """Check if current user has required permission."""
         check_permission(
             user_roles=current_user.roles,
             required_permission=permission,
             resource=permission.value.split(":")[0],
-            action=permission.value.split(":")[1]
+            action=permission.value.split(":")[1],
         )
         return current_user
-    
+
     return permission_checker
 
 
 def require_role(role: Role):
     """
     Create a FastAPI dependency that requires a specific role.
-    
+
     Args:
         role: Required role
-        
+
     Returns:
         FastAPI dependency function
-        
+
     Example:
         @app.delete("/users/{user_id}", dependencies=[Depends(require_role(Role.ADMIN))])
         async def delete_user(user_id: str):
             ...
     """
-    async def role_checker(
-        current_user: TokenPayload = Depends(get_current_user)
-    ) -> TokenPayload:
+
+    async def role_checker(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
         """Check if current user has required role."""
         if not has_any_role(current_user.roles, [role]):
-            raise AuthorizationError(
-                resource="endpoint",
-                action="access",
-                required_role=role.value
-            )
+            raise AuthorizationError(resource="endpoint", action="access", required_role=role.value)
         return current_user
-    
+
     return role_checker
 
 
 def require_any_role(roles: List[Role]):
     """
     Create a FastAPI dependency that requires any of the specified roles.
-    
+
     Args:
         roles: List of acceptable roles
-        
+
     Returns:
         FastAPI dependency function
     """
-    async def role_checker(
-        current_user: TokenPayload = Depends(get_current_user)
-    ) -> TokenPayload:
+
+    async def role_checker(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
         """Check if current user has any of the required roles."""
         if not has_any_role(current_user.roles, roles):
             role_names = [r.value for r in roles]
             raise AuthorizationError(
                 resource="endpoint",
                 action="access",
-                required_role=f"one of: {', '.join(role_names)}"
+                required_role=f"one of: {', '.join(role_names)}",
             )
         return current_user
-    
+
     return role_checker
 
 
@@ -307,32 +301,27 @@ def require_any_role(roles: List[Role]):
 # Resource Ownership Checks
 # ============================================================================
 
+
 def check_resource_ownership(
-    resource_owner_id: str,
-    current_user: TokenPayload,
-    allow_admin: bool = True
+    resource_owner_id: str, current_user: TokenPayload, allow_admin: bool = True
 ) -> None:
     """
     Check if user owns a resource or is an admin.
-    
+
     Args:
         resource_owner_id: User ID of resource owner
         current_user: Current authenticated user
         allow_admin: Whether admins can access any resource
-        
+
     Raises:
         AuthorizationError: If user doesn't own resource and isn't admin
     """
     # Check if user owns the resource
     if resource_owner_id == current_user.user_id:
         return
-    
+
     # Check if user is admin (if allowed)
     if allow_admin and has_any_role(current_user.roles, [Role.ADMIN]):
         return
-    
-    raise AuthorizationError(
-        resource="resource",
-        action="access",
-        required_role="owner or admin"
-    )
+
+    raise AuthorizationError(resource="resource", action="access", required_role="owner or admin")

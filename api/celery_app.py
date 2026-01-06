@@ -5,6 +5,7 @@ Configures Celery for asynchronous task execution with Redis broker.
 """
 
 from celery import Celery
+
 from api.config import settings
 
 # Create Celery app
@@ -12,7 +13,7 @@ celery_app = Celery(
     "apgi_tasks",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["api.tasks.experimental_tasks"]
+    include=["api.tasks.experimental_tasks"],
 )
 
 # Configure Celery

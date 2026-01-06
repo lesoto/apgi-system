@@ -5,10 +5,11 @@ Provides API versioning information including current version,
 supported versions, and deprecation notices.
 """
 
+from datetime import datetime
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from datetime import datetime
-from typing import List, Dict, Optional
 
 router = APIRouter(prefix="/v1", tags=["Version"])
 
@@ -25,10 +26,10 @@ DEPRECATED_ENDPOINTS: Dict[str, Dict[str, str]] = {}
 async def get_version_info():
     """
     Get API version information.
-    
+
     Returns current version, supported versions, deprecated versions,
     and links to API documentation.
-    
+
     **Validates: Requirements 6.1, 6.4**
     """
     return JSONResponse(
@@ -40,15 +41,15 @@ async def get_version_info():
             "deprecated_versions": DEPRECATED_VERSIONS,
             "api_spec_url": "/openapi.json",
             "documentation_url": "/docs",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        },
     )
 
 
 def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]]):
     """
     Configure deprecated endpoints.
-    
+
     Args:
         deprecated_config: Dictionary mapping endpoint paths to deprecation info
                           Format: {"/v1/endpoint": {"sunset": "2026-01-01", "replacement": "/v2/endpoint"}}
@@ -60,10 +61,10 @@ def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]])
 def is_endpoint_deprecated(path: str) -> Optional[Dict[str, str]]:
     """
     Check if an endpoint is deprecated.
-    
+
     Args:
         path: The endpoint path to check
-        
+
     Returns:
         Deprecation info if deprecated, None otherwise
     """
@@ -73,7 +74,7 @@ def is_endpoint_deprecated(path: str) -> Optional[Dict[str, str]]:
 def get_deprecated_endpoints() -> Dict[str, Dict[str, str]]:
     """
     Get all deprecated endpoints configuration.
-    
+
     Returns:
         Dictionary of deprecated endpoints and their info
     """

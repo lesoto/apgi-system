@@ -4,16 +4,15 @@ Database Connection Management
 SQLAlchemy engine and session configuration.
 """
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import NullPool
+import logging
 from contextlib import contextmanager
 from typing import Generator
-import logging
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from api.config import settings
 from api.database.models import Base
-
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +28,13 @@ engine = create_engine(
 
 
 # Create session factory
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
     """
     Initialize database by creating all tables.
-    
+
     This should be called during application startup.
     """
     try:
@@ -53,10 +48,10 @@ def init_db():
 def get_db() -> Generator[Session, None, None]:
     """
     Dependency function to get database session.
-    
+
     Yields:
         Session: SQLAlchemy database session
-        
+
     Usage:
         @app.get("/endpoint")
         async def endpoint(db: Session = Depends(get_db)):
@@ -74,10 +69,10 @@ def get_db() -> Generator[Session, None, None]:
 def get_db_context() -> Generator[Session, None, None]:
     """
     Context manager for database session.
-    
+
     Yields:
         Session: SQLAlchemy database session
-        
+
     Usage:
         with get_db_context() as db:
             # Use db session
@@ -97,7 +92,7 @@ def get_db_context() -> Generator[Session, None, None]:
 def close_db():
     """
     Close database connections.
-    
+
     This should be called during application shutdown.
     """
     try:

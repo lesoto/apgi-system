@@ -5,20 +5,20 @@ Celery tasks for executing experimental paradigms (Iowa Gambling, Masking, Atten
 """
 
 import logging
-from typing import Dict, Any
-from celery import Task
 from datetime import datetime
+from typing import Any, Dict
 
-from api.celery_app import celery_app
-from apgi_system.system import APGISystem
-from apgi_system.platform_utils import get_resource_path
+from celery import Task
+
+from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_system.platform_utils import get_resource_path
+from apgi_system.system import APGISystem
+from api.celery_app import celery_app
 from api.database.connection import get_db
 from api.database.models import Task as TaskModel
 from api.services.webhook_manager import WebhookManager
-
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
     """
     Trigger webhook delivery when task completes.
-    
+
     Args:
         task_id: Celery task ID
         result: Task result data
@@ -34,28 +34,28 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
     try:
         # Get database session
         db = next(get_db())
-        
+
         # Find task record
-        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
-        
+        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()  # type: ignore[arg-type]
+
         if not task_record:
             logger.warning(f"Task record not found for task {task_id}")
             return
-        
+
         # Update task status in database
-        task_record.status = result.get("status", "completed")
-        task_record.completed_at = datetime.utcnow()
-        task_record.result_data = result
-        
+        task_record.status = result.get("status", "completed")  # type: ignore[assignment]
+        task_record.completed_at = datetime.utcnow()  # type: ignore[assignment]
+        task_record.result_data = result  # type: ignore[assignment]
+
         if result.get("status") == "failed":
-            task_record.error_message = result.get("error")
-        
+            task_record.error_message = result.get("error")  # type: ignore[assignment]
+
         db.commit()
-        
+
         # Check if webhook URL is configured
         if task_record.webhook_url:
             logger.info(f"Triggering webhook for task {task_id} to {task_record.webhook_url}")
-            
+
             # Create webhook payload
             payload = {
                 "task_id": task_id,
@@ -63,51 +63,52 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
                 "task_type": task_record.task_type,
                 "status": result.get("status", "completed"),
                 "completed_at": datetime.utcnow().isoformat() + "Z",
-                "result": result
+                "result": result,
             }
-            
+
             # Create webhook delivery
             webhook_manager = WebhookManager()
             delivery_id = await webhook_manager.create_webhook_delivery(
-                db=db,
-                task_id=task_id,
-                webhook_url=task_record.webhook_url,
-                payload=payload
+                db=db, task_id=task_id, webhook_url=task_record.webhook_url, payload=payload  # type: ignore[arg-type]
             )
-            
+
             # Attempt immediate delivery
             await webhook_manager.deliver_webhook(db, delivery_id)
             await webhook_manager.close()
-            
+
             logger.info(f"Webhook delivery {delivery_id} created for task {task_id}")
         else:
             logger.debug(f"No webhook URL configured for task {task_id}")
-        
+
         db.close()
-        
+
     except Exception as e:
         logger.error(f"Failed to trigger webhook for task {task_id}: {e}", exc_info=True)
 
 
 class APGITask(Task):
     """Base task class with APGI system initialization."""
-    
+
     _apgi_system = None
-    
+
     @property
     def apgi_system(self):
         """Lazy initialization of APGI system."""
         if self._apgi_system is None:
             # Use platform-aware resource path resolution
-            self._apgi_system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
+            self._apgi_system = APGISystem(
+                config_path=str(get_resource_path("config/default.yaml"))
+            )
         return self._apgi_system
 
 
-@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_iowa_gambling_task")
+@celery_app.task(
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_iowa_gambling_task"
+)
 def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Execute Iowa Gambling Task.
-    
+
     Args:
         session_id: Session identifier
         parameters: Task parameters including:
@@ -117,12 +118,12 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
             - outcome_stimulus_strength: Outcome strength (default: 2.0)
             - interoceptive_gain: Interoceptive signal multiplier (default: 1.0)
             - deck_selection_strategy: 'balanced', 'random', or 'participant_choice' (default: 'balanced')
-    
+
     Returns:
         Dict with task results and analysis
     """
     logger.info(f"Starting Iowa Gambling Task for session {session_id}")
-    
+
     result = None
     try:
         # Extract parameters with defaults
@@ -132,7 +133,7 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
         outcome_stimulus_strength = parameters.get("outcome_stimulus_strength", 2.0)
         interoceptive_gain = parameters.get("interoceptive_gain", 1.0)
         deck_selection_strategy = parameters.get("deck_selection_strategy", "balanced")
-        
+
         # Create task instance
         task = IowaGamblingTask(
             num_trials=num_trials,
@@ -140,45 +141,50 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
             deck_stimulus_strength=deck_stimulus_strength,
             outcome_stimulus_strength=outcome_stimulus_strength,
             interoceptive_gain=interoceptive_gain,
-            deck_selection_strategy=deck_selection_strategy
+            deck_selection_strategy=deck_selection_strategy,
         )
-        
+
         # Run all trials
         results = task.run_all_trials(self.apgi_system)
-        
+
         logger.info(f"Iowa Gambling Task completed for session {session_id}")
-        
+
         result = {
             "task_type": "iowa_gambling",
             "session_id": session_id,
             "status": "completed",
-            "results": results
+            "results": results,
         }
-        
+
     except Exception as e:
         logger.error(f"Iowa Gambling Task failed for session {session_id}: {e}", exc_info=True)
         result = {
             "task_type": "iowa_gambling",
             "session_id": session_id,
             "status": "failed",
-            "error": str(e)
+            "error": str(e),
         }
-    
+
     # Trigger webhook on completion (async)
     import asyncio
+
     try:
         asyncio.run(trigger_webhook_on_completion(self.request.id, result))
     except Exception as e:
         logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
-    
+
     return result
 
 
-@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_masking_paradigm_task")
-def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+@celery_app.task(
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_masking_paradigm_task"
+)
+def execute_masking_paradigm_task(
+    self, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Execute Masking Paradigm Task.
-    
+
     Args:
         session_id: Session identifier
         parameters: Task parameters including:
@@ -188,12 +194,12 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
             - num_trials_per_condition: Trials per SOA (default: 20)
             - target_strength: Target stimulus strength (default: 2.0)
             - mask_strength: Mask stimulus strength (default: 3.0)
-    
+
     Returns:
         Dict with task results and analysis
     """
     logger.info(f"Starting Masking Paradigm Task for session {session_id}")
-    
+
     result = None
     try:
         # Extract parameters with defaults
@@ -203,7 +209,7 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
         num_trials_per_condition = parameters.get("num_trials_per_condition", 20)
         target_strength = parameters.get("target_strength", 2.0)
         mask_strength = parameters.get("mask_strength", 3.0)
-        
+
         # Create task instance
         task = MaskingParadigmTask(
             target_duration_ms=target_duration_ms,
@@ -211,45 +217,50 @@ def execute_masking_paradigm_task(self, session_id: str, parameters: Dict[str, A
             mask_duration_ms=mask_duration_ms,
             num_trials_per_condition=num_trials_per_condition,
             target_strength=target_strength,
-            mask_strength=mask_strength
+            mask_strength=mask_strength,
         )
-        
+
         # Run all trials
         results = task.run_all_trials(self.apgi_system)
-        
+
         logger.info(f"Masking Paradigm Task completed for session {session_id}")
-        
+
         result = {
             "task_type": "masking_paradigm",
             "session_id": session_id,
             "status": "completed",
-            "results": results
+            "results": results,
         }
-        
+
     except Exception as e:
         logger.error(f"Masking Paradigm Task failed for session {session_id}: {e}", exc_info=True)
         result = {
             "task_type": "masking_paradigm",
             "session_id": session_id,
             "status": "failed",
-            "error": str(e)
+            "error": str(e),
         }
-    
+
     # Trigger webhook on completion (async)
     import asyncio
+
     try:
         asyncio.run(trigger_webhook_on_completion(self.request.id, result))
     except Exception as e:
         logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
-    
+
     return result
 
 
-@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_attentional_blink_task")
-def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+@celery_app.task(
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_attentional_blink_task"
+)
+def execute_attentional_blink_task(
+    self, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Execute Attentional Blink Task.
-    
+
     Args:
         session_id: Session identifier
         parameters: Task parameters including:
@@ -258,12 +269,12 @@ def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, 
             - num_trials_per_lag: Trials per lag condition (default: 20)
             - lags: List of lags to test (default: [1, 2, 3, 4, 8])
             - target_salience: Target salience boost (default: 2.0)
-    
+
     Returns:
         Dict with task results and analysis
     """
     logger.info(f"Starting Attentional Blink Task for session {session_id}")
-    
+
     result = None
     try:
         # Extract parameters with defaults
@@ -272,42 +283,43 @@ def execute_attentional_blink_task(self, session_id: str, parameters: Dict[str, 
         num_trials_per_lag = parameters.get("num_trials_per_lag", 20)
         lags = parameters.get("lags", [1, 2, 3, 4, 8])
         target_salience = parameters.get("target_salience", 2.0)
-        
+
         # Create task instance
         task = AttentionalBlinkTask(
             stream_length=stream_length,
             item_duration_ms=item_duration_ms,
             num_trials_per_lag=num_trials_per_lag,
             lags=lags,
-            target_salience=target_salience
+            target_salience=target_salience,
         )
-        
+
         # Run all trials
         results = task.run_all_trials(self.apgi_system)
-        
+
         logger.info(f"Attentional Blink Task completed for session {session_id}")
-        
+
         result = {
             "task_type": "attentional_blink",
             "session_id": session_id,
             "status": "completed",
-            "results": results
+            "results": results,
         }
-        
+
     except Exception as e:
         logger.error(f"Attentional Blink Task failed for session {session_id}: {e}", exc_info=True)
         result = {
             "task_type": "attentional_blink",
             "session_id": session_id,
             "status": "failed",
-            "error": str(e)
+            "error": str(e),
         }
-    
+
     # Trigger webhook on completion (async)
     import asyncio
+
     try:
         asyncio.run(trigger_webhook_on_completion(self.request.id, result))
     except Exception as e:
         logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
-    
+
     return result

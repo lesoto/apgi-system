@@ -71,3 +71,7 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+
+[tool.mypy]
+ignore_missing_imports = true
+disallow_untyped_defs = false
