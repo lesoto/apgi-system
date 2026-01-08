@@ -43,6 +43,7 @@ python build/create_icons.py
 ```
 
 This will:
+
 1. Create the source PNG (1024x1024)
 2. Generate Windows .ico with multiple resolutions
 3. Create macOS iconset directory with all required sizes
@@ -63,6 +64,7 @@ iconutil -c icns resources/icons/apgi.iconset
 ## Requirements
 
 Icon generation requires:
+
 - Python 3.9+
 - Pillow (PIL) library
 

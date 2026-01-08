@@ -17,22 +17,26 @@ This API provides programmatic access to the APGI consciousness modeling system,
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Configure environment:
+1. Configure environment:
+
 ```bash
 cp .env.example .env
 # Edit .env with your settings
 ```
 
-3. Start the API server:
+1. Start the API server:
+
 ```bash
 python -m api.main
 ```
 
 Or using uvicorn directly:
+
 ```bash
 uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -41,13 +45,13 @@ uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 
 Once the server is running, access the interactive API documentation:
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI JSON: http://localhost:8000/openapi.json
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+- OpenAPI JSON: <http://localhost:8000/openapi.json>
 
 ## Project Structure
 
-```
+```text
 api/
 ├── __init__.py           # Package initialization
 ├── main.py               # FastAPI application entry point

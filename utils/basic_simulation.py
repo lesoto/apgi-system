@@ -50,31 +50,31 @@ def plot_results(history):
 
     # Ignition events
     plt.subplot(4, 1, 1)
-    plt.plot(history['time'], history['ignitions'], 'r.', alpha=0.5)
-    plt.ylabel('Ignition Events')
-    plt.title('APGI System Simulation Results')
+    plt.plot(history["time"], history["ignitions"], "r.", alpha=0.5)
+    plt.ylabel("Ignition Events")
+    plt.title("APGI System Simulation Results")
 
     # Free energy
     plt.subplot(4, 1, 2)
-    plt.plot(history['time'], history['free_energy'])
-    plt.ylabel('Free Energy')
+    plt.plot(history["time"], history["free_energy"])
+    plt.ylabel("Free Energy")
 
     # Precision
     plt.subplot(4, 1, 3)
-    plt.plot(history['time'], history['precision'])
-    plt.ylabel('Extero Precision')
+    plt.plot(history["time"], history["precision"])
+    plt.ylabel("Extero Precision")
 
     # Metabolic reserves
     plt.subplot(4, 1, 4)
-    plt.plot(history['time'], history['metabolic_reserves'])
-    plt.ylabel('Metabolic Reserves')
-    plt.xlabel('Time (ms)')
+    plt.plot(history["time"], history["metabolic_reserves"])
+    plt.ylabel("Metabolic Reserves")
+    plt.xlabel("Time (ms)")
 
     plt.tight_layout()
-    plt.savefig('apgi_simulation_results.png', dpi=150)
+    plt.savefig("apgi_simulation_results.png", dpi=150)
     print("\nPlot saved as 'apgi_simulation_results.png'")
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -22,7 +22,6 @@ from hypothesis import HealthCheck
 from apgi_system.system import APGISystem
 from tests.strategies import observation_strategy, body_state_strategy, config_strategy
 
-
 # Configure Hypothesis for property-based testing
 settings.register_profile(
     "property_tests",

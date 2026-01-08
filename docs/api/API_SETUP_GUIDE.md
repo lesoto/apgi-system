@@ -46,8 +46,9 @@ uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 #### Step 4: Verify Installation
 
 Open your browser and navigate to:
-- API Documentation: http://localhost:8000/docs
-- Health Check: http://localhost:8000/health
+
+- API Documentation: <http://localhost:8000/docs>
+- Health Check: <http://localhost:8000/health>
 
 ### Method 2: Docker Compose (Recommended for Full Stack)
 
@@ -64,11 +65,11 @@ docker-compose logs -f api
 docker-compose down
 ```
 
-The API will be available at http://localhost:8000
+The API will be available at <http://localhost:8000>
 
 ### Method 3: Using Setup Scripts
 
-#### On Linux/Mac:
+#### On Linux/Mac
 
 ```bash
 chmod +x api/setup.sh
@@ -77,7 +78,7 @@ source venv/bin/activate
 python -m api.main
 ```
 
-#### On Windows (PowerShell):
+#### On Windows (PowerShell)
 
 ```powershell
 .\api\setup.ps1
@@ -87,7 +88,7 @@ python -m api.main
 
 ## Project Structure
 
-```
+```text
 api/
 ├── __init__.py           # Package initialization
 ├── main.py               # FastAPI application entry point
@@ -175,15 +176,15 @@ make run
 
 Once the server is running, access the interactive documentation:
 
-- **Swagger UI**: http://localhost:8000/docs
+- **Swagger UI**: <http://localhost:8000/docs>
   - Interactive API testing interface
   - Try out endpoints directly from the browser
 
-- **ReDoc**: http://localhost:8000/redoc
+- **ReDoc**: <http://localhost:8000/redoc>
   - Alternative documentation view
   - Better for reading and understanding the API
 
-- **OpenAPI JSON**: http://localhost:8000/openapi.json
+- **OpenAPI JSON**: <http://localhost:8000/openapi.json>
   - Raw OpenAPI specification
   - Use for code generation or external tools
 
@@ -192,6 +193,7 @@ Once the server is running, access the interactive documentation:
 ### Issue: ModuleNotFoundError
 
 **Solution**: Ensure all dependencies are installed:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -199,13 +201,15 @@ pip install -r requirements.txt
 ### Issue: Port 8000 already in use
 
 **Solution**: Use a different port:
+
 ```bash
 uvicorn api.main:app --port 8001
 ```
 
 ### Issue: Database connection errors
 
-**Solution**: 
+**Solution**:
+
 1. Ensure PostgreSQL is running
 2. Verify DATABASE_URL in .env
 3. Check database credentials
@@ -213,6 +217,7 @@ uvicorn api.main:app --port 8001
 ### Issue: Redis connection errors
 
 **Solution**:
+
 1. Ensure Redis is running: `redis-cli ping`
 2. Verify REDIS_URL in .env
 3. For development, Redis is optional - the API will work without it
@@ -240,6 +245,7 @@ For production deployment:
 8. Use environment-specific configuration
 
 Example production command:
+
 ```bash
 gunicorn api.main:app \
   --workers 4 \
@@ -252,6 +258,7 @@ gunicorn api.main:app \
 ## Support
 
 For issues or questions:
+
 - Check the API documentation at `/docs`
 - Review the design document: `.kiro/specs/api-rest-interface/design.md`
 - Check the requirements: `.kiro/specs/api-rest-interface/requirements.md`

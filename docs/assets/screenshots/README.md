@@ -28,34 +28,34 @@ This directory contains screenshots referenced in `README_DISTRIBUTION.md`.
 
 ### macOS Installation
 
-6. **macos_download.png**
+1. **macos_download.png**
    - Browser showing the download of `APGI_System.dmg`
    - Should show the file being saved to Downloads folder
 
-7. **macos_dmg_window.png**
+2. **macos_dmg_window.png**
    - Mounted DMG window
    - Should show APGI System icon and Applications folder shortcut
    - Should display custom background if configured
 
-8. **macos_drag_install.png**
+3. **macos_drag_install.png**
    - Screenshot showing the drag-and-drop installation process
    - Should show cursor dragging app icon to Applications folder
 
-9. **macos_applications.png**
+4. **macos_applications.png**
    - Finder window showing Applications folder
    - Should highlight APGI System in the list
 
-10. **macos_gatekeeper.png**
-    - macOS Gatekeeper security warning
-    - Should show "cannot be opened because it is from an unidentified developer" message
+5. **macos_gatekeeper.png**
+   - macOS Gatekeeper security warning
+   - Should show "cannot be opened because it is from an unidentified developer" message
 
-11. **macos_privacy_settings.png**
-    - System Settings → Privacy & Security
-    - Should show "APGI System was blocked" message and "Open Anyway" button
+6. **macos_privacy_settings.png**
+   - System Settings → Privacy & Security
+   - Should show "APGI System was blocked" message and "Open Anyway" button
 
-12. **macos_app_running.png**
-    - APGI System main window running on macOS
-    - Should show the full application interface
+7. **macos_app_running.png**
+   - APGI System main window running on macOS
+   - Should show the full application interface
 
 ## Screenshot Guidelines
 
@@ -70,11 +70,13 @@ This directory contains screenshots referenced in `README_DISTRIBUTION.md`.
 ### Platform-Specific Guidelines
 
 **Windows:**
+
 - Use Windows 10 or 11 with default theme
 - Ensure taskbar and window decorations are visible
 - Capture full windows, not just portions
 
 **macOS:**
+
 - Use macOS 12 or later with default theme
 - Ensure menu bar and window decorations are visible
 - Capture full windows, not just portions
@@ -83,11 +85,13 @@ This directory contains screenshots referenced in `README_DISTRIBUTION.md`.
 ### Capturing Screenshots
 
 **Windows:**
+
 - Use Snipping Tool (Windows 10) or Snip & Sketch (Windows 11)
 - Or press `Win + Shift + S` for quick capture
 - Save as PNG format
 
 **macOS:**
+
 - Press `Cmd + Shift + 4` then `Space` to capture a window
 - Or press `Cmd + Shift + 3` to capture full screen
 - Screenshots automatically save to Desktop as PNG
@@ -106,6 +110,7 @@ This directory contains screenshots referenced in `README_DISTRIBUTION.md`.
 ## File Naming Convention
 
 Use the exact filenames specified in `README_DISTRIBUTION.md`:
+
 - Use lowercase letters
 - Use underscores for spaces
 - Use `.png` extension
@@ -114,6 +119,7 @@ Use the exact filenames specified in `README_DISTRIBUTION.md`:
 ## Updating Screenshots
 
 When updating the application:
+
 1. Recapture all screenshots with the new version
 2. Ensure version numbers match (if visible)
 3. Update any UI changes reflected in screenshots
@@ -133,6 +139,7 @@ convert -size 1280x720 xc:lightgray -pointsize 48 -fill black \
 ## Checklist
 
 Before finalizing documentation:
+
 - [ ] All 12 screenshots captured
 - [ ] Screenshots are high quality and clear
 - [ ] Personal information removed

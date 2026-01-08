@@ -17,7 +17,6 @@ from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.ignition.threshold import IgnitionThreshold
 from apgi_system.ignition.global_workspace import GlobalWorkspace
 
-
 # Load default config
 config_path = Path(__file__).parent.parent / "config" / "default.yaml"
 with open(config_path, "r") as f:

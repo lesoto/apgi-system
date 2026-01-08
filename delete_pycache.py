@@ -7,80 +7,285 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Set, Dict, Any
 
-
 # Essential files and directories to NEVER remove
 ESSENTIAL_FILES = {
-    "README.md", "README.txt", "README.rst", "README",
-    "LICENSE", "LICENSE.txt", "COPYING",
-    "setup.py", "setup.cfg", "pyproject.toml", "requirements.txt", "requirements-dev.txt",
-    "Pipfile", "Pipfile.lock", "poetry.lock", "environment.yml", "conda.yml",
-    "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
-    "Makefile", "CMakeLists.txt", "configure", "config",
-    "manifest", "MANIFEST.in", "CHANGELOG.md", "CHANGELOG.rst",
-    "CONTRIBUTING.md", "AUTHORS", "NEWS", "HISTORY.md",
-    "tox.ini", ".flake8", ".pylintrc", "mypy.ini", "pytest.ini",
-    "bandit.yaml", "black.toml", "isort.cfg", ".pre-commit-config.yaml",
+    "README.md",
+    "README.txt",
+    "README.rst",
+    "README",
+    "LICENSE",
+    "LICENSE.txt",
+    "COPYING",
+    "setup.py",
+    "setup.cfg",
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "Pipfile",
+    "Pipfile.lock",
+    "poetry.lock",
+    "environment.yml",
+    "conda.yml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "Makefile",
+    "CMakeLists.txt",
+    "configure",
+    "config",
+    "manifest",
+    "MANIFEST.in",
+    "CHANGELOG.md",
+    "CHANGELOG.rst",
+    "CONTRIBUTING.md",
+    "AUTHORS",
+    "NEWS",
+    "HISTORY.md",
+    "tox.ini",
+    ".flake8",
+    ".pylintrc",
+    "mypy.ini",
+    "pytest.ini",
+    "bandit.yaml",
+    "black.toml",
+    "isort.cfg",
+    ".pre-commit-config.yaml",
 }
 
 ESSENTIAL_DIRS = {
-    ".git", ".svn", ".hg", ".bzr",  # Version control
-    "src", "source", "lib", "libs", "modules", "packages",  # Source code
-    "docs", "doc", "documentation",  # Documentation
-    "tests", "test", "specs", "spec",  # Test files
-    "examples", "example", "samples", "sample",  # Examples
-    "scripts", "bin", "tools", "util", "utils",  # Utility scripts
-    "config", "conf", "cfg", "settings",  # Configuration
-    "data", "dataset", "datasets", "resources", "assets",  # Data files
-    "templates", "template", "views", "static", "public",  # Web assets
+    ".git",
+    ".svn",
+    ".hg",
+    ".bzr",  # Version control
+    "src",
+    "source",
+    "lib",
+    "libs",
+    "modules",
+    "packages",  # Source code
+    "docs",
+    "doc",
+    "documentation",  # Documentation
+    "tests",
+    "test",
+    "specs",
+    "spec",  # Test files
+    "examples",
+    "example",
+    "samples",
+    "sample",  # Examples
+    "scripts",
+    "bin",
+    "tools",
+    "util",
+    "utils",  # Utility scripts
+    "config",
+    "conf",
+    "cfg",
+    "settings",  # Configuration
+    "data",
+    "dataset",
+    "datasets",
+    "resources",
+    "assets",  # Data files
+    "templates",
+    "template",
+    "views",
+    "static",
+    "public",  # Web assets
 }
 
 # Temporary and cache directories to remove
 TEMP_DIR_NAMES = {
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".hypothesis", "htmlcov", ".tox",
-    ".ipynb_checkpoints", ".cache", "build", "dist", ".coverage", "coverage",
-    ".nox", ".ruff_cache", ".benchmarks", ".pytest", ".mypy", ".flake8", ".bandit",
-    "node_modules", ".npm", ".yarn", ".pnpm", "bower_components",
-    ".venv", "venv", ".env", "env", "envs", ".virtualenv", "virtualenv",
-    ".conda", "conda-env", ".envs", "anaconda3", "miniconda3",
-    ".eggs", "*.egg-info", "pip-wheel-metadata", "wheel-house",
-    ".platformio", ".pio", ".vscode", ".idea", ".eclipse", ".netbeans",
-    ".DS_Store", "Thumbs.db", "desktop.ini", ".gitkeep", ".gitignore",
-    ".tmp", ".temp", ".backup", ".old", ".orig", ".bak", ".save",
-    "logs", "log", "tmp", "temp", "cache", "caches",
-    ".gradle", ".maven", "target", "out", "build", "dist",
-    ".sass-cache", ".node_repl_history", ".python-version", ".ruby-version",
-    ".nyc_output", "coverage", "reports", ".coveragerc",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".hypothesis",
+    "htmlcov",
+    ".tox",
+    ".ipynb_checkpoints",
+    ".cache",
+    "build",
+    "dist",
+    ".coverage",
+    "coverage",
+    ".nox",
+    ".ruff_cache",
+    ".benchmarks",
+    ".pytest",
+    ".mypy",
+    ".flake8",
+    ".bandit",
+    "node_modules",
+    ".npm",
+    ".yarn",
+    ".pnpm",
+    "bower_components",
+    ".venv",
+    "venv",
+    ".env",
+    "env",
+    "envs",
+    ".virtualenv",
+    "virtualenv",
+    ".conda",
+    "conda-env",
+    ".envs",
+    "anaconda3",
+    "miniconda3",
+    ".eggs",
+    "*.egg-info",
+    "pip-wheel-metadata",
+    "wheel-house",
+    ".platformio",
+    ".pio",
+    ".vscode",
+    ".idea",
+    ".eclipse",
+    ".netbeans",
+    ".DS_Store",
+    "Thumbs.db",
+    "desktop.ini",
+    ".gitkeep",
+    ".gitignore",
+    ".tmp",
+    ".temp",
+    ".backup",
+    ".old",
+    ".orig",
+    ".bak",
+    ".save",
+    "logs",
+    "log",
+    "tmp",
+    "temp",
+    "cache",
+    "caches",
+    ".gradle",
+    ".maven",
+    "target",
+    "out",
+    "build",
+    "dist",
+    ".sass-cache",
+    ".node_repl_history",
+    ".python-version",
+    ".ruby-version",
+    ".nyc_output",
+    "coverage",
+    "reports",
+    ".coveragerc",
 }
 
 # Temporary file patterns to remove
 TEMP_FILE_PATTERNS = [
-    "*.pyc", "*.pyo", "*.pyd", "*.pyi", "*.pyx", "*.pyb",
-    ".coverage", "coverage.xml", ".coverage.*", "*.cover",
-    "*.log", "*.log.*", "*.out", "*.err",
-    ".DS_Store", "Thumbs.db", "desktop.ini",
-    "*.tmp", "*.temp", "*~", "*.swp", "*.swo", "*.bak", "*.orig", "*.save",
-    "*.old", "*.backup", "*.copy", "*.duplicate",
-    "*.cache", "*.cach", "*.tmp.*", "*.temp.*",
-    "*.pid", "*.lock", "*.lck", "*.wfl",
-    "*.core", "*.dump", "*.crash", "*.dmp",
-    "*.trace", "*.prof", "*.profile", "*.stats",
-    "*.s3db", "*.sqlite-shm", "*.sqlite-wal",
-    "*.egg-info", "*.egg", "*.whl", "*.wheel",
-    "*.tgz", "*.tar.gz", "*.zip", "*.rar", "*.7z",  # Only if temp archives
-    "*.deb", "*.rpm", "*.dmg", "*.pkg", "*.msi", "*.exe",  # Installation files
-    "*.patch", "*.diff", "*.rej", "*.orig",
-    "*.session", "*.cookie", "*.token", "*.auth",
-    "*.debug", "*.test", "*.tests", "*.spec", "*.mock",
-    "*.lprof", "*.prof", "*.pstats", "*.trace",
-    "*.svg", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.ico",  # Only temp images
-    "*.pdf", "*.doc", "*.docx", "*.xls", "*.xlsx", "*.ppt", "*.pptx",  # Only temp docs
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    "*.pyi",
+    "*.pyx",
+    "*.pyb",
+    ".coverage",
+    "coverage.xml",
+    ".coverage.*",
+    "*.cover",
+    "*.log",
+    "*.log.*",
+    "*.out",
+    "*.err",
+    ".DS_Store",
+    "Thumbs.db",
+    "desktop.ini",
+    "*.tmp",
+    "*.temp",
+    "*~",
+    "*.swp",
+    "*.swo",
+    "*.bak",
+    "*.orig",
+    "*.save",
+    "*.old",
+    "*.backup",
+    "*.copy",
+    "*.duplicate",
+    "*.cache",
+    "*.cach",
+    "*.tmp.*",
+    "*.temp.*",
+    "*.pid",
+    "*.lock",
+    "*.lck",
+    "*.wfl",
+    "*.core",
+    "*.dump",
+    "*.crash",
+    "*.dmp",
+    "*.trace",
+    "*.prof",
+    "*.profile",
+    "*.stats",
+    "*.s3db",
+    "*.sqlite-shm",
+    "*.sqlite-wal",
+    "*.egg-info",
+    "*.egg",
+    "*.whl",
+    "*.wheel",
+    "*.tgz",
+    "*.tar.gz",
+    "*.zip",
+    "*.rar",
+    "*.7z",  # Only if temp archives
+    "*.deb",
+    "*.rpm",
+    "*.dmg",
+    "*.pkg",
+    "*.msi",
+    "*.exe",  # Installation files
+    "*.patch",
+    "*.diff",
+    "*.rej",
+    "*.orig",
+    "*.session",
+    "*.cookie",
+    "*.token",
+    "*.auth",
+    "*.debug",
+    "*.test",
+    "*.tests",
+    "*.spec",
+    "*.mock",
+    "*.lprof",
+    "*.prof",
+    "*.pstats",
+    "*.trace",
+    "*.svg",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.bmp",
+    "*.ico",  # Only temp images
+    "*.pdf",
+    "*.doc",
+    "*.docx",
+    "*.xls",
+    "*.xlsx",
+    "*.ppt",
+    "*.pptx",  # Only temp docs
 ]
 
 # Directories to skip during traversal (never enter)
 SKIP_TRAVERSE_DIRS = {
-    ".git", ".svn", ".hg", ".bzr",  # Version control
+    ".git",
+    ".svn",
+    ".hg",
+    ".bzr",  # Version control
     "node_modules",  # Node dependencies (handled separately)
-    "venv", ".venv", "env", ".env",  # Virtual environments (handled separately)
+    "venv",
+    ".venv",
+    "env",
+    ".env",  # Virtual environments (handled separately)
 }
 
 # Default configuration
@@ -105,14 +310,14 @@ def matches_any(name: str, patterns: Iterable[str]) -> bool:
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration from JSON file."""
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
         return {**DEFAULT_CONFIG, **config}
     except FileNotFoundError:
         if os.path.basename(config_path) == ".cleanrc":
             # Try to create default config
             try:
-                with open(config_path, 'w') as f:
+                with open(config_path, "w") as f:
                     json.dump(DEFAULT_CONFIG, f, indent=2)
                 print(f"Created default config at {config_path}")
                 return DEFAULT_CONFIG
@@ -140,13 +345,14 @@ def is_safe_to_remove(item_path: str, root_dir: str, safe_mode: bool = True) -> 
     """Additional safety checks before removing files/directories."""
     if not safe_mode:
         return True
-    
+
     # Never remove files directly in root unless they're clearly temporary
     rel_path = os.path.relpath(item_path, root_dir)
     if rel_path.count(os.sep) == 0:  # Direct child of root
-        return os.path.basename(item_path).startswith('.') or \
-               any(temp in os.path.basename(item_path).lower() for temp in ['temp', 'tmp', 'cache', 'log'])
-    
+        return os.path.basename(item_path).startswith(".") or any(
+            temp in os.path.basename(item_path).lower() for temp in ["temp", "tmp", "cache", "log"]
+        )
+
     return True
 
 
@@ -156,13 +362,13 @@ def create_backup(item_path: str, backup_dir: str) -> bool:
         os.makedirs(backup_dir, exist_ok=True)
         backup_name = os.path.basename(item_path)
         backup_path = os.path.join(backup_dir, backup_name)
-        
+
         counter = 1
         while os.path.exists(backup_path):
             name, ext = os.path.splitext(backup_name)
             backup_path = os.path.join(backup_dir, f"{name}_{counter}{ext}")
             counter += 1
-        
+
         if os.path.isfile(item_path):
             shutil.copy2(item_path, backup_path)
         else:
@@ -193,7 +399,7 @@ def delete_temporary_items(
     # Load configuration
     if config is None:
         config = DEFAULT_CONFIG
-    
+
     temp_dir_names = set(config.get("temp_dirs", TEMP_DIR_NAMES))
     temp_file_patterns = config.get("temp_files", TEMP_FILE_PATTERNS)
     essential_files = set(config.get("essential_files", ESSENTIAL_FILES))
@@ -201,17 +407,17 @@ def delete_temporary_items(
     skip_traverse_dirs = set(config.get("skip_dirs", SKIP_TRAVERSE_DIRS))
     safe_mode = config.get("safe_mode", True)
     backup_before_delete = config.get("backup_before_delete", False)
-    
+
     # Add user-specified patterns
     temp_dir_names.update(include_dir_patterns)
     temp_file_patterns.extend(include_file_patterns)
-    
+
     # Create backup directory if needed
     if backup_dir and backup_before_delete and not dry_run:
         os.makedirs(backup_dir, exist_ok=True)
         if verbose:
             print(f"Backup directory: {backup_dir}")
-    
+
     removed_dirs = 0
     removed_files = 0
     skipped_essential = 0
@@ -227,7 +433,7 @@ def delete_temporary_items(
         # Process directories
         for d in list(dirnames):
             full_d = os.path.join(dirpath, d)
-            
+
             # Skip essential directories
             if is_essential_dir(full_d, essential_dirs):
                 if verbose:
@@ -235,12 +441,12 @@ def delete_temporary_items(
                 dirnames.remove(d)
                 skipped_essential += 1
                 continue
-            
+
             # Skip traversal directories
             if d in skip_traverse_dirs:
                 dirnames.remove(d)
                 continue
-            
+
             # Check if directory should be removed
             should_remove_dir = (
                 d in temp_dir_names
@@ -249,13 +455,13 @@ def delete_temporary_items(
                 or (remove_node_modules and d == "node_modules")
                 or (remove_venvs and d in set(venv_names))
             ) and not matches_any(d, exclude_dir_patterns)
-            
+
             # Additional safety check
             if should_remove_dir and not is_safe_to_remove(full_d, root_dir, safe_mode):
                 if verbose:
                     print(f"Skipping unsafe directory: {full_d}")
                 continue
-            
+
             if should_remove_dir:
                 if dry_run:
                     if verbose:
@@ -268,7 +474,7 @@ def delete_temporary_items(
                             if create_backup(full_d, backup_dir):
                                 if verbose:
                                     print(f"Backed up directory: {full_d}")
-                        
+
                         shutil.rmtree(full_d, ignore_errors=False)
                         if verbose:
                             print(f"Removed directory: {full_d}")
@@ -282,31 +488,31 @@ def delete_temporary_items(
         # Process files
         for f in list(filenames):
             full_f = os.path.join(dirpath, f)
-            
+
             # Skip essential files
             if is_essential_file(full_f, essential_files):
                 if verbose:
                     print(f"Skipping essential file: {full_f}")
                 skipped_essential += 1
                 continue
-            
+
             # Skip excluded patterns
             if matches_any(f, exclude_file_patterns):
                 continue
-            
+
             # Check if file should be removed
             should_remove_file = (
                 f in temp_file_patterns
                 or matches_any(f, temp_file_patterns)
                 or matches_any(f, include_file_patterns)
             )
-            
+
             # Additional safety check
             if should_remove_file and not is_safe_to_remove(full_f, root_dir, safe_mode):
                 if verbose:
                     print(f"Skipping unsafe file: {full_f}")
                 continue
-            
+
             if should_remove_file:
                 if dry_run:
                     if verbose:
@@ -319,14 +525,14 @@ def delete_temporary_items(
                             if create_backup(full_f, backup_dir):
                                 if verbose:
                                     print(f"Backed up file: {full_f}")
-                        
+
                         os.remove(full_f)
                         if verbose:
                             print(f"Removed file: {full_f}")
                         removed_files += 1
                     except Exception as e:
                         print(f"Error removing file {full_f}: {e}")
-    
+
     # Summary
     if verbose:
         print(f"\nSummary: Removed {removed_dirs} directories and {removed_files} files")
@@ -352,7 +558,9 @@ def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True)
             print(f"Error pruning directory {dirpath}: {e}")
 
 
-def clear_log_files(root_dir: str, delete_logs_dir: bool = False, dry_run: bool = False, verbose: bool = True):
+def clear_log_files(
+    root_dir: str, delete_logs_dir: bool = False, dry_run: bool = False, verbose: bool = True
+):
     """Either truncate files under a `logs` dir, or delete the logs directory entirely.
 
     - If delete_logs_dir is True, the whole logs directory is removed.
@@ -408,40 +616,98 @@ Examples:
   %(prog)s --config .cleanrc          # Use custom config
   %(prog)s --backup /tmp/backup       # Backup before deletion
   %(prog)s --unsafe                   # Disable safety mode
-        """
+        """,
     )
-    
+
     # Basic options
-    p.add_argument("root", nargs="?", default=None, help="Root directory to clean (defaults to script dir)")
-    p.add_argument("--dry-run", action="store_true", help="Show what would be removed without deleting")
+    p.add_argument(
+        "root", nargs="?", default=None, help="Root directory to clean (defaults to script dir)"
+    )
+    p.add_argument(
+        "--dry-run", action="store_true", help="Show what would be removed without deleting"
+    )
     p.add_argument("--yes", action="store_true", help="Don't prompt for confirmation")
     p.add_argument("--quiet", action="store_true", help="Reduce output")
-    
+
     # Configuration
     p.add_argument("--config", default=None, help="Path to configuration file (JSON)")
-    p.add_argument("--create-config", action="store_true", help="Create default .cleanrc config file")
-    
+    p.add_argument(
+        "--create-config", action="store_true", help="Create default .cleanrc config file"
+    )
+
     # Safety and backup
     p.add_argument("--unsafe", action="store_true", help="Disable safety mode (not recommended)")
     p.add_argument("--backup", metavar="DIR", help="Backup directory before deletion")
-    p.add_argument("--no-backup", action="store_true", help="Disable backup even if config enables it")
-    
+    p.add_argument(
+        "--no-backup", action="store_true", help="Disable backup even if config enables it"
+    )
+
     # Log handling
-    p.add_argument("--delete-logs", action="store_true", help="Remove the entire logs directory instead of truncating files")
-    p.add_argument("--clear-logs-only", action="store_true", help="Only clear log files, don't remove other temp files")
-    
+    p.add_argument(
+        "--delete-logs",
+        action="store_true",
+        help="Remove the entire logs directory instead of truncating files",
+    )
+    p.add_argument(
+        "--clear-logs-only",
+        action="store_true",
+        help="Only clear log files, don't remove other temp files",
+    )
+
     # Advanced controls
-    p.add_argument("--include-dir", action="append", default=[], help="Additional directory patterns to remove (glob). Can be passed multiple times.")
-    p.add_argument("--include-file", action="append", default=[], help="Additional file patterns to remove (glob). Can be passed multiple times.")
-    p.add_argument("--exclude-dir", action="append", default=[], help="Directory patterns to exclude from deletion (glob). Can be passed multiple times.")
-    p.add_argument("--exclude-file", action="append", default=[], help="File patterns to exclude from deletion (glob). Can be passed multiple times.")
-    p.add_argument("--remove-node-modules", action="store_true", help="Also remove node_modules directories")
-    p.add_argument("--remove-venvs", action="store_true", help="Also remove common virtualenv directories (.venv, venv, .env, env)")
-    p.add_argument("--venv-names", nargs="*", default=None, help="Override names considered virtualenvs (space-separated)")
-    p.add_argument("--follow-links", action="store_true", help="Follow symbolic links during traversal (use with caution)")
-    p.add_argument("--max-depth", type=int, default=None, help="Limit traversal depth relative to root (1 = only root level)")
-    p.add_argument("--prune-empty-dirs", action="store_true", help="Remove now-empty directories after cleanup")
-    
+    p.add_argument(
+        "--include-dir",
+        action="append",
+        default=[],
+        help="Additional directory patterns to remove (glob). Can be passed multiple times.",
+    )
+    p.add_argument(
+        "--include-file",
+        action="append",
+        default=[],
+        help="Additional file patterns to remove (glob). Can be passed multiple times.",
+    )
+    p.add_argument(
+        "--exclude-dir",
+        action="append",
+        default=[],
+        help="Directory patterns to exclude from deletion (glob). Can be passed multiple times.",
+    )
+    p.add_argument(
+        "--exclude-file",
+        action="append",
+        default=[],
+        help="File patterns to exclude from deletion (glob). Can be passed multiple times.",
+    )
+    p.add_argument(
+        "--remove-node-modules", action="store_true", help="Also remove node_modules directories"
+    )
+    p.add_argument(
+        "--remove-venvs",
+        action="store_true",
+        help="Also remove common virtualenv directories (.venv, venv, .env, env)",
+    )
+    p.add_argument(
+        "--venv-names",
+        nargs="*",
+        default=None,
+        help="Override names considered virtualenvs (space-separated)",
+    )
+    p.add_argument(
+        "--follow-links",
+        action="store_true",
+        help="Follow symbolic links during traversal (use with caution)",
+    )
+    p.add_argument(
+        "--max-depth",
+        type=int,
+        default=None,
+        help="Limit traversal depth relative to root (1 = only root level)",
+    )
+    p.add_argument(
+        "--prune-empty-dirs", action="store_true", help="Remove now-empty directories after cleanup"
+    )
+
     return p.parse_args(argv)
 
 
@@ -454,7 +720,7 @@ def main(argv: List[str] = None):
     if args.create_config:
         config_path = os.path.join(root_directory, ".cleanrc")
         try:
-            with open(config_path, 'w') as f:
+            with open(config_path, "w") as f:
                 json.dump(DEFAULT_CONFIG, f, indent=2)
             print(f"Created default config at {config_path}")
             return 0
@@ -504,8 +770,10 @@ def main(argv: List[str] = None):
         print(f"Safe mode: {'ON' if config['safe_mode'] else 'OFF'}")
         print(f"Backup: {'ON' if config['backup_before_delete'] else 'OFF'}")
 
-    venv_names = args.venv_names if args.venv_names is not None else (".venv", "venv", ".env", "env")
-    
+    venv_names = (
+        args.venv_names if args.venv_names is not None else (".venv", "venv", ".env", "env")
+    )
+
     # Run cleanup unless only clearing logs
     if not args.clear_logs_only:
         delete_temporary_items(
@@ -524,9 +792,11 @@ def main(argv: List[str] = None):
             config=config,
             backup_dir=args.backup,
         )
-    
+
     # Handle logs
-    clear_log_files(root_directory, delete_logs_dir=args.delete_logs, dry_run=dry_run, verbose=verbose)
+    clear_log_files(
+        root_directory, delete_logs_dir=args.delete_logs, dry_run=dry_run, verbose=verbose
+    )
 
     # Prune empty directories
     if args.prune_empty_dirs:

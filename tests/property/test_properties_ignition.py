@@ -28,7 +28,6 @@ from tests.strategies import (
     observation_strategy,
 )
 
-
 # Configure Hypothesis for property-based testing
 settings.register_profile(
     "property_tests",

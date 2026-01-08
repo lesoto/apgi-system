@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from api.config import settings
-from api.database.models import Base
+from api.database.models import Base, User
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +33,62 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """
-    Initialize database by creating all tables.
+    Initialize database by creating all tables and default user.
 
     This should be called during application startup.
     """
     try:
+        # Create all tables
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
+
+        # Create default user if it doesn't exist
+        create_default_user()
+
     except Exception as e:
         logger.error(f"Failed to create database tables: {e}")
         raise
+
+
+def create_default_user():
+    """
+    Create a default user for session management.
+
+    This ensures that the foreign key constraint for sessions
+    can be satisfied when creating sessions without explicit user management.
+    """
+    db = SessionLocal()
+    try:
+        # Check if default user already exists
+        from sqlalchemy import select
+
+        stmt = select(User).where(User.username == "default_user")
+        result = db.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            logger.info("Default user already exists")
+            return
+
+        # Create default user
+        default_user = User(
+            user_id="default_user",
+            username="default_user",
+            email="default@apgi-system.local",
+            password_hash="no_password_required",  # Not used for API access
+            roles=["user", "session_manager"],
+        )
+
+        db.add(default_user)
+        db.commit()
+        logger.info("Default user created successfully")
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create default user: {e}")
+        raise
+    finally:
+        db.close()
 
 
 def get_db() -> Generator[Session, None, None]:

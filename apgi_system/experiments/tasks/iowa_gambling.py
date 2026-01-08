@@ -365,7 +365,12 @@ class IowaGamblingTask:
 
             # Monitor anticipatory somatic markers (bodily responses before outcome)
             # These emerge from interoceptive precision signals
-            if "interoception" in state:
+            if "body" in state and "prediction_error" in state["body"]:
+                # Use prediction error magnitude as somatic marker
+                intero_signal = np.linalg.norm(state["body"]["prediction_error"])
+                if intero_signal > anticipatory_response:
+                    anticipatory_response = intero_signal
+            elif "interoception" in state:
                 intero_signal = state["interoception"].get("interoceptive_precision", 0.0)
                 if intero_signal > anticipatory_response:
                     anticipatory_response = intero_signal
@@ -397,7 +402,12 @@ class IowaGamblingTask:
             state = apgi_system.step(outcome_stimulus)
 
             # Monitor somatic marker (interoceptive response to outcome)
-            if "interoception" in state:
+            if "body" in state and "prediction_error" in state["body"]:
+                # Use prediction error magnitude as somatic marker
+                intero_signal = np.linalg.norm(state["body"]["prediction_error"])
+                if intero_signal > somatic_marker_strength:
+                    somatic_marker_strength = intero_signal
+            elif "interoception" in state:
                 intero_signal = state["interoception"].get("interoceptive_precision", 0.0)
                 if intero_signal > somatic_marker_strength:
                     somatic_marker_strength = intero_signal

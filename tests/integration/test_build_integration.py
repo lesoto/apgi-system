@@ -16,7 +16,6 @@ from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
 
-
 # Import build modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from build_common import (

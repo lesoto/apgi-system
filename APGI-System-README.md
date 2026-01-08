@@ -15,6 +15,7 @@ The APGI framework integrates:
 ### APGI System  ✅
 
 The core APGI system with all subsystems:
+
 - Active Inference Engine
 - Hierarchical Predictor
 - Precision Weighting
@@ -30,6 +31,7 @@ The core APGI system with all subsystems:
 ### System Step Execution ✅
 
 The system successfully executes simulation steps:
+
 - Processes exteroceptive input (256-dimensional)
 - Updates all subsystems
 - Returns complete state dictionary
@@ -41,16 +43,17 @@ The system successfully executes simulation steps:
 ### Experimental Tasks ✅
 
 All experimental paradigms are importable and functional:
+
 - Attentional Blink Task
 - Change Blindness Task
 - Binocular Rivalry Task
 - Iowa Gambling Task
 - Masking Paradigm Task
 
-
 ### GUI Features Validation ✅
 
 #### Control Panel
+
 - ✓ Start/Pause/Stop/Reset buttons
 - ✓ Speed control slider (0.1x - 10x)
 - ✓ System status display
@@ -58,6 +61,7 @@ All experimental paradigms are importable and functional:
 - ✓ Event log with timestamps
 
 #### Visualization Tabs (6 tabs)
+
 1. ✓ Neural Activity - Ignition events, workspace, precision, free energy
 2. ✓ Interoception - Heart rate, cortisol, allostatic load, metabolic reserves
 3. ✓ System Metrics - Somatic markers, gamma/beta power
@@ -66,6 +70,7 @@ All experimental paradigms are importable and functional:
 6. ✓ State Space - 3D trajectory visualization
 
 #### Menu System
+
 - ✓ File Menu (8 items) - New, Load, Save, Export, Auto-save, Exit
 - ✓ Edit Menu (4 items) - Parameters, Precision, Threshold, Reset
 - ✓ Simulation Menu (5 items) - Start, Pause, Stop, Reset, Preset Tasks
@@ -75,6 +80,7 @@ All experimental paradigms are importable and functional:
 - ✓ Help Menu (3 items) - Documentation, Shortcuts, About
 
 #### Keyboard Shortcuts
+
 - ✓ Ctrl+N - New Session
 - ✓ Ctrl+O - Load Configuration
 - ✓ Ctrl+S - Save Configuration
@@ -92,6 +98,7 @@ All experimental paradigms are importable and functional:
 ### Real-Time Simulation ✅
 
 **Test:** Start simulation and observe updates
+
 - ✓ Simulation thread starts successfully
 - ✓ System steps execute at ~1000 Hz
 - ✓ GUI updates at 10 Hz (100ms intervals)
@@ -101,6 +108,7 @@ All experimental paradigms are importable and functional:
 ### Parameter Adjustment ✅
 
 **Test:** Modify parameters during simulation
+
 - ✓ Sliders respond immediately
 - ✓ Values apply to running system
 - ✓ Changes reflected in plots
@@ -109,22 +117,14 @@ All experimental paradigms are importable and functional:
 ### Data Export ✅
 
 **Test:** Export simulation data
+
 - ✓ CSV export format available
 - ✓ JSON export format available
 - ✓ All metrics included in export
 - ✓ Timestamps accurate
 
-### Experimental Tasks ✅
-
-**Test:** Run preset experimental paradigms
-- ✓ Task selection dialog works
-- ✓ Progress tracking functional
-- ✓ Results display correctly
-- ✓ Data saved to files
-- ✓ Analysis reports generated
-
-
 **Launch Command:**
+
 ```bash
 python run_gui.py
 ```
@@ -134,7 +134,6 @@ or
 ```bash
 python apgi_gui.py
 ```
-
 
 ## Architecture
 
@@ -146,7 +145,6 @@ apgi_system/
 ├── ignition/           # Global workspace and ignition dynamics
 ├── self_model/         # Minimal and narrative self
 ├── thermodynamic/      # Energy budget and entropy tracking
-├── experiments/        # Tasks and validation
 └── visualization/      # Real-time monitoring
 ```
 
@@ -233,75 +231,60 @@ pytest tests/test_core.py -v
 - Neural signatures match empirical data
 - Pathology models reproduce clinical phenotypes
 
+## APGI System: Comprehensive Analysis
 
-I'll analyze this app in detail to understand its functionality and entry points. Let me start by exploring the project structure and key files.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# APGI System: Comprehensive Analysis
-
-## Overview
+### System Overview
 
 The **APGI (Allostatic Precision-Gated Ignition) System** is a sophisticated computational framework for modeling consciousness based on active inference, predictive processing, and allostatic regulation. It implements a biologically-inspired model of cognitive function with multiple interacting subsystems.
 
-## Core Architecture
+### Core Architecture
 
 The system is organized into several key modules:
 
 ### **Core Systems** (`apgi_system/core/`)
+
 - **Active Inference Engine**: Variational free energy minimization and Bayesian inference
 - **Hierarchical Predictor**: Multi-level predictive processing (4 levels: sensory → feature → category → abstract)
 - **Precision Weighting**: Dynamic precision modulation of prediction errors
 - **Free Energy Calculator**: Tracks system-wide variational free energy
 
 ### **Neural Systems** (`apgi_system/neural/`)
+
 - **Microscale**: Spiking neural networks
 - **Mesoscale**: Neural column dynamics
 - **Macroscale**: Large-scale brain networks
 - **Oscillations**: Multi-band neural oscillations (delta, theta, alpha, beta, gamma)
 
 ### **Interoception** (`apgi_system/interoception/`)
+
 - **Body Model**: Simulates physiological states (heart rate, respiration, temperature, glucose, cortisol)
 - **Allostatic Regulator**: Maintains homeostatic balance
 - **Somatic Marker System**: Emotion-like signals for decision-making
 
 ### **Ignition Dynamics** (`apgi_system/ignition/`)
+
 - **Ignition Threshold**: Dynamic threshold for global broadcasting
 - **Global Workspace**: Information sharing across subsystems
 - **Temporal Dynamics**: Timing of ignition events (300-500ms timeline)
 
 ### **Self-Model** (`apgi_system/self_model/`)
+
 - **Minimal Self**: Basic self-representation and coherence tracking
 - **Narrative Self**: Episodic memory and autobiographical processing
 - **Coherence Maintenance**: Self-model integrity monitoring
 
 ### **Thermodynamic** (`apgi_system/thermodynamic/`)
+
 - **Metabolic Budget**: Energy constraints and consumption tracking
 - **Entropy Tracker**: Information entropy and thermodynamic costs
 
 ## Entry Points
 
 ### **1. GUI Application** (Primary Interface)
+
 **File**: [apgi_gui.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/apgi_gui.py:0:0-0:0) (83,840 bytes)
-**Launch**: 
+**Launch**:
+
 ```bash
 python apgi_gui.py
 # or
@@ -309,6 +292,7 @@ python utils/run_gui.py
 ```
 
 **Features**:
+
 - **Real-time visualization** with 6 tabs:
   1. Neural Activity (ignition events, workspace, precision, free energy)
   2. Interoception (heart rate, cortisol, allostatic load, metabolic reserves)
@@ -323,9 +307,11 @@ python utils/run_gui.py
 - **Keyboard shortcuts** (Ctrl+N/O/S/E/Q, F5-F8)
 
 ### **2. REST API** (Web Interface)
+
 **File**: [api/main.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/api/main.py:0:0-0:0)
 **Framework**: FastAPI with comprehensive middleware
 **Features**:
+
 - RESTful endpoints for system control
 - Authentication and rate limiting
 - Database integration with Alembic migrations
@@ -334,8 +320,10 @@ python utils/run_gui.py
 - CORS support for web clients
 
 ### **3. Programmatic Interface**
+
 **File**: [apgi_system/system.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/apgi_system/system.py:0:0-0:0)
 **Usage**:
+
 ```python
 from apgi_system.system import APGISystem
 
@@ -344,8 +332,10 @@ results = system.run(duration_ms=10000.0)
 ```
 
 ### **4. Experimental Tasks**
+
 **Location**: `apgi_system/experiments/tasks/`
 **Available Tasks**:
+
 - **Iowa Gambling Task**: Decision-making under uncertainty
 - **Attentional Blink Task**: Temporal attention limitations
 - **Change Blindness Task**: Visual perception failures
@@ -355,24 +345,28 @@ results = system.run(duration_ms=10000.0)
 ## Key Functionality
 
 ### **Real-Time Simulation**
+
 - **Timestep**: 1ms microscale resolution
 - **Update Rate**: ~1000 Hz system, 10 Hz GUI
 - **Multi-threaded architecture** for responsive UI
 - **State tracking** with comprehensive history
 
 ### **Hierarchical Processing**
+
 - **4-level hierarchy**: 256→128→64→32 nodes
 - **Different timescales**: 10ms→50ms→200ms→500ms
 - **Predictive coding** with error minimization
 - **Precision weighting** with neuromodulator effects
 
 ### **Physiological Modeling**
+
 - **Body states**: Heart rate, respiration, temperature, glucose, cortisol
 - **Allostatic ranges**: Tight (10%), moderate (20%), wide (30%)
 - **Metabolic constraints**: 5-10% ignition overhead, 25-30% task overhead
 - **Energy budgeting** with recovery dynamics
 
 ### **Consciousness Metrics**
+
 - **Ignition events**: Global workspace broadcasting
 - **Phi integration**: IIT consciousness measure
 - **PCI complexity**: Perturbational complexity index
@@ -383,6 +377,7 @@ results = system.run(duration_ms=10000.0)
 
 **File**: [config/default.yaml](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/config/default.yaml:0:0-0:0)
 **Sections**:
+
 - System parameters (timestep, random seed)
 - Hierarchy structure (levels, nodes, timescales)
 - Active inference (learning rates, thresholds)
@@ -404,6 +399,7 @@ results = system.run(duration_ms=10000.0)
 ## Validation & Testing
 
 The system includes comprehensive validation:
+
 - **Unit tests** for individual components
 - **Integration tests** for subsystem interactions
 - **Property-based tests** using Hypothesis
@@ -413,6 +409,7 @@ The system includes comprehensive validation:
 ## Research Applications
 
 This system models:
+
 - **Attentional blink** and perceptual limitations
 - **Change blindness** and visual awareness
 - **Decision-making** under uncertainty (Iowa Gambling)

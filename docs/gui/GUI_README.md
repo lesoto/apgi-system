@@ -173,6 +173,7 @@ python -m apgi_gui
 ### Basic Usage
 
 1. **Launch Application**
+
    ```bash
    python run_gui.py
    ```
@@ -210,48 +211,60 @@ python -m apgi_gui
 #### Manual Interventions
 
 **Trigger Ignition:**
+
 ```bash
 Tools → Trigger Ignition Event
 ```
+
 Forces high arousal/stress to induce ignition
 
 **Induce Stressor:**
+
 ```bash
 Tools → Induce Stressor
 ```
+
 Adds allostatic load spike
 
 **Modulate Precision:**
+
 ```bash
 Tools → Modulate Precision
 ```
+
 Apply multiplicative factor to precision weights
 
 #### Configuration Management
 
 **Save Current Setup:**
+
 ```bash
 File → Save Configuration (Ctrl+S)
 ```
+
 Saves all parameter values to YAML
 
 **Load Previous Setup:**
+
 ```bash
 File → Load Configuration (Ctrl+O)
 ```
+
 Restores parameters from YAML file
 
 ## Data Export Formats
 
 ### CSV Export
+
 ```csv
-time,ignition,free_energy,extero_precision,intero_precision,...
-0.00,0,1.234,1.0,0.8,...
-0.01,0,1.245,1.0,0.8,...
-0.02,1,2.456,1.5,0.9,...
+time, ignition, free_energy, extero_precision, intero_precision,...
+0.00, 0, 1.234, 1.0, 0.8,...
+0.01, 0, 1.245, 1.0, 0.8,...
+0.02, 1, 2.456, 1.5, 0.9,...
 ```
 
 ### JSON Export
+
 ```json
 [
   {
@@ -268,7 +281,7 @@ time,ignition,free_energy,extero_precision,intero_precision,...
 ## Keyboard Shortcuts Reference
 
 | Shortcut | Action |
-|----------|--------|
+| - | - |
 | **Ctrl+N** | New Session |
 | **Ctrl+O** | Load Configuration |
 | **Ctrl+S** | Save Configuration |
@@ -284,37 +297,44 @@ time,ignition,free_energy,extero_precision,intero_precision,...
 ### Understanding the Plots
 
 #### **Ignition Events (Red Dots)**
+
 - Each dot = consciousness event
 - Clustering indicates high ignition rate
 - Gaps indicate suppression/refractory periods
 
 #### **Workspace Activity (Blue Line)**
+
 - 0 = Idle (unconscious processing)
 - 1 = Broadcasting (conscious access)
 - Duration ~300-500ms per event
 
 #### **Precision (Green/Red Lines)**
+
 - Green = Exteroceptive (sensory)
 - Red = Interoceptive (body)
 - Higher = more influence on ignition
 
 #### **Free Energy (Purple Line)**
+
 - Prediction error magnitude
 - Spikes precede ignition events
 - Minimized through learning
 
 #### **Heart Rate**
+
 - Responds to arousal/activity
 - Predicted by interoceptive model
 - Prediction errors drive ignition
 
 #### **Allostatic Load**
+
 - Cumulative stress/deviation
 - Rises during challenges
 - Decay during recovery
 - High load → higher ignition threshold
 
 #### **Metabolic Reserves**
+
 - Energy budget (0-100)
 - Depletes during ignition (~7.5% per event)
 - Recovers slowly over time
@@ -328,11 +348,13 @@ time,ignition,free_energy,extero_precision,intero_precision,...
 - **Color**: Time evolution (blue→red = early→late)
 
 **Healthy trajectory:**
+
 - Low free energy (good predictions)
 - Moderate precision (balanced)
 - Low allostatic load (stable)
 
 **Stressed trajectory:**
+
 - High free energy (poor predictions)
 - Variable precision (uncertainty)
 - High allostatic load (overload)
@@ -340,6 +362,7 @@ time,ignition,free_energy,extero_precision,intero_precision,...
 ## Troubleshooting
 
 ### GUI Won't Start
+
 ```bash
 # Check dependencies
 pip install matplotlib tkinter
@@ -349,16 +372,19 @@ python -c "from apgi_system.system import APGISystem; print('OK')"
 ```
 
 ### Slow Performance
+
 - Reduce simulation speed (slider)
 - Decrease buffer size in code
 - Close other applications
 
 ### Plots Not Updating
+
 - Check if simulation is running (not paused)
 - Verify FPS counter shows activity
 - Reset simulation (F8)
 
 ### Memory Issues
+
 - Export data periodically
 - Reset simulation to clear buffers
 - Reduce buffer_size in apgi_gui.py
@@ -389,18 +415,21 @@ python -c "from apgi_system.system import APGISystem; print('OK')"
 ## Architecture Notes
 
 ### Threading Model
+
 - **Main thread**: GUI updates, user interaction
 - **Simulation thread**: APGI system stepping (separate)
 - **Update rate**: 100ms GUI refresh, ~1ms simulation steps
 
 ### Data Flow
-```
+
+```text
 User Input → Parameters → APGI System → State → Buffers → Plots
                                           ↓
                                     Export/Log
 ```
 
 ### Performance Optimization
+
 - Plots update at 10 Hz (not every simulation step)
 - Deque buffers limit memory (1000 samples)
 - Canvas draw_idle() for efficient rendering
@@ -409,6 +438,7 @@ User Input → Parameters → APGI System → State → Buffers → Plots
 ## Future Enhancements
 
 Planned features:
+
 - [ ] Custom task designer
 - [ ] Real-time neural network visualization
 - [ ] Multi-session comparison
@@ -429,8 +459,8 @@ Planned features:
 
 Same as main APGI System project (MIT License)
 
----
+## Conclusion
 
-**Happy Modeling! 🧠✨**
+Happy Modeling! 🧠✨
 
 For questions or issues, please open a GitHub issue in the project repository.

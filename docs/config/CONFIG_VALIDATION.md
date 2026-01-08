@@ -33,6 +33,7 @@ validator.validate(config)
 ### 1. Schema Validation
 
 The validator checks:
+
 - Required sections are present
 - Required fields within sections are present
 - Field types are correct (int, float, list, dict)
@@ -43,6 +44,7 @@ The validator checks:
 ### 2. Cross-Parameter Validation
 
 The validator performs consistency checks:
+
 - Thermodynamic budget consistency (baseline + ignition ≤ total)
 - Ignition timing consistency (amplification vs refractory period)
 - Precision initialization within range
@@ -59,7 +61,8 @@ for error in errors:
 ```
 
 Example output:
-```
+
+```text
 Field 'system.timestep_ms' value 1000.0 is out of range [0.01, 100.0]
 Missing required field: 'active_inference.learning_rate' (Learning rate for active inference)
 Field 'active_inference.precision_range' range invalid: min (10.0) must be less than max (1.0)
@@ -145,6 +148,7 @@ All configurations must include these sections:
 ### Optional Sections
 
 These sections are optional but will be validated if present:
+
 - `self_model`: Self-model parameters
 - `oscillations`: Neural oscillation parameters
 - `validation`: Validation and metrics settings
@@ -163,6 +167,7 @@ These sections are optional but will be validated if present:
 **Error**: `Field 'system.timestep_ms' has wrong type: expected int or float, got str`
 
 **Solution**: Remove quotes from numeric values in YAML:
+
 ```yaml
 # Wrong
 timestep_ms: "1.0"
@@ -176,6 +181,7 @@ timestep_ms: 1.0
 **Error**: `Field 'active_inference.learning_rate' value 5.0 is out of range [0.0, 1.0]`
 
 **Solution**: Adjust the value to be within the acceptable range:
+
 ```yaml
 # Wrong
 learning_rate: 5.0
@@ -189,6 +195,7 @@ learning_rate: 0.01
 **Error**: `Field 'precision_range' range invalid: min (10.0) must be less than max (1.0)`
 
 **Solution**: Ensure the first value is less than the second:
+
 ```yaml
 # Wrong
 precision_range: [10.0, 1.0]
@@ -202,6 +209,7 @@ precision_range: [0.1, 10.0]
 **Warning**: `baseline_consumption (60.0) + ignition_cost (50.0) exceeds total_energy_budget (100.0)`
 
 **Solution**: Increase the total budget or reduce consumption/costs:
+
 ```yaml
 # Option 1: Increase budget
 total_energy_budget: 150.0
@@ -234,6 +242,7 @@ except ConfigValidationError as e:
 ## Examples
 
 See `examples/validate_config_example.py` for complete working examples of:
+
 1. Validating the default configuration
 2. Handling invalid configurations
 3. Getting detailed error messages
@@ -242,6 +251,7 @@ See `examples/validate_config_example.py` for complete working examples of:
 6. Accessing help for common mistakes
 
 Run the examples:
+
 ```bash
 python examples/validate_config_example.py
 ```
@@ -253,6 +263,7 @@ python examples/validate_config_example.py
 Main validation class.
 
 **Methods**:
+
 - `validate(config)`: Validate and raise exception if invalid
 - `validate_with_details(config)`: Return list of error messages
 - `validate_parameter_ranges(config)`: Check cross-parameter consistency
@@ -264,9 +275,11 @@ Main validation class.
 Convenience function to validate a YAML configuration file.
 
 **Parameters**:
+
 - `config_path` (str): Path to YAML configuration file
 
 **Raises**:
+
 - `ConfigValidationError`: If configuration is invalid
 - `FileNotFoundError`: If file doesn't exist
 

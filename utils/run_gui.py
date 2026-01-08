@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from apgi_gui import main
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 60)
     print("APGI System - Consciousness Modeling Framework")
     print("=" * 60)
@@ -27,5 +27,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"\n\nERROR: {str(e)}")
         import traceback
+
         traceback.print_exc()
         input("\nPress Enter to exit...")

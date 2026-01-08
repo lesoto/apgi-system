@@ -1,10 +1,11 @@
 """Quick test of platform utilities."""
+
 from apgi_system.platform_utils import (
-    get_platform, 
-    is_bundled, 
-    get_resource_path, 
-    get_config_dir, 
-    get_data_dir
+    get_platform,
+    is_bundled,
+    get_resource_path,
+    get_config_dir,
+    get_data_dir,
 )
 
 print(f"Platform: {get_platform()}")

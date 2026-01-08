@@ -9,7 +9,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+
+matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 import yaml
@@ -23,23 +24,24 @@ import time
 
 from apgi_system.system import APGISystem
 from apgi_system.platform_utils import (
-    get_resource_path, 
+    get_resource_path,
     get_data_dir,
     load_resource_with_fallback,
     safe_write_file,
-    check_required_libraries
+    check_required_libraries,
 )
 import logging
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)
+# Reduce logging verbosity for cleaner GUI startup
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.WARNING,  # Only show warnings and errors, not info/debug
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler('apgi_gui.log'),
-        logging.StreamHandler()
-    ]
+        logging.FileHandler("apgi_gui.log"),
+        # Only log to file, not console for cleaner startup
+    ],
 )
 
 
@@ -63,19 +65,19 @@ class APGIGui:
         self.buffer_size = 1000
         self.time_buffer = deque(maxlen=self.buffer_size)
         self.data_buffers = {
-            'ignition': deque(maxlen=self.buffer_size),
-            'free_energy': deque(maxlen=self.buffer_size),
-            'extero_precision': deque(maxlen=self.buffer_size),
-            'intero_precision': deque(maxlen=self.buffer_size),
-            'metabolic_reserves': deque(maxlen=self.buffer_size),
-            'allostatic_load': deque(maxlen=self.buffer_size),
-            'heart_rate': deque(maxlen=self.buffer_size),
-            'cortisol': deque(maxlen=self.buffer_size),
-            'workspace_active': deque(maxlen=self.buffer_size),
-            'gamma_power': deque(maxlen=self.buffer_size),
-            'beta_power': deque(maxlen=self.buffer_size),
-            'somatic_markers': deque(maxlen=self.buffer_size),
-            'minimal_self_coherence': deque(maxlen=self.buffer_size),
+            "ignition": deque(maxlen=self.buffer_size),
+            "free_energy": deque(maxlen=self.buffer_size),
+            "extero_precision": deque(maxlen=self.buffer_size),
+            "intero_precision": deque(maxlen=self.buffer_size),
+            "metabolic_reserves": deque(maxlen=self.buffer_size),
+            "allostatic_load": deque(maxlen=self.buffer_size),
+            "heart_rate": deque(maxlen=self.buffer_size),
+            "cortisol": deque(maxlen=self.buffer_size),
+            "workspace_active": deque(maxlen=self.buffer_size),
+            "gamma_power": deque(maxlen=self.buffer_size),
+            "beta_power": deque(maxlen=self.buffer_size),
+            "somatic_markers": deque(maxlen=self.buffer_size),
+            "minimal_self_coherence": deque(maxlen=self.buffer_size),
         }
 
         # Logging
@@ -102,14 +104,23 @@ class APGIGui:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="New Session", command=self._new_session, accelerator="Ctrl+N")
-        file_menu.add_command(label="Load Configuration...", command=self._load_config, accelerator="Ctrl+O")
-        file_menu.add_command(label="Save Configuration...", command=self._save_config, accelerator="Ctrl+S")
+        file_menu.add_command(
+            label="Load Configuration...", command=self._load_config, accelerator="Ctrl+O"
+        )
+        file_menu.add_command(
+            label="Save Configuration...", command=self._save_config, accelerator="Ctrl+S"
+        )
         file_menu.add_separator()
-        file_menu.add_command(label="Export Data...", command=self._export_data, accelerator="Ctrl+E")
+        file_menu.add_command(
+            label="Export Data...", command=self._export_data, accelerator="Ctrl+E"
+        )
         file_menu.add_command(label="Export Plot...", command=self._export_plot)
         file_menu.add_separator()
-        file_menu.add_checkbutton(label="Auto-save Data", variable=tk.BooleanVar(value=False),
-                                   command=self._toggle_auto_save)
+        file_menu.add_checkbutton(
+            label="Auto-save Data",
+            variable=tk.BooleanVar(value=False),
+            command=self._toggle_auto_save,
+        )
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._exit_app, accelerator="Ctrl+Q")
 
@@ -175,15 +186,15 @@ class APGIGui:
         help_menu.add_command(label="About APGI System", command=self._show_about)
 
         # Bind keyboard shortcuts
-        self.root.bind('<Control-n>', lambda e: self._new_session())
-        self.root.bind('<Control-o>', lambda e: self._load_config())
-        self.root.bind('<Control-s>', lambda e: self._save_config())
-        self.root.bind('<Control-e>', lambda e: self._export_data())
-        self.root.bind('<Control-q>', lambda e: self._exit_app())
-        self.root.bind('<F5>', lambda e: self._start_simulation())
-        self.root.bind('<F6>', lambda e: self._pause_simulation())
-        self.root.bind('<F7>', lambda e: self._stop_simulation())
-        self.root.bind('<F8>', lambda e: self._reset_simulation())
+        self.root.bind("<Control-n>", lambda e: self._new_session())
+        self.root.bind("<Control-o>", lambda e: self._load_config())
+        self.root.bind("<Control-s>", lambda e: self._save_config())
+        self.root.bind("<Control-e>", lambda e: self._export_data())
+        self.root.bind("<Control-q>", lambda e: self._exit_app())
+        self.root.bind("<F5>", lambda e: self._start_simulation())
+        self.root.bind("<F6>", lambda e: self._pause_simulation())
+        self.root.bind("<F7>", lambda e: self._stop_simulation())
+        self.root.bind("<F8>", lambda e: self._reset_simulation())
 
     def _create_main_layout(self):
         """Create main application layout."""
@@ -214,16 +225,24 @@ class APGIGui:
         btn_frame = ttk.Frame(control_frame)
         btn_frame.pack(fill=tk.X)
 
-        self.start_btn = ttk.Button(btn_frame, text="▶ Start", command=self._start_simulation, width=10)
+        self.start_btn = ttk.Button(
+            btn_frame, text="▶ Start", command=self._start_simulation, width=10
+        )
         self.start_btn.pack(side=tk.LEFT, padx=2)
 
-        self.pause_btn = ttk.Button(btn_frame, text="⏸ Pause", command=self._pause_simulation, width=10, state=tk.DISABLED)
+        self.pause_btn = ttk.Button(
+            btn_frame, text="⏸ Pause", command=self._pause_simulation, width=10, state=tk.DISABLED
+        )
         self.pause_btn.pack(side=tk.LEFT, padx=2)
 
-        self.stop_btn = ttk.Button(btn_frame, text="⏹ Stop", command=self._stop_simulation, width=10, state=tk.DISABLED)
+        self.stop_btn = ttk.Button(
+            btn_frame, text="⏹ Stop", command=self._stop_simulation, width=10, state=tk.DISABLED
+        )
         self.stop_btn.pack(side=tk.LEFT, padx=2)
 
-        self.reset_btn = ttk.Button(btn_frame, text="↻ Reset", command=self._reset_simulation, width=10)
+        self.reset_btn = ttk.Button(
+            btn_frame, text="↻ Reset", command=self._reset_simulation, width=10
+        )
         self.reset_btn.pack(side=tk.LEFT, padx=2)
 
         # Speed control
@@ -231,11 +250,15 @@ class APGIGui:
         speed_frame.pack(fill=tk.X, pady=5)
         ttk.Label(speed_frame, text="Speed:").pack(side=tk.LEFT)
         self.speed_var = tk.DoubleVar(value=1.0)
-        speed_scale = ttk.Scale(speed_frame, from_=0.1, to=10.0, variable=self.speed_var, orient=tk.HORIZONTAL)
+        speed_scale = ttk.Scale(
+            speed_frame, from_=0.1, to=10.0, variable=self.speed_var, orient=tk.HORIZONTAL
+        )
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.speed_label = ttk.Label(speed_frame, text="1.0x")
         self.speed_label.pack(side=tk.LEFT)
-        self.speed_var.trace_add('write', lambda *args: self.speed_label.config(text=f"{self.speed_var.get():.1f}x"))
+        self.speed_var.trace_add(
+            "write", lambda *args: self.speed_label.config(text=f"{self.speed_var.get():.1f}x")
+        )
 
         # System Status
         status_frame = ttk.LabelFrame(parent, text="System Status", padding=10)
@@ -243,18 +266,18 @@ class APGIGui:
 
         self.status_labels = {}
         status_items = [
-            ('Time', '0.00 s'),
-            ('Ignition Events', '0'),
-            ('Workspace', 'Idle'),
-            ('Metabolic Reserves', '100.0%'),
-            ('Allostatic Load', '0.0%'),
+            ("Time", "0.00 s"),
+            ("Ignition Events", "0"),
+            ("Workspace", "Idle"),
+            ("Metabolic Reserves", "100.0%"),
+            ("Allostatic Load", "0.0%"),
         ]
 
         for label, initial in status_items:
             frame = ttk.Frame(status_frame)
             frame.pack(fill=tk.X, pady=2)
-            ttk.Label(frame, text=f"{label}:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
-            self.status_labels[label] = ttk.Label(frame, text=initial, font=('Arial', 9))
+            ttk.Label(frame, text=f"{label}:", font=("Arial", 9, "bold")).pack(side=tk.LEFT)
+            self.status_labels[label] = ttk.Label(frame, text=initial, font=("Arial", 9))
             self.status_labels[label].pack(side=tk.RIGHT)
 
         # Parameter Adjustments
@@ -267,8 +290,7 @@ class APGIGui:
         scrollable_frame = ttk.Frame(canvas)
 
         scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
@@ -280,14 +302,14 @@ class APGIGui:
         # Add parameter controls
         self.param_vars = {}
         parameters = [
-            ('Ignition Threshold', 'baseline_threshold', 1.0, 5.0, 2.0),
-            ('Extero Precision', 'extero_precision', 0.1, 10.0, 1.0),
-            ('Intero Precision', 'intero_precision', 0.1, 10.0, 0.8),
-            ('Arousal Level', 'arousal', 0.0, 1.0, 0.0),
-            ('Stress Level', 'stress', 0.0, 1.0, 0.0),
-            ('Activity Level', 'activity', 0.0, 1.0, 0.0),
-            ('Learning Rate', 'learning_rate', 0.001, 0.1, 0.01),
-            ('Attention Gain', 'attention_gain', 0.5, 3.0, 1.0),
+            ("Ignition Threshold", "baseline_threshold", 1.0, 5.0, 2.0),
+            ("Extero Precision", "extero_precision", 0.1, 10.0, 1.0),
+            ("Intero Precision", "intero_precision", 0.1, 10.0, 0.8),
+            ("Arousal Level", "arousal", 0.0, 1.0, 0.0),
+            ("Stress Level", "stress", 0.0, 1.0, 0.0),
+            ("Activity Level", "activity", 0.0, 1.0, 0.0),
+            ("Learning Rate", "learning_rate", 0.001, 0.1, 0.01),
+            ("Attention Gain", "attention_gain", 0.5, 3.0, 1.0),
         ]
 
         for i, (label, key, min_val, max_val, default) in enumerate(parameters):
@@ -305,13 +327,17 @@ class APGIGui:
             val_label = ttk.Label(frame, text=f"{default:.2f}", width=6)
             val_label.pack(side=tk.LEFT)
 
-            var.trace_add('write', lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.2f}"))
+            var.trace_add(
+                "write", lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.2f}")
+            )
 
         # Event Log
         log_frame = ttk.LabelFrame(parent, text="Event Log", padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=8, width=40, font=('Courier', 8))
+        self.log_text = scrolledtext.ScrolledText(
+            log_frame, height=8, width=40, font=("Courier", 8)
+        )
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self._log_event("APGI System initialized")
 
@@ -355,30 +381,40 @@ class APGIGui:
         fig = Figure(figsize=(10, 8))
 
         self.neural_axes = {
-            'ignition': fig.add_subplot(4, 1, 1),
-            'workspace': fig.add_subplot(4, 1, 2),
-            'precision': fig.add_subplot(4, 1, 3),
-            'free_energy': fig.add_subplot(4, 1, 4),
+            "ignition": fig.add_subplot(4, 1, 1),
+            "workspace": fig.add_subplot(4, 1, 2),
+            "precision": fig.add_subplot(4, 1, 3),
+            "free_energy": fig.add_subplot(4, 1, 4),
         }
 
         # Configure axes
-        self.neural_axes['ignition'].set_ylabel('Ignition Events')
-        self.neural_axes['ignition'].set_ylim(-0.1, 1.1)
+        self.neural_axes["ignition"].set_ylabel("Ignition Events")
+        self.neural_axes["ignition"].set_ylim(-0.1, 1.1)
 
-        self.neural_axes['workspace'].set_ylabel('Workspace Activity')
-        self.neural_axes['precision'].set_ylabel('Precision')
-        self.neural_axes['free_energy'].set_ylabel('Free Energy')
-        self.neural_axes['free_energy'].set_xlabel('Time (s)')
+        self.neural_axes["workspace"].set_ylabel("Workspace Activity")
+        self.neural_axes["precision"].set_ylabel("Precision")
+        self.neural_axes["free_energy"].set_ylabel("Free Energy")
+        self.neural_axes["free_energy"].set_xlabel("Time (s)")
 
         # Initialize line plots
         self.neural_lines = {}
-        self.neural_lines['ignition'] = self.neural_axes['ignition'].scatter([], [], c='red', s=50, alpha=0.6)
-        self.neural_lines['workspace'], = self.neural_axes['workspace'].plot([], [], 'b-', linewidth=2)
-        self.neural_lines['extero_precision'], = self.neural_axes['precision'].plot([], [], 'g-', label='Extero', linewidth=2)
-        self.neural_lines['intero_precision'], = self.neural_axes['precision'].plot([], [], 'r-', label='Intero', linewidth=2)
-        self.neural_lines['free_energy'], = self.neural_axes['free_energy'].plot([], [], 'purple', linewidth=2)
+        self.neural_lines["ignition"] = self.neural_axes["ignition"].scatter(
+            [], [], c="red", s=50, alpha=0.6
+        )
+        (self.neural_lines["workspace"],) = self.neural_axes["workspace"].plot(
+            [], [], "b-", linewidth=2
+        )
+        (self.neural_lines["extero_precision"],) = self.neural_axes["precision"].plot(
+            [], [], "g-", label="Extero", linewidth=2
+        )
+        (self.neural_lines["intero_precision"],) = self.neural_axes["precision"].plot(
+            [], [], "r-", label="Intero", linewidth=2
+        )
+        (self.neural_lines["free_energy"],) = self.neural_axes["free_energy"].plot(
+            [], [], "purple", linewidth=2
+        )
 
-        self.neural_axes['precision'].legend(loc='upper right')
+        self.neural_axes["precision"].legend(loc="upper right")
 
         fig.tight_layout()
 
@@ -396,23 +432,31 @@ class APGIGui:
         fig = Figure(figsize=(10, 8))
 
         self.intero_axes = {
-            'heart_rate': fig.add_subplot(4, 1, 1),
-            'cortisol': fig.add_subplot(4, 1, 2),
-            'allostatic_load': fig.add_subplot(4, 1, 3),
-            'metabolic': fig.add_subplot(4, 1, 4),
+            "heart_rate": fig.add_subplot(4, 1, 1),
+            "cortisol": fig.add_subplot(4, 1, 2),
+            "allostatic_load": fig.add_subplot(4, 1, 3),
+            "metabolic": fig.add_subplot(4, 1, 4),
         }
 
-        self.intero_axes['heart_rate'].set_ylabel('Heart Rate (bpm)')
-        self.intero_axes['cortisol'].set_ylabel('Cortisol (μg/dL)')
-        self.intero_axes['allostatic_load'].set_ylabel('Allostatic Load')
-        self.intero_axes['metabolic'].set_ylabel('Metabolic Reserves')
-        self.intero_axes['metabolic'].set_xlabel('Time (s)')
+        self.intero_axes["heart_rate"].set_ylabel("Heart Rate (bpm)")
+        self.intero_axes["cortisol"].set_ylabel("Cortisol (μg/dL)")
+        self.intero_axes["allostatic_load"].set_ylabel("Allostatic Load")
+        self.intero_axes["metabolic"].set_ylabel("Metabolic Reserves")
+        self.intero_axes["metabolic"].set_xlabel("Time (s)")
 
         self.intero_lines = {}
-        self.intero_lines['heart_rate'], = self.intero_axes['heart_rate'].plot([], [], 'r-', linewidth=2)
-        self.intero_lines['cortisol'], = self.intero_axes['cortisol'].plot([], [], 'orange', linewidth=2)
-        self.intero_lines['allostatic_load'], = self.intero_axes['allostatic_load'].plot([], [], 'darkred', linewidth=2)
-        self.intero_lines['metabolic'], = self.intero_axes['metabolic'].plot([], [], 'green', linewidth=2)
+        (self.intero_lines["heart_rate"],) = self.intero_axes["heart_rate"].plot(
+            [], [], "r-", linewidth=2
+        )
+        (self.intero_lines["cortisol"],) = self.intero_axes["cortisol"].plot(
+            [], [], "orange", linewidth=2
+        )
+        (self.intero_lines["allostatic_load"],) = self.intero_axes["allostatic_load"].plot(
+            [], [], "darkred", linewidth=2
+        )
+        (self.intero_lines["metabolic"],) = self.intero_axes["metabolic"].plot(
+            [], [], "green", linewidth=2
+        )
 
         fig.tight_layout()
 
@@ -430,20 +474,24 @@ class APGIGui:
         fig = Figure(figsize=(10, 8))
 
         self.metrics_axes = {
-            'somatic': fig.add_subplot(3, 1, 1),
-            'gamma': fig.add_subplot(3, 1, 2),
-            'beta': fig.add_subplot(3, 1, 3),
+            "somatic": fig.add_subplot(3, 1, 1),
+            "gamma": fig.add_subplot(3, 1, 2),
+            "beta": fig.add_subplot(3, 1, 3),
         }
 
-        self.metrics_axes['somatic'].set_ylabel('Somatic Markers')
-        self.metrics_axes['gamma'].set_ylabel('Gamma Power')
-        self.metrics_axes['beta'].set_ylabel('Beta Power')
-        self.metrics_axes['beta'].set_xlabel('Time (s)')
+        self.metrics_axes["somatic"].set_ylabel("Somatic Markers")
+        self.metrics_axes["gamma"].set_ylabel("Gamma Power")
+        self.metrics_axes["beta"].set_ylabel("Beta Power")
+        self.metrics_axes["beta"].set_xlabel("Time (s)")
 
         self.metrics_lines = {}
-        self.metrics_lines['somatic'], = self.metrics_axes['somatic'].plot([], [], 'purple', linewidth=2)
-        self.metrics_lines['gamma'], = self.metrics_axes['gamma'].plot([], [], 'darkgreen', linewidth=2)
-        self.metrics_lines['beta'], = self.metrics_axes['beta'].plot([], [], 'blue', linewidth=2)
+        (self.metrics_lines["somatic"],) = self.metrics_axes["somatic"].plot(
+            [], [], "purple", linewidth=2
+        )
+        (self.metrics_lines["gamma"],) = self.metrics_axes["gamma"].plot(
+            [], [], "darkgreen", linewidth=2
+        )
+        (self.metrics_lines["beta"],) = self.metrics_axes["beta"].plot([], [], "blue", linewidth=2)
 
         fig.tight_layout()
 
@@ -461,13 +509,13 @@ class APGIGui:
         fig = Figure(figsize=(10, 8))
 
         ax = fig.add_subplot(1, 1, 1)
-        ax.set_ylabel('Coherence')
-        ax.set_xlabel('Time (s)')
+        ax.set_ylabel("Coherence")
+        ax.set_xlabel("Time (s)")
         ax.set_ylim(0, 1.1)
 
-        self.coherence_line, = ax.plot([], [], 'b-', linewidth=2, label='Minimal Self')
-        ax.axhline(y=0.7, color='g', linestyle='--', label='Normal Threshold')
-        ax.axhline(y=0.4, color='r', linestyle='--', label='Depersonalization')
+        (self.coherence_line,) = ax.plot([], [], "b-", linewidth=2, label="Minimal Self")
+        ax.axhline(y=0.7, color="g", linestyle="--", label="Normal Threshold")
+        ax.axhline(y=0.4, color="r", linestyle="--", label="Depersonalization")
         ax.legend()
 
         fig.tight_layout()
@@ -489,12 +537,12 @@ class APGIGui:
         ax1 = fig.add_subplot(2, 1, 1)
         ax2 = fig.add_subplot(2, 1, 2)
 
-        ax1.set_ylabel('Oscillation Signal')
-        ax1.set_xlabel('Time (s)')
-        ax2.set_ylabel('Power')
-        ax2.set_xlabel('Frequency Band')
+        ax1.set_ylabel("Oscillation Signal")
+        ax1.set_xlabel("Time (s)")
+        ax2.set_ylabel("Power")
+        ax2.set_xlabel("Frequency Band")
 
-        self.osc_signal_line, = ax1.plot([], [], 'b-', linewidth=1)
+        (self.osc_signal_line,) = ax1.plot([], [], "b-", linewidth=1)
 
         # Bar plot for power spectrum
         self.osc_bars = None
@@ -517,14 +565,14 @@ class APGIGui:
         from mpl_toolkits.mplot3d import Axes3D
 
         fig = Figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
 
-        ax.set_xlabel('Free Energy')
-        ax.set_ylabel('Precision')
-        ax.set_zlabel('Allostatic Load')
-        ax.set_title('3D State Space Trajectory')
+        ax.set_xlabel("Free Energy")
+        ax.set_ylabel("Precision")
+        ax.set_zlabel("Allostatic Load")
+        ax.set_title("3D State Space Trajectory")
 
-        self.state_scatter = ax.scatter([], [], [], c='b', marker='o', s=20, alpha=0.6)
+        self.state_scatter = ax.scatter([], [], [], c="b", marker="o", s=20, alpha=0.6)
         self.state_ax = ax
 
         canvas = FigureCanvasTkAgg(fig, parent)
@@ -680,16 +728,18 @@ class APGIGui:
 
         try:
             # Apply body state modulations
-            self.apgi_system.body_model.set_arousal(self.param_vars['arousal'].get())
-            self.apgi_system.body_model.set_stress(self.param_vars['stress'].get())
-            self.apgi_system.body_model.set_activity(self.param_vars['activity'].get())
+            self.apgi_system.body_model.set_arousal(self.param_vars["arousal"].get())
+            self.apgi_system.body_model.set_stress(self.param_vars["stress"].get())
+            self.apgi_system.body_model.set_activity(self.param_vars["activity"].get())
 
             # Apply precision
-            self.apgi_system.precision.extero_baseline = self.param_vars['extero_precision'].get()
-            self.apgi_system.precision.intero_baseline = self.param_vars['intero_precision'].get()
+            self.apgi_system.precision.extero_baseline = self.param_vars["extero_precision"].get()
+            self.apgi_system.precision.intero_baseline = self.param_vars["intero_precision"].get()
 
             # Apply threshold
-            self.apgi_system.ignition_threshold.baseline_threshold = self.param_vars['baseline_threshold'].get()
+            self.apgi_system.ignition_threshold.baseline_threshold = self.param_vars[
+                "baseline_threshold"
+            ].get()
 
         except Exception as e:
             self._log_event(f"Error applying parameters: {str(e)}")
@@ -697,35 +747,42 @@ class APGIGui:
 
     def _record_state(self, state):
         """Record state data."""
-        current_time = state['time'] / 1000.0  # Convert to seconds
+        current_time = state["time"] / 1000.0  # Convert to seconds
 
         self.time_buffer.append(current_time)
 
         # Extract and record metrics
-        self.data_buffers['ignition'].append(1 if state['ignition']['ignition_occurred'] else 0)
-        self.data_buffers['free_energy'].append(state['ignition']['total_signal'])
-        self.data_buffers['extero_precision'].append(state['precision']['exteroceptive'])
-        self.data_buffers['intero_precision'].append(state['precision']['interoceptive'])
-        self.data_buffers['metabolic_reserves'].append(state['metabolism']['reserves'])
-        self.data_buffers['allostatic_load'].append(state['allostasis']['allostatic_load'])
-        self.data_buffers['heart_rate'].append(state['body']['current']['heart_rate'])
-        self.data_buffers['cortisol'].append(state['body']['current']['cortisol'])
-        self.data_buffers['workspace_active'].append(1 if state['workspace']['is_broadcasting'] else 0)
-        self.data_buffers['gamma_power'].append(state['oscillations']['band_powers'].get('gamma', 0))
-        self.data_buffers['beta_power'].append(state['oscillations']['band_powers'].get('beta', 0))
-        self.data_buffers['minimal_self_coherence'].append(state['self_model']['minimal']['coherence'])
+        self.data_buffers["ignition"].append(1 if state["ignition"]["ignition_occurred"] else 0)
+        self.data_buffers["free_energy"].append(state["ignition"]["total_signal"])
+        self.data_buffers["extero_precision"].append(state["precision"]["exteroceptive"])
+        self.data_buffers["intero_precision"].append(state["precision"]["interoceptive"])
+        self.data_buffers["metabolic_reserves"].append(state["metabolism"]["reserves"])
+        self.data_buffers["allostatic_load"].append(state["allostasis"]["allostatic_load"])
+        self.data_buffers["heart_rate"].append(state["body"]["current"]["heart_rate"])
+        self.data_buffers["cortisol"].append(state["body"]["current"]["cortisol"])
+        self.data_buffers["workspace_active"].append(
+            1 if state["workspace"]["is_broadcasting"] else 0
+        )
+        self.data_buffers["gamma_power"].append(
+            state["oscillations"]["band_powers"].get("gamma", 0)
+        )
+        self.data_buffers["beta_power"].append(state["oscillations"]["band_powers"].get("beta", 0))
+        self.data_buffers["minimal_self_coherence"].append(
+            state["self_model"]["minimal"]["coherence"]
+        )
 
         # Count somatic markers
-        if hasattr(self.apgi_system.somatic_markers, 'markers'):
-            self.data_buffers['somatic_markers'].append(len(self.apgi_system.somatic_markers.markers))
+        if hasattr(self.apgi_system.somatic_markers, "markers"):
+            self.data_buffers["somatic_markers"].append(
+                len(self.apgi_system.somatic_markers.markers)
+            )
         else:
-            self.data_buffers['somatic_markers'].append(0)
+            self.data_buffers["somatic_markers"].append(0)
 
         # Log data for export
-        self.log_data.append({
-            'time': current_time,
-            **{k: v[-1] for k, v in self.data_buffers.items()}
-        })
+        self.log_data.append(
+            {"time": current_time, **{k: v[-1] for k, v in self.data_buffers.items()}}
+        )
 
     def _update_displays(self):
         """Update all displays (called periodically)."""
@@ -744,19 +801,19 @@ class APGIGui:
         try:
             summary = self.apgi_system.get_state_summary()
 
-            self.status_labels['Time'].config(text=f"{summary['time_ms'] / 1000.0:.2f} s")
+            self.status_labels["Time"].config(text=f"{summary['time_ms'] / 1000.0:.2f} s")
 
-            stats = summary['ignition_stats']
-            self.status_labels['Ignition Events'].config(text=str(stats['recent_ignitions']))
+            stats = summary["ignition_stats"]
+            self.status_labels["Ignition Events"].config(text=str(stats["recent_ignitions"]))
 
-            workspace = 'Broadcasting' if summary['workspace_state'] == 'broadcasting' else 'Idle'
-            self.status_labels['Workspace'].config(text=workspace)
+            workspace = "Broadcasting" if summary["workspace_state"] == "broadcasting" else "Idle"
+            self.status_labels["Workspace"].config(text=workspace)
 
-            reserves = summary['metabolic_reserves']
-            self.status_labels['Metabolic Reserves'].config(text=f"{reserves:.1f}%")
+            reserves = summary["metabolic_reserves"]
+            self.status_labels["Metabolic Reserves"].config(text=f"{reserves:.1f}%")
 
-            load = summary['allostatic_load'] * 100
-            self.status_labels['Allostatic Load'].config(text=f"{load:.1f}%")
+            load = summary["allostatic_load"] * 100
+            self.status_labels["Allostatic Load"].config(text=f"{load:.1f}%")
 
         except Exception as e:
             self._log_event(f"Error updating status labels: {str(e)}")
@@ -795,49 +852,51 @@ class APGIGui:
     def _update_neural_plots(self, time_data):
         """Update neural activity plots."""
         # Ignition events (scatter plot)
-        ignitions = np.array(self.data_buffers['ignition'])
+        ignitions = np.array(self.data_buffers["ignition"])
         ignition_times = time_data[ignitions > 0]
         ignition_values = ignitions[ignitions > 0]
 
         if len(ignition_times) > 0:
-            self.neural_lines['ignition'].set_offsets(np.column_stack([ignition_times, ignition_values]))
+            self.neural_lines["ignition"].set_offsets(
+                np.column_stack([ignition_times, ignition_values])
+            )
 
         # Workspace activity
-        workspace = np.array(self.data_buffers['workspace_active'])
-        self.neural_lines['workspace'].set_data(time_data, workspace)
+        workspace = np.array(self.data_buffers["workspace_active"])
+        self.neural_lines["workspace"].set_data(time_data, workspace)
 
         # Precision
-        extero_prec = np.array(self.data_buffers['extero_precision'])
-        intero_prec = np.array(self.data_buffers['intero_precision'])
-        self.neural_lines['extero_precision'].set_data(time_data, extero_prec)
-        self.neural_lines['intero_precision'].set_data(time_data, intero_prec)
+        extero_prec = np.array(self.data_buffers["extero_precision"])
+        intero_prec = np.array(self.data_buffers["intero_precision"])
+        self.neural_lines["extero_precision"].set_data(time_data, extero_prec)
+        self.neural_lines["intero_precision"].set_data(time_data, intero_prec)
 
         # Free energy
-        fe = np.array(self.data_buffers['free_energy'])
-        self.neural_lines['free_energy'].set_data(time_data, fe)
+        fe = np.array(self.data_buffers["free_energy"])
+        self.neural_lines["free_energy"].set_data(time_data, fe)
 
         # Update axis limits
         for key, ax in self.neural_axes.items():
-            if key != 'ignition':
+            if key != "ignition":
                 ax.set_xlim(time_data[0], time_data[-1])
                 ax.relim()
                 ax.autoscale_view(scalex=False, scaley=True)
 
-        self.neural_axes['ignition'].set_xlim(time_data[0], time_data[-1])
+        self.neural_axes["ignition"].set_xlim(time_data[0], time_data[-1])
 
         self.neural_canvas.draw_idle()
 
     def _update_intero_plots(self, time_data):
         """Update interoception plots."""
-        hr = np.array(self.data_buffers['heart_rate'])
-        cortisol = np.array(self.data_buffers['cortisol'])
-        load = np.array(self.data_buffers['allostatic_load'])
-        metabolic = np.array(self.data_buffers['metabolic_reserves'])
+        hr = np.array(self.data_buffers["heart_rate"])
+        cortisol = np.array(self.data_buffers["cortisol"])
+        load = np.array(self.data_buffers["allostatic_load"])
+        metabolic = np.array(self.data_buffers["metabolic_reserves"])
 
-        self.intero_lines['heart_rate'].set_data(time_data, hr)
-        self.intero_lines['cortisol'].set_data(time_data, cortisol)
-        self.intero_lines['allostatic_load'].set_data(time_data, load)
-        self.intero_lines['metabolic'].set_data(time_data, metabolic)
+        self.intero_lines["heart_rate"].set_data(time_data, hr)
+        self.intero_lines["cortisol"].set_data(time_data, cortisol)
+        self.intero_lines["allostatic_load"].set_data(time_data, load)
+        self.intero_lines["metabolic"].set_data(time_data, metabolic)
 
         for ax in self.intero_axes.values():
             ax.set_xlim(time_data[0], time_data[-1])
@@ -848,13 +907,13 @@ class APGIGui:
 
     def _update_metrics_plots(self, time_data):
         """Update system metrics plots."""
-        somatic = np.array(self.data_buffers['somatic_markers'])
-        gamma = np.array(self.data_buffers['gamma_power'])
-        beta = np.array(self.data_buffers['beta_power'])
+        somatic = np.array(self.data_buffers["somatic_markers"])
+        gamma = np.array(self.data_buffers["gamma_power"])
+        beta = np.array(self.data_buffers["beta_power"])
 
-        self.metrics_lines['somatic'].set_data(time_data, somatic)
-        self.metrics_lines['gamma'].set_data(time_data, gamma)
-        self.metrics_lines['beta'].set_data(time_data, beta)
+        self.metrics_lines["somatic"].set_data(time_data, somatic)
+        self.metrics_lines["gamma"].set_data(time_data, gamma)
+        self.metrics_lines["beta"].set_data(time_data, beta)
 
         for ax in self.metrics_axes.values():
             ax.set_xlim(time_data[0], time_data[-1])
@@ -865,7 +924,7 @@ class APGIGui:
 
     def _update_self_plot(self, time_data):
         """Update self-model plot."""
-        coherence = np.array(self.data_buffers['minimal_self_coherence'])
+        coherence = np.array(self.data_buffers["minimal_self_coherence"])
         self.coherence_line.set_data(time_data, coherence)
 
         self.self_ax.set_xlim(time_data[0], time_data[-1])
@@ -879,7 +938,9 @@ class APGIGui:
         recent_time = time_data[-window_size:]
 
         # Generate sample oscillation (would come from system in full implementation)
-        sample_osc = np.sin(2 * np.pi * 20 * recent_time) + 0.5 * np.sin(2 * np.pi * 40 * recent_time)
+        sample_osc = np.sin(2 * np.pi * 20 * recent_time) + 0.5 * np.sin(
+            2 * np.pi * 40 * recent_time
+        )
         self.osc_signal_line.set_data(recent_time, sample_osc)
 
         self.osc_ax1.set_xlim(recent_time[0], recent_time[-1])
@@ -887,14 +948,18 @@ class APGIGui:
 
         # Power spectrum
         if self.osc_bars is None:
-            bands = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']
+            bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
             powers = [0.5, 0.7, 1.0, 0.8, 0.6]  # Would come from system
             self.osc_bars = self.osc_ax2.bar(bands, powers)
             self.osc_ax2.set_ylim(0, 1.5)
         else:
             # Update bar heights
-            gamma_power = self.data_buffers['gamma_power'][-1] if self.data_buffers['gamma_power'] else 0.6
-            beta_power = self.data_buffers['beta_power'][-1] if self.data_buffers['beta_power'] else 0.8
+            gamma_power = (
+                self.data_buffers["gamma_power"][-1] if self.data_buffers["gamma_power"] else 0.6
+            )
+            beta_power = (
+                self.data_buffers["beta_power"][-1] if self.data_buffers["beta_power"] else 0.8
+            )
 
             powers = [0.5, 0.7, 1.0, beta_power, gamma_power]
             for bar, power in zip(self.osc_bars, powers):
@@ -908,9 +973,9 @@ class APGIGui:
             return
 
         # Get recent trajectory
-        fe = np.array(self.data_buffers['free_energy'])
-        prec = np.array(self.data_buffers['extero_precision'])
-        load = np.array(self.data_buffers['allostatic_load'])
+        fe = np.array(self.data_buffers["free_energy"])
+        prec = np.array(self.data_buffers["extero_precision"])
+        load = np.array(self.data_buffers["allostatic_load"])
 
         # Color by time
         colors = np.linspace(0, 1, len(fe))
@@ -935,12 +1000,11 @@ class APGIGui:
     def _load_config(self):
         """Load configuration file."""
         filename = filedialog.askopenfilename(
-            title="Load Configuration",
-            filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")]
+            title="Load Configuration", filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")]
         )
         if filename:
             try:
-                with open(filename, 'r') as f:
+                with open(filename, "r") as f:
                     config = yaml.safe_load(f)
                 self.config_path = Path(filename)
                 self._initialize_system()
@@ -954,15 +1018,13 @@ class APGIGui:
         filename = filedialog.asksaveasfilename(
             title="Save Configuration",
             defaultextension=".yaml",
-            filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")]
+            filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")],
         )
         if filename:
             try:
                 # Create config from current parameters
-                config = {
-                    'parameters': {k: v.get() for k, v in self.param_vars.items()}
-                }
-                with open(filename, 'w') as f:
+                config = {"parameters": {k: v.get() for k, v in self.param_vars.items()}}
+                with open(filename, "w") as f:
                     yaml.dump(config, f)
                 self._log_event(f"Configuration saved: {filename}")
                 messagebox.showinfo("Success", "Configuration saved successfully")
@@ -978,22 +1040,22 @@ class APGIGui:
         # Use platform-appropriate data directory as initial directory
         initial_dir = get_data_dir()
         initial_dir.mkdir(parents=True, exist_ok=True)
-        
+
         filename = filedialog.asksaveasfilename(
             title="Export Data",
             initialdir=str(initial_dir),
             defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")]
+            filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")],
         )
 
         if filename:
             try:
-                if filename.endswith('.json'):
-                    with open(filename, 'w') as f:
+                if filename.endswith(".json"):
+                    with open(filename, "w") as f:
                         json.dump(self.log_data, f, indent=2)
                 else:
                     # CSV export
-                    with open(filename, 'w', newline='') as f:
+                    with open(filename, "w", newline="") as f:
                         if self.log_data:
                             writer = csv.DictWriter(f, fieldnames=self.log_data[0].keys())
                             writer.writeheader()
@@ -1009,11 +1071,11 @@ class APGIGui:
         filename = filedialog.asksaveasfilename(
             title="Export Plot",
             defaultextension=".png",
-            filetypes=[("PNG files", "*.png"), ("PDF files", "*.pdf"), ("All files", "*.*")]
+            filetypes=[("PNG files", "*.png"), ("PDF files", "*.pdf"), ("All files", "*.*")],
         )
         if filename:
             try:
-                self.neural_canvas.figure.savefig(filename, dpi=300, bbox_inches='tight')
+                self.neural_canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
                 self._log_event(f"Plot exported: {filename}")
                 messagebox.showinfo("Success", f"Plot saved to {filename}")
             except Exception as e:
@@ -1032,7 +1094,7 @@ class APGIGui:
         data_dir.mkdir(parents=True, exist_ok=True)
         filename = data_dir / f"apgi_autosave_{timestamp}.json"
         try:
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 json.dump(self.log_data, f)
         except Exception as e:
             self._log_event(f"Auto-save failed: {str(e)}")
@@ -1051,88 +1113,91 @@ class APGIGui:
         dialog = tk.Toplevel(self.root)
         dialog.title("Edit System Parameters")
         dialog.geometry("600x700")
-        
+
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
         # Create main frame with scrollbar
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
         canvas = tk.Canvas(main_frame)
         scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
-        
+
         scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        
+
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
-        ttk.Label(dialog, text="System Parameters", font=('Arial', 14, 'bold')).pack(pady=10)
-        
+
+        ttk.Label(dialog, text="System Parameters", font=("Arial", 14, "bold")).pack(pady=10)
+
         # Parameter definitions
         parameters = [
-            ('Ignition Threshold', 'baseline_threshold', 1.0, 5.0, 2.0),
-            ('Extero Precision', 'extero_precision', 0.1, 10.0, 1.0),
-            ('Intero Precision', 'intero_precision', 0.1, 10.0, 0.8),
-            ('Arousal Level', 'arousal', 0.0, 1.0, 0.0),
-            ('Stress Level', 'stress', 0.0, 1.0, 0.0),
-            ('Activity Level', 'activity', 0.0, 1.0, 0.0),
-            ('Learning Rate', 'learning_rate', 0.001, 0.1, 0.01),
-            ('Attention Gain', 'attention_gain', 0.5, 3.0, 1.0),
+            ("Ignition Threshold", "baseline_threshold", 1.0, 5.0, 2.0),
+            ("Extero Precision", "extero_precision", 0.1, 10.0, 1.0),
+            ("Intero Precision", "intero_precision", 0.1, 10.0, 0.8),
+            ("Arousal Level", "arousal", 0.0, 1.0, 0.0),
+            ("Stress Level", "stress", 0.0, 1.0, 0.0),
+            ("Activity Level", "activity", 0.0, 1.0, 0.0),
+            ("Learning Rate", "learning_rate", 0.001, 0.1, 0.01),
+            ("Attention Gain", "attention_gain", 0.5, 3.0, 1.0),
         ]
-        
+
         # Create parameter editors
         param_vars = {}
         for i, (label, key, min_val, max_val, default) in enumerate(parameters):
             frame = ttk.Frame(scrollable_frame)
             frame.pack(fill=tk.X, pady=5, padx=5)
-            
+
             ttk.Label(frame, text=label, width=18).pack(side=tk.LEFT)
-            
+
             # Get current value if it exists, otherwise use default
             current_val = default
-            if hasattr(self, 'param_vars') and key in self.param_vars:
+            if hasattr(self, "param_vars") and key in self.param_vars:
                 current_val = self.param_vars[key].get()
-            
+
             var = tk.DoubleVar(value=current_val)
             param_vars[key] = var
-            
+
             scale = ttk.Scale(frame, from_=min_val, to=max_val, variable=var, orient=tk.HORIZONTAL)
             scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-            
+
             val_label = ttk.Label(frame, text=f"{current_val:.3f}", width=8)
             val_label.pack(side=tk.LEFT)
-            
-            var.trace_add('write', lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.3f}"))
-        
+
+            var.trace_add(
+                "write", lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.3f}")
+            )
+
         # Button frame
         button_frame = ttk.Frame(dialog)
         button_frame.pack(fill=tk.X, pady=10)
-        
+
         def apply_parameters():
             """Apply the edited parameters to the main system."""
-            if hasattr(self, 'param_vars'):
+            if hasattr(self, "param_vars"):
                 for key, var in param_vars.items():
                     self.param_vars[key].set(var.get())
                 self._apply_parameters()
                 messagebox.showinfo("Success", "Parameters applied successfully!")
             else:
                 messagebox.showwarning("Warning", "No active parameter system found.")
-        
+
         def reset_to_defaults():
             """Reset all parameters to their default values."""
             for i, (label, key, min_val, max_val, default) in enumerate(parameters):
                 param_vars[key].set(default)
-        
+
         ttk.Button(button_frame, text="Apply", command=apply_parameters).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Reset to Defaults", command=reset_to_defaults).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Reset to Defaults", command=reset_to_defaults).pack(
+            side=tk.LEFT, padx=5
+        )
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
-        
+
         # Pack scrollbar and canvas
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -1151,9 +1216,9 @@ class APGIGui:
             # Reset parameter sliders
             for key, var in self.param_vars.items():
                 # Set to default values (simplified)
-                if key == 'baseline_threshold':
+                if key == "baseline_threshold":
                     var.set(2.0)
-                elif key in ['extero_precision', 'intero_precision']:
+                elif key in ["extero_precision", "intero_precision"]:
                     var.set(1.0)
                 else:
                     var.set(0.0)
@@ -1166,14 +1231,14 @@ class APGIGui:
         dialog.title("Run Preset Task")
         dialog.geometry("500x400")
 
-        ttk.Label(dialog, text="Select Preset Task:", font=('Arial', 12, 'bold')).pack(pady=10)
+        ttk.Label(dialog, text="Select Preset Task:", font=("Arial", 12, "bold")).pack(pady=10)
 
         tasks = [
             "Attentional Blink",
             "Change Blindness",
             "Binocular Rivalry",
             "Iowa Gambling Task",
-            "Masking Paradigm"
+            "Masking Paradigm",
         ]
 
         listbox = tk.Listbox(dialog, height=len(tasks))
@@ -1187,7 +1252,9 @@ class APGIGui:
 
         ttk.Label(config_frame, text="Trials per condition:").grid(row=0, column=0, sticky=tk.W)
         trials_var = tk.IntVar(value=20)
-        ttk.Spinbox(config_frame, from_=5, to=100, textvariable=trials_var, width=10).grid(row=0, column=1)
+        ttk.Spinbox(config_frame, from_=5, to=100, textvariable=trials_var, width=10).grid(
+            row=0, column=1
+        )
 
         def run_selected():
             selection = listbox.curselection()
@@ -1211,9 +1278,11 @@ class APGIGui:
                     self._run_masking_paradigm_task(trials_per_condition=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
-                    messagebox.showinfo("Coming Soon",
-                                      f"{task_name} implementation coming soon!\n\n"
-                                      "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task")
+                    messagebox.showinfo(
+                        "Coming Soon",
+                        f"{task_name} implementation coming soon!\n\n"
+                        "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task",
+                    )
 
         ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
@@ -1242,7 +1311,7 @@ class APGIGui:
                 item_duration_ms=100.0,
                 num_trials_per_lag=num_trials,
                 lags=[1, 2, 3, 4, 8],
-                target_salience=2.0
+                target_salience=2.0,
             )
 
             # Create progress dialog
@@ -1250,12 +1319,14 @@ class APGIGui:
             progress_dialog.title("Running Attentional Blink Task")
             progress_dialog.geometry("400x200")
 
-            ttk.Label(progress_dialog, text="Running trials...",
-                     font=('Arial', 12, 'bold')).pack(pady=10)
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
 
             progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(progress_dialog, length=300,
-                                          mode='determinate', variable=progress_var)
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=300, mode="determinate", variable=progress_var
+            )
             progress_bar.pack(pady=10)
 
             status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
@@ -1272,10 +1343,17 @@ class APGIGui:
                 for trial_idx, trial in enumerate(task.trials):
                     # Update progress
                     progress = (trial_idx / total_trials) * 100
-                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
-                        progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
-                    ))
+                    self.root.after(
+                        0,
+                        lambda p=progress, i=trial_idx, t=total_trials: (
+                            progress_var.set(p),
+                            (
+                                status_label.config(text=f"Trial {i+1} of {t}")
+                                if status_label.winfo_exists()
+                                else None
+                            ),
+                        ),
+                    )
 
                     # Run trial
                     result = task.run_trial(self.apgi_system, trial)
@@ -1302,8 +1380,8 @@ class APGIGui:
                 summary += f"Peak Blink at Lag {analysis['max_blink_lag']}: {analysis['max_blink_rate']:.1%}\n\n"
 
                 summary += "By Lag:\n"
-                for lag in sorted(analysis['lag_analysis'].keys()):
-                    lag_data = analysis['lag_analysis'][lag]
+                for lag in sorted(analysis["lag_analysis"].keys()):
+                    lag_data = analysis["lag_analysis"][lag]
                     summary += f"  Lag {lag}: T2|T1={lag_data['t2_given_t1_accuracy']:.1%}, Blink={lag_data['blink_rate']:.1%}\n"
 
                 self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
@@ -1311,28 +1389,38 @@ class APGIGui:
 
                 # Save results
                 import datetime
+
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"attentional_blink_results_{timestamp}.json"
                 task.save_results(filename)
 
-                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+                self.root.after(
+                    0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                )
 
                 # Add close button
                 def close_and_show_results():
                     progress_dialog.destroy()
                     task.print_results(analysis)
-                    messagebox.showinfo("Task Complete",
-                                      f"Attentional Blink task completed!\n\n"
-                                      f"T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
-                                      f"T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
-                                      f"Blink Rate: {analysis['overall_blink_rate']:.1%}\n\n"
-                                      f"Results saved to:\n{filename}")
+                    messagebox.showinfo(
+                        "Task Complete",
+                        f"Attentional Blink task completed!\n\n"
+                        f"T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
+                        f"T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
+                        f"Blink Rate: {analysis['overall_blink_rate']:.1%}\n\n"
+                        f"Results saved to:\n{filename}",
+                    )
 
-                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
-                                                      command=close_and_show_results).pack(pady=5))
+                self.root.after(
+                    0,
+                    lambda: ttk.Button(
+                        progress_dialog, text="Close", command=close_and_show_results
+                    ).pack(pady=5),
+                )
 
             # Start task thread
             import threading
+
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
@@ -1340,6 +1428,7 @@ class APGIGui:
             self._log_event(f"ERROR running task: {str(e)}")
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
 
     def _run_change_blindness_task(self, num_trials: int = 10):
@@ -1366,7 +1455,7 @@ class APGIGui:
                 blank_duration_ms=80.0,
                 max_alternations=20,
                 num_trials_per_condition=num_trials,
-                change_magnitudes=[0.3, 0.5, 0.8]
+                change_magnitudes=[0.3, 0.5, 0.8],
             )
 
             # Create progress dialog
@@ -1374,12 +1463,14 @@ class APGIGui:
             progress_dialog.title("Running Change Blindness Task")
             progress_dialog.geometry("400x200")
 
-            ttk.Label(progress_dialog, text="Running trials...",
-                     font=('Arial', 12, 'bold')).pack(pady=10)
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
 
             progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(progress_dialog, length=300,
-                                          mode='determinate', variable=progress_var)
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=300, mode="determinate", variable=progress_var
+            )
             progress_bar.pack(pady=10)
 
             status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
@@ -1396,10 +1487,17 @@ class APGIGui:
                 for trial_idx, trial in enumerate(task.trials):
                     # Update progress
                     progress = (trial_idx / total_trials) * 100
-                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
-                        progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
-                    ))
+                    self.root.after(
+                        0,
+                        lambda p=progress, i=trial_idx, t=total_trials: (
+                            progress_var.set(p),
+                            (
+                                status_label.config(text=f"Trial {i+1} of {t}")
+                                if status_label.winfo_exists()
+                                else None
+                            ),
+                        ),
+                    )
 
                     # Run trial
                     result = task.run_trial(self.apgi_system, trial)
@@ -1427,12 +1525,12 @@ class APGIGui:
                 summary += f"Avg Time to Detection: {analysis['overall_avg_time_ms']:.0f} ms\n\n"
 
                 summary += "By Change Type:\n"
-                for change_type, data in analysis['by_change_type'].items():
+                for change_type, data in analysis["by_change_type"].items():
                     summary += f"  {change_type}: {data['detection_rate']:.1%}\n"
 
                 summary += "\nBy Magnitude:\n"
-                for magnitude in sorted(analysis['by_magnitude'].keys()):
-                    data = analysis['by_magnitude'][magnitude]
+                for magnitude in sorted(analysis["by_magnitude"].keys()):
+                    data = analysis["by_magnitude"][magnitude]
                     summary += f"  {magnitude:.1f}: {data['detection_rate']:.1%}\n"
 
                 self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
@@ -1440,28 +1538,38 @@ class APGIGui:
 
                 # Save results
                 import datetime
+
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"change_blindness_results_{timestamp}.json"
                 task.save_results(filename)
 
-                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+                self.root.after(
+                    0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                )
 
                 # Add close button
                 def close_and_show_results():
                     progress_dialog.destroy()
                     task.print_results(analysis)
-                    messagebox.showinfo("Task Complete",
-                                      f"Change Blindness task completed!\n\n"
-                                      f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
-                                      f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
-                                      f"Avg Alternations: {analysis['overall_avg_alternations']:.1f}\n\n"
-                                      f"Results saved to:\n{filename}")
+                    messagebox.showinfo(
+                        "Task Complete",
+                        f"Change Blindness task completed!\n\n"
+                        f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                        f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
+                        f"Avg Alternations: {analysis['overall_avg_alternations']:.1f}\n\n"
+                        f"Results saved to:\n{filename}",
+                    )
 
-                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
-                                                      command=close_and_show_results).pack(pady=5))
+                self.root.after(
+                    0,
+                    lambda: ttk.Button(
+                        progress_dialog, text="Close", command=close_and_show_results
+                    ).pack(pady=5),
+                )
 
             # Start task thread
             import threading
+
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
@@ -1469,6 +1577,7 @@ class APGIGui:
             self._log_event(f"ERROR running task: {str(e)}")
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
 
     def _run_binocular_rivalry_task(self, num_trials: int = 10):
@@ -1494,7 +1603,7 @@ class APGIGui:
                 trial_duration_ms=30000.0,  # 30 seconds per trial
                 num_trials=num_trials,
                 strength_ratios=[(1.0, 1.0), (1.0, 0.8), (1.2, 1.0)],
-                sampling_interval_ms=100.0
+                sampling_interval_ms=100.0,
             )
 
             # Create progress dialog
@@ -1502,12 +1611,14 @@ class APGIGui:
             progress_dialog.title("Running Binocular Rivalry Task")
             progress_dialog.geometry("400x200")
 
-            ttk.Label(progress_dialog, text="Running trials...",
-                     font=('Arial', 12, 'bold')).pack(pady=10)
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
 
             progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(progress_dialog, length=300,
-                                          mode='determinate', variable=progress_var)
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=300, mode="determinate", variable=progress_var
+            )
             progress_bar.pack(pady=10)
 
             status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
@@ -1524,18 +1635,27 @@ class APGIGui:
                 for trial_idx, trial in enumerate(task.trials):
                     # Update progress
                     progress = (trial_idx / total_trials) * 100
-                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
-                        progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
-                    ))
+                    self.root.after(
+                        0,
+                        lambda p=progress, i=trial_idx, t=total_trials: (
+                            progress_var.set(p),
+                            (
+                                status_label.config(text=f"Trial {i+1} of {t}")
+                                if status_label.winfo_exists()
+                                else None
+                            ),
+                        ),
+                    )
 
                     # Run trial
                     result = task.run_trial(self.apgi_system, trial)
 
                     # Log result
                     if trial_idx % 5 == 0:
-                        msg = (f"Trial {trial_idx}: {result.num_alternations} alternations, "
-                               f"Pattern A dominance: {result.pattern_a_dominance_ratio:.1%}\n")
+                        msg = (
+                            f"Trial {trial_idx}: {result.num_alternations} alternations, "
+                            f"Pattern A dominance: {result.pattern_a_dominance_ratio:.1%}\n"
+                        )
                         self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
                         self.root.after(0, lambda: results_text.see(tk.END))
 
@@ -1549,44 +1669,60 @@ class APGIGui:
                 # Display summary
                 summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
-                summary += f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
-                summary += f"Avg Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
+                summary += (
+                    f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
+                )
+                summary += (
+                    f"Avg Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
+                )
                 summary += f"Pattern A Dominance: {analysis['avg_pattern_a_dominance_ratio']:.1%}\n"
                 summary += f"Total Alternations: {analysis['total_alternations']}\n\n"
 
                 summary += "By Strength Ratio:\n"
-                for ratio_key in sorted(analysis['by_strength_ratio'].keys()):
-                    data = analysis['by_strength_ratio'][ratio_key]
-                    summary += (f"  {ratio_key}: Dom={data['avg_dominance_duration_ms']:.0f}ms, "
-                               f"Alt={data['avg_alternation_rate']:.2f}/s\n")
+                for ratio_key in sorted(analysis["by_strength_ratio"].keys()):
+                    data = analysis["by_strength_ratio"][ratio_key]
+                    summary += (
+                        f"  {ratio_key}: Dom={data['avg_dominance_duration_ms']:.0f}ms, "
+                        f"Alt={data['avg_alternation_rate']:.2f}/s\n"
+                    )
 
                 self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
                 self.root.after(0, lambda: results_text.see(tk.END))
 
                 # Save results
                 import datetime
+
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"binocular_rivalry_results_{timestamp}.json"
                 task.save_results(filename)
 
-                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+                self.root.after(
+                    0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                )
 
                 # Add close button
                 def close_and_show_results():
                     progress_dialog.destroy()
                     task.print_results(analysis)
-                    messagebox.showinfo("Task Complete",
-                                      f"Binocular Rivalry task completed!\n\n"
-                                      f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
-                                      f"Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
-                                      f"Total Alternations: {analysis['total_alternations']}\n\n"
-                                      f"Results saved to:\n{filename}")
+                    messagebox.showinfo(
+                        "Task Complete",
+                        f"Binocular Rivalry task completed!\n\n"
+                        f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
+                        f"Alternation Rate: {analysis['avg_alternation_rate']:.2f} per second\n"
+                        f"Total Alternations: {analysis['total_alternations']}\n\n"
+                        f"Results saved to:\n{filename}",
+                    )
 
-                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
-                                                      command=close_and_show_results).pack(pady=5))
+                self.root.after(
+                    0,
+                    lambda: ttk.Button(
+                        progress_dialog, text="Close", command=close_and_show_results
+                    ).pack(pady=5),
+                )
 
             # Start task thread
             import threading
+
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
@@ -1594,6 +1730,7 @@ class APGIGui:
             self._log_event(f"ERROR running task: {str(e)}")
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
 
     def _run_masking_paradigm_task(self, trials_per_condition: int = 20):
@@ -1618,12 +1755,14 @@ class APGIGui:
             progress_dialog.title("Running Masking Paradigm Task")
             progress_dialog.geometry("420x240")
 
-            ttk.Label(progress_dialog, text="Running trials...",
-                     font=('Arial', 12, 'bold')).pack(pady=10)
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
 
             progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(progress_dialog, length=320,
-                                           mode='determinate', variable=progress_var)
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=320, mode="determinate", variable=progress_var
+            )
             progress_bar.pack(pady=10)
 
             status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
@@ -1637,17 +1776,26 @@ class APGIGui:
 
                 for trial_idx, trial in enumerate(task.trials):
                     progress = (trial_idx / total_trials) * 100 if total_trials else 0
-                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
-                        progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
-                    ))
+                    self.root.after(
+                        0,
+                        lambda p=progress, i=trial_idx, t=total_trials: (
+                            progress_var.set(p),
+                            (
+                                status_label.config(text=f"Trial {i+1} of {t}")
+                                if status_label.winfo_exists()
+                                else None
+                            ),
+                        ),
+                    )
 
                     result = task.run_trial(self.apgi_system, trial)
 
                     if trial_idx % 10 == 0:
                         detected = "Yes" if result.target_detected else "No"
-                        msg = (f"Trial {trial_idx}: SOA {result.soa_ms}ms, Detected: {detected}, "
-                               f"Ignitions: {result.ignition_count}\n")
+                        msg = (
+                            f"Trial {trial_idx}: SOA {result.soa_ms}ms, Detected: {detected}, "
+                            f"Ignitions: {result.ignition_count}\n"
+                        )
                         self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
                         self.root.after(0, lambda: results_text.see(tk.END))
 
@@ -1662,33 +1810,44 @@ class APGIGui:
                 summary += f"Overall Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n"
                 summary += f"Masking Effect: {analysis['masking_effect']:.1%}\n\n"
                 summary += "By SOA:\n"
-                for soa in sorted(analysis['by_soa'].keys()):
-                    data = analysis['by_soa'][soa]
-                    summary += (f"  {soa:.0f}ms: Det={data['detection_rate']:.1%}, "
-                                f"Supp={data['suppression_rate']:.1%}, "
-                                f"Avg Strength={data['avg_ignition_strength']:.2f}\n")
+                for soa in sorted(analysis["by_soa"].keys()):
+                    data = analysis["by_soa"][soa]
+                    summary += (
+                        f"  {soa:.0f}ms: Det={data['detection_rate']:.1%}, "
+                        f"Supp={data['suppression_rate']:.1%}, "
+                        f"Avg Strength={data['avg_ignition_strength']:.2f}\n"
+                    )
 
                 self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
                 self.root.after(0, lambda: results_text.see(tk.END))
 
                 import datetime
+
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"masking_paradigm_results_{timestamp}.json"
                 task.save_results(filename)
 
-                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+                self.root.after(
+                    0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                )
 
                 def close_and_show_results():
                     progress_dialog.destroy()
                     task.print_results(analysis)
-                    messagebox.showinfo("Task Complete",
-                                        f"Masking Paradigm task completed!\n\n"
-                                        f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
-                                        f"Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n\n"
-                                        f"Results saved to:\n{filename}")
+                    messagebox.showinfo(
+                        "Task Complete",
+                        f"Masking Paradigm task completed!\n\n"
+                        f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
+                        f"Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n\n"
+                        f"Results saved to:\n{filename}",
+                    )
 
-                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
-                                                      command=close_and_show_results).pack(pady=5))
+                self.root.after(
+                    0,
+                    lambda: ttk.Button(
+                        progress_dialog, text="Close", command=close_and_show_results
+                    ).pack(pady=5),
+                )
 
             threading.Thread(target=run_task_thread, daemon=True).start()
 
@@ -1696,6 +1855,7 @@ class APGIGui:
             self._log_event(f"ERROR running task: {str(e)}")
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
 
     def _run_iowa_gambling_task(self, num_trials: int = 100):
@@ -1723,7 +1883,7 @@ class APGIGui:
                 deck_stimulus_strength=1.5,
                 outcome_stimulus_strength=2.0,
                 interoceptive_gain=1.0,
-                deck_selection_strategy='balanced'
+                deck_selection_strategy="balanced",
             )
 
             # Create progress dialog
@@ -1731,12 +1891,14 @@ class APGIGui:
             progress_dialog.title("Running Iowa Gambling Task")
             progress_dialog.geometry("500x250")
 
-            ttk.Label(progress_dialog, text="Running trials...",
-                     font=('Arial', 12, 'bold')).pack(pady=10)
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
 
             progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(progress_dialog, length=400,
-                                          mode='determinate', variable=progress_var)
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=400, mode="determinate", variable=progress_var
+            )
             progress_bar.pack(pady=10)
 
             status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
@@ -1753,10 +1915,17 @@ class APGIGui:
                 for trial_idx, trial in enumerate(task.trials):
                     # Update progress
                     progress = (trial_idx / total_trials) * 100
-                    self.root.after(0, lambda p=progress, i=trial_idx, t=total_trials: (
-                        progress_var.set(p),
-                        status_label.config(text=f"Trial {i+1} of {t}") if status_label.winfo_exists() else None
-                    ))
+                    self.root.after(
+                        0,
+                        lambda p=progress, i=trial_idx, t=total_trials: (
+                            progress_var.set(p),
+                            (
+                                status_label.config(text=f"Trial {i+1} of {t}")
+                                if status_label.winfo_exists()
+                                else None
+                            ),
+                        ),
+                    )
 
                     # Run trial
                     result = task.run_trial(self.apgi_system, trial)
@@ -1766,7 +1935,9 @@ class APGIGui:
                         deck = result.deck_choice.value
                         net = result.net_outcome
                         balance = result.running_total
-                        msg = f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
+                        msg = (
+                            f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
+                        )
                         self.root.after(0, lambda m=msg: results_text.insert(tk.END, m))
                         self.root.after(0, lambda: results_text.see(tk.END))
 
@@ -1787,9 +1958,9 @@ class APGIGui:
                 summary += f"Net Score: {analysis['net_score']}\n\n"
 
                 summary += "Deck Selections:\n"
-                for deck in ['A', 'B', 'C', 'D']:
-                    deck_data = analysis['by_deck'][deck]
-                    deck_type = 'Bad' if deck in ['A', 'B'] else 'Good'
+                for deck in ["A", "B", "C", "D"]:
+                    deck_data = analysis["by_deck"][deck]
+                    deck_type = "Bad" if deck in ["A", "B"] else "Good"
                     summary += f"  Deck {deck} ({deck_type}): {deck_data['selections']} ({deck_data['selection_percentage']:.1f}%)\n"
 
                 self.root.after(0, lambda s=summary: results_text.insert(tk.END, s))
@@ -1797,27 +1968,37 @@ class APGIGui:
 
                 # Save results
                 import datetime
+
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"iowa_gambling_results_{timestamp}.json"
                 task.save_results(filename)
 
-                self.root.after(0, lambda: self._log_event(f"Task complete. Results saved to {filename}"))
+                self.root.after(
+                    0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                )
 
                 # Add close button
                 def close_and_show_results():
                     progress_dialog.destroy()
                     task.print_results(analysis)
-                    messagebox.showinfo("Task Complete",
-                                      f"Iowa Gambling Task completed!\n\n"
-                                      f"Total Earnings: ${analysis['total_earnings']}\n"
-                                      f"Good Deck Choices: {analysis['advantageous_ratio']:.1%}\n"
-                                      f"Net Score: {analysis['net_score']}\n\n"
-                                      f"Results saved to:\n{filename}")
+                    messagebox.showinfo(
+                        "Task Complete",
+                        f"Iowa Gambling Task completed!\n\n"
+                        f"Total Earnings: ${analysis['total_earnings']}\n"
+                        f"Good Deck Choices: {analysis['advantageous_ratio']:.1%}\n"
+                        f"Net Score: {analysis['net_score']}\n\n"
+                        f"Results saved to:\n{filename}",
+                    )
 
-                self.root.after(0, lambda: ttk.Button(progress_dialog, text="Close",
-                                                      command=close_and_show_results).pack(pady=5))
+                self.root.after(
+                    0,
+                    lambda: ttk.Button(
+                        progress_dialog, text="Close", command=close_and_show_results
+                    ).pack(pady=5),
+                )
 
             import threading
+
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
@@ -1825,13 +2006,14 @@ class APGIGui:
             self._log_event(f"ERROR running task: {str(e)}")
             messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
 
     def _zoom_in(self):
         """Zoom in on all matplotlib plots."""
         try:
             # Zoom in on neural plots
-            if hasattr(self, 'neural_axes'):
+            if hasattr(self, "neural_axes"):
                 for ax in self.neural_axes.values():
                     xlim = ax.get_xlim()
                     ylim = ax.get_ylim()
@@ -1839,15 +2021,21 @@ class APGIGui:
                     y_center = (ylim[0] + ylim[1]) / 2
                     x_range = (xlim[1] - xlim[0]) * 0.8  # Zoom in by 20%
                     y_range = (ylim[1] - ylim[0]) * 0.8
-                    ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
-                    ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                    ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
+                    ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
                 self.neural_canvas.draw_idle()
-            
+
             # Zoom in on other plot canvases if they exist
-            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+            for canvas_attr in [
+                "intero_canvas",
+                "metrics_canvas",
+                "self_canvas",
+                "osc_canvas",
+                "state_canvas",
+            ]:
                 if hasattr(self, canvas_attr):
                     canvas = getattr(self, canvas_attr)
-                    if hasattr(canvas, 'figure'):
+                    if hasattr(canvas, "figure"):
                         for ax in canvas.figure.get_axes():
                             xlim = ax.get_xlim()
                             ylim = ax.get_ylim()
@@ -1855,10 +2043,10 @@ class APGIGui:
                             y_center = (ylim[0] + ylim[1]) / 2
                             x_range = (xlim[1] - xlim[0]) * 0.8
                             y_range = (ylim[1] - ylim[0]) * 0.8
-                            ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
-                            ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                            ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
+                            ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
                         canvas.draw_idle()
-                        
+
         except Exception as e:
             self._log_event(f"Error zooming in: {str(e)}")
 
@@ -1866,7 +2054,7 @@ class APGIGui:
         """Zoom out on all matplotlib plots."""
         try:
             # Zoom out on neural plots
-            if hasattr(self, 'neural_axes'):
+            if hasattr(self, "neural_axes"):
                 for ax in self.neural_axes.values():
                     xlim = ax.get_xlim()
                     ylim = ax.get_ylim()
@@ -1874,15 +2062,21 @@ class APGIGui:
                     y_center = (ylim[0] + ylim[1]) / 2
                     x_range = (xlim[1] - xlim[0]) * 1.25  # Zoom out by 25%
                     y_range = (ylim[1] - ylim[0]) * 1.25
-                    ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
-                    ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                    ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
+                    ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
                 self.neural_canvas.draw_idle()
-            
+
             # Zoom out on other plot canvases if they exist
-            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+            for canvas_attr in [
+                "intero_canvas",
+                "metrics_canvas",
+                "self_canvas",
+                "osc_canvas",
+                "state_canvas",
+            ]:
                 if hasattr(self, canvas_attr):
                     canvas = getattr(self, canvas_attr)
-                    if hasattr(canvas, 'figure'):
+                    if hasattr(canvas, "figure"):
                         for ax in canvas.figure.get_axes():
                             xlim = ax.get_xlim()
                             ylim = ax.get_ylim()
@@ -1890,10 +2084,10 @@ class APGIGui:
                             y_center = (ylim[0] + ylim[1]) / 2
                             x_range = (xlim[1] - xlim[0]) * 1.25
                             y_range = (ylim[1] - ylim[0]) * 1.25
-                            ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
-                            ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                            ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
+                            ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
                         canvas.draw_idle()
-                        
+
         except Exception as e:
             self._log_event(f"Error zooming out: {str(e)}")
 
@@ -1903,24 +2097,30 @@ class APGIGui:
             # Force a plot update to recalculate limits
             if len(self.time_buffer) > 0:
                 self._update_plots()
-            
+
             # Reset neural plots to auto-scale
-            if hasattr(self, 'neural_axes'):
+            if hasattr(self, "neural_axes"):
                 for ax in self.neural_axes.values():
                     ax.relim()
                     ax.autoscale_view()
                 self.neural_canvas.draw_idle()
-            
+
             # Reset other plot canvases if they exist
-            for canvas_attr in ['intero_canvas', 'metrics_canvas', 'self_canvas', 'osc_canvas', 'state_canvas']:
+            for canvas_attr in [
+                "intero_canvas",
+                "metrics_canvas",
+                "self_canvas",
+                "osc_canvas",
+                "state_canvas",
+            ]:
                 if hasattr(self, canvas_attr):
                     canvas = getattr(self, canvas_attr)
-                    if hasattr(canvas, 'figure'):
+                    if hasattr(canvas, "figure"):
                         for ax in canvas.figure.get_axes():
                             ax.relim()
                             ax.autoscale_view()
                         canvas.draw_idle()
-                        
+
         except Exception as e:
             self._log_event(f"Error fitting to window: {str(e)}")
 
@@ -1928,8 +2128,8 @@ class APGIGui:
         """Manually trigger ignition event."""
         if self.apgi_system:
             # Force high arousal to trigger ignition
-            self.param_vars['arousal'].set(0.9)
-            self.param_vars['stress'].set(0.8)
+            self.param_vars["arousal"].set(0.9)
+            self.param_vars["stress"].set(0.8)
             self._log_event("Manual ignition trigger activated")
 
     def _induce_stressor(self):
@@ -1944,7 +2144,7 @@ class APGIGui:
         dialog.title("Modulate Precision")
         dialog.geometry("400x200")
 
-        ttk.Label(dialog, text="Precision Modulation", font=('Arial', 12, 'bold')).pack(pady=10)
+        ttk.Label(dialog, text="Precision Modulation", font=("Arial", 12, "bold")).pack(pady=10)
 
         frame = ttk.Frame(dialog)
         frame.pack(pady=10)
@@ -1955,8 +2155,12 @@ class APGIGui:
 
         def apply():
             factor = factor_var.get()
-            self.param_vars['extero_precision'].set(self.param_vars['extero_precision'].get() * factor)
-            self.param_vars['intero_precision'].set(self.param_vars['intero_precision'].get() * factor)
+            self.param_vars["extero_precision"].set(
+                self.param_vars["extero_precision"].get() * factor
+            )
+            self.param_vars["intero_precision"].set(
+                self.param_vars["intero_precision"].get() * factor
+            )
             self._log_event(f"Precision modulated by factor: {factor:.2f}")
             dialog.destroy()
 
@@ -1965,77 +2169,103 @@ class APGIGui:
     def _inject_input(self):
         """Inject custom sensory input."""
         if not self.apgi_system:
-            messagebox.showwarning("Warning", "No active APGI system found. Please initialize the system first.")
+            messagebox.showwarning(
+                "Warning", "No active APGI system found. Please initialize the system first."
+            )
             return
-        
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Custom Input Injection")
         dialog.geometry("500x600")
-        
+
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        ttk.Label(main_frame, text="Inject Custom Sensory Input", font=('Arial', 12, 'bold')).pack(pady=10)
-        
+
+        ttk.Label(main_frame, text="Inject Custom Sensory Input", font=("Arial", 12, "bold")).pack(
+            pady=10
+        )
+
         # Input type selection
         input_frame = ttk.LabelFrame(main_frame, text="Input Type", padding=10)
         input_frame.pack(fill=tk.X, pady=5)
-        
+
         input_type = tk.StringVar(value="extero")
-        ttk.Radiobutton(input_frame, text="Exteroceptive (External)", variable=input_type, value="extero").pack(anchor=tk.W)
-        ttk.Radiobutton(input_frame, text="Interoceptive (Internal)", variable=input_type, value="intero").pack(anchor=tk.W)
-        
+        ttk.Radiobutton(
+            input_frame, text="Exteroceptive (External)", variable=input_type, value="extero"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            input_frame, text="Interoceptive (Internal)", variable=input_type, value="intero"
+        ).pack(anchor=tk.W)
+
         # Input parameters
         params_frame = ttk.LabelFrame(main_frame, text="Input Parameters", padding=10)
         params_frame.pack(fill=tk.X, pady=5)
-        
+
         # Intensity
         ttk.Label(params_frame, text="Intensity:").grid(row=0, column=0, sticky=tk.W, pady=2)
         intensity_var = tk.DoubleVar(value=1.0)
-        intensity_scale = ttk.Scale(params_frame, from_=0.0, to=5.0, variable=intensity_var, orient=tk.HORIZONTAL)
+        intensity_scale = ttk.Scale(
+            params_frame, from_=0.0, to=5.0, variable=intensity_var, orient=tk.HORIZONTAL
+        )
         intensity_scale.grid(row=0, column=1, sticky=tk.EW, padx=5)
         intensity_label = ttk.Label(params_frame, text="1.00")
         intensity_label.grid(row=0, column=2)
-        intensity_var.trace_add('write', lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}"))
-        
+        intensity_var.trace_add(
+            "write", lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}")
+        )
+
         # Duration
         ttk.Label(params_frame, text="Duration (steps):").grid(row=1, column=0, sticky=tk.W, pady=2)
         duration_var = tk.IntVar(value=10)
-        duration_spin = ttk.Spinbox(params_frame, from_=1, to=100, textvariable=duration_var, width=10)
+        duration_spin = ttk.Spinbox(
+            params_frame, from_=1, to=100, textvariable=duration_var, width=10
+        )
         duration_spin.grid(row=1, column=1, sticky=tk.W, padx=5)
-        
+
         # Noise level
         ttk.Label(params_frame, text="Noise Level:").grid(row=2, column=0, sticky=tk.W, pady=2)
         noise_var = tk.DoubleVar(value=0.1)
-        noise_scale = ttk.Scale(params_frame, from_=0.0, to=1.0, variable=noise_var, orient=tk.HORIZONTAL)
+        noise_scale = ttk.Scale(
+            params_frame, from_=0.0, to=1.0, variable=noise_var, orient=tk.HORIZONTAL
+        )
         noise_scale.grid(row=2, column=1, sticky=tk.EW, padx=5)
         noise_label = ttk.Label(params_frame, text="0.10")
         noise_label.grid(row=2, column=2)
-        noise_var.trace_add('write', lambda *args: noise_label.config(text=f"{noise_var.get():.2f}"))
-        
+        noise_var.trace_add(
+            "write", lambda *args: noise_label.config(text=f"{noise_var.get():.2f}")
+        )
+
         params_frame.columnconfigure(1, weight=1)
-        
+
         # Pattern selection
         pattern_frame = ttk.LabelFrame(main_frame, text="Input Pattern", padding=10)
         pattern_frame.pack(fill=tk.X, pady=5)
-        
+
         pattern_var = tk.StringVar(value="constant")
-        ttk.Radiobutton(pattern_frame, text="Constant", variable=pattern_var, value="constant").pack(anchor=tk.W)
-        ttk.Radiobutton(pattern_frame, text="Pulse", variable=pattern_var, value="pulse").pack(anchor=tk.W)
-        ttk.Radiobutton(pattern_frame, text="Sine Wave", variable=pattern_var, value="sine").pack(anchor=tk.W)
-        ttk.Radiobutton(pattern_frame, text="Random Noise", variable=pattern_var, value="random").pack(anchor=tk.W)
-        
+        ttk.Radiobutton(
+            pattern_frame, text="Constant", variable=pattern_var, value="constant"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(pattern_frame, text="Pulse", variable=pattern_var, value="pulse").pack(
+            anchor=tk.W
+        )
+        ttk.Radiobutton(pattern_frame, text="Sine Wave", variable=pattern_var, value="sine").pack(
+            anchor=tk.W
+        )
+        ttk.Radiobutton(
+            pattern_frame, text="Random Noise", variable=pattern_var, value="random"
+        ).pack(anchor=tk.W)
+
         # Status display
         status_frame = ttk.LabelFrame(main_frame, text="Status", padding=10)
         status_frame.pack(fill=tk.X, pady=5)
-        
+
         status_text = tk.Text(status_frame, height=6, width=50)
         status_text.pack(fill=tk.BOTH, expand=True)
-        
+
         def inject_input():
             """Inject the custom input into the APGI system."""
             try:
@@ -2044,23 +2274,23 @@ class APGIGui:
                 duration = duration_var.get()
                 noise = noise_var.get()
                 pattern = pattern_var.get()
-                
+
                 # Generate input pattern
                 if pattern == "constant":
                     input_signal = np.full(duration, intensity)
                 elif pattern == "pulse":
                     input_signal = np.zeros(duration)
-                    input_signal[duration//4:3*duration//4] = intensity
+                    input_signal[duration // 4 : 3 * duration // 4] = intensity
                 elif pattern == "sine":
-                    t = np.linspace(0, 2*np.pi, duration)
+                    t = np.linspace(0, 2 * np.pi, duration)
                     input_signal = intensity * (np.sin(t) + 1) / 2
                 else:  # random
                     input_signal = np.random.randn(duration) * noise + intensity
-                
+
                 # Add noise
                 if noise > 0:
                     input_signal += np.random.randn(duration) * noise
-                
+
                 # Inject into system (this would need to be implemented in the APGI system)
                 status_text.delete(1.0, tk.END)
                 status_text.insert(tk.END, f"Input Type: {input_type_val}\n")
@@ -2069,26 +2299,34 @@ class APGIGui:
                 status_text.insert(tk.END, f"Duration: {duration} steps\n")
                 status_text.insert(tk.END, f"Noise Level: {noise:.2f}\n\n")
                 status_text.insert(tk.END, "Input injection simulated!\n")
-                status_text.insert(tk.END, "(Note: Actual injection requires APGI system integration)\n")
-                
+                status_text.insert(
+                    tk.END, "(Note: Actual injection requires APGI system integration)\n"
+                )
+
                 messagebox.showinfo("Success", "Custom input injected successfully!")
-                
+
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to inject input: {str(e)}")
                 status_text.delete(1.0, tk.END)
                 status_text.insert(tk.END, f"Error: {str(e)}")
-        
+
         # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Button(button_frame, text="Inject Input", command=inject_input).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Clear Status", command=lambda: status_text.delete(1.0, tk.END)).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(button_frame, text="Inject Input", command=inject_input).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(
+            button_frame, text="Clear Status", command=lambda: status_text.delete(1.0, tk.END)
+        ).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
     def _set_body_state(self):
         """Set body state manually."""
-        messagebox.showinfo("Body State", "Use Activity, Arousal, and Stress sliders in control panel")
+        messagebox.showinfo(
+            "Body State", "Use Activity, Arousal, and Stress sliders in control panel"
+        )
 
     def _show_diagnostics(self):
         """Show system diagnostics."""
@@ -2183,19 +2421,21 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _analyze_coherence(self):
         """Analyze self-model coherence."""
-        messagebox.showinfo("Self-Model Coherence", "Check the Self-Model tab for coherence visualization")
+        messagebox.showinfo(
+            "Self-Model Coherence", "Check the Self-Model tab for coherence visualization"
+        )
 
     def _generate_report(self):
         """Generate comprehensive report."""
         filename = filedialog.asksaveasfilename(
             title="Save Report",
             defaultextension=".txt",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
         )
 
         if filename:
             try:
-                with open(filename, 'w') as f:
+                with open(filename, "w") as f:
                     f.write("APGI System Comprehensive Report\n")
                     f.write("=" * 50 + "\n\n")
                     f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
@@ -2203,7 +2443,9 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                     if self.apgi_system:
                         summary = self.apgi_system.get_state_summary()
                         f.write(f"Simulation Time: {summary['time_ms'] / 1000.0:.2f} seconds\n")
-                        f.write(f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n")
+                        f.write(
+                            f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n"
+                        )
                         f.write(f"Metabolic Reserves: {summary['metabolic_reserves']:.1f}\n")
                         f.write(f"Allostatic Load: {summary['allostatic_load'] * 100:.1f}%\n")
 
@@ -2304,21 +2546,26 @@ For more information, visit the project repository.
 
 def main():
     """Main entry point."""
-    # Check dependencies before starting
+    # Check dependencies before starting (silently)
     try:
         from utils.dependency_checker import check_dependencies_on_startup
-        if not check_dependencies_on_startup():
+
+        deps_ok = check_dependencies_on_startup(silent=True)
+
+        if not deps_ok:
             print("Dependency check failed. Exiting...")
             return
     except ImportError:
-        print("Warning: Dependency checker not available. Continuing anyway...")
+        # Silently continue if dependency checker not available
+        pass
     except Exception as e:
-        print(f"Warning: Error during dependency check: {e}. Continuing anyway...")
-    
+        # Silently continue on other errors during dependency check
+        pass
+
     root = tk.Tk()
     app = APGIGui(root)
     root.mainloop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

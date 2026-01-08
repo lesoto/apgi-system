@@ -41,7 +41,6 @@ from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask, DeckTy
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
-
 # Mark all tests in this module as slow
 pytestmark = pytest.mark.slow
 

@@ -21,7 +21,6 @@ from apgi_system.core.precision import PrecisionWeighting
 from apgi_system.validation import InputValidator
 from tests.strategies import observation_strategy, error_variance_strategy, config_strategy
 
-
 # Configure Hypothesis for property-based testing
 settings.register_profile(
     "property_tests",

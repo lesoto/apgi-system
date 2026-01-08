@@ -15,13 +15,13 @@ import warnings
 
 class DependencyChecker:
     """Checks for required dependencies and provides installation guidance."""
-    
+
     def __init__(self):
         self.python_version = sys.version_info
         self.platform = platform.system()
         self.errors = []
         self.warnings = []
-        
+
     def check_python_version(self, min_version: Tuple[int, int] = (3, 8)) -> bool:
         """Check if Python version meets minimum requirements."""
         if self.python_version < min_version:
@@ -31,19 +31,19 @@ class DependencyChecker:
             )
             return False
         return True
-    
+
     def check_package(self, package_name: str, import_name: Optional[str] = None) -> bool:
         """Check if a Python package is available."""
         if import_name is None:
             import_name = package_name
-        
+
         try:
             importlib.import_module(import_name)
             return True
         except ImportError:
             self.errors.append(f"Missing required package: {package_name}")
             return False
-    
+
     def check_system_service(self, service_name: str, test_command: List[str]) -> bool:
         """Check if a system service is running."""
         try:
@@ -56,71 +56,67 @@ class DependencyChecker:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self.warnings.append(f"Service {service_name} is not available")
             return False
-    
+
     def check_all_dependencies(self) -> Dict[str, bool]:
         """Check all required dependencies."""
         results = {}
-        
+
         # Python version
-        results['python_version'] = self.check_python_version()
-        
+        results["python_version"] = self.check_python_version()
+
         # Core scientific packages
         core_packages = [
-            ('numpy', 'numpy'),
-            ('scipy', 'scipy'),
-            ('matplotlib', 'matplotlib'),
-            ('pandas', 'pandas'),
-            ('sklearn', 'sklearn'),
-            ('networkx', 'networkx'),
-            ('torch', 'torch'),
-            ('jax', 'jax'),
+            ("numpy", "numpy"),
+            ("scipy", "scipy"),
+            ("matplotlib", "matplotlib"),
+            ("pandas", "pandas"),
+            ("sklearn", "sklearn"),
+            ("networkx", "networkx"),
+            ("torch", "torch"),
+            ("jax", "jax"),
         ]
-        
+
         for package, import_name in core_packages:
-            results[f'package_{package}'] = self.check_package(package, import_name)
-        
+            results[f"package_{package}"] = self.check_package(package, import_name)
+
         # Web framework packages
         web_packages = [
-            ('fastapi', 'fastapi'),
-            ('uvicorn', 'uvicorn'),
-            ('pydantic', 'pydantic'),
-            ('sqlalchemy', 'sqlalchemy'),
-            ('redis', 'redis'),
-            ('psycopg2', 'psycopg2'),
+            ("fastapi", "fastapi"),
+            ("uvicorn", "uvicorn"),
+            ("pydantic", "pydantic"),
+            ("sqlalchemy", "sqlalchemy"),
+            ("redis", "redis"),
+            ("psycopg2", "psycopg2"),
         ]
-        
+
         for package, import_name in web_packages:
-            results[f'package_{package}'] = self.check_package(package, import_name)
-        
+            results[f"package_{package}"] = self.check_package(package, import_name)
+
         # GUI packages
-        results['package_tkinter'] = self.check_package('tkinter', 'tkinter')
-        
+        results["package_tkinter"] = self.check_package("tkinter", "tkinter")
+
         # System services
         if self.platform == "Darwin":  # macOS
-            results['service_redis'] = self.check_system_service(
-                'redis', ['redis-cli', 'ping']
-            )
-            results['service_postgresql'] = self.check_system_service(
-                'postgresql', ['psql', '-d', 'apgi_api', '-c', 'SELECT 1;']
+            results["service_redis"] = self.check_system_service("redis", ["redis-cli", "ping"])
+            results["service_postgresql"] = self.check_system_service(
+                "postgresql", ["psql", "-d", "apgi_api", "-c", "SELECT 1;"]
             )
         elif self.platform == "Linux":
-            results['service_redis'] = self.check_system_service(
-                'redis', ['redis-cli', 'ping']
+            results["service_redis"] = self.check_system_service("redis", ["redis-cli", "ping"])
+            results["service_postgresql"] = self.check_system_service(
+                "postgresql", ["psql", "-d", "apgi_api", "-c", "SELECT 1;"]
             )
-            results['service_postgresql'] = self.check_system_service(
-                'postgresql', ['psql', '-d', 'apgi_api', '-c', 'SELECT 1;']
-            )
-        
+
         return results
-    
+
     def get_installation_instructions(self) -> str:
         """Generate helpful installation instructions."""
         instructions = []
-        
+
         if self.errors:
             instructions.append("\n🔧 INSTALLATION INSTRUCTIONS:")
             instructions.append("=" * 50)
-            
+
             # Python version issues
             python_errors = [e for e in self.errors if "Python" in e]
             if python_errors:
@@ -128,7 +124,7 @@ class DependencyChecker:
                 for error in python_errors:
                     instructions.append(f"   ❌ {error}")
                 instructions.append("   💡 Install Python 3.8+ from https://python.org")
-            
+
             # Missing packages
             package_errors = [e for e in self.errors if "Missing required package" in e]
             if package_errors:
@@ -136,21 +132,23 @@ class DependencyChecker:
                 for error in package_errors:
                     instructions.append(f"   ❌ {error}")
                 instructions.append("\n   💡 Install all packages:")
-                instructions.append("      source venv/bin/activate  # Activate virtual environment")
+                instructions.append(
+                    "      source venv/bin/activate  # Activate virtual environment"
+                )
                 instructions.append("      pip install -r requirements.txt")
                 instructions.append("\n   💡 Or run the automated setup:")
                 instructions.append("      ./install.sh")
-        
+
         if self.warnings:
             instructions.append("\n⚠️  SERVICE WARNINGS:")
             instructions.append("=" * 50)
-            
+
             service_warnings = [w for w in self.warnings if "Service" in w]
             if service_warnings:
                 instructions.append("\n🔧 System Services:")
                 for warning in service_warnings:
                     instructions.append(f"   ⚠️  {warning}")
-                
+
                 instructions.append("\n   💡 Start services:")
                 if self.platform == "Darwin":  # macOS
                     instructions.append("      brew services start redis")
@@ -158,95 +156,117 @@ class DependencyChecker:
                 elif self.platform == "Linux":
                     instructions.append("      sudo systemctl start redis")
                     instructions.append("      sudo systemctl start postgresql")
-        
+
         if not self.errors and not self.warnings:
             instructions.append("\n✅ All dependencies satisfied!")
-        
+
         return "\n".join(instructions)
-    
+
     def print_dependency_report(self):
         """Print a comprehensive dependency report."""
         print("\n🔍 APGI System Dependency Check")
         print("=" * 50)
-        
+
         results = self.check_all_dependencies()
-        
+
         # Python version
         print(f"\n🐍 Python Version: {'.'.join(map(str, self.python_version[:2]))}")
-        if results['python_version']:
+        if results["python_version"]:
             print("   ✅ Meets minimum requirements (3.8+)")
         else:
             print("   ❌ Does not meet minimum requirements")
-        
+
         # Core packages
         print("\n📦 Core Scientific Packages:")
-        core_packages = ['numpy', 'scipy', 'matplotlib', 'pandas', 'sklearn', 'networkx', 'torch', 'jax']
+        core_packages = [
+            "numpy",
+            "scipy",
+            "matplotlib",
+            "pandas",
+            "sklearn",
+            "networkx",
+            "torch",
+            "jax",
+        ]
         for package in core_packages:
-            key = f'package_{package}'
+            key = f"package_{package}"
             if results.get(key, False):
                 print(f"   ✅ {package}")
             else:
                 print(f"   ❌ {package}")
-        
+
         # Web framework packages
         print("\n🌐 Web Framework Packages:")
-        web_packages = ['fastapi', 'uvicorn', 'pydantic', 'sqlalchemy', 'redis', 'psycopg2']
+        web_packages = ["fastapi", "uvicorn", "pydantic", "sqlalchemy", "redis", "psycopg2"]
         for package in web_packages:
-            key = f'package_{package}'
+            key = f"package_{package}"
             if results.get(key, False):
                 print(f"   ✅ {package}")
             else:
                 print(f"   ❌ {package}")
-        
+
         # GUI packages
         print("\n🖥️  GUI Packages:")
-        if results.get('package_tkinter', False):
+        if results.get("package_tkinter", False):
             print("   ✅ tkinter")
         else:
             print("   ❌ tkinter")
-        
+
         # System services
         print("\n🔧 System Services:")
-        if 'service_redis' in results:
-            if results['service_redis']:
+        if "service_redis" in results:
+            if results["service_redis"]:
                 print("   ✅ Redis")
             else:
                 print("   ⚠️  Redis (may not be running)")
-        
-        if 'service_postgresql' in results:
-            if results['service_postgresql']:
+
+        if "service_postgresql" in results:
+            if results["service_postgresql"]:
                 print("   ✅ PostgreSQL")
             else:
                 print("   ⚠️  PostgreSQL (may not be running)")
-        
+
         # Print instructions
         print(self.get_installation_instructions())
 
 
-def check_dependencies_on_startup():
-    """Check dependencies at application startup and provide guidance."""
+def check_dependencies_on_startup(silent: bool = True):
+    """Check dependencies at application startup and provide guidance.
+
+    Args:
+        silent: If True, suppress verbose output (default for GUI)
+    """
     checker = DependencyChecker()
-    
+
     # Check if we should skip the detailed check (for quick startup)
-    if '--skip-deps-check' in sys.argv:
+    if "--skip-deps-check" in sys.argv:
         return True
-    
-    checker.print_dependency_report()
-    
-    # If there are critical errors, show warnings
-    if checker.errors:
+
+    if not silent:
+        checker.print_dependency_report()
+
+    # If there are critical errors, show warnings (unless completely silent)
+    if checker.errors and not silent:
         print("\n❌ CRITICAL ISSUES FOUND")
         print("Some dependencies are missing. The application may not work correctly.")
         print("Please follow the installation instructions above.")
-        
+
         # Ask user if they want to continue
         try:
             response = input("\nContinue anyway? (y/N): ").strip().lower()
-            return response in ['y', 'yes']
+            return response in ["y", "yes"]
         except KeyboardInterrupt:
             print("\n\nExiting...")
             return False
-    
+    elif checker.errors and silent:
+        # In silent mode, log errors but don't show interactive prompt
+        import logging
+
+        logger = logging.getLogger(__name__)
+        for error in checker.errors:
+            logger.error(f"Dependency issue: {error}")
+        return False  # Don't continue if there are critical errors
+
     return True
 
 

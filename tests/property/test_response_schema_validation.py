@@ -16,7 +16,6 @@ from typing import Optional, List, Dict, Any
 
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
-
 # ============================================================================
 # Test Models
 # ============================================================================

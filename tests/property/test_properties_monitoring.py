@@ -17,7 +17,6 @@ from api.middleware.metrics import request_counter, request_duration, error_coun
 from fastapi import Request
 from starlette.responses import Response
 
-
 # ============================================================================
 # Strategies for generating test data
 # ============================================================================

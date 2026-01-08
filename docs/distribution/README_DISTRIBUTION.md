@@ -205,6 +205,7 @@ When you first launch APGI System, the application will:
 **Problem:** Double-clicking the executable does nothing or shows an error.
 
 **Solutions:**
+
 - Ensure you're running Windows 10 or 11 (64-bit)
 - Right-click the executable and select "Run as administrator"
 - Check if antivirus software is blocking the application
@@ -216,6 +217,7 @@ When you first launch APGI System, the application will:
 **Problem:** Windows SmartScreen prevents the application from running.
 
 **Solution:**
+
 1. Click "More info" on the SmartScreen dialog
 2. Click "Run anyway" button
 3. This is normal for unsigned applications and only appears once
@@ -225,8 +227,11 @@ When you first launch APGI System, the application will:
 **Problem:** Error message about missing VCRUNTIME140.dll or similar.
 
 **Solution:**
+
 1. Download and install Microsoft Visual C++ Redistributable
-2. Get it from: https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+2. Get it from: <https://aka.ms/vs/17/release/vc_redist.x64.exe>
+
 3. Restart your computer and try again
 
 #### Application Crashes on Startup
@@ -234,11 +239,13 @@ When you first launch APGI System, the application will:
 **Problem:** Application starts but immediately closes or crashes.
 
 **Solutions:**
+
 - Check if you have sufficient RAM (4 GB minimum)
 - Close other applications to free up memory
 - Check Windows Event Viewer for error details
 - Try running from Command Prompt to see error messages:
-  ```
+
+  ```batch
   cd "C:\Program Files\APGI System"
   "APGI System.exe"
   ```
@@ -248,6 +255,7 @@ When you first launch APGI System, the application will:
 **Problem:** Error when trying to save configuration or export data.
 
 **Solutions:**
+
 - Ensure you have write permissions to your user folder
 - Try running as administrator
 - Check available disk space (need at least 100 MB free)
@@ -260,12 +268,14 @@ When you first launch APGI System, the application will:
 **Problem:** macOS Gatekeeper blocks the application.
 
 **Solution:**
+
 1. Go to System Settings → Privacy & Security
 2. Scroll to "Security" section
 3. Click "Open Anyway" next to the APGI System message
 4. Confirm by clicking "Open" in the dialog
 
 **Alternative:**
+
 1. Right-click (or Control-click) the application
 2. Select "Open" from the menu
 3. Click "Open" in the confirmation dialog
@@ -275,12 +285,15 @@ When you first launch APGI System, the application will:
 **Problem:** Double-clicking does nothing or shows an error.
 
 **Solutions:**
+
 - Ensure you're running macOS 12 or later
 - Check Console.app for error messages
 - Try launching from Terminal to see errors:
+
   ```bash
   /Applications/APGI\ System.app/Contents/MacOS/APGI\ System
   ```
+
 - Verify the application was copied to Applications (not run from DMG)
 - Re-download and reinstall the application
 
@@ -289,38 +302,41 @@ When you first launch APGI System, the application will:
 **Problem:** macOS says the application is damaged and can't be opened.
 
 **Solution:**
+
 1. This usually happens if the download was corrupted
 2. Delete the application from Applications folder
 3. Empty Trash
 4. Re-download the .dmg file
 5. Install again
 
-**If problem persists:**
-```bash
-# Remove quarantine attribute (use with caution)
-xattr -cr /Applications/APGI\ System.app
-```
+  ```bash
+  # Remove quarantine attribute (use with caution)
+  xattr -cr /Applications/APGI\ System.app
+  ```
 
 #### Application Crashes on Apple Silicon
 
 **Problem:** Application crashes or shows errors on M1/M2/M3 Macs.
 
 **Solutions:**
+
 - Ensure you downloaded the correct version (Universal or Apple Silicon)
 - Try running in Rosetta mode (Intel version on Apple Silicon)
 - Check Activity Monitor for crash reports
 - Ensure macOS is up to date
 
-#### Can't Save Configuration
+#### Can't Save Configuration (macOS)
 
 **Problem:** Error when trying to save configuration or export data.
 
 **Solutions:**
+
 - Grant Full Disk Access permission:
   1. System Settings → Privacy & Security → Full Disk Access
   2. Click the "+" button and add APGI System
 - Check available disk space (need at least 100 MB free)
 - Verify permissions on Application Support folder:
+
   ```bash
   ls -la ~/Library/Application\ Support/APGI\ System/
   ```
@@ -332,6 +348,7 @@ xattr -cr /Applications/APGI\ System.app
 **Problem:** Interface elements are too large, too small, or blurry.
 
 **Solutions:**
+
 - **Windows:** Check display scaling settings (Settings → Display → Scale)
 - **macOS:** The application should handle Retina displays automatically
 - Try adjusting your display resolution
@@ -342,6 +359,7 @@ xattr -cr /Applications/APGI\ System.app
 **Problem:** Clicking "Run" on experimental tasks does nothing or shows errors.
 
 **Solutions:**
+
 - Check that configuration file is valid
 - Ensure sufficient RAM is available
 - Look for error messages in the application log
@@ -352,6 +370,7 @@ xattr -cr /Applications/APGI\ System.app
 **Problem:** Cannot export data or results.
 
 **Solutions:**
+
 - Ensure you have write permissions to the selected directory
 - Choose a different export location
 - Check available disk space
@@ -362,6 +381,7 @@ xattr -cr /Applications/APGI\ System.app
 **Problem:** Application is sluggish or unresponsive.
 
 **Solutions:**
+
 - Close other applications to free up RAM
 - Reduce the complexity of simulations
 - Check CPU usage in Task Manager (Windows) or Activity Monitor (macOS)
@@ -371,9 +391,9 @@ xattr -cr /Applications/APGI\ System.app
 
 ## Uninstallation
 
-### Windows
+### Windows (Uninstallation)
 
-#### If Installed with Installer:
+#### If Installed with Installer
 
 1. Open Settings → Apps → Installed apps
 2. Find "APGI System" in the list
@@ -383,7 +403,7 @@ xattr -cr /Applications/APGI\ System.app
    - Navigate to `%APPDATA%\APGI System\`
    - Delete the folder
 
-#### If Using Standalone Executable:
+#### If Using Standalone Executable
 
 1. Simply delete the `APGI_System.exe` file
 2. Delete any shortcuts you created
@@ -391,16 +411,17 @@ xattr -cr /Applications/APGI\ System.app
    - Navigate to `%APPDATA%\APGI System\`
    - Delete the folder
 
-### macOS
+### macOS (Uninstallation)
 
 1. Open Finder and go to Applications
 2. Find "APGI System"
 3. Drag it to the Trash (or right-click → Move to Trash)
 4. Empty Trash
 5. Optionally, delete configuration files:
-   ```bash
-   rm -rf ~/Library/Application\ Support/APGI\ System/
-   ```
+
+  ```bash
+  rm -rf ~/Library/Application\ Support/APGI\ System/
+  ```
 
 ---
 
@@ -442,6 +463,7 @@ If you continue to experience issues:
 ### Configuration Files
 
 Your settings are stored in:
+
 - **Windows:** `%APPDATA%\APGI System\config.yaml`
 - **macOS:** `~/Library/Application Support/APGI System/config.yaml`
 
@@ -450,6 +472,7 @@ You can edit this file manually with a text editor, but be careful to maintain v
 ### Data Files
 
 Exported data and results are saved to:
+
 - **Windows:** `%USERPROFILE%\Documents\APGI System\`
 - **macOS:** `~/Documents/APGI System/`
 
@@ -458,6 +481,7 @@ You can change the default export location in the application settings.
 ### Updates
 
 To update to a new version:
+
 1. Download the latest version
 2. Uninstall the current version (optional but recommended)
 3. Install the new version following the installation instructions above
@@ -466,6 +490,7 @@ To update to a new version:
 ### Privacy
 
 The APGI System application:
+
 - Does not collect or transmit personal data
 - Stores all data locally on your computer
 - Does not require internet connectivity (except for optional features)
@@ -478,7 +503,7 @@ The APGI System application:
 ### File Locations
 
 | Item | Windows | macOS |
-|------|---------|-------|
+| - | - | - |
 | Application | `C:\Program Files\APGI System\` | `/Applications/APGI System.app` |
 | Configuration | `%APPDATA%\APGI System\` | `~/Library/Application Support/APGI System/` |
 | Data Export | `%USERPROFILE%\Documents\APGI System\` | `~/Documents/APGI System/` |

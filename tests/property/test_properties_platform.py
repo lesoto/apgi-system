@@ -25,7 +25,6 @@ from apgi_system.platform_utils import (
     get_data_dir,
 )
 
-
 # Configure Hypothesis for property-based testing
 settings.register_profile(
     "property_tests",

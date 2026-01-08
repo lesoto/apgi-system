@@ -11,7 +11,6 @@ import yaml
 from pathlib import Path
 from hypothesis import settings, HealthCheck
 
-
 # Configure Hypothesis profiles
 settings.register_profile(
     "ci", max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow]

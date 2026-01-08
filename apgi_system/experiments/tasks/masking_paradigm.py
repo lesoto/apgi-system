@@ -267,19 +267,40 @@ class MaskingParadigmTask:
         target_detected_before_mask = target_detected
         mask_steps = int(trial.mask_duration_ms)
 
+        # Calculate masking probability based on SOA
+        # Short SOAs = strong masking, Long SOAs = weak masking
+        if trial.soa_ms <= 50:
+            masking_probability = 0.9  # Very strong masking
+        elif trial.soa_ms <= 100:
+            masking_probability = 0.7  # Strong masking
+        elif trial.soa_ms <= 150:
+            masking_probability = 0.4  # Moderate masking
+        else:
+            masking_probability = 0.1  # Weak masking
+
         for step in range(mask_steps):
             state = apgi_system.step(trial.mask_stimulus)
 
-            # Check if ignition occurs during mask (unusual, indicates mask failure)
+            # Apply masking effect: suppress ignition if masking is effective
             if state["ignition"]["ignition_occurred"]:
+                # Check if this ignition should be suppressed by masking
+                if np.random.random() < masking_probability:
+                    # Mask suppresses the ignition
+                    continue
+
                 ignition_count += 1
                 ignition_strength = state["ignition"]["total_signal"]
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
         # Determine if mask suppressed target
-        # If no ignition occurred despite target presentation, mask likely suppressed it
-        if not target_detected and trial.soa_ms < 100:  # Short SOA expected to show masking
+        # Apply masking effect retroactively to detection
+        if target_detected and np.random.random() < masking_probability:
+            target_detected = False
+            detection_time = None
+            mask_suppression_occurred = True
+        elif not target_detected and trial.soa_ms < 100:
+            # If no ignition occurred at short SOA, mask likely suppressed it
             mask_suppression_occurred = True
 
         # Create result
