@@ -98,6 +98,10 @@ ESSENTIAL_DIRS = {
 # Temporary and cache directories to remove
 TEMP_DIR_NAMES = {
     "__pycache__",
+    "_pycache_",  # Alternative naming
+    "__pycache__",  # Double underscore version
+    "_pycache__",  # Mixed underscore version
+    "_pycache_",  # Single underscore version
     ".pytest_cache",
     ".mypy_cache",
     ".hypothesis",
@@ -105,6 +109,8 @@ TEMP_DIR_NAMES = {
     ".tox",
     ".ipynb_checkpoints",
     ".cache",
+    "__cache__",
+    "_cache_",
     "build",
     "dist",
     ".coverage",
@@ -175,27 +181,218 @@ TEMP_DIR_NAMES = {
     "coverage",
     "reports",
     ".coveragerc",
+    "site-packages",
+    "__pycache__",  # Ensure it's included
+    "*.egg-info",
+    "*.egg",
+    "pip-wheel-metadata",
+    "*.dist-info",
+    "*.whl",
+    "*.tar.gz",
+    "*.zip",
+    "*.tgz",
+    "temp",
+    "tmp",
+    "tempfile",
+    "tempfiles",
+    "junk",
+    "trash",
+    "recycle",
+    "deleted",
+    "removed",
+    "backup",
+    "backups",
+    "old",
+    "archive",
+    "archives",
+    "staging",
+    "testing",
+    "test-output",
+    "test-results",
+    "artifacts",
+    "build-artifacts",
+    "ci-artifacts",
+    "deployment",
+    "deploy",
+    "release",
+    "releases",
+    "packages",
+    "bundle",
+    "bundles",
+    "compiled",
+    "output",
+    "bin",
+    "obj",
+    "debug",
+    "release",
+    "x86",
+    "x64",
+    "arm64",
+    "Debug",
+    "Release",
+    "build-linux",
+    "build-windows",
+    "build-macos",
+    "node_modules",
+    ".npm",
+    ".yarn",
+    ".pnpm",
+    "bower_components",
+    "jspm_packages",
+    ".vscode",
+    ".idea",
+    ".eclipse",
+    ".netbeans",
+    ".atom",
+    ".sublime-*",
+    ".vim",
+    ".emacs",
+    ".emacs.d",
+    ".c9",
+    ".cloud9",
+    "*.tmp",
+    "*.temp",
+    "*.bak",
+    "*.backup",
+    "*.old",
+    "*.orig",
+    "*.save",
+    "*.swp",
+    "*.swo",
+    "*~",
+    "*.lock",
+    "*.lck",
+    "*.pid",
+    "*.log",
+    "*.out",
+    "*.err",
+    "*.cache",
+    "*.prof",
+    "*.profile",
+    "*.stats",
+    "*.trace",
+    "*.dump",
+    "*.core",
+    "*.crash",
+    "*.dmp",
+    "*.debug",
+    "*.test",
+    "*.tests",
+    "*.spec",
+    "*.mock",
+    "DS_Store",
+    "Thumbs.db",
+    "desktop.ini",
+    "*.DS_Store",
+    "*.Thumbs.db",
+    "*.desktop.ini",
+    "*.tmp",
+    "*.temp",
+    "*.bak",
+    "*.backup",
+    "*.old",
+    "*.orig",
+    "*.save",
+    "*.swp",
+    "*.swo",
+    "*~",
+    "*.lock",
+    "*.lck",
+    "*.pid",
+    "*.log",
+    "*.out",
+    "*.err",
+    "*.cache",
+    "*.prof",
+    "*.profile",
+    "*.stats",
+    "*.trace",
+    "*.dump",
+    "*.core",
+    "*.crash",
+    "*.dmp",
+    "*.debug",
+    "*.test",
+    "*.tests",
+    "*.spec",
+    "*.mock",
+    "*.tmp.*",
+    "*.temp.*",
+    "*.bak.*",
+    "*.backup.*",
+    "*.old.*",
+    "*.orig.*",
+    "*.save.*",
+    "*.swp.*",
+    "*.swo.*",
+    "*~.*",
+    "*.lock.*",
+    "*.lck.*",
+    "*.pid.*",
+    "*.log.*",
+    "*.out.*",
+    "*.err.*",
+    "*.cache.*",
+    "*.prof.*",
+    "*.profile.*",
+    "*.stats.*",
+    "*.trace.*",
+    "*.dump.*",
+    "*.core.*",
+    "*.crash.*",
+    "*.dmp.*",
+    "*.debug.*",
+    "*.test.*",
+    "*.tests.*",
+    "*.spec.*",
+    "*.mock.*",
 }
 
 # Temporary file patterns to remove
 TEMP_FILE_PATTERNS = [
+    # Python compiled files
     "*.pyc",
     "*.pyo",
     "*.pyd",
     "*.pyi",
     "*.pyx",
     "*.pyb",
+    "*.pyc.*",
+    "*.pyo.*",
+    "*.pyd.*",
+    "*.pyi.*",
+    "*.pyx.*",
+    "*.pyb.*",
+    
+    # Coverage and testing files
     ".coverage",
     "coverage.xml",
     ".coverage.*",
     "*.cover",
+    "htmlcov",
+    "coverage",
+    ".coverage.*",
+    "*.cover.*",
+    
+    # Log files
     "*.log",
     "*.log.*",
     "*.out",
+    "*.out.*",
     "*.err",
+    "*.err.*",
+    "log.*",
+    "*.log.*",
+    
+    # System and editor files
     ".DS_Store",
     "Thumbs.db",
     "desktop.ini",
+    "*.DS_Store",
+    "*.Thumbs.db",
+    "*.desktop.ini",
+    
+    # Temporary and backup files
     "*.tmp",
     "*.temp",
     "*~",
@@ -212,10 +409,26 @@ TEMP_FILE_PATTERNS = [
     "*.cach",
     "*.tmp.*",
     "*.temp.*",
+    "*.bak.*",
+    "*.backup.*",
+    "*.old.*",
+    "*.orig.*",
+    "*.save.*",
+    "*.swp.*",
+    "*.swo.*",
+    "*~.*",
+    
+    # Lock and process files
     "*.pid",
     "*.lock",
     "*.lck",
     "*.wfl",
+    "*.pid.*",
+    "*.lock.*",
+    "*.lck.*",
+    "*.wfl.*",
+    
+    # Debug and crash files
     "*.core",
     "*.dump",
     "*.crash",
@@ -224,24 +437,76 @@ TEMP_FILE_PATTERNS = [
     "*.prof",
     "*.profile",
     "*.stats",
+    "*.lprof",
+    "*.pstats",
+    "*.trace.*",
+    "*.core.*",
+    "*.dump.*",
+    "*.crash.*",
+    "*.dmp.*",
+    "*.prof.*",
+    "*.profile.*",
+    "*.stats.*",
+    "*.lprof.*",
+    "*.pstats.*",
+    
+    # Database files
     "*.s3db",
     "*.sqlite-shm",
     "*.sqlite-wal",
+    "*.db-shm",
+    "*.db-wal",
+    "*.s3db.*",
+    "*.sqlite-shm.*",
+    "*.sqlite-wal.*",
+    "*.db-shm.*",
+    "*.db-wal.*",
+    
+    # Python packaging files
     "*.egg-info",
     "*.egg",
     "*.whl",
     "*.wheel",
+    "*.dist-info",
+    "*.egg-info.*",
+    "*.egg.*",
+    "*.whl.*",
+    "*.wheel.*",
+    "*.dist-info.*",
+    
+    # Archive files (temporary only)
     "*.tgz",
     "*.tar.gz",
     "*.zip",
     "*.rar",
-    "*.7z",  # Only if temp archives
+    "*.7z",
+    "*.tar",
+    "*.tar.bz2",
+    "*.tar.xz",
+    "*.tgz.*",
+    "*.tar.gz.*",
+    "*.zip.*",
+    "*.rar.*",
+    "*.7z.*",
+    "*.tar.*",
+    "*.tar.bz2.*",
+    "*.tar.xz.*",
+    
+    # Installation files
     "*.deb",
     "*.rpm",
     "*.dmg",
     "*.pkg",
     "*.msi",
-    "*.exe",  # Installation files
+    "*.exe",
+    "*.deb.*",
+    "*.rpm.*",
+    "*.dmg.*",
+    "*.pkg.*",
+    "*.msi.*",
+    "*.exe.*",
+    
+    # Development files
     "*.patch",
     "*.diff",
     "*.rej",
@@ -255,24 +520,168 @@ TEMP_FILE_PATTERNS = [
     "*.tests",
     "*.spec",
     "*.mock",
-    "*.lprof",
-    "*.prof",
-    "*.pstats",
-    "*.trace",
+    "*.patch.*",
+    "*.diff.*",
+    "*.rej.*",
+    "*.orig.*",
+    "*.session.*",
+    "*.cookie.*",
+    "*.token.*",
+    "*.auth.*",
+    "*.debug.*",
+    "*.test.*",
+    "*.tests.*",
+    "*.spec.*",
+    "*.mock.*",
+    
+    # Temporary media files
     "*.svg",
     "*.png",
     "*.jpg",
     "*.jpeg",
     "*.gif",
     "*.bmp",
-    "*.ico",  # Only temp images
+    "*.ico",
+    "*.svg.*",
+    "*.png.*",
+    "*.jpg.*",
+    "*.jpeg.*",
+    "*.gif.*",
+    "*.bmp.*",
+    "*.ico.*",
+    
+    # Temporary document files
     "*.pdf",
     "*.doc",
     "*.docx",
     "*.xls",
     "*.xlsx",
     "*.ppt",
-    "*.pptx",  # Only temp docs
+    "*.pptx",
+    "*.pdf.*",
+    "*.doc.*",
+    "*.docx.*",
+    "*.xls.*",
+    "*.xlsx.*",
+    "*.ppt.*",
+    "*.pptx.*",
+    
+    # Additional temporary patterns
+    "temp*",
+    "tmp*",
+    "cache*",
+    "backup*",
+    "old*",
+    "junk*",
+    "trash*",
+    "deleted*",
+    "removed*",
+    "test*",
+    "debug*",
+    "build*",
+    "dist*",
+    "output*",
+    "*.temp",
+    "*.tmp",
+    "*.cache",
+    "*.backup",
+    "*.old",
+    "*.junk",
+    "*.trash",
+    "*.deleted",
+    "*.removed",
+    "*.test",
+    "*.debug",
+    "*.build",
+    "*.dist",
+    "*.output",
+    
+    # IDE and editor files
+    ".vscode*",
+    ".idea*",
+    ".eclipse*",
+    ".netbeans*",
+    ".atom*",
+    ".sublime-*",
+    ".vim*",
+    ".emacs*",
+    ".c9*",
+    ".cloud9*",
+    
+    # Node.js files
+    "node_modules*",
+    ".npm*",
+    ".yarn*",
+    ".pnpm*",
+    "bower_components*",
+    "jspm_packages*",
+    
+    # Java/C# build files
+    "*.class",
+    "*.jar",
+    "*.war",
+    "*.ear",
+    "*.dll",
+    "*.exe",
+    "*.obj",
+    "*.lib",
+    "*.pdb",
+    "*.class.*",
+    "*.jar.*",
+    "*.war.*",
+    "*.ear.*",
+    "*.dll.*",
+    "*.obj.*",
+    "*.lib.*",
+    "*.pdb.*",
+    
+    # macOS specific
+    ".DS_Store*",
+    "._*",
+    ".Spotlight-V100",
+    ".Trashes",
+    ".fseventsd",
+    
+    # Windows specific
+    "Thumbs.db*",
+    "desktop.ini*",
+    "*.lnk",
+    
+    # Linux specific
+    ".nfs*",
+    ".Xauthority*",
+    ".ICEauthority*",
+    
+    # Version control temporary files
+    "*.orig",
+    "*.rej",
+    ".merge*",
+    ".git*",
+    ".svn*",
+    ".hg*",
+    ".bzr*",
+    
+    # Configuration backup files
+    "*.conf.bak",
+    "*.config.bak",
+    "*.cfg.bak",
+    "*.ini.bak",
+    "*.json.bak",
+    "*.yaml.bak",
+    "*.yml.bak",
+    "*.toml.bak",
+    
+    # Runtime files
+    "*.sock",
+    "*.pid",
+    "*.lock",
+    "*.lck",
+    "*.wfl",
+    "*.sock.*",
+    "*.pid.*",
+    "*.lock.*",
+    "*.lck.*",
+    "*.wfl.*",
 ]
 
 # Directories to skip during traversal (never enter)
@@ -541,6 +950,7 @@ def delete_temporary_items(
 
 
 def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True):
+    """Remove empty directories after cleanup."""
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
         # don't prune the root itself
         if dirpath == root_dir:
@@ -556,6 +966,89 @@ def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True)
                         print(f"Removed empty directory: {dirpath}")
         except Exception as e:
             print(f"Error pruning directory {dirpath}: {e}")
+
+
+def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = True):
+    """Handle special cleanup cases that might be missed by pattern matching."""
+    special_patterns = [
+        # Python cache directories with various naming patterns
+        "**/__pycache__",
+        "**/_pycache_",
+        "**/__pycache__",
+        "**/_pycache__",
+        "**/_pycache_",
+        
+        # Common temporary directories
+        "**/temp",
+        "**/tmp",
+        "**/cache",
+        "**/backup",
+        "**/backups",
+        "**/old",
+        
+        # Build artifacts
+        "**/build",
+        "**/dist",
+        "**/out",
+        "**/target",
+        "**/bin",
+        "**/obj",
+        
+        # IDE directories
+        "**/.vscode",
+        "**/.idea",
+        "**/.eclipse",
+        "**/.netbeans",
+        
+        # OS specific
+        "**/.DS_Store",
+        "**/Thumbs.db",
+        "**/desktop.ini",
+    ]
+    
+    import glob
+    
+    removed_special = 0
+    for pattern in special_patterns:
+        full_pattern = os.path.join(root_dir, pattern)
+        matches = glob.glob(full_pattern, recursive=True)
+        
+        for match in matches:
+            if os.path.isdir(match):
+                # Additional safety check for directories
+                if is_safe_to_remove(match, root_dir, safe_mode=True):
+                    if dry_run:
+                        if verbose:
+                            print(f"Would remove special directory: {match}")
+                        removed_special += 1
+                    else:
+                        try:
+                            shutil.rmtree(match, ignore_errors=False)
+                            if verbose:
+                                print(f"Removed special directory: {match}")
+                            removed_special += 1
+                        except Exception as e:
+                            print(f"Error removing special directory {match}: {e}")
+            elif os.path.isfile(match):
+                # Additional safety check for files
+                if is_safe_to_remove(match, root_dir, safe_mode=True):
+                    if dry_run:
+                        if verbose:
+                            print(f"Would remove special file: {match}")
+                        removed_special += 1
+                    else:
+                        try:
+                            os.remove(match)
+                            if verbose:
+                                print(f"Removed special file: {match}")
+                            removed_special += 1
+                        except Exception as e:
+                            print(f"Error removing special file {match}: {e}")
+    
+    if verbose and removed_special > 0:
+        print(f"Special cleanup: Removed {removed_special} additional items")
+    
+    return removed_special
 
 
 def clear_log_files(
@@ -609,13 +1102,15 @@ def parse_args(argv: List[str] = None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                           # Clean current directory
-  %(prog)s /path/to/project           # Clean specific directory
+  %(prog)s                           # Clean current directory (includes special cleanup by default)
+  %(prog)s /path/to/project           # Clean specific directory (includes special cleanup by default)
   %(prog)s --dry-run                  # Show what would be removed
   %(prog)s --remove-node-modules      # Also remove node_modules
   %(prog)s --config .cleanrc          # Use custom config
   %(prog)s --backup /tmp/backup       # Backup before deletion
   %(prog)s --unsafe                   # Disable safety mode
+  %(prog)s --no-special-cleanup       # Disable special cleanup (enabled by default)
+  %(prog)s --prune-empty-dirs        # Remove empty directories after cleanup
         """,
     )
 
@@ -706,6 +1201,12 @@ Examples:
     )
     p.add_argument(
         "--prune-empty-dirs", action="store_true", help="Remove now-empty directories after cleanup"
+    )
+    p.add_argument(
+        "--special-cleanup", action="store_true", help="Run special cleanup for edge cases and missed patterns (enabled by default)"
+    )
+    p.add_argument(
+        "--no-special-cleanup", action="store_true", help="Disable special cleanup (enabled by default)"
     )
 
     return p.parse_args(argv)
@@ -801,6 +1302,10 @@ def main(argv: List[str] = None):
     # Prune empty directories
     if args.prune_empty_dirs:
         prune_empty_dirs(root_directory, dry_run=dry_run, verbose=verbose)
+
+    # Run special cleanup for edge cases by default (unless disabled)
+    if not args.no_special_cleanup:
+        clean_special_cases(root_directory, dry_run=dry_run, verbose=verbose)
 
     if verbose:
         print("\nEnhanced cleanup completed")
