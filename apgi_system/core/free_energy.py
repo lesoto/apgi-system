@@ -575,3 +575,169 @@ class FreeEnergyCalculator:
         prob = np.clip(generative_density, self.eps, 1.0)
         surprise = -np.log(prob)
         return float(np.mean(surprise))
+
+
+# Standalone wrapper functions for backward compatibility and easier testing
+def compute_variational_free_energy(
+    observation: FloatArray, 
+    prediction: FloatArray, 
+    precision: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> tuple[float, dict]:
+    """
+    Standalone wrapper for computing variational free energy.
+    
+    Parameters
+    ----------
+    observation : np.ndarray
+        Observed data
+    prediction : np.ndarray
+        Predicted data
+    precision : np.ndarray
+        Precision weights
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    tuple[float, dict]
+        Total free energy and component breakdown
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_variational_free_energy(observation, prediction, precision)
+
+
+def compute_expected_free_energy(
+    policy: FloatArray,
+    predicted_states: FloatArray,
+    desired_states: FloatArray,
+    precision: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> tuple[float, dict]:
+    """
+    Standalone wrapper for computing expected free energy.
+    
+    Parameters
+    ----------
+    policy : np.ndarray
+        Policy parameters
+    predicted_states : np.ndarray
+        Predicted states under policy
+    desired_states : np.ndarray
+        Desired states
+    precision : np.ndarray
+        Precision weights
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    tuple[float, dict]
+        Total expected free energy and component breakdown
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_expected_free_energy(policy, predicted_states, desired_states, precision)
+
+
+def compute_accuracy(
+    observation: FloatArray, 
+    prediction: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> float:
+    """
+    Standalone wrapper for computing accuracy term.
+    
+    Parameters
+    ----------
+    observation : np.ndarray
+        Observed data
+    prediction : np.ndarray
+        Predicted data
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    float
+        Accuracy value
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_accuracy(observation, prediction)
+
+
+def compute_complexity(
+    prediction: FloatArray,
+    prior_prediction: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> float:
+    """
+    Standalone wrapper for computing complexity term.
+    
+    Parameters
+    ----------
+    prediction : np.ndarray
+        Current prediction
+    prior_prediction : np.ndarray
+        Prior prediction
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    float
+        Complexity value
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_complexity(prediction, prior_prediction)
+
+
+def compute_epistemic_value(
+    policy: FloatArray,
+    predicted_states: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> float:
+    """
+    Standalone wrapper for computing epistemic value.
+    
+    Parameters
+    ----------
+    policy : np.ndarray
+        Policy parameters
+    predicted_states : np.ndarray
+        Predicted states
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    float
+        Epistemic value
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_epistemic_value(policy, predicted_states)
+
+
+def compute_pragmatic_value(
+    predicted_states: FloatArray,
+    desired_states: FloatArray,
+    config: Optional[ConfigDict] = None
+) -> float:
+    """
+    Standalone wrapper for computing pragmatic value.
+    
+    Parameters
+    ----------
+    predicted_states : np.ndarray
+        Predicted states
+    desired_states : np.ndarray
+        Desired states
+    config : dict, optional
+        Configuration parameters
+        
+    Returns
+    -------
+    float
+        Pragmatic value
+    """
+    calc = FreeEnergyCalculator(config)
+    return calc.compute_pragmatic_value(predicted_states, desired_states)

@@ -177,8 +177,38 @@ def mock_task_executor():
 @pytest.fixture
 def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor):
     """Create a test client with mocked dependencies."""
-    app = create_app()
-
+    from api.main import create_app
+    from fastapi.testclient import TestClient
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.auth_manager import TokenPayload
+    from datetime import datetime, timedelta
+    
+    # Create app in test mode (disables auth and CSRF middleware)
+    app = create_app(test_mode=True)
+    
+    # Create mock user token for dependency overrides
+    mock_token_payload = TokenPayload(
+        user_id="test-user-123",
+        username="testuser",
+        roles=["researcher"],
+        exp=datetime.utcnow() + timedelta(days=1),
+        token_type="access"
+    )
+    
+    # Override get_current_user to return mock user
+    async def mock_get_current_user():
+        return mock_token_payload
+    
+    # Override require_permission to always pass
+    def mock_require_permission(permission):
+        def dummy_dependency():
+            return None
+        return dummy_dependency
+    
+    # Apply overrides
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[require_permission] = mock_require_permission
+    
     # Override dependencies
     sessions._session_manager = mock_session_manager
     sessions._redis_client = mock_redis
@@ -332,6 +362,10 @@ class TestSessionEndpointContracts:
         Validates: Requirements 12.3
         """
         response = client.post("/v1/sessions/test-session-123/start")
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+            print(f"Response content: {response.text}")
         assert response.status_code == 200
 
         data = response.json()

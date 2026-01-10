@@ -14,8 +14,15 @@ parent_dir = os.path.dirname(os.path.dirname(__file__))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Import the GUI class
-from apgi_gui import APGIGui, main
+# Import the GUI class from the actual module file
+import importlib.util
+spec = importlib.util.spec_from_file_location("apgi_gui_module", os.path.join(parent_dir, "apgi_gui.py"))
+apgi_gui_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(apgi_gui_module)
+
+# Extract the classes and functions
+APGIGui = apgi_gui_module.APGIGui
+main = apgi_gui_module.main
 
 # Create alias for backward compatibility
 run_gui = main

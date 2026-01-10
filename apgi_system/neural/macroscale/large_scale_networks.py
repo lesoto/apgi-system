@@ -131,15 +131,27 @@ class FrontoparietalNetwork:
             activity: Current workspace activity
             info: Diagnostic information
         """
-        # Recurrent input with overflow protection
+        # Recurrent input with enhanced overflow protection
+        # Check weights and activity for numerical stability before computation
+        self.weights = np.nan_to_num(self.weights, nan=0.0, posinf=1.0, neginf=-1.0)
+        self.activity = np.nan_to_num(self.activity, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        # Apply gradient clipping to prevent extreme values
+        self.weights = np.clip(self.weights, -10, 10)
+        self.activity = np.clip(self.activity, 0, 5)
+        
         recurrent_input = self.weights @ self.activity
 
-        # Check for numerical issues
+        # Enhanced numerical stability checks
         if not np.all(np.isfinite(recurrent_input)):
             # Reset to safe values if overflow occurs
-            self.weights = np.clip(self.weights, -10, 10)
-            self.activity = np.clip(self.activity, 0, 5)
+            self.weights = np.clip(self.weights, -5, 5)
+            self.activity = np.clip(self.activity, 0.1, 2)
             recurrent_input = self.weights @ self.activity
+            
+            # Log warning for debugging
+            import warnings
+            warnings.warn("Numerical instability detected in recurrent computation, values reset", RuntimeWarning)
 
         # Competition (soft winner-take-all)
         competition = -self.competition_strength * np.mean(self.activity)

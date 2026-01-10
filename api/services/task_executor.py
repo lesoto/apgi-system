@@ -200,7 +200,7 @@ class TaskExecutor:
 
         return await asyncio.to_thread(_cancel_task)
 
-    def list_available_tasks(self) -> Dict[str, Any]:
+    async def list_available_tasks(self) -> Dict[str, Any]:
         """
         List all available experimental tasks with descriptions.
 

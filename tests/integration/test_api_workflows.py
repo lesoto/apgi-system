@@ -215,11 +215,11 @@ def mock_data_export_service():
     async def mock_generate_summary_stats(session_id):
         return {
             "session_id": session_id,
-            "total_steps": 100,
             "duration_ms": 1000.0,
-            "ignition_count": 5,
-            "mean_free_energy": 1.5,
-            "metabolic_efficiency": 0.85,
+            "num_steps": 100,
+            "ignition_stats": {"count": 5, "total_signal": 10.0},
+            "energy_stats": {"mean_free_energy": 1.5, "final_free_energy": 1.4},
+            "allostasis_stats": {"mean_load": 0.25, "max_load": 0.5},
         }
 
     service.export_session_data = AsyncMock(side_effect=mock_export_session_data)
@@ -255,7 +255,7 @@ def mock_task_executor():
             return tasks_store[task_id]["result"]
         raise ValueError(f"Task {task_id} not found")
 
-    def mock_list_available_tasks():
+    async def mock_list_available_tasks():
         return {
             "tasks": [
                 {
@@ -274,7 +274,7 @@ def mock_task_executor():
     executor.submit_task = AsyncMock(side_effect=mock_submit_task)
     executor.get_task_status = AsyncMock(side_effect=mock_get_task_status)
     executor.get_task_result = AsyncMock(side_effect=mock_get_task_result)
-    executor.list_available_tasks = Mock(side_effect=mock_list_available_tasks)
+    executor.list_available_tasks = AsyncMock(side_effect=mock_list_available_tasks)
 
     return executor
 
@@ -307,7 +307,35 @@ def client(
     mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor, mock_db_session
 ):
     """Create a test client with all mocked dependencies."""
-    app = create_app()
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.auth_manager import TokenPayload
+    from datetime import datetime, timedelta
+    
+    # Create app in test mode (disables auth and CSRF middleware)
+    app = create_app(test_mode=True)
+
+    # Create mock user token for dependency overrides
+    mock_token_payload = TokenPayload(
+        user_id="test-user-123",
+        username="testuser",
+        roles=["researcher"],
+        exp=datetime.utcnow() + timedelta(days=1),
+        token_type="access"
+    )
+    
+    # Override get_current_user to return mock user
+    async def mock_get_current_user():
+        return mock_token_payload
+    
+    # Override require_permission to always pass
+    def mock_require_permission(permission):
+        def dummy_dependency():
+            return None
+        return dummy_dependency
+    
+    # Apply overrides
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[require_permission] = mock_require_permission
 
     # Override dependencies
     sessions._session_manager = mock_session_manager
@@ -404,8 +432,8 @@ class TestCompleteSimulationWorkflow:
         summary_response = client.get(f"/v1/sessions/{session_id}/summary")
         assert summary_response.status_code == 200
         summary_data = summary_response.json()
-        assert "total_steps" in summary_data
-        assert "ignition_count" in summary_data
+        assert "num_steps" in summary_data
+        assert "ignition_stats" in summary_data
 
         # Step 7: Clean up - delete session
         delete_response = client.delete(f"/v1/sessions/{session_id}")

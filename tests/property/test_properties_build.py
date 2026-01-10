@@ -17,7 +17,7 @@ import pytest
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from build_common import (
+from utils.build_common import (
     get_version,
     analyze_dependencies,
     collect_resources,

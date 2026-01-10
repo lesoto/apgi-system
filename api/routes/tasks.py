@@ -185,6 +185,19 @@ async def get_task_status(
         )
 
         return response
+    except ValueError as e:
+        # Task not found
+        if "not found" in str(e).lower():
+            logger.warning(f"Task {task_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task {task_id} not found"
+            )
+        # Other value errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Failed to get task status for {task_id}: {e}")
         raise HTTPException(

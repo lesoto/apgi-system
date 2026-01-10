@@ -11,6 +11,8 @@ from typing import Any, Dict
 from celery import Task
 
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
 from apgi_system.platform_utils import get_resource_path
@@ -309,6 +311,140 @@ def execute_attentional_blink_task(
         logger.error(f"Attentional Blink Task failed for session {session_id}: {e}", exc_info=True)
         result = {
             "task_type": "attentional_blink",
+            "session_id": session_id,
+            "status": "failed",
+            "error": str(e),
+        }
+
+    # Trigger webhook on completion (async)
+    import asyncio
+
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+
+    return result
+
+
+@celery_app.task(
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_change_blindness_task"
+)
+def execute_change_blindness_task(
+    self, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Execute Change Blindness Task.
+
+    Args:
+        session_id: Session identifier
+        parameters: Task parameters
+
+    Returns:
+        Dict with task results and analysis
+    """
+    logger.info(f"Starting Change Blindness Task for session {session_id}")
+
+    result = None
+    try:
+        # Extract parameters with defaults
+        image_size = parameters.get("image_size", (256, 256))
+        change_magnitude = parameters.get("change_magnitude", 0.3)
+        flicker_duration_ms = parameters.get("flicker_duration_ms", 100.0)
+        num_trials = parameters.get("num_trials", 50)
+
+        # Create task instance
+        task = ChangeBlindnessTask(
+            image_size=image_size,
+            change_magnitude=change_magnitude,
+            flicker_duration_ms=flicker_duration_ms,
+            num_trials=num_trials,
+        )
+
+        # Run all trials
+        results = task.run_all_trials(self.apgi_system)
+
+        logger.info(f"Change Blindness Task completed for session {session_id}")
+
+        result = {
+            "task_type": "change_blindness",
+            "session_id": session_id,
+            "status": "completed",
+            "results": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Change Blindness Task failed for session {session_id}: {e}", exc_info=True)
+        result = {
+            "task_type": "change_blindness",
+            "session_id": session_id,
+            "status": "failed",
+            "error": str(e),
+        }
+
+    # Trigger webhook on completion (async)
+    import asyncio
+
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+
+    return result
+
+
+@celery_app.task(
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_binocular_rivalry_task"
+)
+def execute_binocular_rivalry_task(
+    self, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Execute Binocular Rivalry Task.
+
+    Args:
+        session_id: Session identifier
+        parameters: Task parameters
+
+    Returns:
+        Dict with task results and analysis
+    """
+    logger.info(f"Starting Binocular Rivalry Task for session {session_id}")
+
+    result = None
+    try:
+        # Extract parameters with defaults
+        pattern_size = parameters.get("pattern_size", (256, 256))
+        contrast_left = parameters.get("contrast_left", 1.0)
+        contrast_right = parameters.get("contrast_right", 1.0)
+        duration_seconds = parameters.get("duration_seconds", 60.0)
+        sampling_rate_hz = parameters.get("sampling_rate_hz", 30.0)
+
+        # Create task instance
+        task = BinocularRivalryTask(
+            pattern_size=pattern_size,
+            contrast_left=contrast_left,
+            contrast_right=contrast_right,
+            duration_seconds=duration_seconds,
+            sampling_rate_hz=sampling_rate_hz,
+        )
+
+        # Run all trials
+        results = task.run_all_trials(self.apgi_system)
+
+        logger.info(f"Binocular Rivalry Task completed for session {session_id}")
+
+        result = {
+            "task_type": "binocular_rivalry",
+            "session_id": session_id,
+            "status": "completed",
+            "results": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Binocular Rivalry Task failed for session {session_id}: {e}", exc_info=True)
+        result = {
+            "task_type": "binocular_rivalry",
             "session_id": session_id,
             "status": "failed",
             "error": str(e),

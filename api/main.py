@@ -55,9 +55,12 @@ redis_client: Optional[redis.Redis] = None
 rate_limiting_middleware: Optional[RateLimitingMiddleware] = None
 
 
-def create_app() -> FastAPI:
+def create_app(test_mode: bool = False) -> FastAPI:
     """
     Create and configure the FastAPI application.
+
+    Args:
+        test_mode: If True, disables authentication and CSRF middleware for testing
 
     Returns:
         FastAPI: Configured FastAPI application instance
@@ -84,8 +87,9 @@ def create_app() -> FastAPI:
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
-    # Add authentication middleware (extracts and verifies JWT tokens)
-    app.add_middleware(AuthenticationMiddleware)
+    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
+    if not test_mode:
+        app.add_middleware(AuthenticationMiddleware)
 
     # Add response schema validation middleware
     app.add_middleware(
@@ -94,18 +98,19 @@ def create_app() -> FastAPI:
         fail_on_error=settings.schema_validation_fail_on_error,
     )
 
-    # Add CSRF protection middleware
-    app.add_middleware(
-        CSRFMiddleware,
-        enabled=(
-            settings.csrf_protection_enabled
-            if hasattr(settings, "csrf_protection_enabled")
-            else True
-        ),
-        cookie_name="csrf_token",
-        header_name="X-CSRF-Token",
-        token_expiry_minutes=60,
-    )
+    # Add CSRF protection middleware - skip in test mode
+    if not test_mode:
+        app.add_middleware(
+            CSRFMiddleware,
+            enabled=(
+                settings.csrf_protection_enabled
+                if hasattr(settings, "csrf_protection_enabled")
+                else True
+            ),
+            cookie_name="csrf_token",
+            header_name="X-CSRF-Token",
+            token_expiry_minutes=60,
+        )
 
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})

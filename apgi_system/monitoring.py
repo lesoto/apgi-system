@@ -5,6 +5,7 @@ including execution time, memory usage, and computational efficiency.
 """
 
 import time
+import gc
 import psutil
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
@@ -280,3 +281,114 @@ class PerformanceMonitor:
                     f"Step: {m.step_time_ms:.3f}ms, "
                     f"Mem: {m.memory_usage_mb:.1f}MB"
                 )
+
+
+class SystemProfiler:
+    """Profile system resources and performance characteristics."""
+    
+    def __init__(self):
+        """Initialize system profiler."""
+        self.start_time = time.time()
+        self.profile_data = {}
+        
+    def profile_system_resources(self) -> dict:
+        """Profile current system resource usage.
+        
+        Returns
+        -------
+        dict
+            System resource information
+        """
+        import psutil
+        
+        return {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent,
+            "memory_available_mb": psutil.virtual_memory().available / 1024 / 1024,
+            "disk_usage_percent": psutil.disk_usage('/').percent,
+            "process_count": len(psutil.pids()),
+            "uptime_seconds": time.time() - self.start_time
+        }
+    
+    def profile_python_memory(self) -> dict:
+        """Profile Python memory usage.
+        
+        Returns
+        -------
+        dict
+            Python memory statistics
+        """
+        import sys
+        
+        return {
+            "objects_count": len(gc.get_objects()),
+            "ref_count": sys.gettotalrefcount(),
+            "gc_stats": gc.get_stats()
+        }
+
+
+class MetricsCollector:
+    """Collect and aggregate metrics from multiple sources."""
+    
+    def __init__(self):
+        """Initialize metrics collector."""
+        self.metrics_sources = []
+        self.collected_metrics = []
+        
+    def add_metrics_source(self, source):
+        """Add a metrics source to collect from.
+        
+        Parameters
+        ----------
+        source : object
+            Object with get_metrics() method
+        """
+        self.metrics_sources.append(source)
+        
+    def collect_all_metrics(self) -> dict:
+        """Collect metrics from all sources.
+        
+        Returns
+        -------
+        dict
+            Aggregated metrics from all sources
+        """
+        all_metrics = {}
+        
+        for source in self.metrics_sources:
+            try:
+                if hasattr(source, 'get_metrics'):
+                    metrics = source.get_metrics()
+                    all_metrics[source.__class__.__name__] = metrics
+                elif hasattr(source, 'get_statistics'):
+                    metrics = source.get_statistics()
+                    all_metrics[source.__class__.__name__] = metrics
+            except Exception as e:
+                all_metrics[source.__class__.__name__] = {"error": str(e)}
+                
+        return all_metrics
+    
+    def get_metrics_summary(self) -> dict:
+        """Get summary of collected metrics.
+        
+        Returns
+        -------
+        dict
+            Summary statistics
+        """
+        all_metrics = self.collect_all_metrics()
+        
+        summary = {
+            "total_sources": len(self.metrics_sources),
+            "successful_collections": 0,
+            "failed_collections": 0,
+            "timestamp": time.time()
+        }
+        
+        for source_name, metrics in all_metrics.items():
+            if "error" in metrics:
+                summary["failed_collections"] += 1
+            else:
+                summary["successful_collections"] += 1
+                
+        return summary

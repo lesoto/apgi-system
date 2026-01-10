@@ -25,7 +25,7 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from release import ReleaseManager, ReleaseError
+from utils.release import ReleaseManager, ReleaseError
 
 
 class TestVersionValidation:

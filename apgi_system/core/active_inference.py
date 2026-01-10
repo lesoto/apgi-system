@@ -471,12 +471,26 @@ class HierarchicalGaussianFilter:
         # Get projection matrix from cache
         projection_matrix = self._get_projection_matrix(from_level + 1, target_dim, source_dim)
 
-        # Ensure numerical stability
+        # Ensure numerical stability with enhanced checks
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        # Gradient clipping to prevent overflow
+        projection_matrix = np.clip(projection_matrix, -100, 100)
+        state = np.clip(state, -100, 100)
+        
+        # Check for divide by zero conditions
+        if np.any(np.abs(projection_matrix) < 1e-10):
+            projection_matrix = np.where(np.abs(projection_matrix) < 1e-10, 
+                                   np.sign(projection_matrix) * 1e-10, projection_matrix)
 
         result = projection_matrix @ state
-        return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        # Final result stabilization
+        result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
+        result = np.clip(result, -1000, 1000)  # Prevent extreme values
+        
+        return result
 
     def _compute_total_free_energy(self, observation: FloatArray) -> float:
         """
