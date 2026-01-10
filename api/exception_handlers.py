@@ -198,15 +198,47 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     error_logger.log_error(exc, request=request, error_id=error_id)
 
     # Record error for alerting
+    # Include request body and headers for better debugging (excluding sensitive data)
+    metadata = {
+        "request_id": request_id,
+        "error_id": error_id,
+        "path": request.url.path,
+        "method": request.method,
+    }
+    
+    # Add headers (excluding sensitive ones)
+    safe_headers = {k: v for k, v in dict(request.headers).items() 
+                   if k.lower() not in ['authorization', 'cookie', 'x-api-key']}
+    metadata["headers"] = safe_headers
+    
+    # Add request body for non-form/multipart requests (size limited)
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            body = await request.body()
+            if len(body) < 1000:  # Only log small bodies
+                try:
+                    import json
+                    body_data = json.loads(body.decode())
+                    # Remove sensitive fields
+                    sensitive_keys = ['password', 'token', 'secret', 'key', 'auth']
+                    for key in sensitive_keys:
+                        if key in body_data:
+                            body_data[key] = "[REDACTED]"
+                    metadata["body"] = body_data
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    metadata["body"] = "[UNPARSEABLE]"
+        elif "application/x-www-form-urlencoded" in content_type:
+            form_data = await request.form()
+            metadata["form"] = {k: "[REDACTED]" if any(s in k.lower() for s in ['password', 'token', 'secret']) else v 
+                              for k, v in form_data.items()}
+    except Exception as e:
+        metadata["body_error"] = f"Failed to capture request body: {str(e)}"
+    
     await alert_manager.record_error(
         error_type=type(exc).__name__,
         error_message=str(exc),
-        metadata={
-            "request_id": request_id,
-            "error_id": error_id,
-            "path": request.url.path,
-            "method": request.method,
-        },
+        metadata=metadata,
     )
 
     # Return generic error response (don't expose internal details)

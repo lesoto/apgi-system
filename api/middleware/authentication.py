@@ -113,13 +113,20 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Returns:
             True if path is public, False otherwise
         """
-        # Check exact matches
+        # Check exact matches first
         if path in self.PUBLIC_PATHS:
             return True
 
-        # Check if path starts with any public prefix
-        for public_path in self.PUBLIC_PATHS:
-            if path.startswith(public_path):
+        # Check for path patterns that should be public (e.g., static files)
+        # Only use prefix matching for specific safe patterns
+        path_prefixes = [
+            "/static/",
+            "/docs/",
+            "/redoc/",
+        ]
+        
+        for prefix in path_prefixes:
+            if path.startswith(prefix):
                 return True
 
         return False

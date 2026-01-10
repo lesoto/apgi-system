@@ -9,6 +9,7 @@ This directory contains the continuous integration and deployment workflows for 
 Runs on every push and pull request to `main` and `develop` branches.
 
 **Steps:**
+
 1. **Code Formatting Check** - Validates code formatting with `black`
 2. **Linting** - Checks code quality with `flake8`
 3. **Type Checking** - Validates type hints with `mypy` (non-blocking)
@@ -47,6 +48,7 @@ pytest tests/ -v --cov=apgi_system --cov-report=html --cov-report=term-missing
 ## Coverage Reports
 
 Coverage reports are:
+
 - Displayed in the terminal during CI runs
 - Uploaded as artifacts (HTML format) for each CI run
 - Optionally uploaded to Codecov for tracking over time
@@ -54,6 +56,7 @@ Coverage reports are:
 ## Requirements
 
 The CI pipeline validates:
+
 - ✅ Code formatting (black)
 - ✅ Code quality (flake8)
 - ✅ Type safety (mypy)

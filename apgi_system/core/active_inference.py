@@ -8,6 +8,9 @@ and hierarchical Bayesian filtering.
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
+from functools import lru_cache
+from collections import deque
+import threading
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.validation import InputValidator
@@ -127,8 +130,14 @@ class HierarchicalGaussianFilter:
         self.precision_min = self.config.get("precision_range", [0.1, 10.0])[0]
         self.precision_max = self.config.get("precision_range", [0.1, 10.0])[1]
 
+        # Projection matrix cache with LRU eviction
+        self._projection_cache_max_size = self.config.get("projection_cache_size", 100)
+        self._projection_cache = {}
+        self._cache_access_order = deque()  # Track access order for LRU (O(1) operations)
+        self._cache_lock = threading.Lock()  # Thread safety for cache access
+
     def update(
-        self, observation: FloatArray, action: Optional[FloatArray] = None, dt: float = 0.001
+        self, observation: FloatArray, dt: float = 0.001
     ) -> Tuple[List[BeliefState], float]:
         """
         Update beliefs using variational message passing.
@@ -143,8 +152,6 @@ class HierarchicalGaussianFilter:
         ----------
         observation : np.ndarray
             Sensory observation vector of shape (observation_dim,)
-        action : np.ndarray, optional
-            Current action vector (not currently used in update)
         dt : float, default=0.001
             Time step for belief integration in seconds
 
@@ -157,8 +164,6 @@ class HierarchicalGaussianFilter:
 
         Raises
         ------
-        TypeError
-            If observation is not a numpy array
         ValueError
             If observation shape doesn't match expected dimensions, contains NaN/Inf,
             or dt is not positive
@@ -182,9 +187,6 @@ class HierarchicalGaussianFilter:
         InputValidator.validate_array(
             observation, "observation", expected_shape=(self.observation_dim,)
         )
-
-        if action is not None:
-            InputValidator.validate_array(action, "action")
 
         InputValidator.validate_scalar(dt, "dt", positive=True, value_range=(1e-6, 1.0))
 
@@ -261,12 +263,30 @@ class HierarchicalGaussianFilter:
                 error_below = self.beliefs[0].prediction_error
                 precision_below = self.beliefs[0].precision
             else:
-                error_below = self.beliefs[level - 1].prediction_error
+                # Project error from level below to current level's dimension
+                error_below_raw = self.beliefs[level - 1].prediction_error
+                target_dim = self.beliefs[level].mean.shape[0]
+                source_dim = error_below_raw.shape[0]
+                
+                if target_dim != source_dim:
+                    error_below = self._project_up(level - 1, error_below_raw)
+                else:
+                    error_below = error_below_raw
+                
                 precision_below = self.beliefs[level - 1].precision
 
             # Precision-weighted error from above
             if level < self.num_levels - 1:
-                error_above = self.beliefs[level + 1].prediction_error
+                # Project error from level above to current level's dimension
+                error_above_raw = self.beliefs[level + 1].prediction_error
+                target_dim = self.beliefs[level].mean.shape[0]
+                source_dim = error_above_raw.shape[0]
+                
+                if target_dim != source_dim:
+                    error_above = self._map_down(level + 1, error_above_raw)
+                else:
+                    error_above = error_above_raw
+                    
                 precision_above = self.beliefs[level + 1].precision
             else:
                 # Top level has no error from above
@@ -275,9 +295,23 @@ class HierarchicalGaussianFilter:
 
             # Update belief mean (gradient descent on free energy)
             # δμ = η * (Π_below * ε_below - Π_above * ε_above)
+            
+            # Validate array shapes before computation
+            belief_shape = self.beliefs[level].mean.shape
+            if error_below.shape != belief_shape:
+                raise ValueError(
+                    f"Shape mismatch at level {level}: "
+                    f"belief mean shape {belief_shape} vs error_below shape {error_below.shape}"
+                )
+            if error_above.shape != belief_shape:
+                raise ValueError(
+                    f"Shape mismatch at level {level}: "
+                    f"belief mean shape {belief_shape} vs error_above shape {error_above.shape}"
+                )
+            
             update = self.learning_rate * (
-                precision_below * error_below[: len(self.beliefs[level].mean)]
-                - precision_above * error_above[: len(self.beliefs[level].mean)]
+                precision_below * error_below
+                - precision_above * error_above
             )
 
             self.beliefs[level].mean += dt * update
@@ -341,6 +375,55 @@ class HierarchicalGaussianFilter:
             # Top level predicts itself (prior)
             return self.beliefs[level].mean
 
+    def _get_projection_matrix(
+        self, from_level: int, target_dim: int, source_dim: int
+    ) -> np.ndarray:
+        """
+        Get projection matrix with LRU cache management.
+
+        Args:
+            from_level: Source level (higher in hierarchy)
+            target_dim: Target dimension
+            source_dim: Source dimension
+
+        Returns:
+            Projection matrix
+        """
+        key = (from_level, target_dim, source_dim)
+
+        with self._cache_lock:
+            # Check if matrix exists in cache
+            if key in self._projection_cache:
+                # Move to end (most recently used)
+                self._cache_access_order.remove(key)
+                self._cache_access_order.append(key)
+                return self._projection_cache[key]
+
+            # Create new projection matrix with proper initialization
+            # Use orthogonal initialization for better numerical stability
+            if target_dim == source_dim:
+                # Same dimension: use identity with small noise
+                projection_matrix = np.eye(target_dim) + np.random.randn(target_dim, source_dim) * 0.01
+            else:
+                # Different dimensions: use truncated normal initialization
+                projection_matrix = np.random.randn(target_dim, source_dim) * 0.1
+                # Ensure finite values
+                projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
+                # Add small identity component for stability
+                min_dim = min(target_dim, source_dim)
+                projection_matrix[:min_dim, :min_dim] += np.eye(min_dim) * 0.1
+
+            # Add to cache
+            self._projection_cache[key] = projection_matrix
+            self._cache_access_order.append(key)
+
+            # Evict oldest if cache is full
+            if len(self._projection_cache) > self._projection_cache_max_size:
+                oldest_key = self._cache_access_order.popleft()  # O(1) operation with deque
+                del self._projection_cache[oldest_key]
+
+            return projection_matrix
+
     def _map_down(self, from_level: int, state: FloatArray) -> FloatArray:
         """
         Map state representation down one level in the hierarchy.
@@ -352,32 +435,47 @@ class HierarchicalGaussianFilter:
         ----------
         from_level : int
             Source level (higher in hierarchy)
-        state : np.ndarray
-            State vector at the source level
-
-        Returns
-        -------
-        mapped_state : np.ndarray
-            Projected state at the target level (one level below)
-
-        Notes
-        -----
-        Currently implements linear projection. Can be extended to nonlinear
-        mappings for more complex generative models.
         """
         target_dim = self.beliefs[from_level - 1].mean.shape[0]
         source_dim = state.shape[0]
 
-        # Simple projection matrix (could be learned)
-        if not hasattr(self, "_projection_matrices"):
-            self._projection_matrices = {}
+        # Get projection matrix from cache
+        projection_matrix = self._get_projection_matrix(from_level, target_dim, source_dim)
+        
+        # Ensure numerical stability
+        projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
+        state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        result = projection_matrix @ state
+        return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        key = (from_level, target_dim, source_dim)
-        if key not in self._projection_matrices:
-            # Initialize random projection matrix
-            self._projection_matrices[key] = np.random.randn(target_dim, source_dim) * 0.1
+    def _project_up(self, from_level: int, state: FloatArray) -> FloatArray:
+        """
+        Map state representation up one level in the hierarchy.
 
-        return self._projection_matrices[key] @ state
+        Args:
+            from_level: Source level (lower in hierarchy)
+            state: State vector to map up
+
+        Returns:
+            Mapped state vector at higher level
+        """
+        if from_level >= self.num_levels - 1:
+            # Already at top level
+            return state
+            
+        target_dim = self.beliefs[from_level + 1].mean.shape[0]
+        source_dim = state.shape[0]
+
+        # Get projection matrix from cache
+        projection_matrix = self._get_projection_matrix(from_level + 1, target_dim, source_dim)
+        
+        # Ensure numerical stability
+        projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
+        state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        result = projection_matrix @ state
+        return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 
     def _compute_total_free_energy(self, observation: FloatArray) -> float:
         """

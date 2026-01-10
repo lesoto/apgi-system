@@ -5,6 +5,8 @@ SQLAlchemy engine and session configuration.
 """
 
 import logging
+import secrets
+import string
 from contextlib import contextmanager
 from typing import Generator
 
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from api.config import settings
 from api.database.models import Base, User
+from api.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,35 @@ engine = create_engine(
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def generate_secure_password(length: int = 32) -> str:
+    """
+    Generate a secure random password.
+
+    Args:
+        length: Length of the password to generate
+
+    Returns:
+        Secure random password string
+    """
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    password = "".join(secrets.choice(alphabet) for _ in range(length))
+    return password
+
+
+def generate_secure_username(prefix: str = "user") -> str:
+    """
+    Generate a secure random username.
+
+    Args:
+        prefix: Prefix for the username
+
+    Returns:
+        Secure random username string
+    """
+    random_suffix = secrets.token_hex(8)
+    return f"{prefix}_{random_suffix}"
 
 
 def init_db():
@@ -52,7 +84,7 @@ def init_db():
 
 def create_default_user():
     """
-    Create a default user for session management.
+    Create a default user for session management with secure random credentials.
 
     This ensures that the foreign key constraint for sessions
     can be satisfied when creating sessions without explicit user management.
@@ -70,18 +102,30 @@ def create_default_user():
             logger.info("Default user already exists")
             return
 
+        # Generate secure credentials
+        secure_username = generate_secure_username("default")
+        secure_password = generate_secure_password()
+
+        # Log credentials securely (in production, this should go to a secure secrets manager)
+        logger.warning(
+            "Generated default user credentials - STORE SECURELY",
+            username=secure_username,
+            password=secure_password,
+            note="These credentials allow full system access - change immediately",
+        )
+
         # Create default user
         default_user = User(
-            user_id="default_user",
-            username="default_user",
-            email="default@apgi-system.local",
-            password_hash="no_password_required",  # Not used for API access
+            user_id=secure_username,
+            username=secure_username,
+            email=f"{secure_username}@apgi-system.local",
+            password_hash=AuthManager.hash_password(secure_password),
             roles=["user", "session_manager"],
         )
 
         db.add(default_user)
         db.commit()
-        logger.info("Default user created successfully")
+        logger.info("Default user created with secure credentials")
 
     except Exception as e:
         db.rollback()

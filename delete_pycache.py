@@ -363,7 +363,6 @@ TEMP_FILE_PATTERNS = [
     "*.pyi.*",
     "*.pyx.*",
     "*.pyb.*",
-    
     # Coverage and testing files
     ".coverage",
     "coverage.xml",
@@ -373,7 +372,6 @@ TEMP_FILE_PATTERNS = [
     "coverage",
     ".coverage.*",
     "*.cover.*",
-    
     # Log files
     "*.log",
     "*.log.*",
@@ -383,7 +381,6 @@ TEMP_FILE_PATTERNS = [
     "*.err.*",
     "log.*",
     "*.log.*",
-    
     # System and editor files
     ".DS_Store",
     "Thumbs.db",
@@ -391,7 +388,6 @@ TEMP_FILE_PATTERNS = [
     "*.DS_Store",
     "*.Thumbs.db",
     "*.desktop.ini",
-    
     # Temporary and backup files
     "*.tmp",
     "*.temp",
@@ -417,7 +413,6 @@ TEMP_FILE_PATTERNS = [
     "*.swp.*",
     "*.swo.*",
     "*~.*",
-    
     # Lock and process files
     "*.pid",
     "*.lock",
@@ -427,7 +422,6 @@ TEMP_FILE_PATTERNS = [
     "*.lock.*",
     "*.lck.*",
     "*.wfl.*",
-    
     # Debug and crash files
     "*.core",
     "*.dump",
@@ -449,7 +443,6 @@ TEMP_FILE_PATTERNS = [
     "*.stats.*",
     "*.lprof.*",
     "*.pstats.*",
-    
     # Database files
     "*.s3db",
     "*.sqlite-shm",
@@ -461,7 +454,6 @@ TEMP_FILE_PATTERNS = [
     "*.sqlite-wal.*",
     "*.db-shm.*",
     "*.db-wal.*",
-    
     # Python packaging files
     "*.egg-info",
     "*.egg",
@@ -473,7 +465,6 @@ TEMP_FILE_PATTERNS = [
     "*.whl.*",
     "*.wheel.*",
     "*.dist-info.*",
-    
     # Archive files (temporary only)
     "*.tgz",
     "*.tar.gz",
@@ -491,7 +482,6 @@ TEMP_FILE_PATTERNS = [
     "*.tar.*",
     "*.tar.bz2.*",
     "*.tar.xz.*",
-    
     # Installation files
     "*.deb",
     "*.rpm",
@@ -505,7 +495,6 @@ TEMP_FILE_PATTERNS = [
     "*.pkg.*",
     "*.msi.*",
     "*.exe.*",
-    
     # Development files
     "*.patch",
     "*.diff",
@@ -533,7 +522,6 @@ TEMP_FILE_PATTERNS = [
     "*.tests.*",
     "*.spec.*",
     "*.mock.*",
-    
     # Temporary media files
     "*.svg",
     "*.png",
@@ -549,7 +537,6 @@ TEMP_FILE_PATTERNS = [
     "*.gif.*",
     "*.bmp.*",
     "*.ico.*",
-    
     # Temporary document files
     "*.pdf",
     "*.doc",
@@ -565,7 +552,6 @@ TEMP_FILE_PATTERNS = [
     "*.xlsx.*",
     "*.ppt.*",
     "*.pptx.*",
-    
     # Additional temporary patterns
     "temp*",
     "tmp*",
@@ -595,7 +581,6 @@ TEMP_FILE_PATTERNS = [
     "*.build",
     "*.dist",
     "*.output",
-    
     # IDE and editor files
     ".vscode*",
     ".idea*",
@@ -607,7 +592,6 @@ TEMP_FILE_PATTERNS = [
     ".emacs*",
     ".c9*",
     ".cloud9*",
-    
     # Node.js files
     "node_modules*",
     ".npm*",
@@ -615,7 +599,6 @@ TEMP_FILE_PATTERNS = [
     ".pnpm*",
     "bower_components*",
     "jspm_packages*",
-    
     # Java/C# build files
     "*.class",
     "*.jar",
@@ -634,24 +617,20 @@ TEMP_FILE_PATTERNS = [
     "*.obj.*",
     "*.lib.*",
     "*.pdb.*",
-    
     # macOS specific
     ".DS_Store*",
     "._*",
     ".Spotlight-V100",
     ".Trashes",
     ".fseventsd",
-    
     # Windows specific
     "Thumbs.db*",
     "desktop.ini*",
     "*.lnk",
-    
     # Linux specific
     ".nfs*",
     ".Xauthority*",
     ".ICEauthority*",
-    
     # Version control temporary files
     "*.orig",
     "*.rej",
@@ -660,7 +639,6 @@ TEMP_FILE_PATTERNS = [
     ".svn*",
     ".hg*",
     ".bzr*",
-    
     # Configuration backup files
     "*.conf.bak",
     "*.config.bak",
@@ -670,7 +648,6 @@ TEMP_FILE_PATTERNS = [
     "*.yaml.bak",
     "*.yml.bak",
     "*.toml.bak",
-    
     # Runtime files
     "*.sock",
     "*.pid",
@@ -977,7 +954,6 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
         "**/__pycache__",
         "**/_pycache__",
         "**/_pycache_",
-        
         # Common temporary directories
         "**/temp",
         "**/tmp",
@@ -985,7 +961,6 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
         "**/backup",
         "**/backups",
         "**/old",
-        
         # Build artifacts
         "**/build",
         "**/dist",
@@ -993,26 +968,24 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
         "**/target",
         "**/bin",
         "**/obj",
-        
         # IDE directories
         "**/.vscode",
         "**/.idea",
         "**/.eclipse",
         "**/.netbeans",
-        
         # OS specific
         "**/.DS_Store",
         "**/Thumbs.db",
         "**/desktop.ini",
     ]
-    
+
     import glob
-    
+
     removed_special = 0
     for pattern in special_patterns:
         full_pattern = os.path.join(root_dir, pattern)
         matches = glob.glob(full_pattern, recursive=True)
-        
+
         for match in matches:
             if os.path.isdir(match):
                 # Additional safety check for directories
@@ -1044,10 +1017,10 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
                             removed_special += 1
                         except Exception as e:
                             print(f"Error removing special file {match}: {e}")
-    
+
     if verbose and removed_special > 0:
         print(f"Special cleanup: Removed {removed_special} additional items")
-    
+
     return removed_special
 
 
@@ -1203,10 +1176,14 @@ Examples:
         "--prune-empty-dirs", action="store_true", help="Remove now-empty directories after cleanup"
     )
     p.add_argument(
-        "--special-cleanup", action="store_true", help="Run special cleanup for edge cases and missed patterns (enabled by default)"
+        "--special-cleanup",
+        action="store_true",
+        help="Run special cleanup for edge cases and missed patterns (enabled by default)",
     )
     p.add_argument(
-        "--no-special-cleanup", action="store_true", help="Disable special cleanup (enabled by default)"
+        "--no-special-cleanup",
+        action="store_true",
+        help="Disable special cleanup (enabled by default)",
     )
 
     return p.parse_args(argv)

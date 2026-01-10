@@ -6,6 +6,7 @@ and neuromodulator effects.
 """
 
 import numpy as np
+from collections import deque
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
@@ -166,7 +167,7 @@ class PrecisionWeighting:
         # Volatility tracking
         self.extero_volatility = 0.0
         self.intero_volatility = 0.0
-        self.volatility_window = []
+        self.volatility_window = deque(maxlen=10)  # Fixed-size deque for O(1) operations
 
     def update(
         self,
@@ -314,9 +315,7 @@ class PrecisionWeighting:
             }
         )
 
-        # Keep window size limited
-        if len(self.volatility_window) > 10:
-            self.volatility_window.pop(0)
+        # Window size automatically limited by deque(maxlen=10)
 
         # Compute volatility as variance of uncertainty
         if len(self.volatility_window) > 2:

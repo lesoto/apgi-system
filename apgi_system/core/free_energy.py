@@ -95,6 +95,10 @@ class FreeEnergyCalculator:
         self.eps = 1e-10  # Numerical stability
         self.stability_monitor = NumericalStabilityMonitor(config)
 
+        # Precision bounds to prevent numerical instability
+        self.precision_min = 1e-6  # Minimum precision to prevent overflow
+        self.precision_max = 1e6  # Maximum precision to prevent underflow
+
     def compute_variational_free_energy(
         self,
         observation: FloatArray,
@@ -215,10 +219,19 @@ class FreeEnergyCalculator:
 
         # If precision is scalar, convert to diagonal matrix
         if np.isscalar(precision):
+            # Clamp precision to prevent numerical instability
+            precision = np.clip(precision, self.precision_min, self.precision_max)
             precision_matrix = precision * np.eye(len(error))
         elif precision.ndim == 1:
+            # Clamp vector precision
+            precision = np.clip(precision, self.precision_min, self.precision_max)
             precision_matrix = np.diag(precision)
         else:
+            # Clamp matrix precision (clamp diagonal elements)
+            precision = precision.copy()
+            np.fill_diagonal(
+                precision, np.clip(np.diag(precision), self.precision_min, self.precision_max)
+            )
             precision_matrix = precision
 
         accuracy = 0.5 * error.T @ precision_matrix @ error
@@ -414,7 +427,15 @@ class FreeEnergyCalculator:
 
         # Compute terms
         try:
-            sigma_p_inv = linalg.inv(sigma_p)
+            # Use pseudoinverse for better numerical stability
+            sigma_p_inv = linalg.pinv(sigma_p, rcond=1e-10)
+
+            # Check condition number to detect near-singular matrices
+            cond_num = np.linalg.cond(sigma_p)
+            if cond_num > 1e12:
+                # Matrix is ill-conditioned, use regularization
+                sigma_p_reg = sigma_p + 1e-6 * np.eye(d)
+                sigma_p_inv = linalg.pinv(sigma_p_reg, rcond=1e-10)
 
             log_det_ratio = np.log(linalg.det(sigma_p) + self.eps) - np.log(
                 linalg.det(sigma_q) + self.eps
@@ -429,9 +450,13 @@ class FreeEnergyCalculator:
 
             return max(0.0, float(kl_div))  # KL divergence is non-negative
 
-        except linalg.LinAlgError:
-            # If matrix inversion fails, return large value
-            return 1e6
+        except linalg.LinAlgError as e:
+            # Log the error and raise a proper exception
+            raise ValueError(
+                f"Matrix inversion failed in KL divergence calculation: {str(e)}. "
+                f"This may indicate singular covariance matrices. "
+                f"Consider adding regularization to your covariance matrices."
+            )
 
     def compute_prediction_error(
         self,

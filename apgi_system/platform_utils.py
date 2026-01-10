@@ -31,7 +31,9 @@ def get_platform() -> str:
     """
     Get current platform identifier.
 
-    Returns:
+    Returns
+    -------
+    str
         'windows', 'macos', or 'linux'
     """
     system = platform.system().lower()

@@ -387,12 +387,29 @@ class GlobalWorkspace:
         if self.current_content is None:
             return
 
+        # Store original magnitude for normalization
+        original_magnitude = np.linalg.norm(self.current_content.content)
+        if original_magnitude < 1e-10:  # Avoid division by zero
+            original_magnitude = 1e-10
+
         # Recurrent amplification (increases magnitude)
         amplification = 1.0 + (self.amplification_gain - 1.0) * (
             self.state_time / self.amplification_duration_ms
         )
 
+        # Apply amplification
         self.current_content.content *= amplification
+
+        # Normalize to prevent unbounded growth
+        current_magnitude = np.linalg.norm(self.current_content.content)
+        max_allowed_magnitude = (
+            original_magnitude * self.amplification_gain * 2.0
+        )  # Allow some growth but prevent explosion
+
+        if current_magnitude > max_allowed_magnitude:
+            # Scale down to prevent unbounded growth
+            scale_factor = max_allowed_magnitude / current_magnitude
+            self.current_content.content *= scale_factor
 
         # Add noise for realism
         noise = np.random.randn(*self.current_content.content.shape) * 0.01

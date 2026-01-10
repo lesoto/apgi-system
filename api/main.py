@@ -30,7 +30,9 @@ from api.database.connection import close_db, init_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.alerting import configure_alerting
 from api.middleware.authentication import AuthenticationMiddleware
+from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
+from api.middleware.request_size_limit import RequestSizeLimitMiddleware
 from api.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
@@ -49,6 +51,9 @@ logger = StructuredLogger(__name__)
 # Global Redis client
 redis_client: Optional[redis.Redis] = None
 
+# Global rate limiting middleware reference
+rate_limiting_middleware: Optional[RateLimitingMiddleware] = None
+
 
 def create_app() -> FastAPI:
     """
@@ -64,6 +69,13 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+    )
+
+    # Add request size limiting middleware (first, to catch large requests early)
+    app.add_middleware(
+        RequestSizeLimitMiddleware,
+        max_size_mb=getattr(settings, "max_request_size_mb", 10),
+        enabled=getattr(settings, "request_size_limit_enabled", True),
     )
 
     # Add metrics middleware (first, to track all requests)
@@ -82,14 +94,31 @@ def create_app() -> FastAPI:
         fail_on_error=settings.schema_validation_fail_on_error,
     )
 
+    # Add CSRF protection middleware
+    app.add_middleware(
+        CSRFMiddleware,
+        enabled=(
+            settings.csrf_protection_enabled
+            if hasattr(settings, "csrf_protection_enabled")
+            else True
+        ),
+        cookie_name="csrf_token",
+        header_name="X-CSRF-Token",
+        token_expiry_minutes=60,
+    )
+
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
 
     # Add rate limiting middleware (will be enabled if Redis is available)
-    app.add_middleware(
-        RateLimitingMiddleware,
-        redis_client=redis_client,  # type: ignore[arg-type]  # Will be set in startup
+    global rate_limiting_middleware
+    rate_limiting_middleware = RateLimitingMiddleware(
+        app,
+        redis_client=None,  # Will be set in startup
         enabled=settings.rate_limit_enabled,
+    )
+    app.add_middleware(
+        rate_limiting_middleware.__class__, redis_client=None, enabled=settings.rate_limit_enabled
     )
 
     # Configure CORS
@@ -136,7 +165,13 @@ def create_app() -> FastAPI:
             await redis_client.ping()
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
 
-            # Note: Rate limiting middleware requires Redis client, will be initialized after Redis connection
+            # Update rate limiting middleware with Redis client
+            if rate_limiting_middleware:
+                rate_limiting_middleware.set_redis_client(redis_client)
+                logger.info(
+                    "Rate limiting middleware updated with Redis client", component="middleware"
+                )
+
         except Exception as e:
             logger.error("Failed to initialize Redis", component="redis", error=str(e))
             raise

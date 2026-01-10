@@ -6,11 +6,15 @@ Manages asynchronous execution of experimental tasks using Celery.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional
+import asyncio
+from typing import Dict, Any, Optional
 
 from celery.result import AsyncResult
+from fastapi import HTTPException, status
 
 from api.celery_app import celery_app
+from api.models.schemas import TaskType
+from api.tasks.task_registry import TASK_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +93,16 @@ class TaskExecutor:
         # Prepare parameters
         params = parameters or {}
 
-        # Submit task
-        logger.info(f"Submitting {task_type} task for session {session_id}")
-        result = self.celery.send_task(
-            task_name, args=[session_id, params], task_id=None  # Let Celery generate ID
-        )
+        # Submit task in thread pool to avoid blocking
+        def _submit_task():
+            logger.info(f"Submitting {task_type} task for session {session_id}")
+            result = self.celery.send_task(
+                task_name, args=[session_id, params], task_id=None  # Let Celery generate ID
+            )
+            logger.info(f"Task submitted with ID: {result.id}")
+            return result.id
 
-        task_id = result.id
-        logger.info(f"Task submitted with ID: {task_id}")
+        task_id = await asyncio.to_thread(_submit_task)
 
         # Note: Task metadata storage is handled by the Celery task itself
 
@@ -117,35 +123,38 @@ class TaskExecutor:
                 - result: Task result if completed
                 - error: Error message if failed
         """
-        result = AsyncResult(task_id, app=self.celery)
+        def _get_status():
+            result = AsyncResult(task_id, app=self.celery)
 
-        # Map Celery states to our TaskStatus
-        state_mapping = {
-            "PENDING": TaskStatus.PENDING,
-            "STARTED": TaskStatus.RUNNING,
-            "RETRY": TaskStatus.RUNNING,
-            "SUCCESS": TaskStatus.COMPLETED,
-            "FAILURE": TaskStatus.FAILED,
-        }
+            # Map Celery states to our TaskStatus
+            state_mapping = {
+                "PENDING": TaskStatus.PENDING,
+                "STARTED": TaskStatus.RUNNING,
+                "RETRY": TaskStatus.RUNNING,
+                "SUCCESS": TaskStatus.COMPLETED,
+                "FAILURE": TaskStatus.FAILED,
+            }
 
-        status = state_mapping.get(result.state, TaskStatus.PENDING)
+            status = state_mapping.get(result.state, TaskStatus.PENDING)
 
-        response = {
-            "task_id": task_id,
-            "status": status.value,
-            "state": result.state,
-        }
+            response = {
+                "task_id": task_id,
+                "status": status.value,
+                "state": result.state,
+            }
 
-        # Add result or error information
-        if result.successful():
-            response["result"] = result.result
-        elif result.failed():
-            response["error"] = str(result.info)
-        elif result.state == "STARTED":
-            # Task is running, include any progress info
-            response["info"] = result.info if result.info else {}
+            # Add result or error information
+            if result.successful():
+                response["result"] = result.result
+            elif result.failed():
+                response["error"] = str(result.info)
+            elif result.state == "STARTED":
+                # Task is running, include any progress info
+                response["info"] = result.info if result.info else {}
 
-        return response
+            return response
+
+        return await asyncio.to_thread(_get_status)
 
     async def get_task_result(self, task_id: str) -> Dict[str, Any]:
         """
@@ -160,15 +169,18 @@ class TaskExecutor:
         Raises:
             ValueError: If task is not completed or failed
         """
-        result = AsyncResult(task_id, app=self.celery)
+        def _get_result():
+            result = AsyncResult(task_id, app=self.celery)
 
-        if not result.ready():
-            raise ValueError(f"Task {task_id} is not complete. " f"Current state: {result.state}")
+            if not result.ready():
+                raise ValueError(f"Task {task_id} is not complete. " f"Current state: {result.state}")
 
-        if result.failed():
-            raise ValueError(f"Task {task_id} failed: {result.info}")
+            if result.failed():
+                raise ValueError(f"Task {task_id} failed: {result.info}")
 
-        return result.result
+            return result.result
+
+        return await asyncio.to_thread(_get_result)
 
     async def cancel_task(self, task_id: str) -> Dict[str, Any]:
         """
@@ -180,24 +192,27 @@ class TaskExecutor:
         Returns:
             Dict with cancellation status
         """
-        result = AsyncResult(task_id, app=self.celery)
+        def _cancel_task():
+            result = AsyncResult(task_id, app=self.celery)
 
-        if result.state in ["PENDING", "STARTED", "RETRY"]:
-            result.revoke(terminate=True)
-            logger.info(f"Task {task_id} cancelled")
-            return {
-                "task_id": task_id,
-                "status": "cancelled",
-                "message": "Task cancellation requested",
-            }
-        else:
-            return {
-                "task_id": task_id,
-                "status": result.state,
-                "message": f"Task cannot be cancelled (state: {result.state})",
-            }
+            if result.state in ["PENDING", "STARTED", "RETRY"]:
+                result.revoke(terminate=True)
+                logger.info(f"Task {task_id} cancelled")
+                return {
+                    "task_id": task_id,
+                    "status": "cancelled",
+                    "message": "Task cancellation requested",
+                }
+            else:
+                return {
+                    "task_id": task_id,
+                    "status": result.state,
+                    "message": f"Task cannot be cancelled (state: {result.state})",
+                }
 
-    async def list_available_tasks(self) -> Dict[str, Any]:
+        return await asyncio.to_thread(_cancel_task)
+
+    def list_available_tasks(self) -> Dict[str, Any]:
         """
         List all available experimental tasks with descriptions.
 

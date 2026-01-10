@@ -152,7 +152,7 @@ async def get_ignition_history(  # noqa: C901
     start_time: Optional[float] = Query(None, description="Filter events after this time (ms)"),
     end_time: Optional[float] = Query(None, description="Filter events before this time (ms)"),
     limit: Optional[int] = Query(
-        100, ge=1, le=1000, description="Maximum number of events to return"
+        100, ge=1, le=1000, description="Maximum number of events to return (warning: values > 500 may be slow)"
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     manager: SessionManager = Depends(get_session_manager),
@@ -178,6 +178,10 @@ async def get_ignition_history(  # noqa: C901
         HTTPException: If session not found or history cannot be retrieved
     """
     try:
+        # Warn about potentially expensive queries
+        if limit and limit > 500:
+            logger.warning(f"Expensive query requested for session {session_id}: limit={limit}. Consider using smaller limits or time filters.")
+        
         # Get session
         sim_session = await manager.get_session(session_id)
 

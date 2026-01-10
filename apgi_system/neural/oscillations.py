@@ -4,8 +4,17 @@ Neural Oscillation Engine
 Generates multi-band oscillations and phase-amplitude coupling.
 """
 
+import logging
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+
+from apgi_system.constants import (
+    DEFAULT_TIMESTEP_MS,
+    DEFAULT_FREQS,
+    TWO_PI,
+    MILLISECONDS_TO_SECONDS
+)
 from dataclasses import dataclass
 
 
@@ -120,7 +129,7 @@ class OscillationEngine:
 
         # Time tracking
         self.time = 0.0
-        self.dt_sec = config.get("system", {}).get("timestep_ms", 1.0) / 1000.0
+        self.dt_sec = config.get("system", {}).get("timestep_ms", DEFAULT_TIMESTEP_MS) * MILLISECONDS_TO_SECONDS
 
         # History for power calculation
         self.signal_history = []
@@ -188,8 +197,8 @@ class OscillationEngine:
             center_freq = (band.freq_range[0] + band.freq_range[1]) / 2
 
             # Update phase
-            band.phase += 2 * np.pi * center_freq * dt
-            band.phase = band.phase % (2 * np.pi)
+            band.phase += TWO_PI * center_freq * dt
+            band.phase = band.phase % (TWO_PI)
 
             # Apply modulation if provided
             amplitude = band.amplitude

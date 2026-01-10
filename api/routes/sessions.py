@@ -19,6 +19,11 @@ from api.models.schemas import (
     SessionCreateResponse,
     SessionResponse,
 )
+from api.services.authorization import (
+    Permission,
+    require_permission,
+    get_current_user,
+)
 from api.services.session_manager import SessionLifecycleState, SessionManager
 
 logger = logging.getLogger(__name__)
@@ -72,10 +77,13 @@ def init_session_routes(redis_client: redis.Redis):
     response_model=SessionCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create new simulation session",
-    description="Initialize a new APGI simulation session with the provided configuration",
+    description="Initialize a new APGI simulation session with provided configuration",
+    dependencies=[Depends(require_permission(Permission.SESSION_CREATE))],
 )
 async def create_session(
-    request: SessionCreateRequest, manager: SessionManager = Depends(get_session_manager)
+    request: SessionCreateRequest,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Create new simulation session.
@@ -111,8 +119,13 @@ async def create_session(
     response_model=SessionResponse,
     summary="Get session details",
     description="Retrieve detailed information about a specific simulation session",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
-async def get_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def get_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Get session details.
 
@@ -145,9 +158,14 @@ async def get_session(session_id: str, manager: SessionManager = Depends(get_ses
     "/{session_id}/start",
     response_model=SessionActionResponse,
     summary="Start simulation",
-    description="Start or resume the simulation for the specified session",
+    description="Start or resume simulation for specified session",
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
-async def start_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def start_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Start simulation.
 
@@ -186,9 +204,14 @@ async def start_session(session_id: str, manager: SessionManager = Depends(get_s
     "/{session_id}/pause",
     response_model=SessionActionResponse,
     summary="Pause simulation",
-    description="Pause the simulation while preserving current state",
+    description="Pause simulation while preserving current state",
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
-async def pause_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def pause_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Pause simulation.
 
@@ -227,9 +250,14 @@ async def pause_session(session_id: str, manager: SessionManager = Depends(get_s
     "/{session_id}/stop",
     response_model=SessionActionResponse,
     summary="Stop simulation",
-    description="Stop the simulation for the specified session",
+    description="Stop simulation for specified session",
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
-async def stop_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def stop_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Stop simulation.
 
@@ -264,9 +292,14 @@ async def stop_session(session_id: str, manager: SessionManager = Depends(get_se
     "/{session_id}/reset",
     response_model=SessionActionResponse,
     summary="Reset simulation",
-    description="Reset the simulation to initial conditions",
+    description="Reset simulation to initial conditions",
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
-async def reset_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def reset_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Reset simulation to initial state.
 
@@ -301,9 +334,14 @@ async def reset_session(session_id: str, manager: SessionManager = Depends(get_s
     "/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete session",
-    description="Delete the session and clean up all associated resources",
+    description="Delete session and clean up all associated resources",
+    dependencies=[Depends(require_permission(Permission.SESSION_DELETE))],
 )
-async def delete_session(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def delete_session(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+):
     """
     Delete session and clean up resources.
 

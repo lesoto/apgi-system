@@ -25,18 +25,33 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     headers to all responses.
     """
 
-    def __init__(self, app, redis_client: redis.Redis, enabled: bool = True):
+    def __init__(self, app, redis_client=None, enabled: bool = True):
         """
         Initialize rate limiting middleware.
 
         Args:
             app: FastAPI application
-            redis_client: Redis client for rate limiting
+            redis_client: Redis client for rate limiting (can be None initially)
             enabled: Whether rate limiting is enabled
         """
         super().__init__(app)
-        self.rate_limiter = RateLimiter(redis_client)
+        self.redis_client = redis_client
         self.enabled = enabled
+        self.rate_limiter = None
+
+        # Initialize rate limitter when Redis client is available
+        if redis_client:
+            self.rate_limiter = RateLimiter(redis_client)
+
+    def set_redis_client(self, redis_client: redis.Redis):
+        """
+        Set Redis client and initialize rate limiter.
+
+        Args:
+            redis_client: Redis client for rate limiting
+        """
+        self.redis_client = redis_client
+        self.rate_limiter = RateLimiter(redis_client)
 
     def _get_client_id(self, request: Request) -> str:
         """
@@ -122,8 +137,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP response with rate limit headers
         """
-        # Skip if rate limiting is disabled
-        if not self.enabled:
+        # Skip if rate limiting is disabled or not yet initialized
+        if not self.enabled or not self.rate_limiter:
             return await call_next(request)
 
         # Skip for certain endpoints

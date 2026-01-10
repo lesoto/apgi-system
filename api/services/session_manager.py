@@ -7,20 +7,53 @@ Manages APGI simulation sessions with Redis caching and database persistence.
 import asyncio
 import json
 import logging
+import re
 import uuid
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, Optional
+from collections import OrderedDict
+from sqlalchemy.orm import sessionmaker
 
 import redis.asyncio as redis
 from sqlalchemy import select
 
-from apgi_system.system import APGISystem
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
+from api.database.connection import get_db_session
 from api.models.schemas import SessionCreateRequest
+from apgi_system.system import APGISystem
+from utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+# UUID validation pattern
+UUID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
+
+def validate_session_id(session_id: str) -> str:
+    """
+    Validate session ID format to prevent SQL injection.
+
+    Args:
+        session_id: Session identifier to validate
+
+    Returns:
+        Validated session ID
+
+    Raises:
+        ValueError: If session ID is not a valid UUID
+    """
+    if not session_id or not isinstance(session_id, str):
+        raise ValueError("Session ID must be a non-empty string")
+
+    if not UUID_PATTERN.match(session_id):
+        raise ValueError(f"Invalid session ID format: {session_id}")
+
+    return session_id
 
 
 class SessionLifecycleState(str, Enum):
@@ -270,13 +303,35 @@ class SessionManager:
         self.redis = redis_client
         self.db_session_factory = db_session_factory
 
-        # In-memory session cache
-        self.sessions: Dict[str, SimulationSession] = {}
-
+        # In-memory session cache with TTL and size limits
+        self.session_cache_max_size = 1000  # Maximum number of sessions to cache
+        self.session_ttl_seconds = 3600  # 1 hour TTL for cached sessions
+        self.sessions: OrderedDict[str, Tuple[SimulationSession, float]] = OrderedDict()  # (session, last_access_time)
+        
         # Lock for session cache access
         self.cache_lock = asyncio.Lock()
 
         logger.info("SessionManager initialized")
+
+    def _cleanup_expired_sessions(self) -> None:
+        """Remove expired sessions from cache (called within lock)."""
+        current_time = time.time()
+        expired_keys = []
+        
+        for session_id, (_, last_access) in self.sessions.items():
+            if current_time - last_access > self.session_ttl_seconds:
+                expired_keys.append(session_id)
+        
+        for key in expired_keys:
+            del self.sessions[key]
+            logger.debug(f"Removed expired session {key} from cache")
+    
+    def _evict_oldest_sessions(self) -> None:
+        """Remove oldest sessions to maintain cache size limit (called within lock)."""
+        while len(self.sessions) > self.session_cache_max_size:
+            oldest_key = next(iter(self.sessions))  # OrderedDict preserves insertion order
+            del self.sessions[oldest_key]
+            logger.debug(f"Evicted oldest session {oldest_key} from cache")
 
     async def create_session(
         self, request: SessionCreateRequest, user_id: str = "default_user"
@@ -303,31 +358,38 @@ class SessionManager:
         # Create simulation session
         sim_session = SimulationSession(session_id, config)
 
-        # Store in memory cache
+        # Atomic cache + database operation
         async with self.cache_lock:
-            self.sessions[session_id] = sim_session
+            # Cleanup expired sessions before adding new one
+            self._cleanup_expired_sessions()
+            
+            # First try to persist to database
+            db_session = self.db_session_factory()
+            try:
+                db_model = SessionModel(
+                    session_id=session_id,
+                    user_id=user_id,
+                    config=config,
+                    state=SessionState.CREATED.value,
+                    description=request.description,
+                    tags=[],
+                )
+                db_session.add(db_model)
+                db_session.commit()
 
-        # Persist to database
-        db_session = self.db_session_factory()
-        try:
-            db_model = SessionModel(
-                session_id=session_id,
-                user_id=user_id,
-                config=config,
-                state=SessionState.CREATED.value,
-                description=request.description,
-                tags=[],
-            )
-            db_session.add(db_model)
-            db_session.commit()
-
-            logger.info(f"Session {session_id} created and persisted")
-        except Exception as e:
-            db_session.rollback()
-            logger.error(f"Failed to persist session {session_id}: {e}")
-            raise
-        finally:
-            db_session.close()
+                # Only add to cache after successful DB write
+                self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
+                logger.info(f"Session {session_id} created and persisted")
+            except Exception as e:
+                db_session.rollback()
+                logger.error(f"Failed to persist session {session_id}: {e}")
+                # Don't add to cache if DB write failed
+                raise
+            finally:
+                db_session.close()
+            
+            # Enforce cache size limit
+            self._evict_oldest_sessions()
 
         # Cache session metadata in Redis
         await self._cache_session_metadata(session_id, sim_session)
@@ -345,12 +407,22 @@ class SessionManager:
             SimulationSession instance
 
         Raises:
-            ValueError: If session not found
+            ValueError: If session not found or invalid session ID
         """
+        # Validate session ID format
+        validate_session_id(session_id)
+        
         # Check memory cache first
         async with self.cache_lock:
+            # Cleanup expired sessions
+            self._cleanup_expired_sessions()
+            
             if session_id in self.sessions:
-                return self.sessions[session_id]
+                session_data, last_access = self.sessions[session_id]
+                # Update access time and move to end (LRU)
+                self.sessions.move_to_end(session_id)
+                self.sessions[session_id] = (session_data, time.time())
+                return session_data
 
         # Check Redis cache
         cached_data = await self.redis.get(f"session:{session_id}")
@@ -368,7 +440,7 @@ class SessionManager:
 
             # Add to memory cache
             async with self.cache_lock:
-                self.sessions[session_id] = sim_session
+                self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
             return sim_session
 
@@ -390,7 +462,7 @@ class SessionManager:
 
             # Add to caches
             async with self.cache_lock:
-                self.sessions[session_id] = sim_session
+                self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
             await self._cache_session_metadata(session_id, sim_session)
 
@@ -406,7 +478,12 @@ class SessionManager:
 
         Args:
             session_id: Session identifier
+
+        Raises:
+            ValueError: If session ID is invalid
         """
+        # Validate session ID format
+        validate_session_id(session_id)
         # Remove from memory cache
         async with self.cache_lock:
             if session_id in self.sessions:
@@ -442,7 +519,12 @@ class SessionManager:
         Args:
             session_id: Session identifier
             new_state: New session state
+
+        Raises:
+            ValueError: If session ID is invalid
         """
+        # Validate session ID format
+        validate_session_id(session_id)
         # Update database
         db_session = self.db_session_factory()
         try:

@@ -4,10 +4,14 @@ Authentication Manager Service
 Handles JWT token creation/verification and password hashing for user authentication.
 """
 
+import hmac
+import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import jwt
+
+from utils.datetime_utils import utc_now
 from passlib.context import CryptContext
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -130,7 +134,7 @@ class AuthManager:
         Returns:
             Encoded JWT token string
         """
-        expires_at = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+        expires_at = utc_now() + timedelta(minutes=self.access_token_expire_minutes)
 
         payload = TokenPayload(
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
@@ -195,7 +199,7 @@ class AuthManager:
                 )
 
             # Check expiration (jwt.decode already checks this, but we handle it explicitly)
-            if datetime.utcnow() > payload.exp:
+            if utc_now() > payload.exp:
                 raise ExpiredTokenError("Token has expired")
 
             return payload
@@ -236,8 +240,13 @@ class AuthManager:
             return None
 
         # Update last login
-        user.last_login = datetime.utcnow()  # type: ignore[assignment]
-        self.db.commit()
+        try:
+            user.last_login = utc_now()  # type: ignore[assignment]
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to update last login for user {username}: {e}")
+            # Still return user since login succeeded, just log the error
 
         return user
 
@@ -263,11 +272,16 @@ class AuthManager:
         token_hash = self.hash_password(refresh_token)
         expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
 
-        db_refresh_token = RefreshToken(
-            user_id=user.user_id, token_hash=token_hash, expires_at=expires_at
-        )
-        self.db.add(db_refresh_token)
-        self.db.commit()
+        try:
+            db_refresh_token = RefreshToken(
+                user_id=user.user_id, token_hash=token_hash, expires_at=expires_at
+            )
+            self.db.add(db_refresh_token)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to create refresh token for user {user.user_id}: {e}")
+            raise
 
         return {
             "access_token": access_token,
@@ -279,6 +293,20 @@ class AuthManager:
     # ========================================================================
     # Token Refresh
     # ========================================================================
+
+    @staticmethod
+    def constant_time_compare(val1: str, val2: str) -> bool:
+        """
+        Constant-time comparison to prevent timing attacks.
+
+        Args:
+            val1: First value to compare
+            val2: Second value to compare
+
+        Returns:
+            True if values are equal, False otherwise
+        """
+        return hmac.compare_digest(val1.encode(), val2.encode())
 
     def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
         """
@@ -298,22 +326,31 @@ class AuthManager:
         # Verify refresh token
         payload = self.verify_token(refresh_token, expected_type="refresh")
 
-        # Check if token exists in database and is not revoked
+        # Hash the provided token to lookup the exact token in database
+        token_hash = self.hash_password(refresh_token)
+
+        # Look up the specific token by hash and user_id (not just first non-revoked)
         db_token = (
             self.db.query(RefreshToken)
-            .filter(and_(RefreshToken.user_id == payload.user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
+            .filter(
+                and_(
+                    RefreshToken.user_id == payload.user_id,
+                    RefreshToken.token_hash == token_hash,
+                    not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                )
+            )
             .first()
         )
 
         if not db_token:
-            raise AuthenticationError("Refresh token has been revoked")
+            raise AuthenticationError("Invalid or revoked refresh token")
 
-        # Verify the token hash matches the stored hash
-        if not self.verify_password(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
+        # Use constant-time comparison for token verification
+        if not self.constant_time_compare(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
             raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
-        if datetime.utcnow() > db_token.expires_at:
+        if utc_now() > db_token.expires_at:
             raise ExpiredTokenError("Refresh token has expired")
 
         # Create new access token
@@ -345,19 +382,32 @@ class AuthManager:
             # Verify token to get user_id
             payload = self.verify_token(refresh_token, expected_type="refresh")
 
-            # Find and revoke token in database
+            # Hash the provided token to lookup the exact token in database
+            token_hash = self.hash_password(refresh_token)
+
+            # Find and revoke the specific token by hash and user_id
             db_token = (
                 self.db.query(RefreshToken)
-                .filter(and_(RefreshToken.user_id == payload.user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
+                .filter(
+                    and_(
+                        RefreshToken.user_id == payload.user_id,
+                        RefreshToken.token_hash == token_hash,
+                        not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                    )
+                )
                 .first()
             )
 
-            if db_token:
-                db_token.revoked = True  # type: ignore[assignment]
-                self.db.commit()
-                return True
-
-            return False
+            try:
+                if db_token:
+                    db_token.revoked = True  # type: ignore[assignment]
+                    self.db.commit()
+                    return True
+                return False
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"Failed to revoke refresh token {token_id}: {e}")
+                return False
 
         except (InvalidTokenError, ExpiredTokenError):
             # Token is already invalid, consider it revoked
@@ -373,16 +423,26 @@ class AuthManager:
         Returns:
             Number of tokens revoked
         """
-        tokens = (
-            self.db.query(RefreshToken)
-            .filter(and_(RefreshToken.user_id == user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
-            .all()
-        )
+        try:
+            tokens = (
+                self.db.query(RefreshToken)
+                .filter(and_(RefreshToken.user_id == user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
+                .all()
+            )
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to retrieve tokens for user {user_id}: {e}")
+            raise
 
         count = 0
-        for token in tokens:
-            token.revoked = True  # type: ignore[assignment]
-            count += 1
+        try:
+            for token in tokens:
+                token.revoked = True  # type: ignore[assignment]
+                count += 1
 
-        self.db.commit()
-        return count
+            self.db.commit()
+            return count
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to revoke tokens for user {user_id}: {e}")
+            raise

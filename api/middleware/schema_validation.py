@@ -5,8 +5,9 @@ Validates API responses against OpenAPI schemas to ensure contract compliance.
 Logs validation failures for monitoring and debugging.
 """
 
-import json
-from typing import Any, Callable, Dict, Optional
+import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -419,4 +420,5 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             error=error,
             validation_errors=validation_errors or [],
+            timestamp=datetime.utcnow().isoformat() + "Z",
         )

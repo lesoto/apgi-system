@@ -169,7 +169,16 @@ class APGISystem:
         )
 
         # 7. Ignition threshold computation
-        extero_error = np.random.randn(len(extero_input))  # From predictor
+        # Get actual exteroceptive prediction errors from predictor
+        predictor_errors = self.predictor.get_prediction_errors()
+        extero_error = predictor_errors.get("exteroceptive", np.zeros(len(extero_input)))
+
+        # Ensure extero_error has correct shape
+        if len(extero_error) != len(extero_input):
+            # Fallback to computed prediction error if predictor output is malformed
+            prediction = prediction_results.get("prediction", np.zeros_like(extero_input))
+            extero_error = extero_input - prediction
+
         intero_error = body_info["prediction_error"]
 
         ignition_occurred, ignition_info = self.ignition_threshold.compute_ignition_signal(
