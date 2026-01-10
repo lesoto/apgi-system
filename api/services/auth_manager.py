@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 
 import jwt
 
-from utils.datetime_utils import utc_now
 from passlib.context import CryptContext
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -134,7 +133,7 @@ class AuthManager:
         Returns:
             Encoded JWT token string
         """
-        expires_at = utc_now() + timedelta(minutes=self.access_token_expire_minutes)
+        expires_at = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
 
         payload = TokenPayload(
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
@@ -199,7 +198,7 @@ class AuthManager:
                 )
 
             # Check expiration (jwt.decode already checks this, but we handle it explicitly)
-            if utc_now() > payload.exp:
+            if datetime.utcnow() > payload.exp:
                 raise ExpiredTokenError("Token has expired")
 
             return payload
@@ -241,7 +240,7 @@ class AuthManager:
 
         # Update last login
         try:
-            user.last_login = utc_now()  # type: ignore[assignment]
+            user.last_login = datetime.utcnow()  # type: ignore[assignment]
             self.db.commit()
         except Exception as e:
             self.db.rollback()
@@ -350,7 +349,7 @@ class AuthManager:
             raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
-        if utc_now() > db_token.expires_at:
+        if datetime.utcnow() > db_token.expires_at:
             raise ExpiredTokenError("Refresh token has expired")
 
         # Create new access token

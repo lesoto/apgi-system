@@ -124,7 +124,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/docs/",
             "/redoc/",
         ]
-        
+
         for prefix in path_prefixes:
             if path.startswith(prefix):
                 return True

@@ -13,18 +13,9 @@ from celery.result import AsyncResult
 from fastapi import HTTPException, status
 
 from api.celery_app import celery_app
-from api.models.schemas import TaskType
-from api.tasks.task_registry import TASK_REGISTRY
+from api.tasks.task_registry import TASK_REGISTRY, TaskType
 
 logger = logging.getLogger(__name__)
-
-
-class TaskType(str, Enum):
-    """Available experimental task types."""
-
-    IOWA_GAMBLING = "iowa_gambling"
-    MASKING_PARADIGM = "masking_paradigm"
-    ATTENTIONAL_BLINK = "attentional_blink"
 
 
 class TaskStatus(str, Enum):
@@ -34,14 +25,6 @@ class TaskStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
-
-
-# Map task types to Celery task names
-TASK_REGISTRY = {
-    TaskType.IOWA_GAMBLING: "api.tasks.experimental_tasks.execute_iowa_gambling_task",
-    TaskType.MASKING_PARADIGM: "api.tasks.experimental_tasks.execute_masking_paradigm_task",
-    TaskType.ATTENTIONAL_BLINK: "api.tasks.experimental_tasks.execute_attentional_blink_task",
-}
 
 
 class TaskExecutor:
@@ -123,6 +106,7 @@ class TaskExecutor:
                 - result: Task result if completed
                 - error: Error message if failed
         """
+
         def _get_status():
             result = AsyncResult(task_id, app=self.celery)
 
@@ -169,11 +153,14 @@ class TaskExecutor:
         Raises:
             ValueError: If task is not completed or failed
         """
+
         def _get_result():
             result = AsyncResult(task_id, app=self.celery)
 
             if not result.ready():
-                raise ValueError(f"Task {task_id} is not complete. " f"Current state: {result.state}")
+                raise ValueError(
+                    f"Task {task_id} is not complete. " f"Current state: {result.state}"
+                )
 
             if result.failed():
                 raise ValueError(f"Task {task_id} failed: {result.info}")
@@ -192,6 +179,7 @@ class TaskExecutor:
         Returns:
             Dict with cancellation status
         """
+
         def _cancel_task():
             result = AsyncResult(task_id, app=self.celery)
 

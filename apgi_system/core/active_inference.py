@@ -136,9 +136,7 @@ class HierarchicalGaussianFilter:
         self._cache_access_order = deque()  # Track access order for LRU (O(1) operations)
         self._cache_lock = threading.Lock()  # Thread safety for cache access
 
-    def update(
-        self, observation: FloatArray, dt: float = 0.001
-    ) -> Tuple[List[BeliefState], float]:
+    def update(self, observation: FloatArray, dt: float = 0.001) -> Tuple[List[BeliefState], float]:
         """
         Update beliefs using variational message passing.
 
@@ -267,12 +265,12 @@ class HierarchicalGaussianFilter:
                 error_below_raw = self.beliefs[level - 1].prediction_error
                 target_dim = self.beliefs[level].mean.shape[0]
                 source_dim = error_below_raw.shape[0]
-                
+
                 if target_dim != source_dim:
                     error_below = self._project_up(level - 1, error_below_raw)
                 else:
                     error_below = error_below_raw
-                
+
                 precision_below = self.beliefs[level - 1].precision
 
             # Precision-weighted error from above
@@ -281,12 +279,12 @@ class HierarchicalGaussianFilter:
                 error_above_raw = self.beliefs[level + 1].prediction_error
                 target_dim = self.beliefs[level].mean.shape[0]
                 source_dim = error_above_raw.shape[0]
-                
+
                 if target_dim != source_dim:
                     error_above = self._map_down(level + 1, error_above_raw)
                 else:
                     error_above = error_above_raw
-                    
+
                 precision_above = self.beliefs[level + 1].precision
             else:
                 # Top level has no error from above
@@ -295,7 +293,7 @@ class HierarchicalGaussianFilter:
 
             # Update belief mean (gradient descent on free energy)
             # δμ = η * (Π_below * ε_below - Π_above * ε_above)
-            
+
             # Validate array shapes before computation
             belief_shape = self.beliefs[level].mean.shape
             if error_below.shape != belief_shape:
@@ -308,10 +306,9 @@ class HierarchicalGaussianFilter:
                     f"Shape mismatch at level {level}: "
                     f"belief mean shape {belief_shape} vs error_above shape {error_above.shape}"
                 )
-            
+
             update = self.learning_rate * (
-                precision_below * error_below
-                - precision_above * error_above
+                precision_below * error_below - precision_above * error_above
             )
 
             self.beliefs[level].mean += dt * update
@@ -403,12 +400,16 @@ class HierarchicalGaussianFilter:
             # Use orthogonal initialization for better numerical stability
             if target_dim == source_dim:
                 # Same dimension: use identity with small noise
-                projection_matrix = np.eye(target_dim) + np.random.randn(target_dim, source_dim) * 0.01
+                projection_matrix = (
+                    np.eye(target_dim) + np.random.randn(target_dim, source_dim) * 0.01
+                )
             else:
                 # Different dimensions: use truncated normal initialization
                 projection_matrix = np.random.randn(target_dim, source_dim) * 0.1
                 # Ensure finite values
-                projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
+                projection_matrix = np.nan_to_num(
+                    projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0
+                )
                 # Add small identity component for stability
                 min_dim = min(target_dim, source_dim)
                 projection_matrix[:min_dim, :min_dim] += np.eye(min_dim) * 0.1
@@ -441,11 +442,11 @@ class HierarchicalGaussianFilter:
 
         # Get projection matrix from cache
         projection_matrix = self._get_projection_matrix(from_level, target_dim, source_dim)
-        
+
         # Ensure numerical stability
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
-        
+
         result = projection_matrix @ state
         return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 
@@ -463,17 +464,17 @@ class HierarchicalGaussianFilter:
         if from_level >= self.num_levels - 1:
             # Already at top level
             return state
-            
+
         target_dim = self.beliefs[from_level + 1].mean.shape[0]
         source_dim = state.shape[0]
 
         # Get projection matrix from cache
         projection_matrix = self._get_projection_matrix(from_level + 1, target_dim, source_dim)
-        
+
         # Ensure numerical stability
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
-        
+
         result = projection_matrix @ state
         return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 

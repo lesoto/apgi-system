@@ -13,7 +13,7 @@ from apgi_system.constants import (
     DEFAULT_TIMESTEP_MS,
     DEFAULT_FREQS,
     TWO_PI,
-    MILLISECONDS_TO_SECONDS
+    MILLISECONDS_TO_SECONDS,
 )
 from dataclasses import dataclass
 
@@ -129,7 +129,10 @@ class OscillationEngine:
 
         # Time tracking
         self.time = 0.0
-        self.dt_sec = config.get("system", {}).get("timestep_ms", DEFAULT_TIMESTEP_MS) * MILLISECONDS_TO_SECONDS
+        self.dt_sec = (
+            config.get("system", {}).get("timestep_ms", DEFAULT_TIMESTEP_MS)
+            * MILLISECONDS_TO_SECONDS
+        )
 
         # History for power calculation
         self.signal_history = []

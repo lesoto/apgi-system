@@ -169,8 +169,9 @@ class APGIScreenshotDocumentation:
             if self.gui_window:
                 break
             else:
-                print(f"  ⏳ Waiting 2 seconds before retry...")
-                time.sleep(2)
+                if attempt < max_attempts - 1:  # Don't wait after last attempt
+                    print(f"  ⏳ Waiting 2 seconds before retry...")
+                    time.sleep(2)
 
         if not self.gui_window:
             print("❌ Could not find APGI GUI window, using full-screen fallback mode")
@@ -238,7 +239,11 @@ class APGIScreenshotDocumentation:
             screenshot = pyautogui.screenshot()
 
         screenshot_path = self.screenshots_dir / "gui_discovery.png"
-        screenshot.save(screenshot_path)
+        try:
+            screenshot.save(screenshot_path)
+            print(f"✅ Discovery screenshot saved: {screenshot_path.name}")
+        except Exception as save_error:
+            print(f"⚠️ Could not save discovery screenshot: {save_error}")
 
         # Discover buttons using template matching and heuristics
         self._discover_buttons(screenshot)
@@ -345,172 +350,107 @@ class APGIScreenshotDocumentation:
         )
 
     def _find_gui_window(self) -> Optional[Any]:
-        """Find APGI GUI window with enhanced detection."""
+        """Find APGI GUI window with enhanced detection using macOS native APIs."""
         try:
-            # Wait a bit for window to be fully registered
-            time.sleep(2)
-
             print("🔍 Searching for APGI GUI window...")
 
-            # Method 1: Try to find by exact title first
+            # Method 1: Try macOS native window detection
             try:
-                if hasattr(gw, "getWindowsWithTitle"):
-                    windows = gw.getWindowsWithTitle("APGIConsciousness Modeling Framework")
-                    if windows:
-                        print(f"✅ Found window by exact title: {windows[0].title}")
-                        return windows[0]
-            except Exception as e:
-                print(f"⚠️ Method 1 failed: {e}")
+                from Quartz import (
+                    CGWindowListCopyWindowInfo,
+                    kCGWindowListOptionOnScreenOnly,
+                    kCGNullWindowID,
+                )
+                from AppKit import NSWorkspace
 
-            # Method 2: Try all possible title variations
-            title_variations = [
-                "APGIConsciousness Modeling Framework",
-                "APGIConsciousness",
-                "APGI Consciousness",
-                "Consciousness Modeling",
-                "APGI System",
-                "APGI",
-                "consciousness",
-                "modeling",
-            ]
+                # Get all windows
+                window_list = CGWindowListCopyWindowInfo(
+                    kCGWindowListOptionOnScreenOnly, kCGNullWindowID
+                )
 
-            for title in title_variations:
-                try:
-                    if hasattr(gw, "getWindowsWithTitle"):
-                        windows = gw.getWindowsWithTitle(title)
-                        if windows:
-                            print(
-                                f"✅ Found window by title variation '{title}': {windows[0].title}"
-                            )
-                            return windows[0]
-                except Exception:
-                    continue
+                for window_info in window_list:
+                    window_title = window_info.get("kCGWindowName", "")
+                    owner_name = window_info.get("kCGWindowOwnerName", "")
 
-            # Method 3: Search all windows with comprehensive filtering
-            try:
-                if hasattr(gw, "getAllWindows"):
-                    all_windows = gw.getAllWindows()
-                    print(f"🔍 Checking {len(all_windows)} total windows...")
+                    # Look for APGI windows
+                    if (
+                        "APGI" in window_title
+                        or "APGI" in owner_name
+                        or "consciousness" in window_title.lower()
+                        or "consciousness" in owner_name.lower()
+                    ):
 
-                    candidate_windows = []
-                    for window in all_windows:
-                        if (
-                            hasattr(window, "title")
-                            and window.title
-                            and len(window.title.strip()) > 0
-                        ):
-                            title_lower = window.title.lower()
+                        # Get window bounds
+                        bounds = window_info.get("kCGWindowBounds", {})
+                        if bounds:
+                            print(f"✅ Found APGI window: '{window_title}' (Owner: {owner_name})")
+                            print(f"   Bounds: {bounds}")
 
-                            # Skip obvious system windows
-                            if any(
-                                skip in title_lower
-                                for skip in [
-                                    "desktop",
-                                    "finder",
-                                    "spotlight",
-                                    "notification",
-                                    "system preferences",
-                                    "activity monitor",
-                                    "terminal",
-                                    "visual studio code",
-                                    "vscode",
-                                    "chrome",
-                                    "safari",
-                                    "firefox",
-                                    "edge",
-                                    "opera",
-                                ]
-                            ):
-                                continue
+                            # Create a simple window object
+                            class SimpleWindow:
+                                def __init__(self, title, bounds):
+                                    self.title = title
+                                    self.left = int(bounds.get("X", 0))
+                                    self.top = int(bounds.get("Y", 0))
+                                    self.width = int(bounds.get("Width", 0))
+                                    self.height = int(bounds.get("Height", 0))
 
-                            # Look for our keywords
-                            if any(
-                                keyword in title_lower
-                                for keyword in [
-                                    "apgi",
-                                    "consciousness",
-                                    "modeling",
-                                    "framework",
-                                    "python",
-                                    "tk",
-                                ]
-                            ):
-                                candidate_windows.append(window)
-                                print(
-                                    f"🎯 Candidate: {window.title} ({getattr(window, 'width', 'unknown')}x{getattr(window, 'height', 'unknown')})"
-                                )
+                                def activate(self):
+                                    try:
+                                        # Try to activate using NSWorkspace
+                                        NSWorkspace.sharedWorkspace().activateApplication_(
+                                            owner_name
+                                        )
+                                        return True
+                                    except:
+                                        return False
 
-                    # Sort candidates by size (larger windows are more likely to be our GUI)
-                    if candidate_windows:
-                        candidate_windows.sort(
-                            key=lambda w: getattr(w, "width", 0) * getattr(w, "height", 0),
-                            reverse=True,
-                        )
-                        best_candidate = candidate_windows[0]
-                        print(f"✅ Selected best candidate: {best_candidate.title}")
-                        return best_candidate
+                            return SimpleWindow(window_title, bounds)
 
             except Exception as e:
-                print(f"⚠️ Method 3 failed: {e}")
+                print(f"⚠️ macOS native method failed: {e}")
 
-            # Method 4: Try to find any large window that could be our app
+            # Method 2: Try pygetwindow with fallback
             try:
-                if hasattr(gw, "getAllWindows"):
-                    all_windows = gw.getAllWindows()
-                    # Find large windows that aren't obviously system apps
-                    large_windows = []
-                    for window in all_windows:
-                        if (
-                            hasattr(window, "width")
-                            and hasattr(window, "height")
-                            and hasattr(window, "title")
-                            and window.title
-                        ):
+                titles = gw.getAllTitles()
+                for title in titles:
+                    if title and any(
+                        keyword in title.lower()
+                        for keyword in ["apgi", "consciousness", "modeling"]
+                    ):
+                        print(f"🎯 Found candidate window: {title}")
+                        # Try to estimate window position
+                        try:
+                            # Use pyautogui to get screen size and estimate position
+                            screen_width, screen_height = pyautogui.size()
 
-                            # Must be reasonably large for our GUI
-                            if window.width > 1000 and window.height > 700:
-                                title_lower = window.title.lower()
+                            # Create estimated window object
+                            class EstimatedWindow:
+                                def __init__(self, title):
+                                    self.title = title
+                                    # Estimate window size and position
+                                    self.left = 100
+                                    self.top = 100
+                                    self.width = min(1200, screen_width - 200)
+                                    self.height = min(800, screen_height - 200)
 
-                                # Skip common development tools
-                                if not any(
-                                    skip in title_lower
-                                    for skip in [
-                                        "visual studio",
-                                        "vscode",
-                                        "code",
-                                        "terminal",
-                                        "browser",
-                                        "chrome",
-                                        "safari",
-                                        "firefox",
-                                    ]
-                                ):
-                                    large_windows.append(window)
-                                    print(
-                                        f"🔍 Large window: {window.title} ({window.width}x{window.height})"
-                                    )
+                                def activate(self):
+                                    try:
+                                        # Try to click in the estimated area to activate
+                                        pyautogui.click(
+                                            self.left + self.width // 2, self.top + self.height // 2
+                                        )
+                                        return True
+                                    except:
+                                        return False
 
-                    if large_windows:
-                        # Try the largest one
-                        large_windows.sort(key=lambda w: w.width * w.height, reverse=True)
-                        for window in large_windows[:3]:  # Try top 3
-                            print(f"🎯 Trying to activate: {window.title}")
-                            try:
-                                window.activate()
-                                time.sleep(1)
-                                active = gw.getActiveWindow()
-                                if (
-                                    active
-                                    and hasattr(active, "title")
-                                    and active.title == window.title
-                                ):
-                                    print(f"✅ Successfully activated: {window.title}")
-                                    return window
-                            except Exception:
-                                continue
+                            return EstimatedWindow(title)
+                        except Exception as e:
+                            print(f"   Could not create window object: {e}")
+                            continue
 
             except Exception as e:
-                print(f"⚠️ Method 4 failed: {e}")
+                print(f"⚠️ Fallback method failed: {e}")
 
         except Exception as e:
             print(f"❌ Error finding GUI window: {e}")
@@ -937,53 +877,68 @@ class APGIScreenshotDocumentation:
         """Document all screens and interactions with enhanced error handling."""
         print("\n📸 Documenting all screens and interactions...")
 
+        screenshot_count = 0
+        max_screenshots = 18  # Prevent infinite loops
+
         try:
             # 1. Initial state
-            self._take_screenshot(
+            if self._take_screenshot(
                 "01_initial_state", "Initial GUI state - application just started"
-            )
+            ):
+                screenshot_count += 1
 
             # 2. Click through all tabs (with error handling)
-            if self.tab_locations:
+            if self.tab_locations and screenshot_count < max_screenshots:
                 self._document_all_tabs()
+                screenshot_count += len(self.tab_locations)
             else:
                 print("  ⚠️ No tabs found, skipping tab documentation")
 
             # 3. Test all buttons (with error handling)
-            if self.button_locations:
+            if self.button_locations and screenshot_count < max_screenshots:
                 self._document_all_buttons()
+                screenshot_count += len(self.button_locations)
             else:
                 print("  ⚠️ No buttons found, skipping button documentation")
 
             # 4. Test all sliders (with error handling)
-            if self.slider_locations:
+            if self.slider_locations and screenshot_count < max_screenshots:
                 self._document_all_sliders()
+                screenshot_count += len(self.slider_locations)
             else:
                 print("  ⚠️ No sliders found, skipping slider documentation")
 
             # 5. Test all menu items and submenus (with error handling)
-            if self.menu_items:
+            if self.menu_items and screenshot_count < max_screenshots:
                 self._document_all_menus()
             else:
                 print("  ⚠️ No menu items found, skipping menu documentation")
 
             # 6. Test simulation states (with error handling)
-            self._document_simulation_states()
+            if screenshot_count < max_screenshots:
+                self._document_simulation_states()
 
             # 7. Document all dialog windows (with error handling)
-            self._document_dialog_windows()
+            if screenshot_count < max_screenshots:
+                self._document_dialog_windows()
 
             # 8. Document view toggles and zoom controls (with error handling)
-            self._document_view_toggles()
+            if screenshot_count < max_screenshots:
+                self._document_view_toggles()
 
             # 9. Document speed control (with error handling)
-            self._document_speed_control()
+            if screenshot_count < max_screenshots:
+                self._document_speed_control()
 
             # 10. Document status bar and event log (with error handling)
-            self._document_status_bar_and_log()
+            if screenshot_count < max_screenshots:
+                self._document_status_bar_and_log()
 
             # 11. Final state
-            self._take_screenshot("18_final_state", "Final GUI state - after all documentation")
+            if screenshot_count < max_screenshots:
+                self._take_screenshot("18_final_state", "Final GUI state - after all documentation")
+
+            print(f"\n✅ Completed {len(self.doc_structure['screenshots'])} screenshots")
 
         except Exception as e:
             print(f"❌ Error during screen documentation: {e}")
@@ -1448,8 +1403,19 @@ class APGIScreenshotDocumentation:
                 print("    ⚠️ No GUI window, attempting manual activation...")
                 screenshot = self._manual_screenshot_attempt()
 
-            # Save screenshot
-            screenshot.save(screenshot_path)
+            # Save screenshot with error handling
+            try:
+                screenshot.save(screenshot_path)
+                print(f"    ✅ Saved: {screenshot_path.name}")
+            except Exception as save_error:
+                print(f"    ❌ Failed to save screenshot: {save_error}")
+                # Try alternative save method
+                try:
+                    screenshot.save(screenshot_path, "PNG")
+                    print(f"    ✅ Saved with alternative method: {screenshot_path.name}")
+                except Exception as alt_error:
+                    print(f"    ❌ Alternative save also failed: {alt_error}")
+                    return None
 
             # Add to documentation structure
             screenshot_info = {

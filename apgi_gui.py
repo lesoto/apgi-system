@@ -55,19 +55,19 @@ class APGIGui:
         """Initialize the GUI application."""
         self.root = root
         self.root.title("APGI Consciousness Modeling Framework")
-        
+
         # Set responsive window size based on screen dimensions
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        
+
         # Use 80% of screen dimensions, with minimum and maximum bounds
         window_width = min(max(1200, int(screen_width * 0.8)), 1920)
         window_height = min(max(800, int(screen_height * 0.8)), 1080)
-        
+
         # Center window on screen
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-        
+
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.minsize(1000, 700)  # Set minimum window size
 
@@ -109,13 +109,13 @@ class APGIGui:
         self.log_buffer_size = 10000  # Maximum number of log entries to keep
         self.log_data = deque(maxlen=self.log_buffer_size)
         self.auto_save = False
-        
+
         # UI state variables
         self.view_vars = {
             "control_panel": tk.BooleanVar(value=True),
             "neural_activity": tk.BooleanVar(value=True),
             "interoception": tk.BooleanVar(value=True),
-            "system_metrics": tk.BooleanVar(value=True)
+            "system_metrics": tk.BooleanVar(value=True),
         }
         self.auto_save_var = tk.BooleanVar(value=False)
 
@@ -132,18 +132,24 @@ class APGIGui:
 
     def _create_menu_bar(self):
         """Create comprehensive menu bar."""
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
 
         # File Menu
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="New Session", command=self._new_session, accelerator=f"{self.modifier_key}+N")
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(
-            label="Load Configuration...", command=self._load_config, accelerator=f"{self.modifier_key}+O"
+            label="New Session", command=self._new_session, accelerator=f"{self.modifier_key}+N"
         )
         file_menu.add_command(
-            label="Save Configuration...", command=self._save_config, accelerator=f"{self.modifier_key}+S"
+            label="Load Configuration...",
+            command=self._load_config,
+            accelerator=f"{self.modifier_key}+O",
+        )
+        file_menu.add_command(
+            label="Save Configuration...",
+            command=self._save_config,
+            accelerator=f"{self.modifier_key}+S",
         )
         file_menu.add_separator()
         file_menu.add_command(
@@ -157,11 +163,13 @@ class APGIGui:
             command=self._toggle_auto_save,
         )
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self._exit_app, accelerator=f"{self.modifier_key}+Q")
+        file_menu.add_command(
+            label="Exit", command=self._exit_app, accelerator=f"{self.modifier_key}+Q"
+        )
 
         # Edit Menu
-        edit_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Edit", menu=edit_menu)
         edit_menu.add_command(label="System Parameters...", command=self._edit_parameters)
         edit_menu.add_command(label="Precision Settings...", command=self._edit_precision)
         edit_menu.add_command(label="Ignition Threshold...", command=self._edit_threshold)
@@ -169,8 +177,8 @@ class APGIGui:
         edit_menu.add_command(label="Reset to Defaults", command=self._reset_defaults)
 
         # Simulation Menu
-        sim_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Simulation", menu=sim_menu)
+        sim_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Simulation", menu=sim_menu)
         sim_menu.add_command(label="Start", command=self._start_simulation, accelerator="F5")
         sim_menu.add_command(label="Pause/Resume", command=self._pause_simulation, accelerator="F6")
         sim_menu.add_command(label="Stop", command=self._stop_simulation, accelerator="F7")
@@ -179,20 +187,42 @@ class APGIGui:
         sim_menu.add_command(label="Run Preset Task...", command=self._run_preset_task)
 
         # View Menu
-        view_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="View", menu=view_menu)
-        view_menu.add_checkbutton(label="Control Panel", variable=self.view_vars["control_panel"], command=self._toggle_control_panel)
-        view_menu.add_checkbutton(label="Neural Activity", variable=self.view_vars["neural_activity"], command=self._toggle_neural_activity)
-        view_menu.add_checkbutton(label="Interoception", variable=self.view_vars["interoception"], command=self._toggle_interoception)
-        view_menu.add_checkbutton(label="System Metrics", variable=self.view_vars["system_metrics"], command=self._toggle_system_metrics)
+        view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_checkbutton(
+            label="Control Panel",
+            variable=self.view_vars["control_panel"],
+            command=self._toggle_control_panel,
+        )
+        view_menu.add_checkbutton(
+            label="Neural Activity",
+            variable=self.view_vars["neural_activity"],
+            command=self._toggle_neural_activity,
+        )
+        view_menu.add_checkbutton(
+            label="Interoception",
+            variable=self.view_vars["interoception"],
+            command=self._toggle_interoception,
+        )
+        view_menu.add_checkbutton(
+            label="System Metrics",
+            variable=self.view_vars["system_metrics"],
+            command=self._toggle_system_metrics,
+        )
         view_menu.add_separator()
-        view_menu.add_command(label="Zoom In", accelerator=f"{self.modifier_key}++", command=self._zoom_in)
-        view_menu.add_command(label="Zoom Out", accelerator=f"{self.modifier_key}+-", command=self._zoom_out)
-        view_menu.add_command(label="Fit to Window", accelerator=f"{self.modifier_key}+0", command=self._zoom_fit)
+        view_menu.add_command(
+            label="Zoom In", accelerator=f"{self.modifier_key}++", command=self._zoom_in
+        )
+        view_menu.add_command(
+            label="Zoom Out", accelerator=f"{self.modifier_key}+-", command=self._zoom_out
+        )
+        view_menu.add_command(
+            label="Fit to Window", accelerator=f"{self.modifier_key}+0", command=self._zoom_fit
+        )
 
         # Tools Menu
-        tools_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Tools", menu=tools_menu)
         tools_menu.add_command(label="Trigger Ignition Event", command=self._trigger_ignition)
         tools_menu.add_command(label="Induce Stressor", command=self._induce_stressor)
         tools_menu.add_command(label="Modulate Precision...", command=self._modulate_precision)
@@ -203,8 +233,8 @@ class APGIGui:
         tools_menu.add_command(label="System Diagnostics", command=self._show_diagnostics)
 
         # Analysis Menu
-        analysis_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Analysis", menu=analysis_menu)
+        analysis_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Analysis", menu=analysis_menu)
         analysis_menu.add_command(label="Ignition Statistics", command=self._show_ignition_stats)
         analysis_menu.add_command(label="Energy Budget Report", command=self._show_energy_report)
         analysis_menu.add_command(label="Somatic Marker Analysis", command=self._analyze_markers)
@@ -213,8 +243,8 @@ class APGIGui:
         analysis_menu.add_command(label="Generate Report...", command=self._generate_report)
 
         # Help Menu
-        help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="Documentation", command=self._show_docs)
         help_menu.add_command(label="Keyboard Shortcuts", command=self._show_shortcuts)
         help_menu.add_separator()
@@ -650,13 +680,13 @@ class APGIGui:
 
         except Exception as e:
             self.apgi_system = None
-            error_msg = f"Failed to initialize system:\n{str(e)}"
+            import traceback
 
-            # Show detailed error to user
-            messagebox.showerror(
-                "Initialization Error",
-                f"{error_msg}\n\nThe application will run in limited mode.\nPlease check your configuration file and try again.",
+            error_details = (
+                f"Failed to initialize system:\n{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
             )
+            self._log_event(f"System initialization failed: {str(e)}")
+            messagebox.showerror("Initialization Error", error_details)
 
             self._log_event(f"CRITICAL ERROR: {str(e)}")
             self._update_status("System initialization failed - Limited mode")
@@ -848,17 +878,51 @@ class APGIGui:
             self._log_event("Cannot apply parameters: System not initialized")
             return
 
+        # Validate parameter values before applying
+        validation_errors = []
+
+        # Define valid ranges for parameters
+        valid_ranges = {
+            "arousal": (0.0, 1.0),
+            "stress": (0.0, 1.0),
+            "activity": (0.0, 1.0),
+            "extero_precision": (0.1, 10.0),
+            "intero_precision": (0.1, 10.0),
+            "baseline_threshold": (1.0, 5.0),
+        }
+
+        # Check each parameter
+        for param_name, (min_val, max_val) in valid_ranges.items():
+            if param_name in self.param_vars:
+                try:
+                    value = self.param_vars[param_name].get()
+                    if not isinstance(value, (int, float)):
+                        validation_errors.append(f"{param_name}: Must be a number")
+                    elif not (min_val <= value <= max_val):
+                        validation_errors.append(
+                            f"{param_name}: Must be between {min_val} and {max_val}"
+                        )
+                except Exception as e:
+                    validation_errors.append(f"{param_name}: Error reading value - {str(e)}")
+
+        # If validation errors exist, show them and abort
+        if validation_errors:
+            error_msg = "Parameter validation failed:\n" + "\n".join(validation_errors)
+            self._log_event(f"Parameter validation failed: {'; '.join(validation_errors)}")
+            messagebox.showerror("Validation Error", error_msg)
+            return
+
         # Store current values for rollback
         old_values = {}
         try:
             # Save current values
             old_values = {
-                'arousal': self.apgi_system.body_model.arousal_level,
-                'stress': self.apgi_system.body_model.stress_level, 
-                'activity': self.apgi_system.body_model.activity_level,
-                'extero_precision': self.apgi_system.precision.extero_baseline,
-                'intero_precision': self.apgi_system.precision.intero_baseline,
-                'baseline_threshold': self.apgi_system.ignition_threshold.baseline_threshold
+                "arousal": self.apgi_system.body_model.arousal_level,
+                "stress": self.apgi_system.body_model.stress_level,
+                "activity": self.apgi_system.body_model.activity_level,
+                "extero_precision": self.apgi_system.precision.extero_baseline,
+                "intero_precision": self.apgi_system.precision.intero_baseline,
+                "baseline_threshold": self.apgi_system.ignition_threshold.baseline_threshold,
             }
 
             # Apply body state modulations
@@ -878,16 +942,18 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Error applying parameters: {str(e)} - Rolling back...")
             logger.error(f"Parameter application error: {str(e)}", exc_info=True)
-            
+
             # Rollback to previous values
             try:
                 if old_values:
-                    self.apgi_system.body_model.set_arousal(old_values['arousal'])
-                    self.apgi_system.body_model.set_stress(old_values['stress'])
-                    self.apgi_system.body_model.set_activity(old_values['activity'])
-                    self.apgi_system.precision.extero_baseline = old_values['extero_precision']
-                    self.apgi_system.precision.intero_baseline = old_values['intero_precision']
-                    self.apgi_system.ignition_threshold.baseline_threshold = old_values['baseline_threshold']
+                    self.apgi_system.body_model.set_arousal(old_values["arousal"])
+                    self.apgi_system.body_model.set_stress(old_values["stress"])
+                    self.apgi_system.body_model.set_activity(old_values["activity"])
+                    self.apgi_system.precision.extero_baseline = old_values["extero_precision"]
+                    self.apgi_system.precision.intero_baseline = old_values["intero_precision"]
+                    self.apgi_system.ignition_threshold.baseline_threshold = old_values[
+                        "baseline_threshold"
+                    ]
                     self._log_event("Parameters rolled back to previous values")
             except Exception as rollback_error:
                 self._log_event(f"CRITICAL: Failed to rollback parameters: {str(rollback_error)}")
@@ -991,7 +1057,9 @@ class APGIGui:
             min_buffer_length = len(self.time_buffer)
             for key, buffer in self.data_buffers.items():
                 if len(buffer) < min_buffer_length:
-                    self._log_event(f"Buffer {key} length mismatch: {len(buffer)} vs {min_buffer_length}")
+                    self._log_event(
+                        f"Buffer {key} length mismatch: {len(buffer)} vs {min_buffer_length}"
+                    )
                     return
 
             # Create copies of data for thread-safe access
@@ -1156,8 +1224,21 @@ class APGIGui:
 
         self.state_scatter._offsets3d = (fe, prec, load)
 
-        self.state_ax.set_xlim(fe.min(), fe.max())
-        self.state_ax.set_ylim(prec.min(), prec.max())
+        # Fix axis limits to avoid identical min/max warning
+        fe_min, fe_max = fe.min(), fe.max()
+        prec_min, prec_max = prec.min(), prec.max()
+
+        # Ensure min and max are different by at least a small epsilon
+        if abs(fe_max - fe_min) < 1e-10:
+            fe_center = (fe_min + fe_max) / 2
+            fe_min, fe_max = fe_center - 0.5, fe_center + 0.5
+
+        if abs(prec_max - prec_min) < 1e-10:
+            prec_center = (prec_min + prec_max) / 2
+            prec_min, prec_max = prec_center - 0.5, prec_center + 0.5
+
+        self.state_ax.set_xlim(fe_min, fe_max)
+        self.state_ax.set_ylim(prec_min, prec_max)
         self.state_ax.set_zlim(0, 1)
 
         self.state_canvas.draw_idle()
@@ -1181,17 +1262,17 @@ class APGIGui:
             try:
                 with open(filename, "r") as f:
                     config = yaml.safe_load(f)
-                
+
                 # Validate configuration before using it
                 try:
                     validate_config_file(filename)
                 except ConfigValidationError as e:
                     messagebox.showerror(
-                        "Configuration Error", 
-                        f"Configuration validation failed:\n{str(e)}\n\nPlease fix the configuration file and try again."
+                        "Configuration Error",
+                        f"Configuration validation failed:\n{str(e)}\n\nPlease fix the configuration file and try again.",
                     )
                     return
-                
+
                 self.config_path = Path(filename)
                 self._initialize_system()
                 self._log_event(f"Configuration loaded: {filename}")
@@ -1278,23 +1359,23 @@ class APGIGui:
         self.auto_save = self.auto_save_var.get()
         status = "enabled" if self.auto_save else "disabled"
         self._log_event(f"Auto-save {status}")
-        
+
     def _toggle_control_panel(self):
         """Toggle control panel visibility."""
         # Implementation would show/hide control panel
         visible = self.view_vars["control_panel"].get()
         self._log_event(f"Control panel {'shown' if visible else 'hidden'}")
-        
+
     def _toggle_neural_activity(self):
         """Toggle neural activity panel visibility."""
         visible = self.view_vars["neural_activity"].get()
         self._log_event(f"Neural activity panel {'shown' if visible else 'hidden'}")
-        
+
     def _toggle_interoception(self):
         """Toggle interoception panel visibility."""
         visible = self.view_vars["interoception"].get()
         self._log_event(f"Interoception panel {'shown' if visible else 'hidden'}")
-        
+
     def _toggle_system_metrics(self):
         """Toggle system metrics panel visibility."""
         visible = self.view_vars["system_metrics"].get()
@@ -1420,106 +1501,120 @@ class APGIGui:
     def _edit_precision(self):
         """Edit precision settings."""
         if not self.apgi_system:
-            messagebox.showwarning("Warning", "No active APGI system found. Please initialize the system first.")
+            messagebox.showwarning(
+                "Warning", "No active APGI system found. Please initialize the system first."
+            )
             return
 
         dialog = tk.Toplevel(self.root)
         dialog.title("Precision Settings")
         dialog.geometry("400x300")
-        
+
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
         # Precision settings frame
         frame = ttk.Frame(dialog, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
-        
+
         ttk.Label(frame, text="Precision Parameters", font=("Arial", 12, "bold")).pack(pady=10)
-        
+
         # Current values display
         current_extero = self.apgi_system.precision.extero_baseline
         current_intero = self.apgi_system.precision.intero_baseline
-        
+
         ttk.Label(frame, text=f"Current Exteroceptive Precision: {current_extero:.2f}").pack(pady=5)
         ttk.Label(frame, text=f"Current Interoceptive Precision: {current_intero:.2f}").pack(pady=5)
-        
+
         # New value inputs
         ttk.Label(frame, text="New Exteroceptive Precision:").pack(pady=(20, 5))
         extero_var = tk.DoubleVar(value=current_extero)
-        extero_scale = ttk.Scale(frame, from_=0.1, to=5.0, variable=extero_var, orient=tk.HORIZONTAL, length=300)
+        extero_scale = ttk.Scale(
+            frame, from_=0.1, to=5.0, variable=extero_var, orient=tk.HORIZONTAL, length=300
+        )
         extero_scale.pack(pady=5)
         extero_label = ttk.Label(frame, text=f"{current_extero:.2f}")
         extero_label.pack()
-        extero_var.trace('w', lambda *args: extero_label.config(text=f"{extero_var.get():.2f}"))
-        
+        extero_var.trace("w", lambda *args: extero_label.config(text=f"{extero_var.get():.2f}"))
+
         ttk.Label(frame, text="New Interoceptive Precision:").pack(pady=(20, 5))
         intero_var = tk.DoubleVar(value=current_intero)
-        intero_scale = ttk.Scale(frame, from_=0.1, to=5.0, variable=intero_var, orient=tk.HORIZONTAL, length=300)
+        intero_scale = ttk.Scale(
+            frame, from_=0.1, to=5.0, variable=intero_var, orient=tk.HORIZONTAL, length=300
+        )
         intero_scale.pack(pady=5)
         intero_label = ttk.Label(frame, text=f"{current_intero:.2f}")
         intero_label.pack()
-        intero_var.trace('w', lambda *args: intero_label.config(text=f"{intero_var.get():.2f}"))
-        
+        intero_var.trace("w", lambda *args: intero_label.config(text=f"{intero_var.get():.2f}"))
+
         # Buttons
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=20)
-        
+
         def apply_precision():
             try:
                 self.param_vars["extero_precision"].set(extero_var.get())
                 self.param_vars["intero_precision"].set(intero_var.get())
                 self._apply_parameters()
-                self._log_event(f"Precision updated: Extero={extero_var.get():.2f}, Intero={intero_var.get():.2f}")
+                self._log_event(
+                    f"Precision updated: Extero={extero_var.get():.2f}, Intero={intero_var.get():.2f}"
+                )
                 messagebox.showinfo("Success", "Precision settings updated successfully!")
                 dialog.destroy()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to update precision: {str(e)}")
-        
+
         ttk.Button(button_frame, text="Apply", command=apply_precision).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     def _edit_threshold(self):
         """Edit ignition threshold."""
         if not self.apgi_system:
-            messagebox.showwarning("Warning", "No active APGI system found. Please initialize the system first.")
+            messagebox.showwarning(
+                "Warning", "No active APGI system found. Please initialize the system first."
+            )
             return
 
         dialog = tk.Toplevel(self.root)
         dialog.title("Ignition Threshold Settings")
         dialog.geometry("400x250")
-        
+
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
         # Threshold settings frame
         frame = ttk.Frame(dialog, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
-        
+
         ttk.Label(frame, text="Ignition Threshold", font=("Arial", 12, "bold")).pack(pady=10)
-        
+
         # Current value display
         current_threshold = self.apgi_system.ignition_threshold.baseline_threshold
         ttk.Label(frame, text=f"Current Baseline Threshold: {current_threshold:.2f}").pack(pady=5)
-        
+
         # Info label
         info_text = "Higher values make ignition less likely (more conservative)\nLower values make ignition more likely (more sensitive)"
         ttk.Label(frame, text=info_text, font=("Arial", 9), foreground="gray").pack(pady=10)
-        
+
         # New value input
         ttk.Label(frame, text="New Baseline Threshold:").pack(pady=(20, 5))
         threshold_var = tk.DoubleVar(value=current_threshold)
-        threshold_scale = ttk.Scale(frame, from_=0.5, to=5.0, variable=threshold_var, orient=tk.HORIZONTAL, length=300)
+        threshold_scale = ttk.Scale(
+            frame, from_=0.5, to=5.0, variable=threshold_var, orient=tk.HORIZONTAL, length=300
+        )
         threshold_scale.pack(pady=5)
         threshold_label = ttk.Label(frame, text=f"{current_threshold:.2f}")
         threshold_label.pack()
-        threshold_var.trace('w', lambda *args: threshold_label.config(text=f"{threshold_var.get():.2f}"))
-        
+        threshold_var.trace(
+            "w", lambda *args: threshold_label.config(text=f"{threshold_var.get():.2f}")
+        )
+
         # Buttons
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=20)
-        
+
         def apply_threshold():
             try:
                 self.param_vars["baseline_threshold"].set(threshold_var.get())
@@ -1529,7 +1624,7 @@ class APGIGui:
                 dialog.destroy()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to update threshold: {str(e)}")
-        
+
         ttk.Button(button_frame, text="Apply", command=apply_threshold).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 

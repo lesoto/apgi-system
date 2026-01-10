@@ -131,7 +131,7 @@ class BodyModel:
             cortisol=self.current_state.cortisol,
             blood_pressure=self.current_state.blood_pressure,
         )
-        
+
         # Time tracking for dynamics
         self.last_update_time = 0.0
 
@@ -374,7 +374,7 @@ class BodyModel:
         """
         # Calculate prediction timestep
         pred_dt = self.prediction_lead_ms
-        
+
         # Estimate current rates of change (trends)
         hr_trend = self.current_state.heart_rate - self.previous_state.heart_rate
         resp_trend = self.current_state.respiration - self.previous_state.respiration
@@ -382,57 +382,73 @@ class BodyModel:
         glucose_trend = self.current_state.glucose - self.previous_state.glucose
         cortisol_trend = self.current_state.cortisol - self.previous_state.cortisol
         bp_trend = self.current_state.blood_pressure - self.previous_state.blood_pressure
-        
+
         # Calculate target values based on external influences
         hr_target = self.state_configs.get("heart_rate", {}).get("baseline", 70)
         hr_target += self.arousal_level * 20 + self.activity_level * 30 + self.stress_level * 15
-        
+
         resp_target = self.state_configs.get("respiration", {}).get("baseline", 15)
         resp_target += self.activity_level * 8 + self.stress_level * 4
-        
+
         temp_target = self.state_configs.get("temperature", {}).get("baseline", 37.0)
         temp_target += self.activity_level * 0.5  # Small increase with activity
-        
+
         glucose_target = self.state_configs.get("glucose", {}).get("baseline", 5.0)
         glucose_target += self.activity_level * 1.5
-        
+
         cortisol_target = self.state_configs.get("cortisol", {}).get("baseline", 10)
         cortisol_target += self.stress_level * 25 + self.arousal_level * 5
-        
+
         bp_target = 120  # Default systolic
         bp_target += self.stress_level * 20 + self.arousal_level * 10
-        
+
         # Apply forward dynamics: trend + exponential smoothing toward target
         alpha = pred_dt / 1000.0  # Convert ms to seconds for time constants
-        
+
         # Heart rate prediction
-        hr_pred_trend = self.current_state.heart_rate + hr_trend * (pred_dt / 1.0)  # Extrapolate trend
-        hr_pred_target = hr_target + (self.current_state.heart_rate - hr_target) * np.exp(-alpha / (self.tau_heart / 1000.0))
-        self.predicted_state.heart_rate = 0.7 * hr_pred_target + 0.3 * hr_pred_trend  # Weighted combination
-        
+        hr_pred_trend = self.current_state.heart_rate + hr_trend * (
+            pred_dt / 1.0
+        )  # Extrapolate trend
+        hr_pred_target = hr_target + (self.current_state.heart_rate - hr_target) * np.exp(
+            -alpha / (self.tau_heart / 1000.0)
+        )
+        self.predicted_state.heart_rate = (
+            0.7 * hr_pred_target + 0.3 * hr_pred_trend
+        )  # Weighted combination
+
         # Respiration prediction
         resp_pred_trend = self.current_state.respiration + resp_trend * (pred_dt / 1.0)
-        resp_pred_target = resp_target + (self.current_state.respiration - resp_target) * np.exp(-alpha / (self.tau_respiration / 1000.0))
+        resp_pred_target = resp_target + (self.current_state.respiration - resp_target) * np.exp(
+            -alpha / (self.tau_respiration / 1000.0)
+        )
         self.predicted_state.respiration = 0.7 * resp_pred_target + 0.3 * resp_pred_trend
-        
+
         # Temperature prediction (very slow dynamics)
         temp_pred_trend = self.current_state.temperature + temp_trend * (pred_dt / 1.0)
-        temp_pred_target = temp_target + (self.current_state.temperature - temp_target) * np.exp(-alpha / (self.tau_temperature / 1000.0))
+        temp_pred_target = temp_target + (self.current_state.temperature - temp_target) * np.exp(
+            -alpha / (self.tau_temperature / 1000.0)
+        )
         self.predicted_state.temperature = 0.9 * temp_pred_target + 0.1 * temp_pred_trend
-        
+
         # Glucose prediction
         glucose_pred_trend = self.current_state.glucose + glucose_trend * (pred_dt / 1.0)
-        glucose_pred_target = glucose_target + (self.current_state.glucose - glucose_target) * np.exp(-alpha / (self.tau_glucose / 1000.0))
+        glucose_pred_target = glucose_target + (
+            self.current_state.glucose - glucose_target
+        ) * np.exp(-alpha / (self.tau_glucose / 1000.0))
         self.predicted_state.glucose = 0.8 * glucose_pred_target + 0.2 * glucose_pred_trend
-        
+
         # Cortisol prediction (very slow dynamics)
         cortisol_pred_trend = self.current_state.cortisol + cortisol_trend * (pred_dt / 1.0)
-        cortisol_pred_target = cortisol_target + (self.current_state.cortisol - cortisol_target) * np.exp(-alpha / (self.tau_cortisol / 1000.0))
+        cortisol_pred_target = cortisol_target + (
+            self.current_state.cortisol - cortisol_target
+        ) * np.exp(-alpha / (self.tau_cortisol / 1000.0))
         self.predicted_state.cortisol = 0.9 * cortisol_pred_target + 0.1 * cortisol_pred_trend
-        
+
         # Blood pressure prediction
         bp_pred_trend = self.current_state.blood_pressure + bp_trend * (pred_dt / 1.0)
-        bp_pred_target = bp_target + (self.current_state.blood_pressure - bp_target) * np.exp(-alpha / 2.0)  # BP responds faster
+        bp_pred_target = bp_target + (self.current_state.blood_pressure - bp_target) * np.exp(
+            -alpha / 2.0
+        )  # BP responds faster
         self.predicted_state.blood_pressure = 0.8 * bp_pred_target + 0.2 * bp_pred_trend
 
     def _compute_prediction_error(self) -> np.ndarray:

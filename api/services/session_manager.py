@@ -21,12 +21,12 @@ from sqlalchemy import select
 
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
-from api.database.connection import get_db_session
+from api.database.connection import get_db_context
 from api.models.schemas import SessionCreateRequest
 from apgi_system.system import APGISystem
-from utils.logging import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # UUID validation pattern
 UUID_PATTERN = re.compile(
@@ -306,8 +306,10 @@ class SessionManager:
         # In-memory session cache with TTL and size limits
         self.session_cache_max_size = 1000  # Maximum number of sessions to cache
         self.session_ttl_seconds = 3600  # 1 hour TTL for cached sessions
-        self.sessions: OrderedDict[str, Tuple[SimulationSession, float]] = OrderedDict()  # (session, last_access_time)
-        
+        self.sessions: OrderedDict[str, Tuple[SimulationSession, float]] = (
+            OrderedDict()
+        )  # (session, last_access_time)
+
         # Lock for session cache access
         self.cache_lock = asyncio.Lock()
 
@@ -317,15 +319,15 @@ class SessionManager:
         """Remove expired sessions from cache (called within lock)."""
         current_time = time.time()
         expired_keys = []
-        
+
         for session_id, (_, last_access) in self.sessions.items():
             if current_time - last_access > self.session_ttl_seconds:
                 expired_keys.append(session_id)
-        
+
         for key in expired_keys:
             del self.sessions[key]
             logger.debug(f"Removed expired session {key} from cache")
-    
+
     def _evict_oldest_sessions(self) -> None:
         """Remove oldest sessions to maintain cache size limit (called within lock)."""
         while len(self.sessions) > self.session_cache_max_size:
@@ -362,7 +364,7 @@ class SessionManager:
         async with self.cache_lock:
             # Cleanup expired sessions before adding new one
             self._cleanup_expired_sessions()
-            
+
             # First try to persist to database
             db_session = self.db_session_factory()
             try:
@@ -387,7 +389,7 @@ class SessionManager:
                 raise
             finally:
                 db_session.close()
-            
+
             # Enforce cache size limit
             self._evict_oldest_sessions()
 
@@ -411,12 +413,12 @@ class SessionManager:
         """
         # Validate session ID format
         validate_session_id(session_id)
-        
+
         # Check memory cache first
         async with self.cache_lock:
             # Cleanup expired sessions
             self._cleanup_expired_sessions()
-            
+
             if session_id in self.sessions:
                 session_data, last_access = self.sessions[session_id]
                 # Update access time and move to end (LRU)

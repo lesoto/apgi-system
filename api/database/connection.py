@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from api.config import settings
 from api.database.models import Base, User
-from api.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +112,9 @@ def create_default_user():
             password=secure_password,
             note="These credentials allow full system access - change immediately",
         )
+
+        # Import here to avoid circular import
+        from api.services.auth_manager import AuthManager
 
         # Create default user
         default_user = User(

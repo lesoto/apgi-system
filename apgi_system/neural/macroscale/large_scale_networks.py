@@ -131,17 +131,33 @@ class FrontoparietalNetwork:
             activity: Current workspace activity
             info: Diagnostic information
         """
-        # Recurrent input
+        # Recurrent input with overflow protection
         recurrent_input = self.weights @ self.activity
+
+        # Check for numerical issues
+        if not np.all(np.isfinite(recurrent_input)):
+            # Reset to safe values if overflow occurs
+            self.weights = np.clip(self.weights, -10, 10)
+            self.activity = np.clip(self.activity, 0, 5)
+            recurrent_input = self.weights @ self.activity
 
         # Competition (soft winner-take-all)
         competition = -self.competition_strength * np.mean(self.activity)
 
-        # Total input
+        # Total input with bounds checking
         total_input = external_input + self.amplification_gain * recurrent_input + competition
+
+        # Check total input for numerical issues
+        if not np.all(np.isfinite(total_input)):
+            total_input = np.clip(total_input, -100, 100)
 
         # Update activity
         dactivity = (dt / self.tau) * (-self.activity + total_input)
+
+        # Check derivative for numerical issues
+        if not np.all(np.isfinite(dactivity)):
+            dactivity = np.clip(dactivity, -10, 10)
+
         self.activity += dactivity
 
         # Apply nonlinearity

@@ -226,7 +226,7 @@ async def cancel_task(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Task {task_id} not found",
             )
-        
+
         result = await executor.cancel_task(task_id)
 
         logger.info(f"Task {task_id} cancellation requested")

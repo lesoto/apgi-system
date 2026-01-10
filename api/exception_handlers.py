@@ -205,12 +205,15 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         "path": request.url.path,
         "method": request.method,
     }
-    
+
     # Add headers (excluding sensitive ones)
-    safe_headers = {k: v for k, v in dict(request.headers).items() 
-                   if k.lower() not in ['authorization', 'cookie', 'x-api-key']}
+    safe_headers = {
+        k: v
+        for k, v in dict(request.headers).items()
+        if k.lower() not in ["authorization", "cookie", "x-api-key"]
+    }
     metadata["headers"] = safe_headers
-    
+
     # Add request body for non-form/multipart requests (size limited)
     try:
         content_type = request.headers.get("content-type", "")
@@ -219,9 +222,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             if len(body) < 1000:  # Only log small bodies
                 try:
                     import json
+
                     body_data = json.loads(body.decode())
                     # Remove sensitive fields
-                    sensitive_keys = ['password', 'token', 'secret', 'key', 'auth']
+                    sensitive_keys = ["password", "token", "secret", "key", "auth"]
                     for key in sensitive_keys:
                         if key in body_data:
                             body_data[key] = "[REDACTED]"
@@ -230,11 +234,17 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
                     metadata["body"] = "[UNPARSEABLE]"
         elif "application/x-www-form-urlencoded" in content_type:
             form_data = await request.form()
-            metadata["form"] = {k: "[REDACTED]" if any(s in k.lower() for s in ['password', 'token', 'secret']) else v 
-                              for k, v in form_data.items()}
+            metadata["form"] = {
+                k: (
+                    "[REDACTED]"
+                    if any(s in k.lower() for s in ["password", "token", "secret"])
+                    else v
+                )
+                for k, v in form_data.items()
+            }
     except Exception as e:
         metadata["body_error"] = f"Failed to capture request body: {str(e)}"
-    
+
     await alert_manager.record_error(
         error_type=type(exc).__name__,
         error_message=str(exc),
