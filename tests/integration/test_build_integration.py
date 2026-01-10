@@ -115,7 +115,9 @@ class TestWindowsBuildIntegration:
             assert "config_files" in resources, "Should have config_files key"
 
             # Should find YAML files
-            yaml_files = [r for r in resources["config_files"] if r.endswith(".yaml") or r.endswith(".yml")]
+            yaml_files = [
+                r for r in resources["config_files"] if r.endswith(".yaml") or r.endswith(".yml")
+            ]
             assert len(yaml_files) > 0, "Should find at least one YAML config file"
 
         # Test resources directory
@@ -124,7 +126,9 @@ class TestWindowsBuildIntegration:
             resources = collect_resources(str(resources_dir))
 
             # Should find icon files
-            icon_files = [r for r in resources["icon_files"] if r.endswith((".ico", ".icns", ".png"))]
+            icon_files = [
+                r for r in resources["icon_files"] if r.endswith((".ico", ".icns", ".png"))
+            ]
             assert len(icon_files) > 0, "Should find at least one icon file"
 
     def test_windows_build_hidden_imports_detection(self):

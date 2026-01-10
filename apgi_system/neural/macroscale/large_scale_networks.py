@@ -8,6 +8,7 @@ Implements macroscale brain networks:
 """
 
 import numpy as np
+import threading
 from typing import Dict, Any, Optional, List, Tuple
 from enum import Enum
 
@@ -131,69 +132,79 @@ class FrontoparietalNetwork:
             activity: Current workspace activity
             info: Diagnostic information
         """
-        # Recurrent input with enhanced overflow protection
-        # Check weights and activity for numerical stability before computation
-        self.weights = np.nan_to_num(self.weights, nan=0.0, posinf=1.0, neginf=-1.0)
-        self.activity = np.nan_to_num(self.activity, nan=0.0, posinf=1.0, neginf=-1.0)
-        
-        # Apply gradient clipping to prevent extreme values
-        self.weights = np.clip(self.weights, -10, 10)
-        self.activity = np.clip(self.activity, 0, 5)
-        
-        recurrent_input = self.weights @ self.activity
+        with threading.Lock():
+            # Recurrent input with enhanced overflow protection
+            # Check weights and activity for numerical stability before computation
+            self.weights = np.nan_to_num(self.weights, nan=0.0, posinf=1.0, neginf=-1.0)
+            self.activity = np.nan_to_num(self.activity, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        # Enhanced numerical stability checks
-        if not np.all(np.isfinite(recurrent_input)):
-            # Reset to safe values if overflow occurs
-            self.weights = np.clip(self.weights, -5, 5)
-            self.activity = np.clip(self.activity, 0.1, 2)
+            # Apply gradient clipping to prevent extreme values
+            self.weights = np.clip(self.weights, -10, 10)
+            self.activity = np.clip(self.activity, 0, 5)
+
+            # Thread-safe matrix multiplication
             recurrent_input = self.weights @ self.activity
-            
-            # Log warning for debugging
-            import warnings
-            warnings.warn("Numerical instability detected in recurrent computation, values reset", RuntimeWarning)
 
-        # Competition (soft winner-take-all)
-        competition = -self.competition_strength * np.mean(self.activity)
+            # Enhanced numerical stability checks
+            if not np.all(np.isfinite(recurrent_input)):
+                # Reset to safe values if overflow occurs
+                self.weights = np.clip(self.weights, -5, 5)
+                self.activity = np.clip(self.activity, 0.1, 2)
+                # Thread-safe matrix multiplication in recovery path
+                recurrent_input = self.weights @ self.activity
 
-        # Total input with bounds checking
-        total_input = external_input + self.amplification_gain * recurrent_input + competition
+                # Log warning for debugging
+                import warnings
 
-        # Check total input for numerical issues
-        if not np.all(np.isfinite(total_input)):
-            total_input = np.clip(total_input, -100, 100)
+                warnings.warn(
+                    "Numerical instability detected in recurrent computation, values reset",
+                    RuntimeWarning,
+                )
 
-        # Update activity
-        dactivity = (dt / self.tau) * (-self.activity + total_input)
+            # Competition (soft winner-take-all)
+            competition = -self.competition_strength * np.mean(self.activity)
 
-        # Check derivative for numerical issues
-        if not np.all(np.isfinite(dactivity)):
-            dactivity = np.clip(dactivity, -10, 10)
+            # Total input with bounds checking
+            total_input = external_input + self.amplification_gain * recurrent_input + competition
 
-        self.activity += dactivity
+            # Check total input for numerical issues
+            if not np.all(np.isfinite(total_input)):
+                total_input = np.clip(total_input, -100, 100)
 
-        # Apply nonlinearity
-        self.activity = np.maximum(0, self.activity)  # ReLU
+            # Update activity
+            dactivity = (dt / self.tau) * (-self.activity + total_input)
 
-        # Normalization to prevent explosion
-        max_activity = np.max(self.activity)
-        if max_activity > 10.0:
-            self.activity *= 10.0 / max_activity
+            # Check derivative for numerical issues
+            if not np.all(np.isfinite(dactivity)):
+                dactivity = np.clip(dactivity, -10, 10)
+
+            self.activity += dactivity
+
+            # Apply nonlinearity
+            self.activity = np.maximum(0, self.activity)  # ReLU
+
+            # Normalization to prevent explosion
+            max_activity = np.max(self.activity)
+            if max_activity > 10.0:
+                self.activity *= 10.0 / max_activity
 
         # Handle broadcasting
         if ignition_signal and not self.is_broadcasting:
-            self._initiate_broadcast()
+            with threading.Lock():
+                self._initiate_broadcast()
         elif self.is_broadcasting:
-            self._maintain_broadcast(dt)
+            with threading.Lock():
+                self._maintain_broadcast(dt)
 
-        info = {
-            "mean_activity": float(np.mean(self.activity)),
-            "max_activity": float(np.max(self.activity)),
-            "active_nodes": int(np.sum(self.activity > 0.1)),
-            "is_broadcasting": self.is_broadcasting,
-        }
+        with threading.Lock():
+            info = {
+                "mean_activity": float(np.mean(self.activity)),
+                "max_activity": float(np.max(self.activity)),
+                "active_nodes": int(np.sum(self.activity > 0.1)),
+                "is_broadcasting": self.is_broadcasting,
+            }
 
-        return self.activity.copy(), info
+            return self.activity.copy(), info
 
     def _initiate_broadcast(self):
         """Initiate global broadcast."""

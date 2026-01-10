@@ -70,12 +70,12 @@ class APGIGui:
 
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.minsize(1000, 700)  # Set minimum window size
-        
+
         # Force window to be visible and bring to front
         self.root.deiconify()
         self.root.lift()
-        self.root.attributes('-topmost', True)
-        self.root.after_idle(lambda: self.root.attributes('-topmost', False))
+        self.root.attributes("-topmost", True)
+        self.root.after_idle(lambda: self.root.attributes("-topmost", False))
 
         # Platform-specific modifier key for shortcuts
         self.modifier_key = "Command" if platform.system() == "Darwin" else "Ctrl"
@@ -89,12 +89,12 @@ class APGIGui:
 
         # Data buffers for plotting with configurable sizes
         self.buffer_size = 1000  # Default buffer size
-        self.min_buffer_size = 100   # Minimum buffer size
-        self.max_buffer_size = 10000 # Maximum buffer size
-        
+        self.min_buffer_size = 100  # Minimum buffer size
+        self.max_buffer_size = 10000  # Maximum buffer size
+
         # Initialize buffers with default size
         self._initialize_buffers(self.buffer_size)
-        
+
         # Add buffer size configuration to UI variables
         self.buffer_size_var = tk.IntVar(value=self.buffer_size)
 
@@ -123,6 +123,7 @@ class APGIGui:
         except Exception as e:
             print(f"❌ Error creating menu bar: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -131,6 +132,7 @@ class APGIGui:
         except Exception as e:
             print(f"❌ Error creating main layout: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -139,6 +141,7 @@ class APGIGui:
         except Exception as e:
             print(f"❌ Error creating status bar: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -175,37 +178,37 @@ class APGIGui:
         dialog.title("Buffer Configuration")
         dialog.geometry("400x200")
         dialog.resizable(False, False)
-        
+
         # Center dialog
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
         # Buffer size control
         frame = ttk.Frame(dialog, padding=20)
         frame.pack(fill=tk.BOTH, expand=True)
-        
+
         ttk.Label(frame, text="Data Buffer Size:", font=("Arial", 10, "bold")).pack(pady=5)
-        
+
         buffer_frame = ttk.Frame(frame)
         buffer_frame.pack(pady=10)
-        
+
         ttk.Label(buffer_frame, text="Size:").pack(side=tk.LEFT)
-        
+
         buffer_spinbox = ttk.Spinbox(
-            buffer_frame, 
-            from_=self.min_buffer_size, 
+            buffer_frame,
+            from_=self.min_buffer_size,
             to=self.max_buffer_size,
             textvariable=self.buffer_size_var,
-            width=10
+            width=10,
         )
         buffer_spinbox.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(buffer_frame, text="points").pack(side=tk.LEFT)
-        
+
         # Memory usage estimate
         memory_label = ttk.Label(frame, text="")
         memory_label.pack(pady=10)
-        
+
         def update_memory_estimate(*args):
             try:
                 size = int(self.buffer_size_var.get())
@@ -216,14 +219,14 @@ class APGIGui:
                 memory_label.config(text=f"Estimated memory usage: {estimated_mb:.1f} MB")
             except:
                 memory_label.config(text="Invalid buffer size")
-        
+
         self.buffer_size_var.trace_add("write", update_memory_estimate)
         update_memory_estimate()
-        
+
         # Buttons
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=10)
-        
+
         def apply_buffer_size():
             try:
                 new_size = int(self.buffer_size_var.get())
@@ -234,27 +237,26 @@ class APGIGui:
                     self._log_event(f"Buffer size updated to {new_size} points")
                 else:
                     messagebox.showerror(
-                        "Invalid Size", 
-                        f"Buffer size must be between {self.min_buffer_size} and {self.max_buffer_size}"
+                        "Invalid Size",
+                        f"Buffer size must be between {self.min_buffer_size} and {self.max_buffer_size}",
                     )
             except ValueError:
                 messagebox.showerror("Invalid Size", "Please enter a valid number")
-        
+
         ttk.Button(button_frame, text="Apply", command=apply_buffer_size).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
-        
+
         # Add to View menu
         view_menu = None
         for i in range(self.menu_bar.index("end")):
             if self.menu_bar.entrycget(i, "label") == "View":
                 view_menu = self.menu_bar.nametowidget(self.menu_bar.entrycget(i, "menu"))
                 break
-        
+
         if view_menu:
             view_menu.add_separator()
             view_menu.add_command(
-                label="Configure Buffer Size...", 
-                command=self._configure_buffer_size
+                label="Configure Buffer Size...", command=self._configure_buffer_size
             )
 
         # Thread safety locks
@@ -282,22 +284,25 @@ class APGIGui:
         except Exception as e:
             print(f"❌ Error creating menu bar: {e}")
             import traceback
+
             traceback.print_exc()
             return
-            
+
         try:
             self._create_main_layout()
         except Exception as e:
             print(f"❌ Error creating main layout: {e}")
             import traceback
+
             traceback.print_exc()
             return
-            
+
         try:
             self._create_status_bar()
         except Exception as e:
             print(f"❌ Error creating status bar: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -502,9 +507,7 @@ class APGIGui:
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.speed_label = ttk.Label(speed_frame, text="1.0x")
         self.speed_label.pack(side=tk.LEFT)
-        self.speed_var.trace_add(
-            "write", lambda *args: self._update_speed_cache()
-        )
+        self.speed_var.trace_add("write", lambda *args: self._update_speed_cache())
 
         # System Status
         status_frame = ttk.LabelFrame(parent, text="System Status", padding=10)
@@ -868,7 +871,7 @@ class APGIGui:
                 f"Failed to initialize system:\n{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
             )
             self._log_event(f"System initialization failed: {str(e)}")
-            
+
             # Enhanced error dialog with troubleshooting guidance
             troubleshooting_msg = (
                 f"{error_details}\n\n"
@@ -880,7 +883,7 @@ class APGIGui:
                 "5. Restart the application\n\n"
                 "For detailed help, see APGI-System-README.md"
             )
-            
+
             messagebox.showerror("Initialization Error", troubleshooting_msg)
 
             self._log_event(f"CRITICAL ERROR: {str(e)}")
@@ -891,13 +894,13 @@ class APGIGui:
 
             # Log the full error for debugging
             logger.error(f"System initialization failed: {str(e)}", exc_info=True)
-            
+
             # Offer to reset configuration
             try:
                 reset_result = messagebox.askyesno(
                     "Reset Configuration?",
                     "Would you like to reset to default configuration?\n\n"
-                    "This may resolve initialization issues."
+                    "This may resolve initialization issues.",
                 )
                 if reset_result:
                     self._reset_to_default_config()
@@ -909,26 +912,26 @@ class APGIGui:
         try:
             # Reset to default configuration path
             self.config_path = get_resource_path("config/default.yaml")
-            
+
             # Reinitialize system with default config
             self._initialize_system()
-            
+
             # Log the reset
             self._log_event("Configuration reset to defaults")
-            
+
             # Show success message
             messagebox.showinfo(
                 "Configuration Reset",
                 "Configuration has been reset to default settings.\n\n"
-                "The system will now attempt to initialize with defaults."
+                "The system will now attempt to initialize with defaults.",
             )
-            
+
         except Exception as e:
             # Show error if reset fails
             messagebox.showerror(
                 "Reset Failed",
                 f"Failed to reset configuration:\n{str(e)}\n\n"
-                "Please check the configuration file manually."
+                "Please check the configuration file manually.",
             )
             self._log_event(f"Configuration reset failed: {str(e)}")
 
@@ -1110,7 +1113,7 @@ class APGIGui:
     def _safe_update_fps(self, fps):
         """Safely update FPS label with existence check."""
         try:
-            if hasattr(self, 'fps_label') and self.fps_label.winfo_exists():
+            if hasattr(self, "fps_label") and self.fps_label.winfo_exists():
                 self.fps_label.config(text=f"{fps:.1f} FPS")
         except Exception:
             # Ignore errors during shutdown
@@ -1119,7 +1122,7 @@ class APGIGui:
     def _safe_enable_system_controls(self, enabled):
         """Safely enable/disable system controls with existence check."""
         try:
-            if hasattr(self, 'start_btn') and self.start_btn.winfo_exists():
+            if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._enable_system_controls(enabled)
         except Exception:
             # Ignore errors during shutdown
@@ -1128,7 +1131,7 @@ class APGIGui:
     def _safe_update_ui_after_error(self):
         """Safely update UI after error with existence check."""
         try:
-            if hasattr(self, 'start_btn') and self.start_btn.winfo_exists():
+            if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._update_ui_after_error()
         except Exception:
             # Ignore errors during shutdown
@@ -1175,32 +1178,32 @@ class APGIGui:
             extero_prec = self._param_cache.get("extero_precision", 1.0)
             intero_prec = self._param_cache.get("intero_precision", 0.8)
             threshold = self._param_cache.get("baseline_threshold", 2.0)
-            
+
             # Check for potentially unstable combinations
             if arousal > 0.8 and stress > 0.8 and activity > 0.8:
                 validation_errors.append(
                     "High arousal + stress + activity may cause instability. "
                     "Consider reducing at least one parameter."
                 )
-            
+
             if extero_prec > 8.0 and intero_prec > 8.0:
                 validation_errors.append(
                     "Very high precision values may cause numerical overflow. "
                     "Consider keeping precision ≤ 8.0."
                 )
-            
+
             if threshold < 1.5 and (arousal > 0.9 or stress > 0.9):
                 validation_errors.append(
                     "Low threshold with high arousal/stress may cause excessive ignition events. "
                     "Consider increasing threshold or reducing arousal/stress."
                 )
-            
+
             if activity > 0.9 and threshold > 4.0:
                 validation_errors.append(
                     "High activity with very high threshold may prevent ignition. "
                     "Consider reducing threshold or activity."
                 )
-                
+
         except Exception as e:
             validation_errors.append(f"Cross-parameter validation error: {str(e)}")
 
@@ -1973,6 +1976,20 @@ class APGIGui:
             row=0, column=1
         )
 
+        # Create Run Task button (initially disabled)
+        run_button = ttk.Button(dialog, text="Run Task", state=tk.DISABLED)
+        run_button.pack(pady=5)
+
+        def on_selection_change(event):
+            """Enable Run Task button when a task is selected."""
+            if listbox.curselection():
+                run_button.config(state=tk.NORMAL)
+            else:
+                run_button.config(state=tk.DISABLED)
+
+        # Bind selection change event
+        listbox.bind("<<ListboxSelect>>", on_selection_change)
+
         def run_selected():
             selection = listbox.curselection()
             if selection:
@@ -2001,7 +2018,7 @@ class APGIGui:
                         "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task",
                     )
 
-        ttk.Button(dialog, text="Run Task", command=run_selected).pack(pady=5)
+        run_button.config(command=run_selected)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
 
     def _run_attentional_blink_task(self, num_trials: int = 20):
@@ -2079,12 +2096,26 @@ class APGIGui:
                     # Log result
                     if trial_idx % 10 == 0:
                         msg = f"Trial {trial_idx}: Lag {result.lag}, T1: {result.t1_detected}, T2: {result.t2_detected}\n"
-                        self.root.after(0, lambda m=msg, rt=results_text: rt.insert(tk.END, m) if rt.winfo_exists() else None)
-                        self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                        self.root.after(
+                            0,
+                            lambda m=msg, rt=results_text: (
+                                rt.insert(tk.END, m) if rt.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
 
                 # Task complete
-                self.root.after(0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None)
-                self.root.after(0, lambda sl=status_label: sl.config(text="Analysis complete!") if sl.winfo_exists() else None)
+                self.root.after(
+                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
+                )
+                self.root.after(
+                    0,
+                    lambda sl=status_label: (
+                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                    ),
+                )
 
                 # Analyze results
                 analysis = task.analyze_results()
@@ -2102,8 +2133,15 @@ class APGIGui:
                     lag_data = analysis["lag_analysis"][lag]
                     summary += f"  Lag {lag}: T2|T1={lag_data['t2_given_t1_accuracy']:.1%}, Blink={lag_data['blink_rate']:.1%}\n"
 
-                self.root.after(0, lambda s=summary, rt=results_text: rt.insert(tk.END, s) if rt.winfo_exists() else None)
-                self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                self.root.after(
+                    0,
+                    lambda s=summary, rt=results_text: (
+                        rt.insert(tk.END, s) if rt.winfo_exists() else None
+                    ),
+                )
+                self.root.after(
+                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                )
 
                 # Save results
                 import datetime
@@ -2225,12 +2263,26 @@ class APGIGui:
                     if trial_idx % 10 == 0:
                         detected_str = "Yes" if result.change_detected else "No"
                         msg = f"Trial {trial_idx}: {result.change_type.value}, Detected: {detected_str}\n"
-                        self.root.after(0, lambda m=msg, rt=results_text: rt.insert(tk.END, m) if rt.winfo_exists() else None)
-                        self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                        self.root.after(
+                            0,
+                            lambda m=msg, rt=results_text: (
+                                rt.insert(tk.END, m) if rt.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
 
                 # Task complete
-                self.root.after(0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None)
-                self.root.after(0, lambda sl=status_label: sl.config(text="Analysis complete!") if sl.winfo_exists() else None)
+                self.root.after(
+                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
+                )
+                self.root.after(
+                    0,
+                    lambda sl=status_label: (
+                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                    ),
+                )
 
                 # Analyze results
                 analysis = task.analyze_results()
@@ -2252,8 +2304,15 @@ class APGIGui:
                     data = analysis["by_magnitude"][magnitude]
                     summary += f"  {magnitude:.1f}: {data['detection_rate']:.1%}\n"
 
-                self.root.after(0, lambda s=summary, rt=results_text: rt.insert(tk.END, s) if rt.winfo_exists() else None)
-                self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                self.root.after(
+                    0,
+                    lambda s=summary, rt=results_text: (
+                        rt.insert(tk.END, s) if rt.winfo_exists() else None
+                    ),
+                )
+                self.root.after(
+                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                )
 
                 # Save results
                 import datetime
@@ -2376,12 +2435,26 @@ class APGIGui:
                             f"Trial {trial_idx}: {result.num_alternations} alternations, "
                             f"Pattern A dominance: {result.pattern_a_dominance_ratio:.1%}\n"
                         )
-                        self.root.after(0, lambda m=msg, rt=results_text: rt.insert(tk.END, m) if rt.winfo_exists() else None)
-                        self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                        self.root.after(
+                            0,
+                            lambda m=msg, rt=results_text: (
+                                rt.insert(tk.END, m) if rt.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
 
                 # Task complete
-                self.root.after(0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None)
-                self.root.after(0, lambda sl=status_label: sl.config(text="Analysis complete!") if sl.winfo_exists() else None)
+                self.root.after(
+                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
+                )
+                self.root.after(
+                    0,
+                    lambda sl=status_label: (
+                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                    ),
+                )
 
                 # Analyze results
                 analysis = task.analyze_results()
@@ -2406,8 +2479,15 @@ class APGIGui:
                         f"Alt={data['avg_alternation_rate']:.2f}/s\n"
                     )
 
-                self.root.after(0, lambda s=summary, rt=results_text: rt.insert(tk.END, s) if rt.winfo_exists() else None)
-                self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                self.root.after(
+                    0,
+                    lambda s=summary, rt=results_text: (
+                        rt.insert(tk.END, s) if rt.winfo_exists() else None
+                    ),
+                )
+                self.root.after(
+                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                )
 
                 # Save results
                 import datetime
@@ -2518,11 +2598,25 @@ class APGIGui:
                             f"Trial {trial_idx}: SOA {result.soa_ms}ms, Detected: {detected}, "
                             f"Ignitions: {result.ignition_count}\n"
                         )
-                        self.root.after(0, lambda m=msg, rt=results_text: rt.insert(tk.END, m) if rt.winfo_exists() else None)
-                        self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                        self.root.after(
+                            0,
+                            lambda m=msg, rt=results_text: (
+                                rt.insert(tk.END, m) if rt.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
 
-                self.root.after(0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None)
-                self.root.after(0, lambda sl=status_label: sl.config(text="Analysis complete!") if sl.winfo_exists() else None)
+                self.root.after(
+                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
+                )
+                self.root.after(
+                    0,
+                    lambda sl=status_label: (
+                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                    ),
+                )
 
                 analysis = task.analyze_results()
 
@@ -2540,8 +2634,15 @@ class APGIGui:
                         f"Avg Strength={data['avg_ignition_strength']:.2f}\n"
                     )
 
-                self.root.after(0, lambda s=summary, rt=results_text: rt.insert(tk.END, s) if rt.winfo_exists() else None)
-                self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                self.root.after(
+                    0,
+                    lambda s=summary, rt=results_text: (
+                        rt.insert(tk.END, s) if rt.winfo_exists() else None
+                    ),
+                )
+                self.root.after(
+                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                )
 
                 import datetime
 
@@ -2661,12 +2762,26 @@ class APGIGui:
                         msg = (
                             f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
                         )
-                        self.root.after(0, lambda m=msg, rt=results_text: rt.insert(tk.END, m) if rt.winfo_exists() else None)
-                        self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                        self.root.after(
+                            0,
+                            lambda m=msg, rt=results_text: (
+                                rt.insert(tk.END, m) if rt.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
 
                 # Task complete
-                self.root.after(0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None)
-                self.root.after(0, lambda sl=status_label: sl.config(text="Analysis complete!") if sl.winfo_exists() else None)
+                self.root.after(
+                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
+                )
+                self.root.after(
+                    0,
+                    lambda sl=status_label: (
+                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                    ),
+                )
 
                 # Analyze results
                 analysis = task.analyze_results()
@@ -2686,8 +2801,15 @@ class APGIGui:
                     deck_type = "Bad" if deck in ["A", "B"] else "Good"
                     summary += f"  Deck {deck} ({deck_type}): {deck_data['selections']} ({deck_data['selection_percentage']:.1f}%)\n"
 
-                self.root.after(0, lambda s=summary, rt=results_text: rt.insert(tk.END, s) if rt.winfo_exists() else None)
-                self.root.after(0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None)
+                self.root.after(
+                    0,
+                    lambda s=summary, rt=results_text: (
+                        rt.insert(tk.END, s) if rt.winfo_exists() else None
+                    ),
+                )
+                self.root.after(
+                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                )
 
                 # Save results
                 import datetime
@@ -3257,7 +3379,7 @@ For more information, visit the project repository.
 
     def _log_event(self, message):
         """Log event to event log (thread-safe)."""
-        if hasattr(self, 'log_text') and self.log_text is not None:
+        if hasattr(self, "log_text") and self.log_text is not None:
             timestamp = datetime.now().strftime("%H:%M:%S")
             log_message = f"[{timestamp}] {message}\n"
             # Schedule GUI update on main thread
@@ -3266,7 +3388,7 @@ For more information, visit the project repository.
     def _safe_log_to_gui(self, message):
         """Safely log message to GUI with existence check."""
         try:
-            if hasattr(self, 'log_text') and self.log_text.winfo_exists():
+            if hasattr(self, "log_text") and self.log_text.winfo_exists():
                 self.log_text.insert(tk.END, message)
                 self.log_text.see(tk.END)
         except Exception:
@@ -3275,14 +3397,14 @@ For more information, visit the project repository.
 
     def _update_status(self, message):
         """Update status bar message (thread-safe)."""
-        if hasattr(self, 'status_text') and self.status_text is not None:
+        if hasattr(self, "status_text") and self.status_text is not None:
             # Schedule GUI update on main thread
             self.root.after(0, lambda msg=message: self._safe_update_status(msg))
 
     def _safe_update_status(self, message):
         """Safely update status bar with existence check."""
         try:
-            if hasattr(self, 'status_text') and self.status_text.winfo_exists():
+            if hasattr(self, "status_text") and self.status_text.winfo_exists():
                 self.status_text.config(text=message)
         except Exception:
             # Ignore errors during shutdown
@@ -3291,7 +3413,7 @@ For more information, visit the project repository.
     def _update_speed_cache(self):
         """Update thread-safe speed cache and label."""
         try:
-            if hasattr(self, 'speed_var') and hasattr(self, 'speed_label'):
+            if hasattr(self, "speed_var") and hasattr(self, "speed_label"):
                 if self.speed_label.winfo_exists():
                     self._speed_value = self.speed_var.get()
                     self.speed_label.config(text=f"{self._speed_value:.1f}x")
@@ -3301,17 +3423,19 @@ For more information, visit the project repository.
 
     def _setup_param_cache(self):
         """Set up thread-safe parameter cache with traces."""
-        if hasattr(self, 'param_vars'):
+        if hasattr(self, "param_vars"):
             for param_name, var in self.param_vars.items():
                 # Initialize cache
                 self._param_cache[param_name] = var.get()
                 # Add trace to update cache when variable changes
-                var.trace_add("write", lambda *args, name=param_name: self._update_param_cache(name))
+                var.trace_add(
+                    "write", lambda *args, name=param_name: self._update_param_cache(name)
+                )
 
     def _update_param_cache(self, param_name):
         """Update thread-safe parameter cache."""
         try:
-            if hasattr(self, 'param_vars') and param_name in self.param_vars:
+            if hasattr(self, "param_vars") and param_name in self.param_vars:
                 self._param_cache[param_name] = self.param_vars[param_name].get()
         except Exception:
             # Ignore errors during shutdown
@@ -3339,10 +3463,11 @@ def main():
             print("- QUICKSTART_GUI.txt in the project root")
             print("- APGI-System-README.md")
             print("=" * 60)
-            
+
             # Try to show GUI dialog if possible
             try:
                 from tkinter import messagebox
+
                 error_root = tk.Tk()
                 error_root.withdraw()  # Hide main window
                 messagebox.showerror(
@@ -3350,14 +3475,14 @@ def main():
                     "Required dependencies are missing.\n\n"
                     "Please run:\n"
                     "pip install -r requirements.txt\n\n"
-                    "See QUICKSTART_GUI.txt for details."
+                    "See QUICKSTART_GUI.txt for details.",
                 )
                 error_root.destroy()
             except:
                 pass
-            
+
             return
-            
+
     except ImportError:
         print("Warning: Dependency checker not available. Attempting to continue...")
         print("If you encounter errors, please install all requirements:")

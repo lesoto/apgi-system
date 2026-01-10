@@ -579,14 +579,14 @@ class FreeEnergyCalculator:
 
 # Standalone wrapper functions for backward compatibility and easier testing
 def compute_variational_free_energy(
-    observation: FloatArray, 
-    prediction: FloatArray, 
+    observation: FloatArray,
+    prediction: FloatArray,
     precision: FloatArray,
-    config: Optional[ConfigDict] = None
+    config: Optional[ConfigDict] = None,
 ) -> tuple[float, dict]:
     """
     Standalone wrapper for computing variational free energy.
-    
+
     Parameters
     ----------
     observation : np.ndarray
@@ -597,7 +597,7 @@ def compute_variational_free_energy(
         Precision weights
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     tuple[float, dict]
@@ -612,11 +612,11 @@ def compute_expected_free_energy(
     predicted_states: FloatArray,
     desired_states: FloatArray,
     precision: FloatArray,
-    config: Optional[ConfigDict] = None
+    config: Optional[ConfigDict] = None,
 ) -> tuple[float, dict]:
     """
     Standalone wrapper for computing expected free energy.
-    
+
     Parameters
     ----------
     policy : np.ndarray
@@ -629,7 +629,7 @@ def compute_expected_free_energy(
         Precision weights
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     tuple[float, dict]
@@ -640,13 +640,11 @@ def compute_expected_free_energy(
 
 
 def compute_accuracy(
-    observation: FloatArray, 
-    prediction: FloatArray,
-    config: Optional[ConfigDict] = None
+    observation: FloatArray, prediction: FloatArray, config: Optional[ConfigDict] = None
 ) -> float:
     """
     Standalone wrapper for computing accuracy term.
-    
+
     Parameters
     ----------
     observation : np.ndarray
@@ -655,7 +653,7 @@ def compute_accuracy(
         Predicted data
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     float
@@ -666,13 +664,11 @@ def compute_accuracy(
 
 
 def compute_complexity(
-    prediction: FloatArray,
-    prior_prediction: FloatArray,
-    config: Optional[ConfigDict] = None
+    prediction: FloatArray, prior_prediction: FloatArray, config: Optional[ConfigDict] = None
 ) -> float:
     """
     Standalone wrapper for computing complexity term.
-    
+
     Parameters
     ----------
     prediction : np.ndarray
@@ -681,7 +677,7 @@ def compute_complexity(
         Prior prediction
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     float
@@ -692,13 +688,11 @@ def compute_complexity(
 
 
 def compute_epistemic_value(
-    policy: FloatArray,
-    predicted_states: FloatArray,
-    config: Optional[ConfigDict] = None
+    policy: FloatArray, predicted_states: FloatArray, config: Optional[ConfigDict] = None
 ) -> float:
     """
     Standalone wrapper for computing epistemic value.
-    
+
     Parameters
     ----------
     policy : np.ndarray
@@ -707,7 +701,7 @@ def compute_epistemic_value(
         Predicted states
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     float
@@ -718,13 +712,11 @@ def compute_epistemic_value(
 
 
 def compute_pragmatic_value(
-    predicted_states: FloatArray,
-    desired_states: FloatArray,
-    config: Optional[ConfigDict] = None
+    predicted_states: FloatArray, desired_states: FloatArray, config: Optional[ConfigDict] = None
 ) -> float:
     """
     Standalone wrapper for computing pragmatic value.
-    
+
     Parameters
     ----------
     predicted_states : np.ndarray
@@ -733,7 +725,7 @@ def compute_pragmatic_value(
         Desired states
     config : dict, optional
         Configuration parameters
-        
+
     Returns
     -------
     float

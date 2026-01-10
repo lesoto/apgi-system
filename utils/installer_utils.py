@@ -13,17 +13,18 @@ from typing import List, Dict, Any, Optional
 
 class InstallerError(Exception):
     """Custom exception for installer errors."""
+
     pass
 
 
 def check_python_version(min_version: tuple = (3, 8)) -> bool:
     """Check if Python version meets requirements.
-    
+
     Parameters
     ----------
     min_version : tuple, optional
         Minimum Python version, by default (3, 8)
-        
+
     Returns
     -------
     bool
@@ -34,14 +35,14 @@ def check_python_version(min_version: tuple = (3, 8)) -> bool:
 
 def install_package(package: str, upgrade: bool = False) -> bool:
     """Install a Python package using pip.
-    
+
     Parameters
     ----------
     package : str
         Package name to install
     upgrade : bool, optional
         Whether to upgrade if already installed, by default False
-        
+
     Returns
     -------
     bool
@@ -52,7 +53,7 @@ def install_package(package: str, upgrade: bool = False) -> bool:
         if upgrade:
             cmd.append("--upgrade")
         cmd.append(package)
-        
+
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return True
     except subprocess.CalledProcessError as e:
@@ -62,12 +63,12 @@ def install_package(package: str, upgrade: bool = False) -> bool:
 
 def install_requirements(requirements_file: str = "requirements.txt") -> bool:
     """Install packages from requirements file.
-    
+
     Parameters
     ----------
     requirements_file : str, optional
         Path to requirements file, by default "requirements.txt"
-        
+
     Returns
     -------
     bool
@@ -76,13 +77,10 @@ def install_requirements(requirements_file: str = "requirements.txt") -> bool:
     if not os.path.exists(requirements_file):
         print(f"Requirements file {requirements_file} not found")
         return False
-    
+
     try:
         subprocess.run(
-            ["pip", "install", "-r", requirements_file],
-            check=True,
-            capture_output=True,
-            text=True
+            ["pip", "install", "-r", requirements_file], check=True, capture_output=True, text=True
         )
         return True
     except subprocess.CalledProcessError as e:
@@ -92,12 +90,12 @@ def install_requirements(requirements_file: str = "requirements.txt") -> bool:
 
 def check_package_installed(package: str) -> bool:
     """Check if a package is installed.
-    
+
     Parameters
     ----------
     package : str
         Package name to check
-        
+
     Returns
     -------
     bool
@@ -112,12 +110,12 @@ def check_package_installed(package: str) -> bool:
 
 def create_virtual_environment(venv_path: str = "venv") -> bool:
     """Create a Python virtual environment.
-    
+
     Parameters
     ----------
     venv_path : str, optional
         Path for virtual environment, by default "venv"
-        
+
     Returns
     -------
     bool
@@ -133,7 +131,7 @@ def create_virtual_environment(venv_path: str = "venv") -> bool:
 
 def get_system_info() -> Dict[str, Any]:
     """Get system information for installation.
-    
+
     Returns
     -------
     Dict[str, Any]
@@ -141,7 +139,7 @@ def get_system_info() -> Dict[str, Any]:
     """
     import platform
     import psutil
-    
+
     return {
         "platform": platform.system(),
         "platform_release": platform.release(),
@@ -157,67 +155,74 @@ def get_system_info() -> Dict[str, Any]:
 
 def validate_installation() -> Dict[str, bool]:
     """Validate APGI system installation.
-    
+
     Returns
     -------
     Dict[str, bool]
         Validation results
     """
     results = {}
-    
+
     # Check core packages
     core_packages = [
-        "numpy", "scipy", "matplotlib", "pandas", 
-        "sklearn", "networkx", "torch", "jax"
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "pandas",
+        "sklearn",
+        "networkx",
+        "torch",
+        "jax",
     ]
-    
+
     for package in core_packages:
         results[f"core_{package}"] = check_package_installed(package)
-    
+
     # Check API packages
     api_packages = ["fastapi", "uvicorn", "pydantic", "sqlalchemy"]
-    
+
     for package in api_packages:
         results[f"api_{package}"] = check_package_installed(package)
-    
+
     # Check system packages
     system_packages = ["redis", "psycopg2"]
-    
+
     for package in system_packages:
         results[f"system_{package}"] = check_package_installed(package)
-    
+
     # Check GUI
     results["gui_tkinter"] = check_package_installed("tkinter")
-    
+
     return results
 
 
 def extract_version_from_pyproject(pyproject_path: str = "pyproject.toml") -> str:
     """Extract version from pyproject.toml file.
-    
+
     Parameters
     ----------
     pyproject_path : str, optional
         Path to pyproject.toml file, by default "pyproject.toml"
-        
+
     Returns
     -------
     str
         Version string
     """
     pyproject_file = Path(pyproject_path)
-    
+
     if not pyproject_file.exists():
         raise InstallerError(f"pyproject.toml file not found: {pyproject_path}")
-    
+
     try:
         import toml
+
         config = toml.load(pyproject_file)
         version = config.get("project", {}).get("version")
-        
+
         if not version:
             raise InstallerError("Version not found in pyproject.toml")
-        
+
         return version
     except ImportError:
         raise InstallerError("toml package not available for parsing pyproject.toml")
@@ -227,12 +232,12 @@ def extract_version_from_pyproject(pyproject_path: str = "pyproject.toml") -> st
 
 def normalize_path_for_inno(path: str) -> str:
     """Normalize path for Inno Setup script.
-    
+
     Parameters
     ----------
     path : str
         Path to normalize
-        
+
     Returns
     -------
     str
@@ -240,17 +245,19 @@ def normalize_path_for_inno(path: str) -> str:
     """
     # Convert forward slashes to backslashes for Windows
     normalized = path.replace("/", "\\")
-    
+
     # Ensure absolute paths start with drive letter
     if normalized.startswith("\\"):
         normalized = "C:" + normalized
-    
+
     return normalized
 
 
-def generate_registry_entries(app_name: str, version: str, install_path: str) -> List[Dict[str, str]]:
+def generate_registry_entries(
+    app_name: str, version: str, install_path: str
+) -> List[Dict[str, str]]:
     """Generate Windows registry entries for application.
-    
+
     Parameters
     ----------
     app_name : str
@@ -259,7 +266,7 @@ def generate_registry_entries(app_name: str, version: str, install_path: str) ->
         Application version
     install_path : str
         Installation path
-        
+
     Returns
     -------
     List[Dict[str, str]]
@@ -270,40 +277,36 @@ def generate_registry_entries(app_name: str, version: str, install_path: str) ->
             "key": f"SOFTWARE\\{app_name}",
             "value_name": "DisplayName",
             "value_data": app_name,
-            "value_type": "REG_SZ"
+            "value_type": "REG_SZ",
         },
         {
             "key": f"SOFTWARE\\{app_name}",
             "value_name": "DisplayVersion",
             "value_data": version,
-            "value_type": "REG_SZ"
+            "value_type": "REG_SZ",
         },
         {
             "key": f"SOFTWARE\\{app_name}",
             "value_name": "InstallLocation",
             "value_data": install_path,
-            "value_type": "REG_SZ"
+            "value_type": "REG_SZ",
         },
         {
             "key": f"SOFTWARE\\{app_name}",
             "value_name": "Publisher",
             "value_data": "APGI System",
-            "value_type": "REG_SZ"
-        }
+            "value_type": "REG_SZ",
+        },
     ]
-    
+
     return entries
 
 
 def generate_inno_setup_script(
-    app_name: str,
-    version: str,
-    source_dir: str,
-    output_dir: str,
-    executable_name: str = None
+    app_name: str, version: str, source_dir: str, output_dir: str, executable_name: str = None
 ) -> str:
     """Generate Inno Setup script for Windows installer.
-    
+
     Parameters
     ----------
     app_name : str
@@ -316,7 +319,7 @@ def generate_inno_setup_script(
         Output directory
     executable_name : str, optional
         Executable name, by default None
-        
+
     Returns
     -------
     str
@@ -324,7 +327,7 @@ def generate_inno_setup_script(
     """
     if executable_name is None:
         executable_name = app_name.lower().replace(" ", "_") + ".exe"
-    
+
     script = f"""
 [Setup]
 AppName={app_name}
@@ -347,12 +350,12 @@ Name: "{{commondesktop}}\\{app_name}"; Filename: "{{app}}\\{executable_name}"
 
 [Registry]
 """
-    
+
     # Add registry entries
     registry_entries = generate_registry_entries(app_name, version, "{{app}}")
     for entry in registry_entries:
         script += f'Root: HKCU; Subkey: "{entry["key"]}"; ValueType: {entry["value_type"]}; ValueName: "{entry["value_name"]}"; ValueData: "{entry["value_data"]}"\n'
-    
+
     script += f"""
 [Run]
 Filename: "{{app}}\\{executable_name}"; Description: "Launch application"; Flags: nowait postinstall skipifsilent
@@ -360,5 +363,5 @@ Filename: "{{app}}\\{executable_name}"; Description: "Launch application"; Flags
 [UninstallDelete]
 Type: filesandordirs; Name: "{{app}}"
 """
-    
+
     return script.strip()

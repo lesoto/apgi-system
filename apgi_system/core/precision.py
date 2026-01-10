@@ -6,6 +6,7 @@ and neuromodulator effects.
 """
 
 import numpy as np
+import threading
 from collections import deque
 from typing import Dict, Any, Optional, List
 from enum import Enum
@@ -306,7 +307,6 @@ class PrecisionWeighting:
         """
         Update volatility estimates.
 
-        Volatility = rate of change of uncertainty
         """
         self.volatility_window.append(
             {
@@ -315,15 +315,15 @@ class PrecisionWeighting:
             }
         )
 
-        # Window size automatically limited by deque(maxlen=10)
-
         # Compute volatility as variance of uncertainty
         if len(self.volatility_window) > 2:
             extero_unc = [w["extero_uncertainty"] for w in self.volatility_window]
             intero_unc = [w["intero_uncertainty"] for w in self.volatility_window]
 
-            self.extero_volatility = np.var(extero_unc)
-            self.intero_volatility = np.var(intero_unc)
+            # Thread-safe numpy operations
+            with threading.Lock():
+                self.extero_volatility = np.var(extero_unc) if len(extero_unc) > 1 else 0.0
+                self.intero_volatility = np.var(intero_unc) if len(intero_unc) > 1 else 0.0
 
     def _apply_attention(self, target: str) -> None:
         """

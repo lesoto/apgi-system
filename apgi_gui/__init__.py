@@ -16,7 +16,10 @@ if parent_dir not in sys.path:
 
 # Import the GUI class from the actual module file
 import importlib.util
-spec = importlib.util.spec_from_file_location("apgi_gui_module", os.path.join(parent_dir, "apgi_gui.py"))
+
+spec = importlib.util.spec_from_file_location(
+    "apgi_gui_module", os.path.join(parent_dir, "apgi_gui.py")
+)
 apgi_gui_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(apgi_gui_module)
 

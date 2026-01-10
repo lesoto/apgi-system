@@ -447,7 +447,9 @@ class HierarchicalGaussianFilter:
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        result = projection_matrix @ state
+        # Thread-safe matrix multiplication
+        with threading.Lock():
+            result = projection_matrix @ state
         return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 
     def _project_up(self, from_level: int, state: FloatArray) -> FloatArray:
@@ -474,22 +476,27 @@ class HierarchicalGaussianFilter:
         # Ensure numerical stability with enhanced checks
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
-        
+
         # Gradient clipping to prevent overflow
         projection_matrix = np.clip(projection_matrix, -100, 100)
         state = np.clip(state, -100, 100)
-        
+
         # Check for divide by zero conditions
         if np.any(np.abs(projection_matrix) < 1e-10):
-            projection_matrix = np.where(np.abs(projection_matrix) < 1e-10, 
-                                   np.sign(projection_matrix) * 1e-10, projection_matrix)
+            projection_matrix = np.where(
+                np.abs(projection_matrix) < 1e-10,
+                np.sign(projection_matrix) * 1e-10,
+                projection_matrix,
+            )
 
-        result = projection_matrix @ state
-        
+        # Thread-safe matrix multiplication
+        with threading.Lock():
+            result = projection_matrix @ state
+
         # Final result stabilization
         result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
         result = np.clip(result, -1000, 1000)  # Prevent extreme values
-        
+
         return result
 
     def _compute_total_free_energy(self, observation: FloatArray) -> float:
