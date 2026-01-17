@@ -142,8 +142,19 @@ class FrontoparietalNetwork:
             self.weights = np.clip(self.weights, -10, 10)
             self.activity = np.clip(self.activity, 0, 5)
 
-            # Thread-safe matrix multiplication
-            recurrent_input = self.weights @ self.activity
+            # Check for valid inputs before multiplication
+            if not np.all(np.isfinite(self.weights)) or not np.all(np.isfinite(self.activity)):
+                recurrent_input = np.zeros(self.activity.shape[0])
+            else:
+                # Thread-safe matrix multiplication with error handling
+                try:
+                    with threading.Lock():
+                        # Suppress numpy warnings for this operation
+                        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+                            recurrent_input = self.weights @ self.activity
+                except (FloatingPointError, ValueError):
+                    # Fallback to safe computation
+                    recurrent_input = np.zeros(self.activity.shape[0])
 
             # Enhanced numerical stability checks
             if not np.all(np.isfinite(recurrent_input)):
@@ -151,7 +162,8 @@ class FrontoparietalNetwork:
                 self.weights = np.clip(self.weights, -5, 5)
                 self.activity = np.clip(self.activity, 0.1, 2)
                 # Thread-safe matrix multiplication in recovery path
-                recurrent_input = self.weights @ self.activity
+                with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+                    recurrent_input = self.weights @ self.activity
 
                 # Log warning for debugging
                 import warnings

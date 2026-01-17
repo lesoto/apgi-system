@@ -40,44 +40,30 @@ class ErrorResponse(BaseModel):
 # ============================================================================
 
 
-@st.composite
-def valid_status_string(draw):
+def valid_status_string():
     """Generate valid status strings."""
-    return draw(st.sampled_from(["ok", "success", "pending", "completed", "failed"]))
+    return st.sampled_from(["ok", "success", "pending", "completed", "failed"])
 
 
-@st.composite
-def valid_response_data(draw):
+def valid_response_data():
     """Generate valid response data dictionaries."""
     # Generate simple dictionaries with string keys and various value types
-    keys = draw(st.lists(st.text(min_size=1, max_size=20), min_size=0, max_size=5, unique=True))
-
-    data = {}
-    for key in keys:
-        value_type = draw(st.sampled_from(["string", "int", "float", "bool", "list"]))
-
-        if value_type == "string":
-            data[key] = draw(st.text(max_size=100))
-        elif value_type == "int":
-            data[key] = draw(st.integers(min_value=-1000, max_value=1000))
-        elif value_type == "float":
-            data[key] = draw(
-                st.floats(
-                    min_value=-1000.0, max_value=1000.0, allow_nan=False, allow_infinity=False
-                )
-            )
-        elif value_type == "bool":
-            data[key] = draw(st.booleans())
-        elif value_type == "list":
-            data[key] = draw(st.lists(st.integers(), max_size=10))
-
-    return data if data else None
+    return st.dictionaries(
+        keys=st.text(min_size=1, max_size=10),
+        values=st.one_of(
+            st.integers(),
+            st.floats(allow_nan=False, allow_infinity=False),
+            st.text(max_size=20),
+            st.booleans(),
+        ),
+        min_size=0,
+        max_size=5,
+    ).map(lambda data: data if data else None)
 
 
-@st.composite
-def valid_count(draw):
+def valid_count():
     """Generate valid count values."""
-    return draw(st.integers(min_value=0, max_value=10000))
+    return st.integers(min_value=0, max_value=10000)
 
 
 # ============================================================================

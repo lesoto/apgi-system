@@ -126,12 +126,6 @@ All experimental paradigms are importable and functional:
 **Launch Command:**
 
 ```bash
-python run_gui.py
-```
-
-or
-
-```bash
 python apgi_gui.py
 ```
 

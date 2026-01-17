@@ -447,9 +447,20 @@ class HierarchicalGaussianFilter:
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        # Thread-safe matrix multiplication
-        with threading.Lock():
-            result = projection_matrix @ state
+        # Check for valid inputs before multiplication
+        if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
+            return np.zeros(target_dim)
+
+        # Thread-safe matrix multiplication with error handling
+        try:
+            with threading.Lock():
+                # Suppress numpy warnings for this operation
+                with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+                    result = projection_matrix @ state
+        except (FloatingPointError, ValueError):
+            # Fallback to safe computation
+            result = np.zeros(target_dim)
+
         return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
 
     def _project_up(self, from_level: int, state: FloatArray) -> FloatArray:
@@ -489,9 +500,19 @@ class HierarchicalGaussianFilter:
                 projection_matrix,
             )
 
-        # Thread-safe matrix multiplication
-        with threading.Lock():
-            result = projection_matrix @ state
+        # Check for valid inputs before multiplication
+        if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
+            return np.zeros(target_dim)
+
+        # Thread-safe matrix multiplication with error handling
+        try:
+            with threading.Lock():
+                # Suppress numpy warnings for this operation
+                with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+                    result = projection_matrix @ state
+        except (FloatingPointError, ValueError):
+            # Fallback to safe computation
+            result = np.zeros(target_dim)
 
         # Final result stabilization
         result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
