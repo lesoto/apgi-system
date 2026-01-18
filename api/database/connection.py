@@ -107,10 +107,9 @@ def create_default_user():
 
         # Log credentials securely (in production, this should go to a secure secrets manager)
         logger.warning(
-            "Generated default user credentials - STORE SECURELY",
-            username=secure_username,
-            password=secure_password,
-            note="These credentials allow full system access - change immediately",
+            f"Generated default user credentials - STORE SECURELY. "
+            f"Username: {secure_username}, Password: {secure_password}. "
+            f"NOTE: These credentials allow full system access - change immediately"
         )
 
         # Import here to avoid circular import

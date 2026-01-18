@@ -6,6 +6,7 @@ Simple launcher script for the APGI GUI application.
 """
 
 import sys
+import traceback
 from pathlib import Path
 
 # Add parent directory to path
@@ -26,7 +27,5 @@ if __name__ == "__main__":
         print("\n\nApplication closed by user")
     except Exception as e:
         print(f"\n\nERROR: {str(e)}")
-        import traceback
-
         traceback.print_exc()
         input("\nPress Enter to exit...")

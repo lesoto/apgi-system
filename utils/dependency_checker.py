@@ -10,7 +10,6 @@ import importlib
 import subprocess
 import platform
 from typing import List, Dict, Tuple, Optional
-import warnings
 
 
 class DependencyChecker:
@@ -109,6 +108,56 @@ class DependencyChecker:
 
         return results
 
+    def _format_python_instructions(self, python_errors: List[str]) -> List[str]:
+        """Format Python version installation instructions."""
+        if not python_errors:
+            return []
+
+        instructions = [
+            "\n📦 Python Version:",
+        ]
+        for error in python_errors:
+            instructions.append(f"   ❌ {error}")
+        instructions.append("   💡 Install Python 3.8+ from https://python.org")
+        return instructions
+
+    def _format_package_instructions(self, package_errors: List[str]) -> List[str]:
+        """Format package installation instructions."""
+        if not package_errors:
+            return []
+
+        instructions = [
+            "\n📦 Python Packages:",
+        ]
+        for error in package_errors:
+            instructions.append(f"   ❌ {error}")
+        instructions.append("\n   💡 Install all packages:")
+        instructions.append("      source venv/bin/activate  # Activate virtual environment")
+        instructions.append("      pip install -r requirements.txt")
+        instructions.append("\n   💡 Or run the automated setup:")
+        instructions.append("      ./install.sh")
+        return instructions
+
+    def _format_service_instructions(self, service_warnings: List[str]) -> List[str]:
+        """Format service installation instructions."""
+        if not service_warnings:
+            return []
+
+        instructions = [
+            "\n🔧 System Services:",
+        ]
+        for warning in service_warnings:
+            instructions.append(f"   ⚠️  {warning}")
+
+        instructions.append("\n   💡 Start services:")
+        if self.platform == "Darwin":  # macOS
+            instructions.append("      brew services start redis")
+            instructions.append("      brew services start postgresql@14")
+        elif self.platform == "Linux":
+            instructions.append("      sudo systemctl start redis")
+            instructions.append("      sudo systemctl start postgresql")
+        return instructions
+
     def get_installation_instructions(self) -> str:
         """Generate helpful installation instructions."""
         instructions = []
@@ -119,48 +168,55 @@ class DependencyChecker:
 
             # Python version issues
             python_errors = [e for e in self.errors if "Python" in e]
-            if python_errors:
-                instructions.append("\n📦 Python Version:")
-                for error in python_errors:
-                    instructions.append(f"   ❌ {error}")
-                instructions.append("   💡 Install Python 3.8+ from https://python.org")
+            instructions.extend(self._format_python_instructions(python_errors))
 
             # Missing packages
             package_errors = [e for e in self.errors if "Missing required package" in e]
-            if package_errors:
-                instructions.append("\n📦 Python Packages:")
-                for error in package_errors:
-                    instructions.append(f"   ❌ {error}")
-                instructions.append("\n   💡 Install all packages:")
-                instructions.append(
-                    "      source venv/bin/activate  # Activate virtual environment"
-                )
-                instructions.append("      pip install -r requirements.txt")
-                instructions.append("\n   💡 Or run the automated setup:")
-                instructions.append("      ./install.sh")
+            instructions.extend(self._format_package_instructions(package_errors))
 
         if self.warnings:
             instructions.append("\n⚠️  SERVICE WARNINGS:")
             instructions.append("=" * 50)
 
             service_warnings = [w for w in self.warnings if "Service" in w]
-            if service_warnings:
-                instructions.append("\n🔧 System Services:")
-                for warning in service_warnings:
-                    instructions.append(f"   ⚠️  {warning}")
-
-                instructions.append("\n   💡 Start services:")
-                if self.platform == "Darwin":  # macOS
-                    instructions.append("      brew services start redis")
-                    instructions.append("      brew services start postgresql@14")
-                elif self.platform == "Linux":
-                    instructions.append("      sudo systemctl start redis")
-                    instructions.append("      sudo systemctl start postgresql")
+            instructions.extend(self._format_service_instructions(service_warnings))
 
         if not self.errors and not self.warnings:
             instructions.append("\n✅ All dependencies satisfied!")
 
         return "\n".join(instructions)
+
+    def _print_python_version(self, results: Dict[str, bool]):
+        """Print Python version information."""
+        print(f"\n🐍 Python Version: {'.'.join(map(str, self.python_version[:2]))}")
+        if results["python_version"]:
+            print("   ✅ Meets minimum requirements (3.8+)")
+        else:
+            print("   ❌ Does not meet minimum requirements")
+
+    def _print_package_group(self, title: str, packages: List[str], results: Dict[str, bool]):
+        """Print a group of packages with their status."""
+        print(f"\n{title}")
+        for package in packages:
+            key = f"package_{package}"
+            if results.get(key, False):
+                print(f"   ✅ {package}")
+            else:
+                print(f"   ❌ {package}")
+
+    def _print_services(self, results: Dict[str, bool]):
+        """Print system services status."""
+        print("\n🔧 System Services:")
+
+        if "service_redis" in results:
+            status = "✅" if results["service_redis"] else "⚠️"
+            note = "" if results["service_redis"] else " (may not be running)"
+            print(f"   {status} Redis{note}")
+
+        if "service_postgresql" in results:
+            status = "✅" if results["service_postgresql"] else "⚠️"
+            note = "" if results["service_postgresql"] else " (may not be running)"
+            print(f"   {status} PostgreSQL{note}")
 
     def print_dependency_report(self):
         """Print a comprehensive dependency report."""
@@ -170,14 +226,9 @@ class DependencyChecker:
         results = self.check_all_dependencies()
 
         # Python version
-        print(f"\n🐍 Python Version: {'.'.join(map(str, self.python_version[:2]))}")
-        if results["python_version"]:
-            print("   ✅ Meets minimum requirements (3.8+)")
-        else:
-            print("   ❌ Does not meet minimum requirements")
+        self._print_python_version(results)
 
         # Core packages
-        print("\n📦 Core Scientific Packages:")
         core_packages = [
             "numpy",
             "scipy",
@@ -188,43 +239,18 @@ class DependencyChecker:
             "torch",
             "jax",
         ]
-        for package in core_packages:
-            key = f"package_{package}"
-            if results.get(key, False):
-                print(f"   ✅ {package}")
-            else:
-                print(f"   ❌ {package}")
+        self._print_package_group("\n📦 Core Scientific Packages:", core_packages, results)
 
         # Web framework packages
-        print("\n🌐 Web Framework Packages:")
         web_packages = ["fastapi", "uvicorn", "pydantic", "sqlalchemy", "redis", "psycopg2"]
-        for package in web_packages:
-            key = f"package_{package}"
-            if results.get(key, False):
-                print(f"   ✅ {package}")
-            else:
-                print(f"   ❌ {package}")
+        self._print_package_group("\n🌐 Web Framework Packages:", web_packages, results)
 
         # GUI packages
-        print("\n🖥️  GUI Packages:")
-        if results.get("package_tkinter", False):
-            print("   ✅ tkinter")
-        else:
-            print("   ❌ tkinter")
+        gui_status = "✅" if results.get("package_tkinter", False) else "❌"
+        print(f"\n🖥️  GUI Packages:\n   {gui_status} tkinter")
 
         # System services
-        print("\n🔧 System Services:")
-        if "service_redis" in results:
-            if results["service_redis"]:
-                print("   ✅ Redis")
-            else:
-                print("   ⚠️  Redis (may not be running)")
-
-        if "service_postgresql" in results:
-            if results["service_postgresql"]:
-                print("   ✅ PostgreSQL")
-            else:
-                print("   ⚠️  PostgreSQL (may not be running)")
+        self._print_services(results)
 
         # Print instructions
         print(self.get_installation_instructions())

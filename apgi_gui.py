@@ -95,9 +95,6 @@ class APGIGui:
         # Initialize buffers with default size
         self._initialize_buffers(self.buffer_size)
 
-        # Add buffer size configuration to UI variables
-        self.buffer_size_var = tk.IntVar(value=self.buffer_size)
-
         # Thread safety locks
         self.data_lock = RLock()  # Reentrant lock for data buffers
         self.log_lock = Lock()  # Simple lock for log data
@@ -108,14 +105,14 @@ class APGIGui:
         self.log_data = deque(maxlen=self.log_buffer_size)
         self.auto_save = False
 
-        # UI state variables
+        # Initialize view variables as regular Python variables first
         self.view_vars = {
-            "control_panel": tk.BooleanVar(value=True),
-            "neural_activity": tk.BooleanVar(value=True),
-            "interoception": tk.BooleanVar(value=True),
-            "system_metrics": tk.BooleanVar(value=True),
+            "control_panel": True,
+            "neural_activity": True,
+            "interoception": True,
+            "system_metrics": True,
         }
-        self.auto_save_var = tk.BooleanVar(value=False)
+        self.auto_save = False
 
         # Build GUI
         try:
@@ -151,6 +148,9 @@ class APGIGui:
         # Start update loop
         self._update_displays()
 
+        # Schedule tkinter variable conversion for after main loop starts
+        self.root.after(100, self._convert_to_tkinter_variables)
+
     def _initialize_buffers(self, size):
         """Initialize data buffers with specified size."""
         self.time_buffer = deque(maxlen=size)
@@ -171,6 +171,73 @@ class APGIGui:
         }
         self.buffer_size = size
         self._log_event(f"Buffer size set to {size} points")
+
+    def _convert_to_tkinter_variables(self):
+        """Convert Python variables to tkinter variables after GUI is created."""
+        # Convert buffer size variable
+        self.buffer_size_var = tk.IntVar(master=self.root, value=self.buffer_size)
+
+        # Convert view variables to tkinter variables
+        old_view_vars = self.view_vars.copy()
+        self.view_vars = {}
+        for key, value in old_view_vars.items():
+            self.view_vars[key] = tk.BooleanVar(master=self.root, value=value)
+
+        # Convert auto-save variable
+        self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
+
+        # Convert speed variable and assign to scale
+        self.speed_var = tk.DoubleVar(master=self.root, value=self._speed_value)
+        if hasattr(self, "_speed_scale"):
+            self._speed_scale.configure(variable=self.speed_var)
+            self.speed_var.trace_add("write", lambda *args: self._update_speed_cache())
+
+        # Convert parameter variables and assign to scales
+        for key, value in self.param_vars.items():
+            var = tk.DoubleVar(master=self.root, value=value)
+            self.param_vars[key] = var
+
+            # Assign to scale if it exists
+            if key in self.param_scales:
+                self.param_scales[key].configure(variable=var)
+
+            # Update label if it exists
+            if key in self.param_labels:
+                var.trace_add(
+                    "write",
+                    lambda *args, v=var, l=self.param_labels[key]: l.config(text=f"{v.get():.2f}"),
+                )
+
+        # Assign variables to existing view menu checkbuttons
+        try:
+            if hasattr(self, "_view_menu"):
+                checkbuttons = [
+                    ("Control Panel", "control_panel"),
+                    ("Neural Activity", "neural_activity"),
+                    ("Interoception", "interoception"),
+                    ("System Metrics", "system_metrics"),
+                ]
+
+                for i, (label, key) in enumerate(checkbuttons):
+                    try:
+                        self._view_menu.entryconfig(i, variable=self.view_vars[key])
+                    except:
+                        pass  # Skip if entry doesn't exist
+        except Exception as e:
+            print(f"Warning: Could not assign variables to view menu: {e}")
+
+        # Now add the auto-save checkbutton to the file menu
+        try:
+            file_menu = self.menu_bar.winfo_children()[0]  # File menu is first
+            # Insert the auto-save checkbutton before the last separator
+            file_menu.insert_checkbutton(
+                file_menu.index(file_menu.winfo_children()[-2]),  # Before last separator
+                label="Auto-save Data",
+                variable=self.auto_save_var,
+                command=self._toggle_auto_save,
+            )
+        except Exception as e:
+            print(f"Warning: Could not add auto-save checkbutton: {e}")
 
     def _configure_buffer_size(self):
         """Open dialog to configure buffer size."""
@@ -339,11 +406,7 @@ class APGIGui:
         )
         file_menu.add_command(label="Export Plot...", command=self._export_plot)
         file_menu.add_separator()
-        file_menu.add_checkbutton(
-            label="Auto-save Data",
-            variable=self.auto_save_var,
-            command=self._toggle_auto_save,
-        )
+        # Auto-save checkbutton will be added after variables are initialized
         file_menu.add_separator()
         file_menu.add_command(
             label="Exit", command=self._exit_app, accelerator=f"{self.modifier_key}+Q"
@@ -371,24 +434,22 @@ class APGIGui:
         # View Menu
         view_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="View", menu=view_menu)
+        # Store view menu for later variable assignment
+        self._view_menu = view_menu
         view_menu.add_checkbutton(
             label="Control Panel",
-            variable=self.view_vars["control_panel"],
             command=self._toggle_control_panel,
         )
         view_menu.add_checkbutton(
             label="Neural Activity",
-            variable=self.view_vars["neural_activity"],
             command=self._toggle_neural_activity,
         )
         view_menu.add_checkbutton(
             label="Interoception",
-            variable=self.view_vars["interoception"],
             command=self._toggle_interoception,
         )
         view_menu.add_checkbutton(
             label="System Metrics",
-            variable=self.view_vars["system_metrics"],
             command=self._toggle_system_metrics,
         )
         view_menu.add_separator()
@@ -499,15 +560,13 @@ class APGIGui:
         speed_frame = ttk.Frame(control_frame)
         speed_frame.pack(fill=tk.X, pady=5)
         ttk.Label(speed_frame, text="Speed:").pack(side=tk.LEFT)
-        self.speed_var = tk.DoubleVar(value=1.0)
         self._speed_value = 1.0  # Thread-safe cache
-        speed_scale = ttk.Scale(
-            speed_frame, from_=0.1, to=10.0, variable=self.speed_var, orient=tk.HORIZONTAL
-        )
+        speed_scale = ttk.Scale(speed_frame, from_=0.1, to=10.0, orient=tk.HORIZONTAL)
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.speed_label = ttk.Label(speed_frame, text="1.0x")
         self.speed_label.pack(side=tk.LEFT)
-        self.speed_var.trace_add("write", lambda *args: self._update_speed_cache())
+        # Store scale reference for later variable assignment
+        self._speed_scale = speed_scale
 
         # System Status
         status_frame = ttk.LabelFrame(parent, text="System Status", padding=10)
@@ -550,6 +609,8 @@ class APGIGui:
 
         # Add parameter controls
         self.param_vars = {}
+        self.param_scales = {}
+        self.param_labels = {}
         parameters = [
             ("Ignition Threshold", "baseline_threshold", 1.0, 5.0, 2.0),
             ("Extero Precision", "extero_precision", 0.1, 10.0, 1.0),
@@ -567,18 +628,18 @@ class APGIGui:
 
             ttk.Label(frame, text=label, width=18).pack(side=tk.LEFT)
 
-            var = tk.DoubleVar(value=default)
-            self.param_vars[key] = var
+            # Store as regular variable for now
+            self.param_vars[key] = default
 
-            scale = ttk.Scale(frame, from_=min_val, to=max_val, variable=var, orient=tk.HORIZONTAL)
+            scale = ttk.Scale(frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL)
             scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
             val_label = ttk.Label(frame, text=f"{default:.2f}", width=6)
             val_label.pack(side=tk.LEFT)
 
-            var.trace_add(
-                "write", lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.2f}")
-            )
+            # Store scale and label references for later
+            self.param_scales[key] = scale
+            self.param_labels[key] = val_label
 
         # Initialize thread-safe parameter cache after all parameters are created
         self._param_cache = {}
@@ -3425,12 +3486,16 @@ For more information, visit the project repository.
         """Set up thread-safe parameter cache with traces."""
         if hasattr(self, "param_vars"):
             for param_name, var in self.param_vars.items():
-                # Initialize cache
-                self._param_cache[param_name] = var.get()
-                # Add trace to update cache when variable changes
-                var.trace_add(
-                    "write", lambda *args, name=param_name: self._update_param_cache(name)
-                )
+                # Initialize cache - handle both regular variables and tkinter variables
+                if hasattr(var, "get"):
+                    self._param_cache[param_name] = var.get()
+                    # Add trace to update cache when variable changes
+                    var.trace_add(
+                        "write", lambda *args, name=param_name: self._update_param_cache(name)
+                    )
+                else:
+                    # Regular variable
+                    self._param_cache[param_name] = var
 
     def _update_param_cache(self, param_name):
         """Update thread-safe parameter cache."""

@@ -4,11 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
+from apgi_system.system import APGISystem
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from apgi_system.system import APGISystem
 
 
 def main():

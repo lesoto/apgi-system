@@ -8,7 +8,7 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 
 class InstallerError(Exception):

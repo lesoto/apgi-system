@@ -8,7 +8,6 @@ Handles dependency installation and runs the appropriate documentation tool.
 
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 
