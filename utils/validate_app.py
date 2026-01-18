@@ -11,11 +11,11 @@ def test_imports():
     """Test all required imports."""
     print("Testing imports...")
     try:
-        import numpy
-        import scipy
-        import matplotlib
-        import yaml
-        import tkinter
+        import numpy  # noqa: F401
+        import scipy  # noqa: F401
+        import matplotlib  # noqa: F401
+        import yaml  # noqa: F401
+        import tkinter  # noqa: F401
 
         print("✓ All core dependencies imported successfully")
         return True
@@ -31,7 +31,7 @@ def test_apgi_system():
         from apgi_system.system import APGISystem
         from apgi_system.platform_utils import get_resource_path
 
-        system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
+        APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         print("✓ APGI System initialized successfully")
         return True
     except Exception as e:
@@ -84,10 +84,10 @@ def test_gui_imports():
     """Test GUI-specific imports."""
     print("\nTesting GUI imports...")
     try:
-        import tkinter as tk
-        from tkinter import ttk
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-        from matplotlib.figure import Figure
+        import tkinter as tk  # noqa: F401
+        from tkinter import ttk  # noqa: F401
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # noqa: F401
+        from matplotlib.figure import Figure  # noqa: F401
 
         print("✓ GUI dependencies imported successfully")
         return True
@@ -100,8 +100,8 @@ def test_config_file():
     """Test configuration file."""
     print("\nTesting configuration file...")
     try:
-        import yaml
-        from pathlib import Path
+        import yaml  # noqa: F401
+        from pathlib import Path  # noqa: F401
         from apgi_system.platform_utils import get_resource_path
 
         config_path = get_resource_path("config/default.yaml")
@@ -133,7 +133,7 @@ def test_experimental_tasks():
     """Test experimental task imports."""
     print("\nTesting experimental tasks...")
     try:
-        from apgi_system.experiments.tasks import (
+        from apgi_system.experiments.tasks import (  # noqa: F401
             AttentionalBlinkTask,
             ChangeBlindnessTask,
             BinocularRivalryTask,

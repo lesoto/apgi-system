@@ -90,6 +90,10 @@ class AttentionalBlinkTask:
         # Results storage
         self.results: List[TrialResult] = []
 
+        # Step execution state
+        self._step_state = None
+        self._current_trial_result = None
+
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
         trials = []
@@ -446,3 +450,149 @@ class AttentionalBlinkTask:
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
         self.results = []
+        self._step_state = None
+        self._current_trial_result = None
+
+    def step(self, apgi_system) -> Dict[str, Any]:
+        """
+        Execute one step of the current trial.
+
+        This method allows incremental execution of the task, useful for:
+        - Real-time interaction
+        - GUI integration
+        - Testing and debugging
+
+        Args:
+            apgi_system: The APGI system instance
+
+        Returns:
+            Dictionary with current state including:
+            - 'done': True if trial/task is complete
+            - 'trial_complete': True if current trial is complete
+            - 'trial_number': Current trial number
+            - 'stimulus': Current stimulus being presented
+            - 'stimulus_type': Type of current stimulus
+            - 'position': Current position in stream
+            - 'result': Trial result if trial is complete
+            - 'state': Current system state
+        """
+        # Initialize step state if needed
+        if self._step_state is None:
+            # Get next trial
+            trial = self.get_next_trial()
+            if trial is None:
+                return {
+                    "done": True,
+                    "trial_complete": False,
+                    "trial_number": None,
+                    "stimulus": None,
+                    "stimulus_type": None,
+                    "position": None,
+                    "result": None,
+                    "state": None,
+                }
+
+            # Initialize trial state
+            apgi_system.reset()
+            self._step_state = {
+                "trial": trial,
+                "position": 0,
+                "step_in_position": 0,
+                "t1_detected": False,
+                "t2_detected": False,
+                "t1_ignition_time": None,
+                "t2_ignition_time": None,
+                "t1_signal_strength": 0.0,
+                "t2_signal_strength": 0.0,
+                "t1_presentation_time": None,
+                "t2_presentation_time": None,
+                "seen_t1": False,
+                "seen_t2": False,
+            }
+            self._current_trial_result = None
+
+        state = self._step_state
+        trial = state["trial"]
+
+        # Get current stimulus
+        if state["position"] >= len(trial.stream):
+            # Trial complete
+            blink_occurred = state["t1_detected"] and not state["t2_detected"]
+            result = TrialResult(
+                trial_number=trial.trial_number,
+                lag=trial.lag,
+                t1_detected=state["t1_detected"],
+                t2_detected=state["t2_detected"],
+                t1_ignition_time=state["t1_ignition_time"],
+                t2_ignition_time=state["t2_ignition_time"],
+                t1_signal_strength=state["t1_signal_strength"],
+                t2_signal_strength=state["t2_signal_strength"],
+                blink_occurred=blink_occurred,
+            )
+            self.results.append(result)
+            self.current_trial_idx += 1
+            self._step_state = None
+            self._current_trial_result = result
+
+            return {
+                "done": self.get_next_trial() is None,
+                "trial_complete": True,
+                "trial_number": trial.trial_number,
+                "stimulus": None,
+                "stimulus_type": None,
+                "position": state["position"],
+                "result": result,
+                "state": None,
+            }
+
+        stimulus = trial.stream[state["position"]]
+        stim_type = trial.stream_types[state["position"]]
+
+        # Track presentation times
+        if stim_type == StimulusType.TARGET_1:
+            state["t1_presentation_time"] = apgi_system.time
+            state["seen_t1"] = True
+        elif stim_type == StimulusType.TARGET_2:
+            state["t2_presentation_time"] = apgi_system.time
+            state["seen_t2"] = True
+
+        # Step the system
+        system_state = apgi_system.step(stimulus)
+
+        # Check for ignition
+        if system_state["ignition"]["ignition_occurred"]:
+            ignition_time = system_state["time"]
+
+            # Determine which target this ignition is for
+            if state["seen_t1"] and not state["t1_detected"]:
+                if state["t1_presentation_time"] is not None:
+                    time_since_t1 = ignition_time - state["t1_presentation_time"]
+                    if 0 <= time_since_t1 <= 400:  # 400ms window
+                        state["t1_detected"] = True
+                        state["t1_ignition_time"] = ignition_time
+                        state["t1_signal_strength"] = system_state["ignition"]["total_signal"]
+
+            if state["seen_t2"] and not state["t2_detected"]:
+                if state["t2_presentation_time"] is not None:
+                    time_since_t2 = ignition_time - state["t2_presentation_time"]
+                    if 0 <= time_since_t2 <= 400:  # 400ms window
+                        state["t2_detected"] = True
+                        state["t2_ignition_time"] = ignition_time
+                        state["t2_signal_strength"] = system_state["ignition"]["total_signal"]
+
+        # Advance step counter
+        state["step_in_position"] += 1
+        if state["step_in_position"] >= int(self.item_duration_ms):
+            state["position"] += 1
+            state["step_in_position"] = 0
+
+        return {
+            "done": False,
+            "trial_complete": False,
+            "trial_number": trial.trial_number,
+            "stimulus": stimulus,
+            "stimulus_type": stim_type,
+            "position": state["position"],
+            "result": None,
+            "state": system_state,
+        }

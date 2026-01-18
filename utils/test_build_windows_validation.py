@@ -4,7 +4,11 @@ import sys
 
 sys.path.insert(0, "build")
 
-from build_windows import WindowsBuilder
+try:
+    from build_windows import WindowsBuilder  # noqa: E402
+except ImportError:
+    print("build_windows module not found")
+    sys.exit(1)
 
 
 def test_builder():

@@ -51,6 +51,13 @@ class Permission(str, Enum):
     SYSTEM_ADMIN = "system:admin"
     USER_MANAGE = "user:manage"
 
+    # User management permissions (more granular)
+    USER_CREATE = "user:create"
+    USER_READ = "user:read"
+    USER_UPDATE = "user:update"
+    USER_DELETE = "user:delete"
+    USER_ADMIN = "user:admin"  # Full user administration
+
 
 # Role to permissions mapping
 ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
@@ -68,6 +75,11 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.DATA_READ,
         Permission.SYSTEM_ADMIN,
         Permission.USER_MANAGE,
+        Permission.USER_CREATE,
+        Permission.USER_READ,
+        Permission.USER_UPDATE,
+        Permission.USER_DELETE,
+        Permission.USER_ADMIN,
     },
     Role.RESEARCHER: {
         # Researchers can create and manage their own sessions and tasks
@@ -81,12 +93,16 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.TASK_DELETE,
         Permission.DATA_EXPORT,
         Permission.DATA_READ,
+        # Limited user management (can read and update own profile)
+        Permission.USER_READ,
     },
     Role.VIEWER: {
         # Viewers can only read data
         Permission.SESSION_READ,
         Permission.TASK_READ,
         Permission.DATA_READ,
+        # Can read basic user info
+        Permission.USER_READ,
     },
 }
 
@@ -206,6 +222,11 @@ async def get_current_user(
     Raises:
         InvalidTokenError: If token is invalid or expired
     """
+    if not credentials or not credentials.credentials:
+        raise InvalidTokenError(
+            "Missing authorization token. Please provide a valid JWT token in the Authorization header."
+        )
+
     token = credentials.credentials
     auth_manager = AuthManager(db)
 
@@ -213,7 +234,20 @@ async def get_current_user(
         payload = auth_manager.verify_token(token, expected_type="access")
         return payload
     except Exception as e:
-        raise InvalidTokenError(str(e))
+        # Provide more helpful error messages based on the exception type
+        error_msg = str(e)
+        if "expired" in error_msg.lower():
+            raise InvalidTokenError("Token has expired. Please log in again to get a new token.")
+        elif "invalid" in error_msg.lower() or "malformed" in error_msg.lower():
+            raise InvalidTokenError("Invalid token format. Please provide a valid JWT token.")
+        elif "token type" in error_msg.lower():
+            raise InvalidTokenError(
+                "Invalid token type. Please use an access token, not a refresh token."
+            )
+        else:
+            raise InvalidTokenError(
+                "Authentication failed. Please check your credentials and try again."
+            )
 
 
 def require_permission(permission: Permission):

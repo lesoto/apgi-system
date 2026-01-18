@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from apgi_system.platform_utils import get_resource_path
+from apgi_system.config_validator import ConfigValidator, ConfigValidationError
 from apgi_system.core import (
     ActiveInferenceEngine,
     FreeEnergyCalculator,
@@ -62,6 +63,13 @@ class APGISystem:
 
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
+
+        # Validate configuration
+        validator = ConfigValidator()
+        try:
+            validator.validate(self.config)
+        except ConfigValidationError as e:
+            raise ValueError(f"Configuration validation failed:\n{e}") from e
 
         # Initialize all subsystems
         self._initialize_subsystems()

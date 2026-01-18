@@ -93,6 +93,10 @@ class ChangeBlindnessTask:
         # Results storage
         self.results: List[TrialResult] = []
 
+        # Step execution state
+        self._step_state = None
+        self._current_trial_result = None
+
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
         trials = []
@@ -599,3 +603,138 @@ class ChangeBlindnessTask:
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
         self.results = []
+        self._step_state = None
+        self._current_trial_result = None
+
+    def step(self, apgi_system) -> Dict[str, Any]:
+        """
+        Execute one step of the current trial.
+
+        Args:
+            apgi_system: The APGI system instance
+
+        Returns:
+            Dictionary with current state including:
+            - 'done': True if trial/task is complete
+            - 'trial_complete': True if current trial is complete
+            - 'trial_number': Current trial number
+            - 'phase': Current phase ('original', 'blank', 'modified')
+            - 'alternation': Current alternation number
+            - 'stimulus': Current stimulus being presented
+            - 'result': Trial result if trial is complete
+            - 'state': Current system state
+        """
+        # Initialize step state if needed
+        if self._step_state is None:
+            # Get next trial
+            trial = self.get_next_trial()
+            if trial is None:
+                return {
+                    "done": True,
+                    "trial_complete": False,
+                    "trial_number": None,
+                    "phase": None,
+                    "alternation": None,
+                    "stimulus": None,
+                    "result": None,
+                    "state": None,
+                }
+
+            # Initialize trial state
+            apgi_system.reset()
+            blank_screen = self._generate_blank()
+            self._step_state = {
+                "trial": trial,
+                "alternation": 0,
+                "phase": "original",  # original, blank, modified
+                "step_in_phase": 0,
+                "blank_screen": blank_screen,
+                "change_detected": False,
+                "alternations_to_detection": None,
+                "time_to_detection": None,
+                "ignition_signal_strength": 0.0,
+            }
+            self._current_trial_result = None
+
+        state = self._step_state
+        trial = state["trial"]
+
+        # Determine stimulus based on phase
+        if state["phase"] == "original":
+            stimulus = trial.original_image
+            phase_duration = self.presentation_duration_ms
+        elif state["phase"] == "blank":
+            stimulus = state["blank_screen"]
+            phase_duration = self.blank_duration_ms
+        else:  # modified
+            stimulus = trial.modified_image
+            phase_duration = self.presentation_duration_ms
+
+        # Step the system
+        system_state = apgi_system.step(stimulus)
+
+        # Check for ignition during modified image
+        if state["phase"] == "modified" and not state["change_detected"]:
+            if system_state["ignition"]["ignition_occurred"]:
+                state["change_detected"] = True
+                state["alternations_to_detection"] = state["alternation"] + 1
+                state["time_to_detection"] = system_state["time"] - (
+                    state["alternation"]
+                    * (self.presentation_duration_ms * 2 + self.blank_duration_ms * 2)
+                )
+                state["ignition_signal_strength"] = system_state["ignition"]["total_signal"]
+
+        # Advance step counter
+        state["step_in_phase"] += 1
+
+        # Check if phase is complete
+        if state["step_in_phase"] >= int(phase_duration):
+            state["step_in_phase"] = 0
+
+            # Transition to next phase
+            if state["phase"] == "original":
+                state["phase"] = "blank"
+            elif state["phase"] == "blank":
+                state["phase"] = "modified"
+            else:  # modified
+                state["phase"] = "blank"
+                state["alternation"] += 1
+
+                # Check if should stop (detected or max alternations)
+                if state["change_detected"] or state["alternation"] >= trial.max_alternations:
+                    # Trial complete
+                    result = TrialResult(
+                        trial_number=trial.trial_number,
+                        change_type=trial.change_type,
+                        change_magnitude=trial.change_magnitude,
+                        change_detected=state["change_detected"],
+                        alternations_to_detection=state["alternations_to_detection"],
+                        time_to_detection=state["time_to_detection"],
+                        ignition_signal_strength=state["ignition_signal_strength"],
+                    )
+                    self.results.append(result)
+                    self.current_trial_idx += 1
+                    self._step_state = None
+                    self._current_trial_result = result
+
+                    return {
+                        "done": self.get_next_trial() is None,
+                        "trial_complete": True,
+                        "trial_number": trial.trial_number,
+                        "phase": None,
+                        "alternation": state["alternation"],
+                        "stimulus": None,
+                        "result": result,
+                        "state": None,
+                    }
+
+        return {
+            "done": False,
+            "trial_complete": False,
+            "trial_number": trial.trial_number,
+            "phase": state["phase"],
+            "alternation": state["alternation"],
+            "stimulus": stimulus,
+            "result": None,
+            "state": system_state,
+        }

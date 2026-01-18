@@ -5,13 +5,14 @@ Handles JWT token creation/verification and password hashing for user authentica
 """
 
 import hmac
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import bcrypt
 import jwt
 
-from passlib.context import CryptContext
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -19,8 +20,7 @@ from api.config import settings
 from api.database.models import RefreshToken, User
 from api.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
 
 
 class TokenPayload:
@@ -101,7 +101,13 @@ class AuthManager:
         Returns:
             Hashed password string
         """
-        return pwd_context.hash(password)
+        # Truncate password to 72 bytes (bcrypt limit)
+        password_bytes = password.encode("utf-8")
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+        salt = bcrypt.gensalt(rounds=12)
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        return hashed.decode("utf-8")
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -115,7 +121,12 @@ class AuthManager:
         Returns:
             True if password matches, False otherwise
         """
-        return pwd_context.verify(plain_password, hashed_password)
+        # Truncate password to 72 bytes (bcrypt limit) - must match hash_password behavior
+        password_bytes = plain_password.encode("utf-8")
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+        hashed_bytes = hashed_password.encode("utf-8")
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
 
     # ========================================================================
     # Token Creation
@@ -405,7 +416,7 @@ class AuthManager:
                 return False
             except Exception as e:
                 self.db.rollback()
-                logger.error(f"Failed to revoke refresh token {token_id}: {e}")
+                logger.error(f"Failed to revoke refresh token {token_hash}: {e}")
                 return False
 
         except (InvalidTokenError, ExpiredTokenError):

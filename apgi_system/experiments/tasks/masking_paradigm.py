@@ -112,6 +112,10 @@ class MaskingParadigmTask:
         self.current_trial_idx = 0
         self.results: List[TrialResult] = []
 
+        # Step execution state
+        self._step_state = None
+        self._current_trial_result = None
+
         print(f"Masking Paradigm Task initialized:")
         print(f"  - SOAs: {self.soas} ms")
         print(f"  - Target duration: {self.target_duration_ms} ms")
@@ -551,4 +555,129 @@ class MaskingParadigmTask:
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
         self.results = []
+        self._step_state = None
+        self._current_trial_result = None
         print("Task reset. Ready for new run.")
+
+    def step(self, apgi_system) -> Dict[str, Any]:
+        """
+        Execute one step of the current trial.
+
+        Args:
+            apgi_system: The APGI system instance
+
+        Returns:
+            Dictionary with current state including:
+            - 'done': True if trial/task is complete
+            - 'trial_complete': True if current trial is complete
+            - 'trial_number': Current trial number
+            - 'phase': Current phase ('target', 'mask')
+            - 'stimulus': Current stimulus being presented
+            - 'result': Trial result if trial is complete
+            - 'state': Current system state
+        """
+        # Initialize step state if needed
+        if self._step_state is None:
+            # Get next trial
+            trial = self.get_next_trial()
+            if trial is None:
+                return {
+                    "done": True,
+                    "trial_complete": False,
+                    "trial_number": None,
+                    "phase": None,
+                    "stimulus": None,
+                    "result": None,
+                    "state": None,
+                }
+
+            # Initialize trial state
+            apgi_system.reset()
+            self._step_state = {
+                "trial": trial,
+                "phase": "target",  # target, mask
+                "step_in_phase": 0,
+                "target_detected": False,
+                "target_ignition_time": None,
+                "target_signal_strength": 0.0,
+                "mask_detected": False,
+                "mask_ignition_time": None,
+                "mask_signal_strength": 0.0,
+            }
+            self._current_trial_result = None
+
+        state = self._step_state
+        trial = state["trial"]
+
+        # Determine stimulus based on phase
+        if state["phase"] == "target":
+            stimulus = trial.target
+            phase_duration = self.target_duration_ms
+        else:  # mask
+            stimulus = trial.mask
+            phase_duration = self.mask_duration_ms
+
+        # Step the system
+        system_state = apgi_system.step(stimulus)
+
+        # Check for ignition
+        if system_state["ignition"]["ignition_occurred"]:
+            ignition_time = system_state["time"]
+            ignition_strength = system_state["ignition"]["total_signal"]
+
+            if state["phase"] == "target" and not state["target_detected"]:
+                state["target_detected"] = True
+                state["target_ignition_time"] = ignition_time
+                state["target_signal_strength"] = ignition_strength
+
+            elif state["phase"] == "mask" and not state["mask_detected"]:
+                state["mask_detected"] = True
+                state["mask_ignition_time"] = ignition_time
+                state["mask_signal_strength"] = ignition_strength
+
+        # Advance step counter
+        state["step_in_phase"] += 1
+
+        # Check if phase is complete
+        if state["step_in_phase"] >= int(phase_duration):
+            state["step_in_phase"] = 0
+
+            # Transition to next phase
+            if state["phase"] == "target":
+                state["phase"] = "mask"
+            else:  # mask
+                # Trial complete
+                result = TrialResult(
+                    trial_number=trial.trial_number,
+                    soa=trial.soa,
+                    target_detected=state["target_detected"],
+                    mask_detected=state["mask_detected"],
+                    target_ignition_time=state["target_ignition_time"],
+                    mask_ignition_time=state["mask_ignition_time"],
+                    target_signal_strength=state["target_signal_strength"],
+                    mask_signal_strength=state["mask_signal_strength"],
+                )
+                self.results.append(result)
+                self.current_trial_idx += 1
+                self._step_state = None
+                self._current_trial_result = result
+
+                return {
+                    "done": self.get_next_trial() is None,
+                    "trial_complete": True,
+                    "trial_number": trial.trial_number,
+                    "phase": None,
+                    "stimulus": None,
+                    "result": result,
+                    "state": None,
+                }
+
+        return {
+            "done": False,
+            "trial_complete": False,
+            "trial_number": trial.trial_number,
+            "phase": state["phase"],
+            "stimulus": stimulus,
+            "result": None,
+            "state": system_state,
+        }

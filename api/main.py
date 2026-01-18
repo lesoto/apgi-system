@@ -41,7 +41,7 @@ from api.middleware.logging import (
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from api.routes import auth, export, health, metrics, sessions, state, tasks, version
+from api.routes import auth, export, health, metrics, sessions, state, tasks, users, version
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -240,6 +240,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
 
     # Include routers
     app.include_router(auth.router)
+    app.include_router(users.router)
     app.include_router(sessions.router)
     app.include_router(state.router)
     app.include_router(tasks.router)

@@ -306,6 +306,33 @@ class AuthorizationError(APIError):
 
 
 # ============================================================================
+# User Management Exceptions (404, 409)
+# ============================================================================
+
+
+class UserNotFoundError(APIError):
+    """
+    Exception raised when a requested user does not exist.
+
+    HTTP Status: 404 Not Found
+    """
+
+    def __init__(self, user_id: str):
+        """
+        Initialize user not found error.
+
+        Args:
+            user_id: The user identifier that was not found
+        """
+        super().__init__(
+            code="USER_NOT_FOUND",
+            message=f"User with ID '{user_id}' not found",
+            status_code=404,
+            details={"user_id": user_id},
+        )
+
+
+# ============================================================================
 # Rate Limiting Exceptions (429)
 # ============================================================================
 

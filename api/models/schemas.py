@@ -470,3 +470,126 @@ class VersionResponse(BaseModel):
     supported_versions: List[str] = Field(..., description="List of supported versions")
     deprecated_versions: List[str] = Field(..., description="List of deprecated versions")
     api_spec_url: str = Field(..., description="URL to OpenAPI specification")
+
+
+# ============================================================================
+# User Management Models
+# ============================================================================
+
+
+class UserCreateRequest(BaseModel):
+    """Request to create a new user."""
+
+    username: Optional[str] = Field(None, description="Username (auto-generated if not provided)")
+    email: Optional[str] = Field(None, description="Email address")
+    password: Optional[str] = Field(None, description="Password (auto-generated if not provided)")
+    roles: Optional[List[str]] = Field(None, description="List of user roles")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "username": "john_doe",
+                "email": "john@example.com",
+                "password": "secure_password123",
+                "roles": ["user"],
+            }
+        }
+    )
+
+
+class UserCreateResponse(BaseModel):
+    """Response after user creation."""
+
+    user_id: str = Field(..., description="User identifier")
+    username: str = Field(..., description="Username")
+    email: str = Field(..., description="Email address")
+    roles: List[str] = Field(..., description="User roles")
+    password: str = Field(..., description="Plain text password (only returned once)")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    message: str = Field(..., description="Status message")
+
+
+class UserResponse(BaseModel):
+    """User information response."""
+
+    user_id: str = Field(..., description="User identifier")
+    username: str = Field(..., description="Username")
+    email: str = Field(..., description="Email address")
+    roles: List[str] = Field(..., description="User roles")
+    is_active: bool = Field(..., description="Whether user is active")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    last_login: Optional[datetime] = Field(None, description="Last login timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                "username": "john_doe",
+                "email": "john@example.com",
+                "roles": ["user"],
+                "is_active": True,
+                "created_at": "2025-12-03T10:30:00Z",
+                "updated_at": "2025-12-03T10:30:00Z",
+                "last_login": "2025-12-03T11:00:00Z",
+            }
+        }
+    )
+
+
+class UserUpdateRequest(BaseModel):
+    """Request to update user information."""
+
+    email: Optional[str] = Field(None, description="New email address")
+    roles: Optional[List[str]] = Field(None, description="New roles list (admin only)")
+    is_active: Optional[bool] = Field(None, description="Active status (admin only)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "newemail@example.com",
+                "roles": ["user", "researcher"],
+                "is_active": True,
+            }
+        }
+    )
+
+
+class PasswordResetRequest(BaseModel):
+    """Request to reset user password."""
+
+    new_password: Optional[str] = Field(
+        None, description="New password (auto-generated if not provided)"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"new_password": "new_secure_password456"}}
+    )
+
+
+class PasswordResetResponse(BaseModel):
+    """Response after password reset."""
+
+    user_id: str = Field(..., description="User identifier")
+    new_password: str = Field(..., description="New plain text password")
+    message: str = Field(..., description="Status message")
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+
+    total_users: int = Field(..., description="Total number of users")
+    active_users: int = Field(..., description="Number of active users")
+    inactive_users: int = Field(..., description="Number of inactive users")
+    role_counts: Dict[str, int] = Field(..., description="Count of users by role")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_users": 10,
+                "active_users": 8,
+                "inactive_users": 2,
+                "role_counts": {"admin": 2, "user": 6, "researcher": 2},
+            }
+        }
+    )

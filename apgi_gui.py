@@ -3444,6 +3444,35 @@ For more information, visit the project repository.
 
 def main():
     """Main entry point."""
+    # Create splash screen first to show GUI is starting
+    splash_root = tk.Tk()
+    splash_root.title("APGI System")
+    splash_root.geometry("400x200")
+    splash_root.resizable(False, False)
+
+    # Center splash screen
+    screen_width = splash_root.winfo_screenwidth()
+    screen_height = splash_root.winfo_screenheight()
+    x = (screen_width - 400) // 2
+    y = (screen_height - 200) // 2
+    splash_root.geometry(f"400x200+{x}+{y}")
+
+    # Show loading message
+    splash_frame = ttk.Frame(splash_root, padding=20)
+    splash_frame.pack(fill=tk.BOTH, expand=True)
+
+    ttk.Label(
+        splash_frame, text="APGI Consciousness Modeling Framework", font=("Arial", 14, "bold")
+    ).pack(pady=(0, 10))
+    ttk.Label(splash_frame, text="Loading...", font=("Arial", 12)).pack(pady=(0, 5))
+    progress = ttk.Progressbar(splash_frame, mode="indeterminate", length=300)
+    progress.pack(pady=10)
+    progress.start(10)
+
+    splash_root.update()
+    splash_root.lift()
+    splash_root.attributes("-topmost", True)
+
     # Check dependencies before starting with user-friendly error handling
     try:
         from utils.dependency_checker import check_dependencies_on_startup
@@ -3489,10 +3518,16 @@ def main():
         print("pip install -r requirements.txt")
     except Exception as e:
         print(f"Warning: Dependency check failed with error: {e}")
-        print("Attempting to start anyway. If issues occur, install dependencies:")
-        print("pip install -r requirements.txt")
 
+    # Create main application
     root = tk.Tk()
+
+    # Close splash screen and show main window
+    try:
+        splash_root.destroy()
+    except:
+        pass
+
     app = APGIGui(root)
     root.mainloop()
 

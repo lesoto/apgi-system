@@ -156,6 +156,10 @@ class IowaGamblingTask:
         self.current_trial_idx = 0
         self.results: List[TrialResult] = []
 
+        # Step execution state
+        self._step_state = None
+        self._current_trial_result = None
+
         print(f"Iowa Gambling Task initialized:")
         print(f"  - Total trials: {self.num_trials}")
         print(f"  - Initial balance: ${self.initial_balance}")
@@ -779,4 +783,175 @@ class IowaGamblingTask:
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
         self.results = []
+        self._step_state = None
+        self._current_trial_result = None
         print("Task reset. Ready for new run.")
+
+    def step(self, apgi_system) -> Dict[str, Any]:
+        """
+        Execute one step of the current trial.
+
+        Args:
+            apgi_system: The APGI system instance
+
+        Returns:
+            Dictionary with current state including:
+            - 'done': True if trial/task is complete
+            - 'trial_complete': True if current trial is complete
+            - 'trial_number': Current trial number
+            - 'phase': Current phase ('deck', 'blank', 'outcome')
+            - 'stimulus': Current stimulus being presented
+            - 'result': Trial result if trial is complete
+            - 'state': Current system state
+        """
+        # Initialize step state if needed
+        if self._step_state is None:
+            # Get next trial
+            trial = self.get_next_trial()
+            if trial is None:
+                return {
+                    "done": True,
+                    "trial_complete": False,
+                    "trial_number": None,
+                    "phase": None,
+                    "stimulus": None,
+                    "result": None,
+                    "state": None,
+                }
+
+            # Initialize trial state
+            apgi_system.reset()
+            self._step_state = {
+                "trial": trial,
+                "phase": "deck",  # deck, blank, outcome
+                "step_in_phase": 0,
+                "deck_presentation_steps": 500,
+                "blank_steps": 200,
+                "outcome_steps": 1000,
+                "ignition_occurred": False,
+                "max_ignition_strength": 0.0,
+                "anticipatory_response": 0.0,
+                "decision_start_time": apgi_system.time,
+                "somatic_marker_strength": 0.0,
+            }
+            self._current_trial_result = None
+
+        state = self._step_state
+        trial = state["trial"]
+
+        # Determine stimulus based on phase
+        if state["phase"] == "deck":
+            stimulus = trial.deck_stimulus
+            phase_duration = state["deck_presentation_steps"]
+        elif state["phase"] == "blank":
+            stimulus = 0.05 * np.random.randn(self.stim_dim)
+            phase_duration = state["blank_steps"]
+        else:  # outcome
+            stimulus = self._generate_outcome_stimulus(trial.net_outcome)
+            phase_duration = state["outcome_steps"]
+
+        # Step the system
+        system_state = apgi_system.step(stimulus)
+
+        # Track state based on phase
+        if state["phase"] == "deck":
+            # Monitor anticipatory somatic markers
+            if "body" in system_state and "prediction_error" in system_state["body"]:
+                intero_signal = np.linalg.norm(system_state["body"]["prediction_error"])
+                if intero_signal > state["anticipatory_response"]:
+                    state["anticipatory_response"] = intero_signal
+            elif "interoception" in system_state:
+                intero_signal = system_state["interoception"].get("interoceptive_precision", 0.0)
+                if intero_signal > state["anticipatory_response"]:
+                    state["anticipatory_response"] = intero_signal
+
+            # Check for ignition
+            if system_state["ignition"]["ignition_occurred"]:
+                state["ignition_occurred"] = True
+                ignition_strength = system_state["ignition"]["total_signal"]
+                if ignition_strength > state["max_ignition_strength"]:
+                    state["max_ignition_strength"] = ignition_strength
+
+        elif state["phase"] == "outcome":
+            # Monitor somatic marker
+            if "body" in system_state and "prediction_error" in system_state["body"]:
+                intero_signal = np.linalg.norm(system_state["body"]["prediction_error"])
+                if intero_signal > state["somatic_marker_strength"]:
+                    state["somatic_marker_strength"] = intero_signal
+            elif "interoception" in system_state:
+                intero_signal = system_state["interoception"].get("interoceptive_precision", 0.0)
+                if intero_signal > state["somatic_marker_strength"]:
+                    state["somatic_marker_strength"] = intero_signal
+
+            # Check for ignition
+            if system_state["ignition"]["ignition_occurred"]:
+                state["ignition_occurred"] = True
+                ignition_strength = system_state["ignition"]["total_signal"]
+                if ignition_strength > state["max_ignition_strength"]:
+                    state["max_ignition_strength"] = ignition_strength
+
+        # Advance step counter
+        state["step_in_phase"] += 1
+
+        # Check if phase is complete
+        if state["step_in_phase"] >= phase_duration:
+            state["step_in_phase"] = 0
+
+            # Transition to next phase
+            if state["phase"] == "deck":
+                state["phase"] = "blank"
+            elif state["phase"] == "blank":
+                state["phase"] = "outcome"
+            else:  # outcome
+                # Trial complete
+                decision_time = system_state["time"] - state["decision_start_time"]
+                self.current_balance += trial.net_outcome
+
+                result = TrialResult(
+                    trial_number=trial.trial_number,
+                    deck_choice=trial.deck_choice,
+                    reward=trial.reward,
+                    penalty=trial.penalty,
+                    net_outcome=trial.net_outcome,
+                    running_total=self.current_balance,
+                    ignition_occurred=state["ignition_occurred"],
+                    ignition_strength=state["max_ignition_strength"],
+                    somatic_marker_strength=state["somatic_marker_strength"],
+                    decision_time=decision_time,
+                    anticipatory_response=state["anticipatory_response"],
+                )
+                self.results.append(result)
+                self.current_trial_idx += 1
+                self._step_state = None
+                self._current_trial_result = result
+
+                return {
+                    "done": self.get_next_trial() is None,
+                    "trial_complete": True,
+                    "trial_number": trial.trial_number,
+                    "phase": None,
+                    "stimulus": None,
+                    "result": result,
+                    "state": None,
+                }
+
+        return {
+            "done": False,
+            "trial_complete": False,
+            "trial_number": trial.trial_number,
+            "phase": state["phase"],
+            "stimulus": stimulus,
+            "result": None,
+            "state": system_state,
+        }
+
+    def get_next_trial(self) -> Optional[Trial]:
+        """
+        Get the next trial to execute.
+
+        Returns:
+            Trial object if available, None if all trials completed
+        """
+        if self.current_trial_idx < len(self.trials):
+            return self.trials[self.current_trial_idx]
+        return None

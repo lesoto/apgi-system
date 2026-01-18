@@ -27,11 +27,11 @@ async def test_rate_limiter():
             key = rate_limiter._get_redis_key(client_id, endpoint)
             count = await redis_client.zcard(key)
             print(
-                f"Request {i+1}: allowed={result.allowed}, remaining={result.remaining}, redis_count={count}"
+                f"Request {i + 1}: allowed={result.allowed}, remaining={result.remaining}, redis_count={count}"
             )
 
             if not result.allowed:
-                print(f"  -> Denied at request {i+1}")
+                print(f"  -> Denied at request {i + 1}")
                 break
 
     finally:

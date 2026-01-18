@@ -19,7 +19,7 @@ def test_gui_launch():
         root = tk.Tk()
 
         # Create GUI instance
-        app = APGIGui(root)
+        APGIGui(root)
 
         print("✓ GUI window opened successfully!")
         print("  - Window title:", root.title())

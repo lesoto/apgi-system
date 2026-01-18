@@ -119,6 +119,10 @@ class BinocularRivalryTask:
         # Results storage
         self.results: List[TrialResult] = []
 
+        # Step execution state
+        self._step_state = None
+        self._current_trial_result = None
+
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
         trials = []
@@ -606,3 +610,161 @@ class BinocularRivalryTask:
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
         self.results = []
+        self._step_state = None
+        self._current_trial_result = None
+
+    def step(self, apgi_system) -> Dict[str, Any]:
+        """
+        Execute one step of the current trial.
+
+        Args:
+            apgi_system: The APGI system instance
+
+        Returns:
+            Dictionary with current state including:
+            - 'done': True if trial/task is complete
+            - 'trial_complete': True if current trial is complete
+            - 'trial_number': Current trial number
+            - 'stimulus': Current stimulus being presented
+            - 'step': Current step number in trial
+            - 'result': Trial result if trial is complete
+            - 'state': Current system state
+        """
+        # Initialize step state if needed
+        if self._step_state is None:
+            # Get next trial
+            trial = self.get_next_trial()
+            if trial is None:
+                return {
+                    "done": True,
+                    "trial_complete": False,
+                    "trial_number": None,
+                    "stimulus": None,
+                    "step": None,
+                    "result": None,
+                    "state": None,
+                }
+
+            # Initialize trial state
+            apgi_system.reset()
+            self._step_state = {
+                "trial": trial,
+                "step": 0,
+                "perceptual_states": [],
+                "current_dominant": None,
+                "current_dominance_start": 0.0,
+                "dominance_periods": [],
+            }
+            self._current_trial_result = None
+
+        state = self._step_state
+        trial = state["trial"]
+
+        # Check if trial is complete
+        if state["step"] >= int(trial.duration_ms):
+            # Analyze dominance periods
+            pattern_a_periods = [
+                p for p in state["dominance_periods"] if p.stimulus == StimulusType.PATTERN_A
+            ]
+            pattern_b_periods = [
+                p for p in state["dominance_periods"] if p.stimulus == StimulusType.PATTERN_B
+            ]
+
+            pattern_a_total = sum(p.duration for p in pattern_a_periods)
+            pattern_b_total = sum(p.duration for p in pattern_b_periods)
+            total_dominance = pattern_a_total + pattern_b_total
+
+            pattern_a_ratio = pattern_a_total / total_dominance if total_dominance > 0 else 0.0
+
+            num_alternations = (
+                len(state["dominance_periods"]) - 1 if state["dominance_periods"] else 0
+            )
+            avg_dominance = (
+                np.mean([p.duration for p in state["dominance_periods"]])
+                if state["dominance_periods"]
+                else 0.0
+            )
+            alternation_rate = (
+                num_alternations / (trial.duration_ms / 1000.0) if trial.duration_ms > 0 else 0.0
+            )
+
+            result = TrialResult(
+                trial_number=trial.trial_number,
+                pattern_a_strength=trial.pattern_a_strength,
+                pattern_b_strength=trial.pattern_b_strength,
+                total_duration_ms=trial.duration_ms,
+                dominance_periods=state["dominance_periods"],
+                num_alternations=num_alternations,
+                pattern_a_total_duration=pattern_a_total,
+                pattern_b_total_duration=pattern_b_total,
+                pattern_a_dominance_ratio=pattern_a_ratio,
+                average_dominance_duration=avg_dominance,
+                alternation_rate=alternation_rate,
+            )
+            self.results.append(result)
+            self.current_trial_idx += 1
+            self._step_state = None
+            self._current_trial_result = result
+
+            return {
+                "done": self.get_next_trial() is None,
+                "trial_complete": True,
+                "trial_number": trial.trial_number,
+                "stimulus": None,
+                "step": state["step"],
+                "result": result,
+                "state": None,
+            }
+
+        # Create rivalry stimulus
+        stimulus = self._create_rivalry_stimulus(trial, apgi_system.time)
+
+        # Step the system
+        system_state = apgi_system.step(stimulus)
+
+        # Sample perceptual state at intervals
+        if state["step"] % int(self.sampling_interval_ms) == 0:
+            # Determine dominant pattern
+            dominant, pattern_a_str, pattern_b_str = self._determine_dominant_pattern(
+                system_state, trial
+            )
+
+            perceptual_state = PerceptualState(
+                time_ms=system_state["time"],
+                dominant_stimulus=dominant,
+                ignition_occurred=system_state["ignition"]["ignition_occurred"],
+                signal_strength=system_state["ignition"].get("total_signal", 0.0),
+                pattern_a_strength=pattern_a_str,
+                pattern_b_strength=pattern_b_str,
+            )
+            state["perceptual_states"].append(perceptual_state)
+
+            # Track dominance switches
+            if dominant is not None and dominant != state["current_dominant"]:
+                # End previous dominance period
+                if state["current_dominant"] is not None:
+                    state["dominance_periods"].append(
+                        DominancePeriod(
+                            stimulus=state["current_dominant"],
+                            start_time=state["current_dominance_start"],
+                            end_time=system_state["time"],
+                            duration=system_state["time"] - state["current_dominance_start"],
+                        )
+                    )
+
+                # Start new dominance period
+                state["current_dominant"] = dominant
+                state["current_dominance_start"] = system_state["time"]
+
+        # Advance step counter
+        state["step"] += 1
+
+        return {
+            "done": False,
+            "trial_complete": False,
+            "trial_number": trial.trial_number,
+            "stimulus": stimulus,
+            "step": state["step"],
+            "result": None,
+            "state": system_state,
+        }

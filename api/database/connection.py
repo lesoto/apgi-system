@@ -90,15 +90,15 @@ def create_default_user():
     """
     db = SessionLocal()
     try:
-        # Check if default user already exists
+        # Check if any default user already exists (users with username starting with "default_")
         from sqlalchemy import select
 
-        stmt = select(User).where(User.username == "default_user")
+        stmt = select(User).where(User.username.like("default_%"))
         result = db.execute(stmt)
         existing_user = result.scalar_one_or_none()
 
         if existing_user:
-            logger.info("Default user already exists")
+            logger.info(f"Default user already exists: {existing_user.username}")
             return
 
         # Generate secure credentials
@@ -127,7 +127,7 @@ def create_default_user():
 
         db.add(default_user)
         db.commit()
-        logger.info("Default user created with secure credentials")
+        logger.info(f"Default user created with secure credentials: {secure_username}")
 
     except Exception as e:
         db.rollback()
