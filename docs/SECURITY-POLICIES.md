@@ -3,11 +3,13 @@
 ## Secrets Rotation Policy
 
 ### Overview
+
 This document outlines the secrets rotation policy for the APGI System to maintain security best practices and minimize the impact of potential credential leaks.
 
 ### Secrets Requiring Rotation
 
 #### 1. JWT Secret Keys
+
 - **Rotation Frequency**: Every 90 days
 - **Purpose**: Used for signing and verifying JWT authentication tokens
 - **Impact**: Requires all users to re-authenticate after rotation
@@ -19,6 +21,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
   5. Old tokens will expire naturally (30-minute access tokens)
 
 #### 2. Database Credentials
+
 - **Rotation Frequency**: Every 180 days
 - **Purpose**: PostgreSQL database access
 - **Impact**: Requires database connection restart
@@ -30,6 +33,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
   5. Verify database connectivity
 
 #### 3. Redis Credentials
+
 - **Rotation Frequency**: Every 180 days
 - **Purpose**: Redis cache and session storage access
 - **Impact**: Session data may be temporarily unavailable
@@ -41,6 +45,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
   5. Restart application services
 
 #### 4. API Keys
+
 - **Rotation Frequency**: Every 90 days
 - **Purpose**: External API integrations
 - **Impact**: External integrations will need updated keys
@@ -52,6 +57,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
   5. Revoke old API keys
 
 #### 5. Webhook URLs and Secrets
+
 - **Rotation Frequency**: Every 180 days
 - **Purpose**: Alerting and notification webhooks
 - **Impact**: Webhook notifications may fail during transition
@@ -65,6 +71,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
 ### Rotation Process
 
 #### Pre-Rotation Checklist
+
 - [ ] Schedule maintenance window during low-traffic period
 - [ ] Notify stakeholders of upcoming rotation
 - [ ] Create backup of current secrets
@@ -72,6 +79,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
 - [ ] Ensure all environments are updated consistently
 
 #### Rotation Steps
+
 1. Generate new secrets using cryptographically secure random generator
 2. Update secrets in all environments (development, staging, production)
 3. Update documentation and configuration files
@@ -81,6 +89,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
 7. Revoke old secrets (after 24-hour grace period)
 
 #### Post-Rotation Verification
+
 - [ ] Verify all services are running
 - [ ] Check authentication is working
 - [ ] Test database connectivity
@@ -92,6 +101,7 @@ This document outlines the secrets rotation policy for the APGI System to mainta
 ### Emergency Rotation
 
 If a secret is suspected to be compromised:
+
 1. **Immediate Action**: Rotate the compromised secret immediately
 2. **Scope**: Rotate all related secrets (e.g., if DB password leaked, rotate all DB credentials)
 3. **Investigation**: Determine scope and impact of the breach
@@ -102,12 +112,14 @@ If a secret is suspected to be compromised:
 ### Automation
 
 #### Automated Rotation
+
 - Implement automated rotation for non-critical secrets
 - Use secret management tools (e.g., HashiCorp Vault, AWS Secrets Manager)
 - Schedule automated rotation during maintenance windows
 - Integrate with CI/CD pipeline for seamless updates
 
 #### Rotation Monitoring
+
 - Track secret age and rotation schedule
 - Set alerts for upcoming rotation deadlines
 - Monitor for failed rotation attempts
@@ -116,6 +128,7 @@ If a secret is suspected to be compromised:
 ### Compliance
 
 This policy aligns with:
+
 - NIST SP 800-53 Rev. 5 (IA-5: Authenticator Management)
 - CIS Controls 8.3 (Encrypt Sensitive Data in Transit)
 - OWASP ASVS 2.8.1 (Verify that secrets are rotated)
@@ -130,18 +143,21 @@ This policy aligns with:
 
 ## API Key Rotation Mechanism
 
-### Overview
+### API Key Overview
+
 API keys are used for external service integrations and must be rotated regularly to maintain security.
 
 ### Rotation Procedure
 
 #### 1. Key Generation
+
 ```bash
 # Generate new API key (32+ characters)
 openssl rand -base64 32
 ```
 
 #### 2. Update Process
+
 1. Generate new API key
 2. Update external service configuration with new key
 3. Update environment variable in all environments
@@ -150,12 +166,14 @@ openssl rand -base64 32
 6. Revoke old key after 24 hours
 
 #### 3. Testing
+
 ```bash
 # Test API key validity
 curl -H "Authorization: Bearer <NEW_API_KEY>" https://api.example.com/health
 ```
 
 ### Key Storage
+
 - Store API keys in environment variables
 - Never commit API keys to version control
 - Use secret management tools for production
@@ -164,21 +182,25 @@ curl -H "Authorization: Bearer <NEW_API_KEY>" https://api.example.com/health
 ### Key Types
 
 #### Internal API Keys
+
 - Used for service-to-service communication
 - Rotate every 90 days
 - Store in Kubernetes secrets
 
 #### External API Keys
+
 - Used for third-party integrations
 - Rotate according to provider requirements
 - Store in environment variables
 
 #### Webhook Secrets
+
 - Used for webhook signature verification
 - Rotate every 180 days
 - Store in environment variables
 
 ### Monitoring
+
 - Monitor API key usage patterns
 - Alert on unusual activity
 - Track key expiration dates
@@ -188,24 +210,28 @@ curl -H "Authorization: Bearer <NEW_API_KEY>" https://api.example.com/health
 
 ## Response Caching Strategy
 
-### Overview
+### Response Caching Overview
+
 Response caching improves API performance and reduces load on backend services.
 
 ### Cache Configuration
 
 #### Redis Caching
+
 - **Cache Store**: Redis
 - **Default TTL**: 300 seconds (5 minutes)
 - **Max Memory**: 1GB
 - **Eviction Policy**: LRU (Least Recently Used)
 
 #### Cacheable Endpoints
+
 - GET requests with idempotent operations
 - Static reference data
 - Aggregated statistics
 - Health check responses
 
 #### Non-Cacheable Endpoints
+
 - POST, PUT, DELETE, PATCH requests
 - Authentication endpoints
 - User-specific data with privacy concerns
@@ -213,19 +239,22 @@ Response caching improves API performance and reduces load on backend services.
 
 ### Cache Key Strategy
 
-#### Key Format
-```
+### Cache Key Format
+
+```text
 {endpoint}:{method}:{params_hash}:{user_id}
 ```
 
 #### Example
-```
+
+```text
 /v1/sessions:GET:abc123:user_456
 ```
 
 ### Cache Invalidation
 
 #### Manual Invalidation
+
 ```python
 # Invalidate specific cache key
 await redis_client.delete(f"v1:sessions:GET:{session_id}")
@@ -235,18 +264,21 @@ await redis_client.delete("v1:sessions:*")
 ```
 
 #### Automatic Invalidation
+
 - Time-based expiration (TTL)
 - Event-based invalidation (data updates)
 - Version-based invalidation
 
 ### Cache Headers
-```
+
+```http
 Cache-Control: public, max-age=300
 ETag: "abc123def456"
 Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT
 ```
 
-### Monitoring
+### Cache Performance Monitoring
+
 - Cache hit rate (target: >80%)
 - Cache miss rate (target: <20%)
 - Average response time
@@ -256,18 +288,21 @@ Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT
 
 ## Database Query Optimization
 
-### Overview
+### Database Optimization Overview
+
 Optimizing database queries ensures efficient data retrieval and maintains application performance.
 
 ### Indexing Strategy
 
 #### Primary Indexes
+
 - All foreign keys
 - Frequently queried columns
 - Unique constraints
 - Primary keys
 
 #### Composite Indexes
+
 ```sql
 -- Example: Sessions table
 CREATE INDEX idx_sessions_user_created 
@@ -279,6 +314,7 @@ ON tasks(status, priority DESC);
 ```
 
 #### Index Maintenance
+
 ```sql
 -- Analyze index usage
 SELECT schemaname, tablename, indexname, idx_scan, idx_tup_read
@@ -293,6 +329,7 @@ REINDEX INDEX idx_sessions_user_created;
 ### Query Optimization
 
 #### Use Prepared Statements
+
 ```python
 # Good
 await conn.execute(
@@ -307,6 +344,7 @@ await conn.execute(
 ```
 
 #### Select Only Required Columns
+
 ```python
 # Good
 await conn.fetchval(
@@ -322,6 +360,7 @@ await conn.fetch(
 ```
 
 #### Use JOINs Efficiently
+
 ```sql
 -- Good: Use JOIN with indexed columns
 SELECT s.*, u.username 
@@ -337,7 +376,8 @@ WHERE s.status = 'active';
 
 ### Query Result Caching
 
-#### Redis Caching
+#### Redis Caching Implementation
+
 ```python
 # Cache query results
 cache_key = f"query:sessions:{user_id}:{status}"
@@ -359,14 +399,16 @@ await redis_client.setex(
 ```
 
 ### Connection Pooling
+
 - **Pool Size**: 20 connections
 - **Max Overflow**: 10 connections
 - **Pool Timeout**: 30 seconds
 - **Pool Recycle**: 3600 seconds (1 hour)
 
-### Monitoring
+### Database Monitoring
 
-#### Query Performance
+### Query Performance Monitoring
+
 ```sql
 -- Slow query log
 SELECT query, mean_exec_time, calls, total_exec_time
@@ -381,6 +423,7 @@ ORDER BY seq_scan DESC;
 ```
 
 #### Performance Metrics
+
 - Average query time (target: <100ms)
 - Slow query count (target: <1%)
 - Connection pool utilization (target: <80%)
@@ -400,6 +443,7 @@ ORDER BY seq_scan DESC;
 ### Maintenance
 
 #### Regular Tasks
+
 ```sql
 -- Vacuum analyze tables
 VACUUM ANALYZE sessions;
@@ -414,6 +458,7 @@ REINDEX TABLE sessions;
 ```
 
 #### Automated Maintenance
+
 ```yaml
 # Kubernetes CronJob
 apiVersion: batch/v1

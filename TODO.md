@@ -1,16 +1,11 @@
 # TODO
 
+## Issues
+
 ## Bugs
 
-- Missing cognitive tasks: Stroop Task, N-back Task
-- Stroop Task Implementation** - Cognitive interference task
-- N-back Task Implementation** - Working memory assessment task
-- Animal consciousness models not implemented
-- Comparative analysis tools absent
-- DDoS protection not implemented
-- Security audit tools missing
 - Mixed error handling approaches across GUIs
-- Theme support only in one GUI (Assistant-GUI), not in others
+- Theme support only in Assistant-GUI, not in other GUIs
 - No accessibility features documented (screen reader support, keyboard navigation)
 - No documented performance benchmarks or SLAs
 - Missing load testing results
@@ -28,18 +23,14 @@
 
 - Animal Consciousness Models** - Research capability expansion
 - Comparative Analysis Tools** - Enhanced research insights
-- DDoS Protection** - Implement rate limiting and IP blocking (#125)
-- Security Audit Tools** - Add automated security scanning (#126)
 - Penetration Testing Framework** - Security validation
 - Load Testing Framework** - Performance validation with Locust/JMeter
-- Additional Unit Tests** - Edge case coverage
 - End-to-end (E2E) GUI tests**
 - Visual regression tests**
 - Performance/load tests**
 - Security tests (OWASP)**
 - Chaos engineering tests**
 - Contract tests for external APIs**
-- Comprehensive API Docs** - Developer experience improvement
 - Automated Dependency Updates** - Maintenance automation
 - Accessibility Features** - Screen reader and keyboard navigation
 - Create unified design system or style guide
