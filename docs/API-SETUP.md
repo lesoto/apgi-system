@@ -169,6 +169,198 @@ To verify the setup is working:
    - Open <http://localhost:8000/docs> in your browser
    - Check health: <http://localhost:8000/health>
 
+## Database Migrations
+
+The APGI API uses Alembic for database schema management. Migrations are critical for deployment and database schema updates.
+
+### Prerequisites
+
+1. **Database must be running**: PostgreSQL should be accessible via `DATABASE_URL`
+2. **Alembic installed**: Already included in `requirements.txt`
+3. **Environment configured**: Set `DATABASE_URL` in your `.env` file
+
+### Migration Commands
+
+#### Initialize Database Schema
+
+For first-time setup or to create the initial database schema:
+
+```bash
+# Apply all migrations to create the database schema
+alembic upgrade head
+```
+
+#### Create New Migration
+
+When you modify database models, create a new migration:
+
+```bash
+# Generate migration based on model changes
+alembic revision --autogenerate -m "Description of changes"
+
+# Example:
+alembic revision --autogenerate -m "Add user authentication table"
+```
+
+#### Apply Migrations
+
+To update the database schema to the latest version:
+
+```bash
+# Apply all pending migrations
+alembic upgrade head
+
+# Apply specific migration
+alembic upgrade +1
+
+# Apply to specific revision
+alembic upgrade <revision_id>
+```
+
+#### Migration Status and History
+
+```bash
+# Check current migration status
+alembic current
+
+# Show migration history
+alembic history
+
+# Show migration details
+alembic show <revision_id>
+```
+
+#### Rollback Migrations
+
+```bash
+# Rollback one migration
+alembic downgrade -1
+
+# Rollback to specific revision
+alembic downgrade <revision_id>
+
+# Rollback to base (empty schema)
+alembic downgrade base
+```
+
+### Handling Migration Failures
+
+#### Common Issues and Solutions
+
+1. **Database Connection Errors**:
+
+   ```bash
+   # Check DATABASE_URL is correct
+   echo $DATABASE_URL
+   
+   # Test database connection
+   python -c "from sqlalchemy import create_engine; engine = create_engine('$DATABASE_URL'); print('Connection successful')"
+   ```
+
+2. **Migration Conflicts**:
+
+   ```bash
+   # If multiple developers create migrations with same number
+   # Merge migrations manually or create new migration
+   alembic revision --merge -m "Merge migrations"
+   ```
+
+3. **Partial Migration Failure**:
+
+   ```bash
+   # Check which migration failed
+   alembic current
+   
+   # Mark migration as applied (if manual fix was applied)
+   alembic stamp <revision_id>
+   ```
+
+4. **Missing Tables**:
+
+   ```bash
+   # Drop all tables and restart (DEVELOPMENT ONLY)
+   alembic downgrade base
+   alembic upgrade head
+   ```
+
+### Deployment Workflow
+
+#### For Production Deployments
+
+1. **Backup Database**:
+
+   ```bash
+   pg_dump $DATABASE_URL > backup_before_migration.sql
+   ```
+
+2. **Test Migrations**:
+
+   ```bash
+   # Test on staging environment first
+   alembic upgrade head --sql
+   ```
+
+3. **Apply Migrations**:
+
+   ```bash
+   # Apply with dry run first
+   alembic upgrade head --sql > migration.sql
+   
+   # Review migration.sql, then apply
+   alembic upgrade head
+   ```
+
+4. **Verify Deployment**:
+
+   ```bash
+   # Check migration status
+   alembic current
+   
+   # Test API endpoints
+   curl -f http://localhost:8000/health
+   ```
+
+#### Docker Compose Workflow
+
+```bash
+# Start services
+docker-compose up -d postgres redis
+
+# Wait for database to be ready
+docker-compose logs postgres | grep "database system is ready to accept connections"
+
+# Run migrations
+docker-compose run --rm api alembic upgrade head
+
+# Start full stack
+docker-compose up -d
+```
+
+### Migration Best Practices
+
+1. **Review Generated Migrations**: Always review `alembic/versions/*.py` files before applying
+2. **Descriptive Messages**: Use clear, descriptive migration messages
+3. **Test on Staging**: Never apply untested migrations to production
+4. **Backup Before Migration**: Always backup production databases before migration
+5. **Rollback Plan**: Have a rollback plan for each migration
+6. **Document Breaking Changes**: Note any breaking changes in migration descriptions
+
+### Migration File Structure
+
+```text
+api/alembic/versions/
+├── 001_initial_schema.py
+├── 002_add_user_tables.py
+├── 003_add_experimental_tasks.py
+└── ...
+```
+
+Each migration file contains:
+
+- `upgrade()`: Function to apply the migration
+- `downgrade()`: Function to rollback the migration
+- Revision metadata and dependencies
+
 ## Next Steps
 
 With the basic structure in place, the next tasks will implement:

@@ -46,6 +46,7 @@ class Settings:
 
         # Authentication Settings
         self.jwt_secret_key: str = os.getenv("JWT_SECRET_KEY")
+        self.environment: str = os.getenv("ENVIRONMENT", "development")
         self.jwt_algorithm: str = "HS256"
         self.jwt_access_token_expire_minutes: int = 30
         self.jwt_refresh_token_expire_days: int = 7
@@ -97,13 +98,24 @@ class Settings:
 
     def __post_init__(self):
         """Validate critical security settings after initialization."""
-        # Validate JWT secret key is configured and not default insecure value
+        # Handle JWT secret key for development vs production
         if not self.jwt_secret_key:
-            raise ValueError(
-                "CRITICAL: JWT_SECRET_KEY environment variable is not set. "
-                "This is required for secure JWT token generation. "
-                "Set a secure JWT_SECRET_KEY environment variable before starting the API."
-            )
+            if self.environment.lower() in ["production", "prod"]:
+                raise ValueError(
+                    "CRITICAL: JWT_SECRET_KEY environment variable is not set for production. "
+                    "This is required for secure JWT token generation. "
+                    "Set a secure JWT_SECRET_KEY environment variable before starting the API."
+                )
+            else:
+                # Development mode - provide a secure default with warning
+                self.jwt_secret_key = "development-secret-key-change-in-production-32-chars-min"
+                warnings.warn(
+                    "DEVELOPMENT WARNING: JWT_SECRET_KEY not set, using development default. "
+                    "This is insecure and should NOT be used in production. "
+                    "Set JWT_SECRET_KEY environment variable for production deployment. "
+                    "Copy .env.example to .env and configure your settings.",
+                    UserWarning,
+                )
 
         # Check for known insecure default values
         insecure_defaults = [
@@ -115,19 +127,35 @@ class Settings:
         ]
 
         if self.jwt_secret_key.lower() in [d.lower() for d in insecure_defaults]:
-            raise ValueError(
-                "CRITICAL: JWT_SECRET_KEY is set to a known insecure default value. "
-                "This allows attackers to forge JWT tokens and bypass authentication. "
-                "Set a secure, random JWT_SECRET_KEY environment variable."
-            )
+            if self.environment.lower() in ["production", "prod"]:
+                raise ValueError(
+                    "CRITICAL: JWT_SECRET_KEY is set to a known insecure default value in production. "
+                    "This allows attackers to forge JWT tokens and bypass authentication. "
+                    "Set a secure, random JWT_SECRET_KEY environment variable."
+                )
+            else:
+                warnings.warn(
+                    "DEVELOPMENT WARNING: JWT_SECRET_KEY is set to a known insecure default value. "
+                    "This should be changed before any production deployment. "
+                    "Set a secure JWT_SECRET_KEY environment variable.",
+                    UserWarning,
+                )
 
         # Validate minimum key length
         if len(self.jwt_secret_key) < 32:
-            raise ValueError(
-                "SECURITY WARNING: JWT_SECRET_KEY is shorter than 32 characters. "
-                "Short keys are vulnerable to brute force attacks. "
-                "Use a secure, random key with at least 32 characters."
-            )
+            if self.environment.lower() in ["production", "prod"]:
+                raise ValueError(
+                    "CRITICAL: JWT_SECRET_KEY is shorter than 32 characters in production. "
+                    "Short keys are vulnerable to brute force attacks. "
+                    "Use a secure, random key with at least 32 characters."
+                )
+            else:
+                warnings.warn(
+                    "DEVELOPMENT WARNING: JWT_SECRET_KEY is shorter than 32 characters. "
+                    "This should be fixed before production deployment. "
+                    "Use a secure, random key with at least 32 characters.",
+                    UserWarning,
+                )
 
         # Validate CORS origins are explicitly configured
         if self.cors_origins == ["*"]:

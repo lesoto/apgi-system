@@ -72,7 +72,6 @@ jobs:
       - name: Run mypy type checker
         run: |
           mypy apgi_system api --ignore-missing-imports --no-strict-optional --allow-untyped-calls --allow-untyped-defs
-        continue-on-error: true
       
       - name: Run unit tests
         env:

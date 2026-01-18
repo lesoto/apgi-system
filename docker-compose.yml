@@ -58,7 +58,7 @@ services:
   celery_worker:
     build: .
     container_name: apgi_celery_worker
-    command: celery -A api.tasks worker --loglevel=info
+    command: celery -A api.celery_app worker --loglevel=info
     environment:
       DATABASE_URL: postgresql://apgi:apgi_password@postgres:5432/apgi_api
       REDIS_URL: redis://redis:6379/0
