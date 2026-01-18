@@ -1408,6 +1408,18 @@ class APGIGui:
             else:
                 self.data_buffers["somatic_markers"].append(0)
 
+            # Performance metrics
+            if len(self.fps_buffer) > 0:
+                self.data_buffers["performance"].append(self.fps_buffer[-1])
+            else:
+                self.data_buffers["performance"].append(0)
+
+            # Memory usage
+            if len(self.memory_buffer) > 0:
+                self.data_buffers["memory_mb"].append(self.memory_buffer[-1])
+            else:
+                self.data_buffers["memory_mb"].append(0)
+
             # Create a snapshot for logging (outside of data_lock to avoid deadlock)
             log_entry = {
                 "time": current_time,
@@ -2111,6 +2123,8 @@ class APGIGui:
             "Binocular Rivalry",
             "Iowa Gambling Task",
             "Masking Paradigm",
+            "Stroop Task",
+            "N-Back Task",
         ]
 
         listbox = tk.Listbox(dialog, height=len(tasks))
@@ -2162,12 +2176,18 @@ class APGIGui:
                 elif task_name == "Masking Paradigm":
                     dialog.destroy()
                     self._run_masking_paradigm_task(trials_per_condition=trials_var.get())
+                elif task_name == "Stroop Task":
+                    dialog.destroy()
+                    self._run_stroop_task(num_trials=trials_var.get())
+                elif task_name == "N-Back Task":
+                    dialog.destroy()
+                    self._run_nback_task(num_trials=trials_var.get())
                 else:
                     self._log_event(f"Task not yet implemented: {task_name}")
                     messagebox.showinfo(
                         "Coming Soon",
                         f"{task_name} implementation coming soon!\n\n"
-                        "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task",
+                        "Currently available:\n- Attentional Blink\n- Change Blindness\n- Binocular Rivalry\n- Iowa Gambling Task\n- Masking Paradigm\n- Stroop Task\n- N-Back Task",
                     )
 
         run_button.config(command=run_selected)
@@ -2993,6 +3013,383 @@ class APGIGui:
                         progress_dialog, text="Close", command=close_and_show_results
                     ).pack(pady=5),
                 )
+
+            import threading
+
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+
+            traceback.print_exc()
+
+    def _run_stroop_task(self, num_trials: int = 60):
+        """Run the Stroop Task experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting Stroop Task...")
+        self._update_status("Running Stroop Task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import StroopTask
+
+            # Create task with specified parameters
+            task = StroopTask(
+                num_trials=num_trials,
+                trial_duration_ms=1500,
+                inter_trial_interval_ms=500,
+                stimulus_strength=2.0,
+                conflict_strength=1.5,
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running Stroop Task")
+            progress_dialog.geometry("500x250")
+
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=400, mode="determinate", variable=progress_var
+            )
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=8, width=60)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            def run_task_thread():
+                """Run task in separate thread to keep GUI responsive."""
+                try:
+                    results = task.run_all_trials(self.apgi_system)
+
+                    # Update progress and status
+                    for i, result in enumerate(results):
+                        progress = (i + 1) / len(results) * 100
+                        self.root.after(
+                            0,
+                            lambda p=progress, pv=progress_var: (
+                                pv.set(p) if pv.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0,
+                            lambda i=i, total=len(results), sl=status_label: (
+                                sl.config(text=f"Trial {i+1} of {total}")
+                                if sl.winfo_exists()
+                                else None
+                            ),
+                        )
+
+                        # Log trial results
+                        self.root.after(
+                            0,
+                            lambda r=result, rt=results_text: (
+                                rt.insert(
+                                    tk.END,
+                                    f"Trial {r['trial_number']}: {r['trial_type']} - RT: {r['response_time_ms']:.0f}ms - Correct: {r['is_correct']}\n",
+                                )
+                                if rt.winfo_exists()
+                                else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
+
+                        # Small delay to show progress
+                        time.sleep(0.1)
+
+                    # Complete progress
+                    self.root.after(
+                        0,
+                        lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None,
+                    )
+                    self.root.after(
+                        0,
+                        lambda sl=status_label: (
+                            sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                        ),
+                    )
+
+                    # Analyze results
+                    analysis = task.analyze_results()
+
+                    # Display summary
+                    summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                    summary += f"Total Trials: {analysis['total_trials']}\n"
+                    summary += f"Overall Accuracy: {analysis['overall_accuracy']:.1%}\n"
+                    summary += f"Mean RT: {analysis['mean_response_time_ms']:.0f}ms\n\n"
+
+                    summary += "By Trial Type:\n"
+                    for trial_type in ["congruent", "incongruent", "neutral"]:
+                        if trial_type in analysis["by_trial_type"]:
+                            data = analysis["by_trial_type"][trial_type]
+                            summary += f"  {trial_type.capitalize()}: {data['accuracy']:.1%} accuracy, {data['mean_rt']:.0f}ms RT\n"
+
+                    summary += f"\nStroop Effect: {analysis['stroop_effect_ms']:.0f}ms\n"
+                    summary += f"Interference Score: {analysis['interference_score']:.2f}\n"
+
+                    self.root.after(
+                        0,
+                        lambda s=summary, rt=results_text: (
+                            rt.insert(tk.END, s) if rt.winfo_exists() else None
+                        ),
+                    )
+                    self.root.after(
+                        0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                    )
+
+                    # Save results
+                    import datetime
+
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"stroop_task_results_{timestamp}.json"
+                    task.save_results(filename)
+
+                    self.root.after(
+                        0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                    )
+
+                    # Add close button
+                    def close_and_show_results():
+                        progress_dialog.destroy()
+                        task.print_results(analysis)
+                        messagebox.showinfo(
+                            "Task Complete",
+                            f"Stroop Task completed!\n\n"
+                            f"Overall Accuracy: {analysis['overall_accuracy']:.1%}\n"
+                            f"Stroop Effect: {analysis['stroop_effect_ms']:.0f}ms\n"
+                            f"Interference Score: {analysis['interference_score']:.2f}\n\n"
+                            f"Results saved to:\n{filename}",
+                        )
+
+                    self.root.after(
+                        0,
+                        lambda: ttk.Button(
+                            progress_dialog, text="Close", command=close_and_show_results
+                        ).pack(pady=5),
+                    )
+
+                except Exception as e:
+                    self.root.after(
+                        0,
+                        lambda: messagebox.showerror(
+                            "Task Error", f"Error running task:\n{str(e)}"
+                        ),
+                    )
+                    self.root.after(
+                        0,
+                        lambda: (
+                            progress_dialog.destroy() if progress_dialog.winfo_exists() else None
+                        ),
+                    )
+
+            import threading
+
+            task_thread = threading.Thread(target=run_task_thread, daemon=True)
+            task_thread.start()
+
+        except Exception as e:
+            self._log_event(f"ERROR running task: {str(e)}")
+            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+            import traceback
+
+            traceback.print_exc()
+
+    def _run_nback_task(self, num_trials: int = 30):
+        """Run the N-Back Task experimental task."""
+        if not self.apgi_system:
+            messagebox.showerror("Error", "System not initialized")
+            return
+
+        # Stop current simulation if running
+        was_running = self.is_running
+        if was_running:
+            self._stop_simulation()
+
+        self._log_event("Starting N-Back Task...")
+        self._update_status("Running N-Back Task...")
+
+        # Import and create task
+        try:
+            from apgi_system.experiments.tasks import NBackTask
+
+            # Create task with specified parameters
+            task = NBackTask(
+                num_trials=num_trials,
+                n_level=2,  # 2-back task
+                stimulus_duration_ms=1000,
+                inter_stimulus_interval_ms=2000,
+                stimulus_strength=2.0,
+                working_memory_load=1.5,
+            )
+
+            # Create progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Running N-Back Task")
+            progress_dialog.geometry("500x250")
+
+            ttk.Label(progress_dialog, text="Running trials...", font=("Arial", 12, "bold")).pack(
+                pady=10
+            )
+
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(
+                progress_dialog, length=400, mode="determinate", variable=progress_var
+            )
+            progress_bar.pack(pady=10)
+
+            status_label = ttk.Label(progress_dialog, text="Trial 0 of 0")
+            status_label.pack(pady=5)
+
+            # Results text area
+            results_text = scrolledtext.ScrolledText(progress_dialog, height=8, width=60)
+            results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+            def run_task_thread():
+                """Run task in separate thread to keep GUI responsive."""
+                try:
+                    results = task.run_all_trials(self.apgi_system)
+
+                    # Update progress and status
+                    for i, result in enumerate(results):
+                        progress = (i + 1) / len(results) * 100
+                        self.root.after(
+                            0,
+                            lambda p=progress, pv=progress_var: (
+                                pv.set(p) if pv.winfo_exists() else None
+                            ),
+                        )
+                        self.root.after(
+                            0,
+                            lambda i=i, total=len(results), sl=status_label: (
+                                sl.config(text=f"Trial {i+1} of {total}")
+                                if sl.winfo_exists()
+                                else None
+                            ),
+                        )
+
+                        # Log trial results
+                        self.root.after(
+                            0,
+                            lambda r=result, rt=results_text: (
+                                rt.insert(
+                                    tk.END,
+                                    f"Trial {r['trial_number']}: Stimulus '{r['stimulus']}' - Target: {r['is_target']} - Response: {r['response']} - Correct: {r['is_correct']}\n",
+                                )
+                                if rt.winfo_exists()
+                                else None
+                            ),
+                        )
+                        self.root.after(
+                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                        )
+
+                        # Small delay to show progress
+                        time.sleep(0.1)
+
+                    # Complete progress
+                    self.root.after(
+                        0,
+                        lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None,
+                    )
+                    self.root.after(
+                        0,
+                        lambda sl=status_label: (
+                            sl.config(text="Analysis complete!") if sl.winfo_exists() else None
+                        ),
+                    )
+
+                    # Analyze results
+                    analysis = task.analyze_results()
+
+                    # Display summary
+                    summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                    summary += f"Total Trials: {analysis['total_trials']}\n"
+                    summary += f"Hit Rate: {analysis['hit_rate']:.1%}\n"
+                    summary += f"False Alarm Rate: {analysis['false_alarm_rate']:.1%}\n"
+                    summary += f"d' (d-prime): {analysis['d_prime']:.2f}\n"
+                    summary += f"Response Criterion: {analysis['response_criterion']:.2f}\n"
+                    summary += f"Mean RT: {analysis['mean_response_time_ms']:.0f}ms\n\n"
+
+                    summary += "Response Breakdown:\n"
+                    summary += f"  Hits: {analysis['hits']}\n"
+                    summary += f"  Misses: {analysis['misses']}\n"
+                    summary += f"  False Alarms: {analysis['false_alarms']}\n"
+                    summary += f"  Correct Rejections: {analysis['correct_rejections']}\n"
+
+                    self.root.after(
+                        0,
+                        lambda s=summary, rt=results_text: (
+                            rt.insert(tk.END, s) if rt.winfo_exists() else None
+                        ),
+                    )
+                    self.root.after(
+                        0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                    )
+
+                    # Save results
+                    import datetime
+
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"nback_task_results_{timestamp}.json"
+                    task.save_results(filename)
+
+                    self.root.after(
+                        0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
+                    )
+
+                    # Add close button
+                    def close_and_show_results():
+                        progress_dialog.destroy()
+                        task.print_results(analysis)
+                        messagebox.showinfo(
+                            "Task Complete",
+                            f"N-Back Task completed!\n\n"
+                            f"Hit Rate: {analysis['hit_rate']:.1%}\n"
+                            f"d' (d-prime): {analysis['d_prime']:.2f}\n"
+                            f"Mean RT: {analysis['mean_response_time_ms']:.0f}ms\n\n"
+                            f"Results saved to:\n{filename}",
+                        )
+
+                    self.root.after(
+                        0,
+                        lambda: ttk.Button(
+                            progress_dialog, text="Close", command=close_and_show_results
+                        ).pack(pady=5),
+                    )
+
+                except Exception as e:
+                    self.root.after(
+                        0,
+                        lambda: messagebox.showerror(
+                            "Task Error", f"Error running task:\n{str(e)}"
+                        ),
+                    )
+                    self.root.after(
+                        0,
+                        lambda: (
+                            progress_dialog.destroy() if progress_dialog.winfo_exists() else None
+                        ),
+                    )
 
             import threading
 
@@ -3853,40 +4250,11 @@ For more information, visit the project repository.
 
 def main():
     """Main entry point for GUI application."""
-    # Create splash screen first to show GUI is starting
-    splash_root = tk.Tk()
-    splash_root.title("APGI System")
-    splash_root.geometry("400x200")
-    splash_root.resizable(False, False)
-
-    # Center splash screen
-    screen_width = splash_root.winfo_screenwidth()
-    screen_height = splash_root.winfo_screenheight()
-    x = (screen_width - 400) // 2
-    y = (screen_height - 200) // 2
-    splash_root.geometry(f"400x200+{x}+{y}")
-
-    # Show loading message
-    splash_frame = ttk.Frame(splash_root, padding=20)
-    splash_frame.pack(fill=tk.BOTH, expand=True)
-
-    ttk.Label(
-        splash_frame, text="APGI Consciousness Modeling Framework", font=("Arial", 14, "bold")
-    ).pack(pady=(0, 10))
-    ttk.Label(splash_frame, text="Loading...", font=("Arial", 12)).pack(pady=(0, 5))
-    progress = ttk.Progressbar(splash_frame, mode="indeterminate", length=300)
-    progress.pack(pady=10)
-    progress.start(10)
-
-    splash_root.update()
-    splash_root.lift()
-    splash_root.attributes("-topmost", True)
-
     # Check dependencies before starting with user-friendly error handling
     try:
         from utils.dependency_checker import check_dependencies_on_startup
 
-        deps_ok = check_dependencies_on_startup(silent=False)
+        deps_ok = check_dependencies_on_startup(silent=True)
 
         if not deps_ok:
             print("=" * 60)
@@ -3922,21 +4290,14 @@ def main():
             return
 
     except ImportError:
-        print("Warning: Dependency checker not available. Attempting to continue...")
-        print("If you encounter errors, please install all requirements:")
-        print("pip install -r requirements.txt")
+        # Silently continue if dependency checker is not available
+        pass
     except Exception as e:
-        print(f"Warning: Dependency check failed with error: {e}")
+        # Silently continue if dependency check fails
+        pass
 
     # Create main application
     root = tk.Tk()
-
-    # Close splash screen and show main window
-    try:
-        splash_root.destroy()
-    except:
-        pass
-
     app = APGIGui(root)
     root.mainloop()
 

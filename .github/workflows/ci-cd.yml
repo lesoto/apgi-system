@@ -175,7 +175,33 @@ jobs:
           image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom.spdx.json
-      
+
+      - name: Validate SBOM
+        run: |
+          if [ ! -f sbom.spdx.json ]; then
+            echo "ERROR: SBOM file was not generated"
+            exit 1
+          fi
+          if ! jq empty sbom.spdx.json 2>/dev/null; then
+            echo "ERROR: SBOM is not valid JSON"
+            exit 1
+          fi
+          echo "SBOM validated successfully"
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
       - name: Upload SBOM
         uses: actions/upload-artifact@v3
         with:

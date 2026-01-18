@@ -13,6 +13,7 @@ from typing import Optional
 import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 # Check dependencies before starting
@@ -169,6 +170,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
         max_size_mb=getattr(settings, "max_request_size_mb", 10),
         enabled=getattr(settings, "request_size_limit_enabled", True),
     )
+
+    # Add GZip compression middleware
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Add metrics middleware (first, to track all requests)
     app.add_middleware(PrometheusMetricsMiddleware)

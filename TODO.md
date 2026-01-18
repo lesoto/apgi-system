@@ -1,90 +1,47 @@
-# Bugs
+# TODO
 
-- [x] **BUG-009: TODO Comments in Codebase** - ✅ RESOLVED: No TODO/FIXME comments found in Python files - the reported 23 files was inaccurate
-- [x] **BUG-010: MyPy Type Checking Permissive** - ✅ RESOLVED: Updated MyPy configuration to use strict type checking (removed permissive flags)
-- [x] **BUG-011: Test Coverage Threshold** - ✅ RESOLVED: Updated test coverage threshold from 85% to 90% in pyproject.toml
+## Bugs
 
-## Issues
-
-- ❌ Missing cognitive tasks: Stroop Task, N-back Task
-- ❌ Animal consciousness models not implemented
-- ❌ Comparative analysis tools absent
-- ❌ DDoS protection not implemented
-- ❌ Security audit tools missing
-- ⚠️ Large monolithic GUI files (Assistant-GUI.py: 8,374 lines, apgi_gui.py: 3,945 lines)
-- ⚠️ Mixed error handling approaches across GUIs
-- ⚠️ No unified design system or style guide
-- ⚠️ Missing responsive design documentation
-- ⚠️ Theme support only in one GUI (Assistant-GUI), not in others
-- ⚠️ No accessibility features documented (screen reader support, keyboard navigation)
-- ⚠️ No internationalization (i18n) support
-- ⚠️ No documented performance benchmarks or SLAs
-- ⚠️ Missing load testing results
-- ⚠️ No CDN configuration for static assets
-- ⚠️ Database query optimization not documented
-- ⚠️ No caching strategy documentation
-- ⚠️ GUI performance under heavy load not tested
-- ⚠️ No global error recovery strategies documented
-- ⚠️ Missing automated error reporting/alerting integration (beyond webhook URLs)
-- ⚠️ No documented disaster recovery procedures
-- ⚠️ Circuit breaker pattern not fully implemented across all services
-- ⚠️ Missing graceful degradation strategies for partial system failures
+- Missing cognitive tasks: Stroop Task, N-back Task
+- Stroop Task Implementation** - Cognitive interference task
+- N-back Task Implementation** - Working memory assessment task
+- Animal consciousness models not implemented
+- Comparative analysis tools absent
+- DDoS protection not implemented
+- Security audit tools missing
+- Mixed error handling approaches across GUIs
+- Theme support only in one GUI (Assistant-GUI), not in others
+- No accessibility features documented (screen reader support, keyboard navigation)
+- No documented performance benchmarks or SLAs
+- Missing load testing results
+- No CDN configuration for static assets
+- Database query optimization not documented
+- No caching strategy documentation
+- GUI performance under heavy load not tested
+- No global error recovery strategies documented
+- Missing automated error reporting/alerting integration (beyond webhook URLs)
+- No documented disaster recovery procedures
+- Circuit breaker pattern not fully implemented across all services
+- Missing graceful degradation strategies for partial system failures
 
 ## Missing Features
 
-- [ ] **Stroop Task Implementation** - Cognitive interference task (#123)
-- [ ] **N-back Task Implementation** - Working memory assessment task (#124)
-- [ ] **Animal Consciousness Models** - Research capability expansion
-- [ ] **Comparative Analysis Tools** - Enhanced research insights
-- [ ] **DDoS Protection** - Implement rate limiting and IP blocking (#125)
-- [ ] **Security Audit Tools** - Add automated security scanning (#126)
-- [ ] **Penetration Testing Framework** - Security validation
-- [ ] **Load Testing Framework** - Performance validation with Locust/JMeter
-- [ ] **Additional Unit Tests** - Edge case coverage
-- [ ] **End-to-end (E2E) GUI tests**
-- [ ] **Visual regression tests**
-- [ ] **Performance/load tests**
-- [ ] **Security tests (OWASP)**
-- [ ] **Chaos engineering tests**
-- [ ] **Contract tests for external APIs**
-- [ ] **Comprehensive API Docs** - Developer experience improvement
-- [ ] **Automated Dependency Updates** - Maintenance automation
-- [ ] **Contribution Guidelines** - Create CONTRIBUTING.md
-- [ ] **Accessibility Features** - Screen reader and keyboard navigation
-- [ ] **Internationalization (i18n)** - Multi-language support
-- [ ] **BUG-008: Large Monolithic GUI Files** - `Assistant-GUI.py` (8,374 lines) and `apgi_gui.py` (3,945 lines) are extremely large monolithic files, making them difficult to maintain, test, and review
-- Default CORS allows wildcard (`*`)
-- No IP allowlisting/blocklisting
-- Missing API key rotation mechanism
-- No secrets rotation policy documented
-- No security scanning (Trivy, Snyk)
-- No SBOM generation validation
-- No CDN for static assets
-- No database query optimization documented
-- No response caching strategy
-- No API pagination for large datasets
-- No compression middleware
-- No database indexes documented beyond models
-- No query result caching
-- No documented test data strategy
-- No test environment isolation documented
-- Missing test fixtures documentation
-- GUI code difficult to test (large monolithic files)
-- Production Kubernetes configuration
-- Database backup/restore procedures
-- Disaster recovery plan
-- Blue-green deployment strategy
-- Canary deployment support
-- Infrastructure as Code (Terraform/Pulumi)
-- Monitoring dashboards (Grafana)
-- Log aggregation (ELK/Loki)
-- No smoke tests after deployment
-- No automated rollback criteria
-- No deployment notifications (Slack/email)
-- Architecture decision records (ADRs)
-- API authentication flow diagrams
-- Database schema diagrams
-- Deployment runbooks
-- Troubleshooting guide
-- Performance tuning guide
-- Security best practices
+- Animal Consciousness Models** - Research capability expansion
+- Comparative Analysis Tools** - Enhanced research insights
+- DDoS Protection** - Implement rate limiting and IP blocking (#125)
+- Security Audit Tools** - Add automated security scanning (#126)
+- Penetration Testing Framework** - Security validation
+- Load Testing Framework** - Performance validation with Locust/JMeter
+- Additional Unit Tests** - Edge case coverage
+- End-to-end (E2E) GUI tests**
+- Visual regression tests**
+- Performance/load tests**
+- Security tests (OWASP)**
+- Chaos engineering tests**
+- Contract tests for external APIs**
+- Comprehensive API Docs** - Developer experience improvement
+- Automated Dependency Updates** - Maintenance automation
+- Accessibility Features** - Screen reader and keyboard navigation
+- Create unified design system or style guide
+- Add responsive design documentation
+- Extend theme support to all GUIs

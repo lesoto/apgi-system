@@ -57,7 +57,9 @@ class Settings:
 
         # CORS Settings
         self.cors_origins: List[str] = (
-            os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+            os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
+            if os.getenv("CORS_ORIGINS")
+            else ["http://localhost:3000", "http://localhost:8000"]
         )
         self.cors_allow_credentials: bool = (
             os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
