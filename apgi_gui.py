@@ -9,6 +9,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import numpy as np
 import matplotlib
+import psutil
+import time
 
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -95,6 +97,11 @@ class APGIGui:
         # Initialize buffers with default size
         self._initialize_buffers(self.buffer_size)
 
+        # Performance tracking
+        self.last_frame_time = time.time()
+        self.fps_buffer = deque(maxlen=100)
+        self.memory_buffer = deque(maxlen=1000)
+
         # Thread safety locks
         self.data_lock = RLock()  # Reentrant lock for data buffers
         self.log_lock = Lock()  # Simple lock for log data
@@ -149,7 +156,8 @@ class APGIGui:
         self._update_displays()
 
         # Schedule tkinter variable conversion for after main loop starts
-        self.root.after(100, self._convert_to_tkinter_variables)
+        # Use a longer delay to ensure the window is fully ready
+        self.root.after(200, self._convert_to_tkinter_variables)
 
     def _initialize_buffers(self, size):
         """Initialize data buffers with specified size."""
@@ -168,6 +176,8 @@ class APGIGui:
             "beta_power": deque(maxlen=size),
             "somatic_markers": deque(maxlen=size),
             "minimal_self_coherence": deque(maxlen=size),
+            "performance": deque(maxlen=size),
+            "memory_mb": deque(maxlen=size),
         }
         self.buffer_size = size
         self._log_event(f"Buffer size set to {size} points")
@@ -229,13 +239,33 @@ class APGIGui:
         # Now add the auto-save checkbutton to the file menu
         try:
             file_menu = self.menu_bar.winfo_children()[0]  # File menu is first
-            # Insert the auto-save checkbutton before the last separator
-            file_menu.insert_checkbutton(
-                file_menu.index(file_menu.winfo_children()[-2]),  # Before last separator
-                label="Auto-save Data",
-                variable=self.auto_save_var,
-                command=self._toggle_auto_save,
-            )
+            # Find the index of the "Exit" command and insert before it
+            exit_index = None
+            last_index = file_menu.index("end")
+            for i in range(last_index + 1):
+                try:
+                    label = file_menu.entrycget(i, "label")
+                    if label == "Exit":
+                        exit_index = i
+                        break
+                except:
+                    continue
+
+            if exit_index is not None:
+                # Insert auto-save checkbutton before Exit
+                file_menu.insert_checkbutton(
+                    exit_index,
+                    label="Auto-save Data",
+                    variable=self.auto_save_var,
+                    command=self._toggle_auto_save,
+                )
+            else:
+                # Fallback: append to end
+                file_menu.add_checkbutton(
+                    label="Auto-save Data",
+                    variable=self.auto_save_var,
+                    command=self._toggle_auto_save,
+                )
         except Exception as e:
             print(f"Warning: Could not add auto-save checkbutton: {e}")
 
@@ -483,6 +513,10 @@ class APGIGui:
         analysis_menu.add_command(label="Somatic Marker Analysis", command=self._analyze_markers)
         analysis_menu.add_command(label="Self-Model Coherence", command=self._analyze_coherence)
         analysis_menu.add_separator()
+        analysis_menu.add_command(
+            label="Statistical Analysis...", command=self._show_statistical_analysis
+        )
+        analysis_menu.add_separator()
         analysis_menu.add_command(label="Generate Report...", command=self._generate_report)
 
         # Help Menu
@@ -502,10 +536,18 @@ class APGIGui:
         self.root.bind("<Control-plus>", lambda e: self._zoom_in())
         self.root.bind("<Control-minus>", lambda e: self._zoom_out())
         self.root.bind("<Control-0>", lambda e: self._zoom_fit())
+        self.root.bind("<Control-r>", lambda e: self._reset_simulation())
+        self.root.bind("<Control-p>", lambda e: self._toggle_parameter_panel())
+        self.root.bind("<Control-l>", lambda e: self._toggle_log_panel())
         self.root.bind("<F5>", lambda e: self._start_simulation())
         self.root.bind("<F6>", lambda e: self._pause_simulation())
         self.root.bind("<F7>", lambda e: self._stop_simulation())
         self.root.bind("<F8>", lambda e: self._reset_simulation())
+        self.root.bind("<F1>", lambda e: self._show_help())
+        self.root.bind("<Tab>", self._handle_tab_navigation)
+        self.root.bind("<Shift-Tab>", self._handle_shift_tab_navigation)
+        self.root.bind("<Control-Tab>", lambda e: self._cycle_notebook_tabs(1))
+        self.root.bind("<Control-Shift-Tab>", lambda e: self._cycle_notebook_tabs(-1))
 
     def _create_main_layout(self):
         """Create main application layout."""
@@ -784,19 +826,21 @@ class APGIGui:
         self.intero_canvas = canvas
 
     def _create_metrics_plots(self, parent):
-        """Create system metrics visualization."""
+        """Create system metrics visualization with performance metrics."""
         fig = Figure(figsize=(10, 8))
 
         self.metrics_axes = {
-            "somatic": fig.add_subplot(3, 1, 1),
-            "gamma": fig.add_subplot(3, 1, 2),
-            "beta": fig.add_subplot(3, 1, 3),
+            "somatic": fig.add_subplot(4, 1, 1),
+            "gamma": fig.add_subplot(4, 1, 2),
+            "performance": fig.add_subplot(4, 1, 3),
+            "memory": fig.add_subplot(4, 1, 4),
         }
 
         self.metrics_axes["somatic"].set_ylabel("Somatic Markers")
         self.metrics_axes["gamma"].set_ylabel("Gamma Power")
-        self.metrics_axes["beta"].set_ylabel("Beta Power")
-        self.metrics_axes["beta"].set_xlabel("Time (s)")
+        self.metrics_axes["performance"].set_ylabel("FPS")
+        self.metrics_axes["memory"].set_ylabel("Memory (MB)")
+        self.metrics_axes["memory"].set_xlabel("Time (s)")
 
         self.metrics_lines = {}
         (self.metrics_lines["somatic"],) = self.metrics_axes["somatic"].plot(
@@ -805,7 +849,12 @@ class APGIGui:
         (self.metrics_lines["gamma"],) = self.metrics_axes["gamma"].plot(
             [], [], "darkgreen", linewidth=2
         )
-        (self.metrics_lines["beta"],) = self.metrics_axes["beta"].plot([], [], "blue", linewidth=2)
+        (self.metrics_lines["performance"],) = self.metrics_axes["performance"].plot(
+            [], [], "red", linewidth=2
+        )
+        (self.metrics_lines["memory"],) = self.metrics_axes["memory"].plot(
+            [], [], "orange", linewidth=2
+        )
 
         fig.tight_layout()
 
@@ -1371,12 +1420,27 @@ class APGIGui:
 
     def _update_displays(self):
         """Update all displays (called periodically)."""
+        # Calculate FPS
+        current_time = time.time()
+        frame_time = current_time - self.last_frame_time
+        if frame_time > 0:
+            fps = 1.0 / frame_time
+            self.fps_buffer.append(fps)
+        self.last_frame_time = current_time
+
+        # Get memory usage
+        try:
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            self.memory_buffer.append(memory_mb)
+        except:
+            pass
+
         if self.is_running and not self.is_paused:
             self._update_status_labels()
             self._update_plots()
 
-        # Schedule next update
-        self.root.after(100, self._update_displays)  # Update every 100ms
+        # Schedule next update - use 50ms for smoother 20Hz refresh rate
+        self.root.after(50, self._update_displays)  # Update every 50ms (20Hz)
 
     def _update_status_labels(self):
         """Update status labels with system validation."""
@@ -1514,11 +1578,23 @@ class APGIGui:
         """Update system metrics plots."""
         somatic = data_copies["somatic_markers"]
         gamma = data_copies["gamma_power"]
-        beta = data_copies["beta_power"]
+
+        # Performance metrics
+        if len(self.fps_buffer) > 0:
+            avg_fps = np.mean(list(self.fps_buffer)[-30:])  # Last 30 frames
+            performance_data = np.full_like(time_data, avg_fps)
+        else:
+            performance_data = np.zeros_like(time_data)
+
+        if len(self.memory_buffer) > 0:
+            memory_data = np.full_like(time_data, self.memory_buffer[-1])
+        else:
+            memory_data = np.zeros_like(time_data)
 
         self.metrics_lines["somatic"].set_data(time_data, somatic)
         self.metrics_lines["gamma"].set_data(time_data, gamma)
-        self.metrics_lines["beta"].set_data(time_data, beta)
+        self.metrics_lines["performance"].set_data(time_data, performance_data)
+        self.metrics_lines["memory"].set_data(time_data, memory_data)
 
         for ax in self.metrics_axes.values():
             ax.set_xlim(time_data[0], time_data[-1])
@@ -1764,8 +1840,23 @@ class APGIGui:
             if not messagebox.askyesno("Exit", "Simulation is running. Exit anyway?"):
                 return
 
+        # Clean up all open toplevel windows (progress dialogs, etc.)
+        self._cleanup_toplevel_windows()
+
         self.root.quit()
         self.root.destroy()
+
+    def _cleanup_toplevel_windows(self):
+        """Clean up all toplevel windows to prevent Tkinter warnings."""
+        try:
+            for widget in self.root.winfo_children():
+                if isinstance(widget, tk.Toplevel):
+                    try:
+                        widget.destroy()
+                    except:
+                        pass
+        except:
+            pass
 
     def _edit_parameters(self):
         """Open parameter editor dialog."""
@@ -3332,7 +3423,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
         )
 
     def _generate_report(self):
-        """Generate comprehensive report."""
+        """Generate comprehensive report with statistical analysis."""
         filename = filedialog.asksaveasfilename(
             title="Save Report",
             defaultextension=".txt",
@@ -3347,22 +3438,197 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                     f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
                     if self.apgi_system:
+                        # Basic summary
                         summary = self.apgi_system.get_state_summary()
                         f.write(f"Simulation Time: {summary['time_ms'] / 1000.0:.2f} seconds\n")
                         f.write(
                             f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n"
                         )
                         f.write(f"Metabolic Reserves: {summary['metabolic_reserves']:.1f}\n")
-                        f.write(f"Allostatic Load: {summary['allostatic_load'] * 100:.1f}%\n")
+                        f.write(f"Allostatic Load: {summary['allostatic_load'] * 100:.1f}%\n\n")
+
+                        # Enhanced statistical analysis
+                        try:
+                            from apgi_system.analysis import SystemAnalyzer
+
+                            analyzer = SystemAnalyzer(self.apgi_system.config)
+                            analysis_results = analyzer.analyze_system(self.apgi_system)
+                            statistical_summary = analyzer.generate_statistical_summary(
+                                analysis_results
+                            )
+
+                            f.write("STATISTICAL ANALYSIS\n")
+                            f.write("-" * 30 + "\n\n")
+
+                            # Ignition analysis
+                            f.write("Ignition Dynamics:\n")
+                            ign_stats = statistical_summary["ignition_analysis"]
+                            f.write(
+                                f"  Rate: {ign_stats['statistics']['ignition_rate_hz']:.3f} Hz\n"
+                            )
+                            f.write(
+                                f"  Mean Interval: {ign_stats['statistics']['mean_ignition_interval_ms']:.1f} ms\n"
+                            )
+                            f.write(f"  Interpretation: {ign_stats['interpretation']}\n\n")
+
+                            # Energy analysis
+                            f.write("Energy Budget:\n")
+                            energy_stats = statistical_summary["energy_analysis"]
+                            f.write(
+                                f"  Total Consumed: {energy_stats['statistics']['total_energy_consumed']:.3f}\n"
+                            )
+                            f.write(
+                                f"  Depletion Rate: {energy_stats['statistics']['reserve_depletion_rate']:.4f}/s\n"
+                            )
+                            f.write(f"  Interpretation: {energy_stats['interpretation']}\n\n")
+
+                            # Learning analysis
+                            f.write("Learning & Memory:\n")
+                            learning_stats = statistical_summary["learning_analysis"]
+                            f.write(
+                                f"  Total Markers: {learning_stats['statistics']['total_markers']}\n"
+                            )
+                            f.write(
+                                f"  Retrieval Success: {learning_stats['statistics']['retrieval_success_rate']:.1%}\n"
+                            )
+                            f.write(f"  Interpretation: {learning_stats['interpretation']}\n\n")
+
+                            # Coherence analysis
+                            f.write("Self-Model Coherence:\n")
+                            coherence_stats = statistical_summary["coherence_analysis"]
+                            f.write(
+                                f"  Mean Coherence: {coherence_stats['statistics']['mean_coherence']:.3f}\n"
+                            )
+                            f.write(f"  Interpretation: {coherence_stats['interpretation']}\n\n")
+
+                        except Exception as e:
+                            f.write(f"Statistical analysis failed: {str(e)}\n\n")
 
                     f.write("\n" + "=" * 50 + "\n")
                     f.write("Event Log:\n")
                     f.write(self.log_text.get(1.0, tk.END))
 
-                self._log_event(f"Report saved: {filename}")
-                messagebox.showinfo("Success", f"Report saved to {filename}")
+                self._log_event(f"Enhanced report saved: {filename}")
+                messagebox.showinfo("Success", f"Comprehensive report saved to {filename}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save report:\n{str(e)}")
+
+    def _show_statistical_analysis(self):
+        """Show detailed statistical analysis dialog."""
+        if not self.apgi_system:
+            messagebox.showwarning("No System", "Please start the simulation first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Statistical Analysis")
+        dialog.geometry("800x600")
+        dialog.resizable(True, True)
+
+        # Center dialog
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Create scrolled text widget for results
+        text_widget = scrolledtext.ScrolledText(dialog, font=("Courier", 10))
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Analysis button
+        def run_analysis():
+            text_widget.delete(1.0, tk.END)
+            text_widget.insert(tk.END, "Running statistical analysis...\n\n")
+
+            try:
+                from apgi_system.analysis import SystemAnalyzer
+
+                analyzer = SystemAnalyzer(self.apgi_system.config)
+                analysis_results = analyzer.analyze_system(self.apgi_system)
+
+                # Correlation analysis
+                text_widget.insert(tk.END, "CORRELATION ANALYSIS\n")
+                text_widget.insert(tk.END, "=" * 40 + "\n\n")
+                correlations = analyzer.compute_correlation_analysis(self.apgi_system.history)
+
+                for var1, corr_dict in correlations.items():
+                    text_widget.insert(tk.END, f"{var1} correlations:\n")
+                    for var2, stats in corr_dict.items():
+                        corr = stats["correlation"]
+                        p_val = stats["p_value"]
+                        significance = (
+                            "***"
+                            if p_val < 0.001
+                            else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
+                        )
+                        text_widget.insert(
+                            tk.END, f"  {var2}: r={corr:.3f} {significance} (p={p_val:.3f})\n"
+                        )
+                    text_widget.insert(tk.END, "\n")
+
+                # Frequency analysis
+                text_widget.insert(tk.END, "\nFREQUENCY DOMAIN ANALYSIS\n")
+                text_widget.insert(tk.END, "=" * 40 + "\n\n")
+                freq_analysis = analyzer.compute_frequency_analysis(self.apgi_system.history)
+
+                for signal_name, freq_data in freq_analysis.items():
+                    text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
+                    text_widget.insert(
+                        tk.END,
+                        f"  Dominant Frequencies: {freq_data['dominant_frequencies']['freqs']}\n",
+                    )
+                    text_widget.insert(
+                        tk.END, f"  Spectral Entropy: {freq_data['spectral_entropy']:.3f}\n"
+                    )
+                    text_widget.insert(tk.END, f"  Total Power: {freq_data['total_power']:.3f}\n\n")
+
+                # Stationarity analysis
+                text_widget.insert(tk.END, "STATIONARITY ANALYSIS\n")
+                text_widget.insert(tk.END, "=" * 40 + "\n\n")
+                stationarity = analyzer.compute_stationarity_analysis(self.apgi_system.history)
+
+                for signal_name, stats in stationarity.items():
+                    text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
+                    text_widget.insert(tk.END, f"  ADF Test p-value: {stats['adf_pvalue']:.4f}\n")
+                    text_widget.insert(tk.END, f"  Trend Strength: {stats['trend_strength']:.6f}\n")
+                    stationary = "Stationary" if stats["adf_pvalue"] < 0.05 else "Non-stationary"
+                    text_widget.insert(tk.END, f"  Result: {stationary}\n\n")
+
+                text_widget.insert(tk.END, "Analysis complete!\n")
+
+            except Exception as e:
+                text_widget.insert(tk.END, f"Analysis failed: {str(e)}\n")
+                import traceback
+
+                text_widget.insert(tk.END, traceback.format_exc())
+
+        # Button frame
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(button_frame, text="Run Analysis", command=run_analysis).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(
+            button_frame,
+            text="Save Results",
+            command=lambda: self._save_analysis_results(text_widget),
+        ).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def _save_analysis_results(self, text_widget):
+        """Save statistical analysis results to file."""
+        filename = filedialog.asksaveasfilename(
+            title="Save Statistical Analysis",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+
+        if filename:
+            try:
+                with open(filename, "w") as f:
+                    f.write(text_widget.get(1.0, tk.END))
+                self._log_event(f"Statistical analysis saved: {filename}")
+                messagebox.showinfo("Success", f"Analysis saved to {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save analysis:\n{str(e)}")
 
     def _show_docs(self):
         """Show documentation."""
@@ -3402,16 +3668,35 @@ For detailed documentation, see APGI-System-README.md in the project directory.
         """Show keyboard shortcuts."""
         shortcuts = """Keyboard Shortcuts
 
+File Operations:
 Ctrl+N  - New Session
 Ctrl+O  - Load Configuration
 Ctrl+S  - Save Configuration
 Ctrl+E  - Export Data
 Ctrl+Q  - Exit
 
+Simulation Control:
 F5      - Start Simulation
 F6      - Pause/Resume
 F7      - Stop Simulation
 F8      - Reset System
+Ctrl+R  - Reset System
+
+View Navigation:
+Ctrl+P  - Toggle Parameter Panel
+Ctrl+L  - Toggle Log Panel
+Ctrl+Tab - Cycle Through Tabs
+Ctrl+Shift+Tab - Reverse Tab Cycle
+Tab     - Navigate Between Controls
+Shift+Tab - Reverse Navigation
+
+Zoom Controls:
+Ctrl++  - Zoom In
+Ctrl+-  - Zoom Out
+Ctrl+0  - Fit to Window
+
+Help:
+F1      - Show Help
 """
 
         messagebox.showinfo("Keyboard Shortcuts", shortcuts)
@@ -3498,17 +3783,76 @@ For more information, visit the project repository.
                     self._param_cache[param_name] = var
 
     def _update_param_cache(self, param_name):
-        """Update thread-safe parameter cache."""
+        """Update parameter cache when tkinter variable changes."""
         try:
             if hasattr(self, "param_vars") and param_name in self.param_vars:
-                self._param_cache[param_name] = self.param_vars[param_name].get()
+                var = self.param_vars[param_name]
+                if hasattr(var, "get"):
+                    self._param_cache[param_name] = var.get()
         except Exception:
-            # Ignore errors during shutdown
             pass
+
+    def _show_help(self):
+        """Show help dialog."""
+        self._show_docs()
+
+    def _toggle_parameter_panel(self):
+        """Toggle parameter panel visibility."""
+        try:
+            if hasattr(self, "param_frame"):
+                current_state = self.param_frame.winfo_ismapped()
+                if current_state:
+                    self.param_frame.pack_forget()
+                    self._log_event("Parameter panel hidden")
+                else:
+                    self.param_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                    self._log_event("Parameter panel shown")
+        except Exception as e:
+            self._log_event(f"Error toggling parameter panel: {e}")
+
+    def _toggle_log_panel(self):
+        """Toggle log panel visibility."""
+        try:
+            if hasattr(self, "log_frame"):
+                current_state = self.log_frame.winfo_ismapped()
+                if current_state:
+                    self.log_frame.pack_forget()
+                    self._log_event("Log panel hidden")
+                else:
+                    self.log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                    self._log_event("Log panel shown")
+        except Exception as e:
+            self._log_event(f"Error toggling log panel: {e}")
+
+    def _handle_tab_navigation(self, event):
+        """Handle Tab key navigation."""
+        # Let tkinter handle default tab navigation
+        return None
+
+    def _handle_shift_tab_navigation(self, event):
+        """Handle Shift+Tab key navigation."""
+        # Let tkinter handle default shift+tab navigation
+        return None
+
+    def _cycle_notebook_tabs(self, direction):
+        """Cycle through notebook tabs."""
+        try:
+            # Find the notebook widget
+            if hasattr(self, "right_panel"):
+                for child in self.right_panel.winfo_children():
+                    if isinstance(child, ttk.Notebook):
+                        current = child.index("current")
+                        total = child.index("end") - 1
+                        new_index = (current + direction) % total
+                        child.select(new_index)
+                        self._log_event(f"Switched to tab: {child.tab(new_index, 'text')}")
+                        break
+        except Exception as e:
+            self._log_event(f"Error cycling tabs: {e}")
 
 
 def main():
-    """Main entry point."""
+    """Main entry point for GUI application."""
     # Create splash screen first to show GUI is starting
     splash_root = tk.Tk()
     splash_root.title("APGI System")

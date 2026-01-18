@@ -5,6 +5,7 @@ Provides Prometheus metrics for monitoring API performance and health.
 """
 
 import time
+import psutil
 from typing import Callable
 
 from fastapi import Request, Response
@@ -41,6 +42,20 @@ error_counter = Counter(
 # Active requests gauge
 active_requests = Gauge("apgi_api_active_requests", "Number of requests currently being processed")
 
+# Memory usage gauge
+memory_usage_bytes = Gauge("apgi_api_memory_usage_bytes", "Current memory usage in bytes")
+
+# CPU usage gauge
+cpu_usage_percent = Gauge("apgi_api_cpu_usage_percent", "Current CPU usage percentage")
+
+# Response size histogram
+response_size_bytes = Histogram(
+    "apgi_api_response_size_bytes",
+    "Response size in bytes",
+    ["method", "endpoint"],
+    buckets=(100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000),
+)
+
 
 class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     """
@@ -51,6 +66,8 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     - Request duration by endpoint and method
     - Active requests
     - Errors by type
+    - Response sizes
+    - System metrics (memory and CPU usage)
     """
 
     def __init__(self, app: ASGIApp):
@@ -93,10 +110,18 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
             request_duration.labels(method=method, endpoint=endpoint).observe(duration)
 
+            # Track response size
+            if hasattr(response, "headers") and "content-length" in response.headers:
+                response_size = int(response.headers["content-length"])
+                response_size_bytes.labels(method=method, endpoint=endpoint).observe(response_size)
+
             # Track errors (4xx and 5xx)
             if status_code >= 400:
                 error_type = "client_error" if status_code < 500 else "server_error"
                 error_counter.labels(error_type=error_type, endpoint=endpoint).inc()
+
+            # Update system metrics
+            self._update_system_metrics()
 
             return response
 
@@ -162,6 +187,20 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             return True
 
         return False
+
+    def _update_system_metrics(self):
+        """Update system-level metrics (memory and CPU usage)."""
+        try:
+            # Memory usage
+            memory_info = psutil.virtual_memory()
+            memory_usage_bytes.set(memory_info.used)
+
+            # CPU usage
+            cpu_percent = psutil.cpu_percent(interval=None)
+            cpu_usage_percent.set(cpu_percent)
+        except Exception:
+            # Silently fail if psutil is not available or other errors occur
+            pass
 
 
 class MetricsCollector:

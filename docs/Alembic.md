@@ -4,51 +4,60 @@ This directory contains Alembic database migrations for the APGI REST API.
 
 ## Setup
 
-1. Install dependencies:
+Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Configure database URL in `.env` file or environment variable:
-```
+Configure database URL in `.env` file or environment variable:
+
+```bash
 DATABASE_URL=postgresql://user:password@localhost/apgi_api
 ```
 
 ## Running Migrations
 
-### Apply all pending migrations:
+### Apply all pending migrations
+
 ```bash
 alembic upgrade head
 ```
 
-### Revert last migration:
+### Revert last migration
+
 ```bash
 alembic downgrade -1
 ```
 
-### Revert all migrations:
+### Revert all migrations
+
 ```bash
 alembic downgrade base
 ```
 
-### View migration history:
+### View migration history
+
 ```bash
 alembic history
 ```
 
-### View current revision:
+### View current revision
+
 ```bash
 alembic current
 ```
 
 ## Creating New Migrations
 
-### Auto-generate migration from model changes:
+### Auto-generate migration from model changes
+
 ```bash
 alembic revision --autogenerate -m "description of changes"
 ```
 
-### Create empty migration:
+### Create empty migration
+
 ```bash
 alembic revision -m "description of changes"
 ```
@@ -58,6 +67,7 @@ alembic revision -m "description of changes"
 Migrations are stored in `api/alembic/versions/` directory.
 
 ### Initial Schema (001)
+
 - Creates all base tables: users, sessions, tasks, session_data, refresh_tokens, webhook_deliveries
 - Sets up indexes for performance
 - Configures foreign key relationships with cascade deletes
@@ -76,6 +86,7 @@ Migrations are stored in `api/alembic/versions/` directory.
 ### Indexes
 
 Performance indexes are created for:
+
 - User lookups (username, email)
 - Session queries (user_id + created_at, state)
 - Task queries (session_id + created_at, status, type)

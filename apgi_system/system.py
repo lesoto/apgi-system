@@ -79,13 +79,16 @@ class APGISystem:
         self.timestep_ms = self.config["system"]["timestep_ms"]
         self.is_running = False
 
-        # History for analysis
+        # History for analysis - use bounded deques to prevent memory leaks
+        max_history_size = self.config.get("system", {}).get("max_history_size", 10000)
+        from collections import deque
+
         self.history = {
-            "time": [],
-            "ignitions": [],
-            "free_energy": [],
-            "precision": [],
-            "metabolic_reserves": [],
+            "time": deque(maxlen=max_history_size),
+            "ignitions": deque(maxlen=max_history_size),
+            "free_energy": deque(maxlen=max_history_size),
+            "precision": deque(maxlen=max_history_size),
+            "metabolic_reserves": deque(maxlen=max_history_size),
         }
 
     def _initialize_subsystems(self):
@@ -300,12 +303,18 @@ class APGISystem:
         Run simulation for specified duration.
 
         Args:
-            duration_ms: Duration in milliseconds
+            duration_ms: Duration in milliseconds (must be positive)
             extero_input_fn: Function that generates exteroceptive input
 
         Returns:
             Summary of run
+
+        Raises:
+            ValueError: If duration_ms is negative or zero
         """
+        if duration_ms <= 0:
+            raise ValueError(f"duration_ms must be positive, got {duration_ms}")
+
         self.is_running = True
         num_steps = int(duration_ms / self.timestep_ms)
 

@@ -75,6 +75,7 @@ curl -X POST "http://localhost:8000/v1/auth/login" \
 ```
 
 Response:
+
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",

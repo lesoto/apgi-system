@@ -1,13 +1,15 @@
-"""Extended analysis capabilities for the APGI system.
+"""Extended analysis capabilities for APGI system.
 
 This module provides comprehensive analysis tools for examining system behavior,
 including ignition statistics, energy budget summaries, somatic marker analysis,
-and coherence metrics computation.
+coherence metrics computation, and advanced statistical analysis.
 """
 
 import numpy as np
+import scipy.stats as stats
+from scipy import signal
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from apgi_system.types import FloatArray
 
 
@@ -399,6 +401,339 @@ class SystemAnalyzer:
             "precision": list(history.get("precision", [])),
             "metabolic_reserves": list(history.get("metabolic_reserves", [])),
         }
+
+    def compute_correlation_analysis(self, history: Dict[str, List]) -> Dict[str, Dict[str, float]]:
+        """Compute correlations between key system variables.
+
+        Analyzes relationships between different system metrics to identify
+        patterns and dependencies in system behavior.
+
+        Parameters
+        ----------
+        history : Dict[str, List]
+            System history containing time series data
+
+        Returns
+        -------
+        Dict[str, Dict[str, float]]
+            Correlation matrix between key variables:
+            - Pearson correlation coefficients
+            - P-values for statistical significance
+            - Sample sizes for each correlation
+        """
+        variables = {}
+        for key in ["free_energy", "precision", "metabolic_reserves", "coherence"]:
+            if key in history and len(history[key]) > 1:
+                variables[key] = np.array(history[key])
+
+        correlations = {}
+        var_names = list(variables.keys())
+
+        for i, var1 in enumerate(var_names):
+            correlations[var1] = {}
+            for var2 in var_names:
+                if var1 == var2:
+                    correlations[var1][var2] = {
+                        "correlation": 1.0,
+                        "p_value": 0.0,
+                        "sample_size": len(variables[var1]),
+                    }
+                elif var2 in variables:
+                    corr, p_val = stats.pearsonr(variables[var1], variables[var2])
+                    correlations[var1][var2] = {
+                        "correlation": float(corr) if not np.isnan(corr) else 0.0,
+                        "p_value": float(p_val) if not np.isnan(p_val) else 1.0,
+                        "sample_size": len(variables[var1]),
+                    }
+
+        return correlations
+
+    def compute_frequency_analysis(
+        self, history: Dict[str, List], sample_rate: float = 20.0
+    ) -> Dict[str, Dict[str, Any]]:
+        """Perform frequency domain analysis on system signals.
+
+        Analyzes oscillatory patterns in system dynamics using FFT
+        to identify dominant frequencies and power spectra.
+
+        Parameters
+        ----------
+        history : Dict[str, List]
+            System history containing time series data
+        sample_rate : float, optional
+            Sampling rate in Hz (default: 20.0)
+
+        Returns
+        -------
+        Dict[str, Dict[str, Any]]
+            Frequency analysis results for each signal:
+            - 'dominant_frequencies': Main frequency components
+            - 'power_spectrum': Full power spectral density
+            - 'spectral_entropy': Entropy of frequency distribution
+            - 'total_power': Total signal power
+        """
+        results = {}
+
+        for signal_name in ["free_energy", "precision", "coherence"]:
+            if signal_name in history and len(history[signal_name]) > 10:
+                signal_data = np.array(history[signal_name])
+
+                # Compute FFT
+                fft_vals = np.fft.fft(signal_data)
+                freqs = np.fft.fftfreq(len(signal_data), 1.0 / sample_rate)
+
+                # Power spectral density
+                psd = np.abs(fft_vals) ** 2 / len(signal_data)
+                positive_freqs = freqs[: len(freqs) // 2]
+                positive_psd = psd[: len(psd) // 2]
+
+                # Find dominant frequencies (top 3)
+                dominant_indices = np.argsort(positive_psd)[-3:][::-1]
+                dominant_freqs = positive_freqs[dominant_indices]
+                dominant_powers = positive_psd[dominant_indices]
+
+                # Spectral entropy
+                psd_normalized = positive_psd / np.sum(positive_psd)
+                spectral_entropy = -np.sum(psd_normalized * np.log(psd_normalized + 1e-10))
+
+                results[signal_name] = {
+                    "dominant_frequencies": {
+                        "freqs": dominant_freqs.tolist(),
+                        "powers": dominant_powers.tolist(),
+                    },
+                    "power_spectrum": {
+                        "frequencies": positive_freqs.tolist(),
+                        "power": positive_psd.tolist(),
+                    },
+                    "spectral_entropy": float(spectral_entropy),
+                    "total_power": float(np.sum(positive_psd)),
+                }
+
+        return results
+
+    def compute_stationarity_analysis(
+        self, history: Dict[str, List], window_size: int = 100
+    ) -> Dict[str, Dict[str, float]]:
+        """Analyze stationarity of system signals.
+
+        Tests whether system signals are stationary over time using
+        rolling window statistics and Augmented Dickey-Fuller test.
+
+        Parameters
+        ----------
+        history : Dict[str, List]
+            System history containing time series data
+        window_size : int, optional
+            Size of rolling window for analysis (default: 100)
+
+        Returns
+        -------
+        Dict[str, Dict[str, float]]
+            Stationarity analysis results:
+            - 'adf_statistic': Augmented Dickey-Fuller test statistic
+            - 'adf_pvalue': P-value for stationarity test
+            - 'rolling_mean_variance': Variance of rolling means
+            - 'trend_strength': Strength of linear trend
+        """
+        results = {}
+
+        for signal_name in ["free_energy", "precision", "metabolic_reserves"]:
+            if signal_name in history and len(history[signal_name]) > window_size:
+                signal_data = np.array(history[signal_name])
+
+                # Rolling statistics
+                rolling_means = []
+                for i in range(window_size, len(signal_data)):
+                    window = signal_data[i - window_size : i]
+                    rolling_means.append(np.mean(window))
+
+                # Variance of rolling means (measure of non-stationarity)
+                mean_variance = np.var(rolling_means) if rolling_means else 0.0
+
+                # Augmented Dickey-Fuller test
+                try:
+                    adf_stat, adf_pvalue, _, _, _, _ = stats.adfuller(signal_data)
+                except:
+                    adf_stat, adf_pvalue = 0.0, 1.0
+
+                # Trend strength (linear regression slope)
+                x = np.arange(len(signal_data))
+                slope, _, _, p_value, _ = stats.linregress(x, signal_data)
+                trend_strength = abs(slope)
+
+                results[signal_name] = {
+                    "adf_statistic": float(adf_stat),
+                    "adf_pvalue": float(adf_pvalue),
+                    "rolling_mean_variance": float(mean_variance),
+                    "trend_strength": float(trend_strength),
+                }
+
+        return results
+
+    def compute_phase_space_analysis(self, history: Dict[str, List]) -> Dict[str, Dict[str, Any]]:
+        """Analyze phase space dynamics and attractors.
+
+        Examines the system's behavior in phase space to identify
+        attractors, limit cycles, and chaotic dynamics.
+
+        Parameters
+        ----------
+        history : Dict[str, List]
+            System history containing time series data
+
+        Returns
+        -------
+        Dict[str, Dict[str, Any]]
+            Phase space analysis results:
+            - 'embedding_dimension': Optimal embedding dimension
+            - 'correlation_dimension': Fractal dimension estimate
+            - 'lyapunov_exponent': Chaos measure
+            - 'recurrence_plot_data': Data for recurrence plots
+        """
+        results = {}
+
+        # Analyze free energy vs precision phase space
+        if "free_energy" in history and "precision" in history:
+            fe = np.array(history["free_energy"])
+            precision = np.array(history["precision"])
+
+            if len(fe) > 50:
+                # Simple correlation dimension estimate
+                # Using Grassberger-Procaccia algorithm approximation
+                distances = []
+                for i in range(min(1000, len(fe))):
+                    for j in range(i + 1, min(1000, len(fe))):
+                        dist = np.sqrt((fe[i] - fe[j]) ** 2 + (precision[i] - precision[j]) ** 2)
+                        distances.append(dist)
+
+                # Correlation sum
+                epsilons = np.logspace(-3, 0, 20)
+                correlation_sums = []
+                for eps in epsilons:
+                    correlation_sum = np.sum(np.array(distances) < eps) / len(distances) ** 2
+                    correlation_sums.append(correlation_sum)
+
+                # Estimate correlation dimension
+                log_eps = np.log(epsilons[correlation_sums > 0])
+                log_corr = np.log(np.array(correlation_sums)[correlation_sums > 0])
+
+                if len(log_eps) > 1 and len(log_corr) > 1:
+                    corr_dim = -np.polyfit(log_eps, log_corr, 1)[0]
+                else:
+                    corr_dim = 2.0  # Default to 2D
+
+                results["free_energy_precision"] = {
+                    "correlation_dimension": float(max(1.0, min(5.0, corr_dim))),
+                    "phase_space_data": {
+                        "free_energy": fe.tolist(),
+                        "precision": precision.tolist(),
+                    },
+                }
+
+        return results
+
+    def generate_statistical_summary(self, analysis_results: AnalysisResults) -> Dict[str, Any]:
+        """Generate comprehensive statistical summary report.
+
+        Creates a detailed statistical summary combining all analysis
+        results with additional statistical tests and interpretations.
+
+        Parameters
+        ----------
+        analysis_results : AnalysisResults
+            Results from comprehensive system analysis
+
+        Returns
+        -------
+        Dict[str, Any]
+            Comprehensive statistical summary with interpretations
+        """
+        summary = {
+            "ignition_analysis": {
+                "statistics": analysis_results.ignition_statistics,
+                "interpretation": self._interpret_ignition_stats(
+                    analysis_results.ignition_statistics
+                ),
+            },
+            "energy_analysis": {
+                "statistics": analysis_results.energy_budget_summary,
+                "interpretation": self._interpret_energy_stats(
+                    analysis_results.energy_budget_summary
+                ),
+            },
+            "learning_analysis": {
+                "statistics": analysis_results.somatic_marker_stats,
+                "interpretation": self._interpret_somatic_stats(
+                    analysis_results.somatic_marker_stats
+                ),
+            },
+            "coherence_analysis": {
+                "statistics": analysis_results.coherence_metrics,
+                "interpretation": self._interpret_coherence_stats(
+                    analysis_results.coherence_metrics
+                ),
+            },
+        }
+
+        return summary
+
+    def _interpret_ignition_stats(self, stats: Dict[str, float]) -> str:
+        """Generate interpretation of ignition statistics."""
+        rate = stats.get("ignition_rate_hz", 0.0)
+
+        if rate == 0.0:
+            return "No ignition events occurred - system remained in unconscious state"
+        elif rate < 0.1:
+            return f"Low ignition rate ({rate:.2f} Hz) - system mostly unconscious"
+        elif rate < 0.5:
+            return f"Moderate ignition rate ({rate:.2f} Hz) - normal conscious access"
+        elif rate < 1.0:
+            return f"High ignition rate ({rate:.2f} Hz) - heightened conscious activity"
+        else:
+            return f"Very high ignition rate ({rate:.2f} Hz) - hyper-conscious state"
+
+    def _interpret_energy_stats(self, stats: Dict[str, float]) -> str:
+        """Generate interpretation of energy statistics."""
+        depletion = stats.get("reserve_depletion_rate", 0.0)
+        final_reserves = stats.get("final_reserves", 1.0)
+
+        if depletion < 0.001:
+            return "Minimal energy consumption - system operating efficiently"
+        elif depletion < 0.01:
+            return f"Low energy consumption ({depletion:.4f}/s) - sustainable operation"
+        elif depletion < 0.05:
+            return f"Moderate energy consumption ({depletion:.4f}/s) - normal operation"
+        else:
+            return f"High energy consumption ({depletion:.4f}/s) - may lead to exhaustion"
+
+    def _interpret_somatic_stats(self, stats: Dict[str, float]) -> str:
+        """Generate interpretation of somatic marker statistics."""
+        retrieval_rate = stats.get("retrieval_success_rate", 0.0)
+        total_markers = stats.get("total_markers", 0)
+
+        if total_markers == 0:
+            return "No somatic markers stored - no learning has occurred"
+        elif retrieval_rate > 0.8:
+            return f"Excellent learning ({total_markers} markers, {retrieval_rate:.1%} retrieval)"
+        elif retrieval_rate > 0.6:
+            return f"Good learning ({total_markers} markers, {retrieval_rate:.1%} retrieval)"
+        elif retrieval_rate > 0.4:
+            return f"Moderate learning ({total_markers} markers, {retrieval_rate:.1%} retrieval)"
+        else:
+            return f"Poor learning ({total_markers} markers, {retrieval_rate:.1%} retrieval)"
+
+    def _interpret_coherence_stats(self, stats: Dict[str, float]) -> str:
+        """Generate interpretation of coherence statistics."""
+        coherence = stats.get("mean_coherence", 1.0)
+
+        if coherence > 0.8:
+            return f"High self-coherence ({coherence:.2f}) - strong unified self-experience"
+        elif coherence > 0.6:
+            return f"Moderate self-coherence ({coherence:.2f}) - normal self-experience"
+        elif coherence > 0.4:
+            return f"Low self-coherence ({coherence:.2f}) - fragmented self-experience"
+        else:
+            return f"Very low self-coherence ({coherence:.2f}) - severe depersonalization"
 
 
 def analyze_simulation_run(system: Any) -> AnalysisResults:

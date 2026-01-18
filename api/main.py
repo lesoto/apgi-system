@@ -4,7 +4,9 @@ APGI REST API Main Application
 FastAPI application providing RESTful access to the APGI System.
 """
 
+import socket
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -55,6 +57,92 @@ redis_client: Optional[redis.Redis] = None
 rate_limiting_middleware: Optional[RateLimitingMiddleware] = None
 
 
+def is_port_available(host: str, port: int) -> bool:
+    """Check if a port is available on the given host."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+            return True
+    except OSError:
+        return False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    global redis_client  # type: ignore # noqa: F824
+
+    # Startup
+    logger.info("Application starting up", component="lifecycle")
+
+    # Configure alerting system
+    configure_alerting(
+        webhook_urls=settings.alert_webhook_urls,
+        enable_log_channel=settings.alert_enable_log_channel,
+        error_rate_threshold=settings.alert_error_rate_threshold,
+        error_rate_window_minutes=settings.alert_error_rate_window_minutes,
+        alert_cooldown_minutes=settings.alert_cooldown_minutes,
+    )
+    logger.info("Alerting system configured", component="alerting")
+
+    # Initialize database
+    try:
+        init_db()
+        logger.info("Database initialized", component="database")
+    except Exception as e:
+        logger.error("Failed to initialize database", component="database", error=str(e))
+        raise
+
+    # Initialize Redis client
+    try:
+        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+        await redis_client.ping()
+        logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+
+        # Update rate limiting middleware with Redis client
+        if rate_limiting_middleware:
+            rate_limiting_middleware.set_redis_client(redis_client)
+            logger.info(
+                "Rate limiting middleware updated with Redis client", component="middleware"
+            )
+
+    except Exception as e:
+        logger.error("Failed to initialize Redis", component="redis", error=str(e))
+        raise
+
+    # Initialize session routes with Redis client
+    sessions.init_session_routes(redis_client)
+    logger.info("Session routes initialized", component="routes")
+
+    # Initialize task routes
+    tasks.init_task_routes()
+    logger.info("Task routes initialized", component="routes")
+
+    # Initialize export routes with session manager
+    session_mgr = sessions.get_session_manager()
+    export.init_export_routes(session_mgr)
+    logger.info("Export routes initialized", component="routes")
+
+    # Initialize health routes with Redis client
+    health.init_health_routes(redis_client)
+    logger.info("Health routes initialized", component="routes")
+
+    yield
+
+    # Shutdown
+    logger.info("Application shutting down", component="lifecycle")
+
+    # Close Redis connection
+    if redis_client:
+        await redis_client.close()
+        logger.info("Redis connection closed", component="redis")
+
+    # Close database connections
+    close_db()
+    logger.info("Database connections closed", component="database")
+
+
 def create_app(test_mode: bool = False) -> FastAPI:
     """
     Create and configure the FastAPI application.
@@ -72,6 +160,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
 
     # Add request size limiting middleware (first, to catch large requests early)
@@ -138,81 +227,6 @@ def create_app(test_mode: bool = False) -> FastAPI:
     # Register exception handlers
     register_exception_handlers(app)
 
-    # Startup event
-    @app.on_event("startup")
-    async def startup_event():
-        """Initialize resources on startup."""
-        global redis_client  # type: ignore # noqa: F824
-
-        # Configure alerting system
-        configure_alerting(
-            webhook_urls=settings.alert_webhook_urls,
-            enable_log_channel=settings.alert_enable_log_channel,
-            error_rate_threshold=settings.alert_error_rate_threshold,
-            error_rate_window_minutes=settings.alert_error_rate_window_minutes,
-            alert_cooldown_minutes=settings.alert_cooldown_minutes,
-        )
-        logger.info("Alerting system configured", component="alerting")
-
-        # Initialize database
-        try:
-            init_db()
-            logger.info("Database initialized", component="database")
-        except Exception as e:
-            logger.error("Failed to initialize database", component="database", error=str(e))
-            raise
-
-        # Initialize Redis client
-        try:
-            redis_client = redis.from_url(
-                settings.redis_url, encoding="utf-8", decode_responses=True
-            )
-            await redis_client.ping()
-            logger.info("Redis client initialized", component="redis", url=settings.redis_url)
-
-            # Update rate limiting middleware with Redis client
-            if rate_limiting_middleware:
-                rate_limiting_middleware.set_redis_client(redis_client)
-                logger.info(
-                    "Rate limiting middleware updated with Redis client", component="middleware"
-                )
-
-        except Exception as e:
-            logger.error("Failed to initialize Redis", component="redis", error=str(e))
-            raise
-
-        # Initialize session routes with Redis client
-        sessions.init_session_routes(redis_client)
-        logger.info("Session routes initialized", component="routes")
-
-        # Initialize task routes
-        tasks.init_task_routes()
-        logger.info("Task routes initialized", component="routes")
-
-        # Initialize export routes with session manager
-        session_mgr = sessions.get_session_manager()
-        export.init_export_routes(session_mgr)
-        logger.info("Export routes initialized", component="routes")
-
-        # Initialize health routes with Redis client
-        health.init_health_routes(redis_client)
-        logger.info("Health routes initialized", component="routes")
-
-    # Shutdown event
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Clean up resources on shutdown."""
-        global redis_client  # type: ignore # noqa: F824
-
-        # Close Redis connection
-        if redis_client:
-            await redis_client.close()
-            logger.info("Redis connection closed", component="redis")
-
-        # Close database connections
-        close_db()
-        logger.info("Database connections closed", component="database")
-
     # Health check endpoint
     @app.get("/health", tags=["Health"])
     async def health_check():
@@ -260,4 +274,22 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    default_port = 8000
+    default_host = "0.0.0.0"
+
+    # Check if default port is available
+    if not is_port_available(default_host, default_port):
+        print(f"⚠️  Port {default_port} is already in use. Trying alternative ports...")
+        # Try to find an available port
+        for port in range(default_port + 1, default_port + 100):
+            if is_port_available(default_host, port):
+                print(f"✓ Using port {port}")
+                default_port = port
+                break
+        else:
+            print(
+                f"❌ Could not find an available port between {default_port} and {default_port + 99}"
+            )
+            sys.exit(1)
+
+    uvicorn.run("api.main:app", host=default_host, port=default_port, reload=True, log_level="info")

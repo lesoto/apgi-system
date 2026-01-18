@@ -6,10 +6,6 @@
 🚀 LAUNCH GUI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Method 1 (Recommended):
-    $ python apgi_gui.py
-
-  Method 2:
     $ python apgi_gui.py
 
   The GUI will initialize the APGI system and open a window with:
@@ -54,16 +50,18 @@
   │ [Neural Activity] [Interoception] [Metrics] [Self] [Osc] [3D]│
   ├─────────────────────────────────────────────────────────────┤
   │                                                             │
-  │  📈 Real-time plots updating every 100ms                   │
+  │  📈 Real-time plots updating every 50ms (20Hz)              │
+  │  🚀 Performance metrics: FPS & Memory usage                  │
   │                                                             │
   │  Tab 1: Ignition events, Workspace, Precision, Free Energy │
   │  Tab 2: Heart rate, Cortisol, Load, Metabolic              │
-  │  Tab 3: Somatic markers, Gamma, Beta                       │
+  │  Tab 3: Somatic markers, Gamma, Beta, Performance, Memory   │
   │  Tab 4: Self-model coherence                               │
   │  Tab 5: Oscillation signals & spectrum                     │
   │  Tab 6: 3D state space trajectory                          │
   │                                                             │
   │  🔍 Navigation toolbar for zoom/pan                        │
+  │  ⌨️  Enhanced keyboard navigation (Ctrl+Tab to switch tabs)   │
   │                                                             │
   └─────────────────────────────────────────────────────────────┘
 
@@ -76,6 +74,7 @@
     F6        Pause/Resume
     F7        Stop simulation
     F8        Reset system
+    Ctrl+R     Reset system (alternative)
 
   File Operations:
     Ctrl+N    New session
@@ -83,6 +82,22 @@
     Ctrl+S    Save configuration
     Ctrl+E    Export data (CSV/JSON)
     Ctrl+Q    Exit application
+
+  View Navigation:
+    Ctrl+P     Toggle parameter panel visibility
+    Ctrl+L     Toggle log panel visibility
+    Ctrl+Tab   Cycle through visualization tabs
+    Ctrl+Shift+Tab  Reverse tab cycle
+    Tab         Navigate between controls
+    Shift+Tab   Reverse navigation
+
+  Zoom Controls:
+    Ctrl++     Zoom in plots
+    Ctrl+-     Zoom out plots
+    Ctrl+0     Fit plots to window
+
+  Help:
+    F1         Show help dialog
 
 
 🎛️  BASIC WORKFLOW
@@ -168,6 +183,8 @@
     🧠 Somatic markers = Learned associations
     🌊 Gamma power = Local neural binding (30-80 Hz)
     📡 Beta power = Top-down predictions (12-30 Hz)
+    📊 Performance = Real-time FPS (frames per second)
+    💾 Memory = Current memory usage in MB
 
   Self-Model Tab:
     🎯 Coherence above 0.7 = Normal
@@ -200,7 +217,8 @@
     ✓ Watch event log to follow system events
     ✓ Correlate plots - see how ignition affects everything
     ✓ Test extreme values to understand boundaries
-    ✓ Switch between tabs during same run
+    ✓ Switch between tabs using Ctrl+Tab for efficiency
+    ✓ Monitor performance metrics to optimize simulation speed
 
 
 ⚙️  ADVANCED FEATURES
@@ -216,7 +234,9 @@
     • CSV export for R/Python analysis
     • JSON export for programmatic access
     • Automatic timestamping
-    • All metrics captured at 10 Hz
+    • All metrics captured at 20Hz (50ms intervals)
+    • Performance monitoring: FPS and memory tracking
+    • Real-time system resource monitoring
 
   Configuration Management:
     • Save parameter sets as YAML
@@ -234,7 +254,10 @@
   Slow performance:
     - Reduce simulation speed slider
     - Close other applications
-    - Check FPS counter in status bar
+    - Check FPS counter in System Metrics tab
+    - Monitor memory usage in System Metrics tab
+    - Use Ctrl+P to hide parameter panel if needed
+    - Use Ctrl+L to hide log panel if needed
 
   Plots not updating:
     - Verify simulation is running (not paused)
