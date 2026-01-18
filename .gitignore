@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,34 +19,52 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Jupyter Notebook
 .ipynb_checkpoints
+
+# Testing
 .pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
 .hypothesis/
+
+# Type checking
 .mypy_cache/
+
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Environment
 .env
-*.db
-*.sqlite
-*.sqlite3
 venv/
 env/
 ENV/
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
 # Project specific
-apgi_gui.log
+*.png
+*.pdf
 results/
 logs/
 *_results.json
 *_results_*.json
+apgi_gui.log
+
+# AI Assistant rules
 .clinerules/byterover-rules.md
 .kilocode/rules/byterover-rules.md
 .roo/rules/byterover-rules.md

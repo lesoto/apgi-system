@@ -247,17 +247,7 @@
     - Reduce buffer size in code if needed
 
 
-📚 DOCUMENTATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Full GUI Documentation:    docs/gui/GUI_README.md (400+ lines)
-  Main System Documentation: APGI-System-README.md
-  Example Scripts:           examples/
-  Tests:                     tests/
-  Configuration:             config/default.yaml
-
-
-🎯 QUICK EXPERIMENT EXAMPLE
+🎯 EXPERIMENT EXAMPLE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Goal: Observe how stress affects ignition threshold

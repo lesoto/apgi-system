@@ -1,39 +1,13 @@
 # TODO
 
-- Real-time simulation state updates
-- Live streaming of metrics
-- Event-driven notifications
-- Bulk data export functionality
-- Batch session management
-- Parallel processing capabilities
-- Clear, actionable error messages
-- User-friendly error descriptions
-- Troubleshooting suggestions
-- Interactive API documentation
-- Usage examples and tutorials
-- Request/response samples
-- 3D brain network visualization
-- Interactive parameter exploration
-- Custom plot configurations
-- Export options for visualizations
 - Authentication overhead optimization
-- Memory allocation improvements
-- Database connection pooling
-- Caching strategies
-- Enhanced rate limiting
 - DDoS protection
 - Security audit tools
 - Penetration testing framework
+- Memory allocation improvements
+- Memory optimization for GPU
+- Load testing and performance tuning
 - Additional cognitive tasks (Stroop, N-back)
 - Clinical pathology models
 - Cross-species comparative models
-- Docker containerization optimization
-- Kubernetes deployment manifests
-- Load testing and performance tuning
-- Monitoring and alerting setup
-- Advanced statistical analysis tools
-- Comparative analysis with empirical data
-- Automated report generation
-- Memory optimization for GPU
-- Automated benchmarking suite
 - Code generation tools
