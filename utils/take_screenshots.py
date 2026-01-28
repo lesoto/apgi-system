@@ -28,10 +28,21 @@ try:
     import numpy as np
 
     SCREENSHOT_AVAILABLE = True
-except ImportError:
-    print("Error: Required packages not installed. Run:")
-    print("  pip install pyautogui pygetwindow pillow opencv-python")
-    sys.exit(1)
+except ImportError as e:
+    print(f"Error: Required packages not installed. Missing: {e}")
+    print("Run: pip install pyautogui pygetwindow pillow opencv-python")
+    SCREENSHOT_AVAILABLE = False
+
+    # Create dummy classes to prevent AttributeError
+    class Dummy:
+        def __getattr__(self, name):
+            raise ImportError(f"Screenshot functionality not available: {name}")
+
+    pyautogui = Dummy()
+    gw = Dummy()
+    Image = Dummy()
+    cv2 = Dummy()
+    np = Dummy()
 
 
 class APGIScreenshotDocumentation:
@@ -57,6 +68,16 @@ class APGIScreenshotDocumentation:
         # GUI process reference
         self.gui_process = None
         self.gui_window = None
+
+        # Performance and reliability settings
+        self.max_retry_attempts = 3
+        self.base_wait_time = 0.5
+        self.screenshot_timeout = 10
+        self.interaction_delay = 1.0
+
+        # Memory management
+        self.max_screenshot_size = (1920, 1080)
+        self.compression_quality = 85
 
         # GUI element locations (will be discovered)
         self.button_locations = {}
@@ -351,10 +372,15 @@ class APGIScreenshotDocumentation:
 
     def _find_gui_window(self) -> Optional[Any]:
         """Find APGI GUI window with enhanced detection using macOS native APIs."""
+        if not SCREENSHOT_AVAILABLE:
+            print("❌ Screenshot functionality not available")
+            return None
+
         try:
             print("🔍 Searching for APGI GUI window...")
 
             # Method 1: Try macOS native window detection
+            macos_available = False
             try:
                 from Quartz import (
                     CGWindowListCopyWindowInfo,
@@ -363,52 +389,60 @@ class APGIScreenshotDocumentation:
                 )
                 from AppKit import NSWorkspace
 
-                # Get all windows
-                window_list = CGWindowListCopyWindowInfo(
-                    kCGWindowListOptionOnScreenOnly, kCGNullWindowID
-                )
+                macos_available = True
+            except ImportError:
+                print("⚠️ macOS native APIs not available")
 
-                for window_info in window_list:
-                    window_title = window_info.get("kCGWindowName", "")
-                    owner_name = window_info.get("kCGWindowOwnerName", "")
+            if macos_available:
+                try:
+                    # Get all windows
+                    window_list = CGWindowListCopyWindowInfo(
+                        kCGWindowListOptionOnScreenOnly, kCGNullWindowID
+                    )
 
-                    # Look for APGI windows
-                    if (
-                        "APGI" in window_title
-                        or "APGI" in owner_name
-                        or "consciousness" in window_title.lower()
-                        or "consciousness" in owner_name.lower()
-                    ):
+                    for window_info in window_list:
+                        window_title = window_info.get("kCGWindowName", "")
+                        owner_name = window_info.get("kCGWindowOwnerName", "")
 
-                        # Get window bounds
-                        bounds = window_info.get("kCGWindowBounds", {})
-                        if bounds:
-                            print(f"✅ Found APGI window: '{window_title}' (Owner: {owner_name})")
-                            print(f"   Bounds: {bounds}")
+                        # Look for APGI windows
+                        if (
+                            "APGI" in window_title
+                            or "APGI" in owner_name
+                            or "consciousness" in window_title.lower()
+                            or "consciousness" in owner_name.lower()
+                        ):
 
-                            # Create a simple window object
-                            class SimpleWindow:
-                                def __init__(self, title, bounds):
-                                    self.title = title
-                                    self.left = int(bounds.get("X", 0))
-                                    self.top = int(bounds.get("Y", 0))
-                                    self.width = int(bounds.get("Width", 0))
-                                    self.height = int(bounds.get("Height", 0))
+                            # Get window bounds
+                            bounds = window_info.get("kCGWindowBounds", {})
+                            if bounds:
+                                print(
+                                    f"✅ Found APGI window: '{window_title}' (Owner: {owner_name})"
+                                )
+                                print(f"   Bounds: {bounds}")
 
-                                def activate(self):
-                                    try:
-                                        # Try to activate using NSWorkspace
-                                        NSWorkspace.sharedWorkspace().activateApplication_(
-                                            owner_name
-                                        )
-                                        return True
-                                    except:
-                                        return False
+                                # Create a simple window object
+                                class SimpleWindow:
+                                    def __init__(self, title, bounds):
+                                        self.title = title
+                                        self.left = int(bounds.get("X", 0))
+                                        self.top = int(bounds.get("Y", 0))
+                                        self.width = int(bounds.get("Width", 0))
+                                        self.height = int(bounds.get("Height", 0))
 
-                            return SimpleWindow(window_title, bounds)
+                                    def activate(self):
+                                        try:
+                                            # Try to activate using NSWorkspace
+                                            NSWorkspace.sharedWorkspace().activateApplication_(
+                                                owner_name
+                                            )
+                                            return True
+                                        except:
+                                            return False
 
-            except Exception as e:
-                print(f"⚠️ macOS native method failed: {e}")
+                                return SimpleWindow(window_title, bounds)
+
+                except Exception as e:
+                    print(f"⚠️ macOS native method failed: {e}")
 
             # Method 2: Try pygetwindow with fallback
             try:
@@ -454,18 +488,25 @@ class APGIScreenshotDocumentation:
 
         except Exception as e:
             print(f"❌ Error finding GUI window: {e}")
+            import traceback
+
+            traceback.print_exc()
 
         print("❌ Could not find APGI GUI window")
         return None
 
     def _discover_buttons(self, screenshot: Image.Image):
-        """Discover button locations using improved image processing."""
+        """Discover button locations using improved image processing with memory optimization."""
         print("  🔘 Discovering buttons...")
 
         try:
-            # Convert to OpenCV format
+            # Convert to OpenCV format with memory management
             img_cv = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
             img_hsv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2HSV)
+
+            # Clean up original screenshot to save memory
+            if hasattr(screenshot, "close"):
+                screenshot.close()
 
             # Enhanced button detection with multiple methods
             button_detections = []
@@ -574,8 +615,17 @@ class APGIScreenshotDocumentation:
                     f"    Found {name} button at ({detection['x']}, {detection['y']}) [confidence: {detection['confidence']:.1f}]"
                 )
 
+            # Clean up OpenCV arrays
+            del img_cv, img_hsv, gray, edges
+            import gc
+
+            gc.collect()
+
         except Exception as e:
             print(f"    ❌ Error in button discovery: {e}")
+            import traceback
+
+            traceback.print_exc()
 
     def _classify_button_by_position(self, x: int, y: int, w: int, h: int) -> str:
         """Classify button type based on its position in the window."""
@@ -947,47 +997,81 @@ class APGIScreenshotDocumentation:
             traceback.print_exc()
 
     def _document_all_tabs(self):
-        """Document all tabs by clicking through them."""
+        """Document all tabs by clicking through them with enhanced error handling."""
         print("  📑 Documenting tabs...")
 
         for tab_name, tab_info in self.tab_locations.items():
-            try:
-                # Click on tab
-                pyautogui.click(tab_info["x"], tab_info["y"])
-                time.sleep(1)  # Wait for tab to load
+            for attempt in range(self.max_retry_attempts):
+                try:
+                    # Ensure window is active
+                    self._ensure_app_is_active()
 
-                # Take screenshot
-                self._take_screenshot(
-                    f"02_tab_{tab_name}", f"Tab: {tab_name.replace('_', ' ').title()}"
-                )
-            except Exception as e:
-                print(f"    ❌ Error documenting tab {tab_name}: {e}")
-                continue
+                    # Click on tab with validation
+                    pyautogui.click(tab_info["x"], tab_info["y"])
+                    time.sleep(self.interaction_delay)
+
+                    # Take screenshot
+                    screenshot_path = self._take_screenshot(
+                        f"02_tab_{tab_name}", f"Tab: {tab_name.replace('_', ' ').title()}"
+                    )
+
+                    if screenshot_path:
+                        break  # Success, move to next tab
+                    else:
+                        print(f"    ⚠️ Screenshot failed for tab {tab_name}, retrying...")
+
+                except Exception as e:
+                    print(f"    ❌ Error documenting tab {tab_name} (attempt {attempt + 1}): {e}")
+                    if attempt < self.max_retry_attempts - 1:
+                        time.sleep(self.base_wait_time * (attempt + 1))
+                    else:
+                        print(
+                            f"    ⚠️ Skipping tab {tab_name} after {self.max_retry_attempts} attempts"
+                        )
+                        continue
 
     def _document_all_buttons(self):
-        """Document all buttons by clicking them."""
+        """Document all buttons by clicking them with enhanced error handling."""
         print("  🔘 Documenting buttons...")
 
         for button_name, button_info in self.button_locations.items():
-            try:
-                # Click button
-                pyautogui.click(button_info["x"], button_info["y"])
-                time.sleep(2)  # Wait for action to complete
+            for attempt in range(self.max_retry_attempts):
+                try:
+                    # Ensure window is active
+                    self._ensure_app_is_active()
 
-                # Take screenshot
-                self._take_screenshot(
-                    f"03_button_{button_name}", f"Button clicked: {button_name.title()}"
-                )
+                    # Click button with validation
+                    pyautogui.click(button_info["x"], button_info["y"])
 
-                # If it's a start/pause/stop, we might need to handle the state change
-                if button_name == "start":
-                    time.sleep(3)  # Let simulation run a bit
-                elif button_name == "stop":
-                    time.sleep(1)  # Let it stop
+                    # Dynamic wait based on button type
+                    if button_name == "start":
+                        time.sleep(3)  # Let simulation run a bit
+                    elif button_name == "stop":
+                        time.sleep(1)  # Let it stop
+                    else:
+                        time.sleep(self.interaction_delay)
 
-            except Exception as e:
-                print(f"    ❌ Error documenting button {button_name}: {e}")
-                continue
+                    # Take screenshot
+                    screenshot_path = self._take_screenshot(
+                        f"03_button_{button_name}", f"Button clicked: {button_name.title()}"
+                    )
+
+                    if screenshot_path:
+                        break  # Success, move to next button
+                    else:
+                        print(f"    ⚠️ Screenshot failed for button {button_name}, retrying...")
+
+                except Exception as e:
+                    print(
+                        f"    ❌ Error documenting button {button_name} (attempt {attempt + 1}): {e}"
+                    )
+                    if attempt < self.max_retry_attempts - 1:
+                        time.sleep(self.base_wait_time * (attempt + 1))
+                    else:
+                        print(
+                            f"    ⚠️ Skipping button {button_name} after {self.max_retry_attempts} attempts"
+                        )
+                        continue
 
     def _document_all_sliders(self):
         """Document all sliders by adjusting them."""
@@ -1353,13 +1437,18 @@ class APGIScreenshotDocumentation:
             print(f"    ❌ Error documenting status bar and log: {e}")
 
     def _take_screenshot(self, filename: str, description: str) -> Optional[Path]:
-        """Take and save screenshot with metadata and error handling."""
+        """Take and save screenshot with metadata and enhanced error handling."""
+        if not SCREENSHOT_AVAILABLE:
+            print("❌ Screenshot functionality not available")
+            return None
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         screenshot_path = self.screenshots_dir / f"{filename}_{timestamp}.png"
 
         # Ensure parent directory exists
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
 
+        screenshot = None
         try:
             # Force window activation and verification before EVERY screenshot
             success = self._ensure_app_is_active()
@@ -1403,9 +1492,19 @@ class APGIScreenshotDocumentation:
                 print("    ⚠️ No GUI window, attempting manual activation...")
                 screenshot = self._manual_screenshot_attempt()
 
-            # Save screenshot with error handling
+            # Save screenshot with error handling and compression
             try:
-                screenshot.save(screenshot_path)
+                # Resize if too large to save memory
+                if (
+                    screenshot.size[0] > self.max_screenshot_size[0]
+                    or screenshot.size[1] > self.max_screenshot_size[1]
+                ):
+                    screenshot.thumbnail(self.max_screenshot_size, Image.Resampling.LANCZOS)
+                    print(f"    📏 Resized screenshot to {screenshot.size}")
+
+                screenshot.save(
+                    screenshot_path, "PNG", optimize=True, quality=self.compression_quality
+                )
                 print(f"    ✅ Saved: {screenshot_path.name}")
             except Exception as save_error:
                 print(f"    ❌ Failed to save screenshot: {save_error}")
@@ -1416,6 +1515,11 @@ class APGIScreenshotDocumentation:
                 except Exception as alt_error:
                     print(f"    ❌ Alternative save also failed: {alt_error}")
                     return None
+            finally:
+                # Clean up memory
+                if screenshot:
+                    screenshot.close()
+                    del screenshot
 
             # Add to documentation structure
             screenshot_info = {
@@ -1446,7 +1550,15 @@ class APGIScreenshotDocumentation:
 
         except Exception as e:
             print(f"❌ Error taking screenshot: {e}")
+            import traceback
+
+            traceback.print_exc()
             return None
+        finally:
+            # Force garbage collection
+            import gc
+
+            gc.collect()
 
     def _ensure_app_is_active(self) -> bool:
         """Ensure the APGI application is the active window."""
@@ -2043,34 +2155,84 @@ class APGIScreenshotDocumentation:
         return html
 
     def _cleanup_processes(self):
-        """Clean up running processes."""
+        """Clean up running processes with enhanced error handling."""
         if self.gui_process:
             try:
+                # Try graceful termination first
                 self.gui_process.terminate()
-                self.gui_process.wait(timeout=5)
-            except:
-                self.gui_process.kill()
+                try:
+                    self.gui_process.wait(timeout=5)
+                    print("✅ GUI process terminated gracefully")
+                except subprocess.TimeoutExpired:
+                    print("⚠️ GUI process did not terminate, forcing kill")
+                    self.gui_process.kill()
+                    self.gui_process.wait(timeout=2)
+                    print("✅ GUI process killed")
+            except ProcessLookupError:
+                print("✅ GUI process already terminated")
+            except Exception as e:
+                print(f"⚠️ Error cleaning up GUI process: {e}")
+            finally:
+                self.gui_process = None
+
+        # Clean up any remaining resources
+        try:
+            import gc
+
+            gc.collect()
+        except Exception:
+            pass
 
 
 def main():
-    """Main entry point."""
+    """Main entry point with enhanced validation."""
     base_dir = Path(__file__).parent.parent
 
-    print("🎯 APGI System Desktop App Screenshot Documentation")
+    print("🎯 APGI System Desktop App Screenshots")
     print("=" * 60)
     print("This tool captures screenshots of the Python Tkinter desktop application")
     print("and automatically interacts with all GUI elements.")
     print()
 
-    # Check dependencies
+    # Check dependencies with better error handling
     if not SCREENSHOT_AVAILABLE:
         print("❌ Required packages not installed. Run:")
         print("   pip install pyautogui pygetwindow pillow opencv-python")
+        print("\n⚠️ Continuing in simulation mode (no actual screenshots will be taken)")
+
+        # Ask user if they want to continue
+        try:
+            response = input("Continue anyway? (y/n): ").strip().lower()
+            if response not in ["y", "yes"]:
+                sys.exit(1)
+        except KeyboardInterrupt:
+            print("\n❌ Cancelled by user")
+            sys.exit(1)
+
+    # Validate base directory
+    if not base_dir.exists():
+        print(f"❌ Base directory does not exist: {base_dir}")
         sys.exit(1)
 
+    # Check if GUI script exists
+    gui_script = base_dir / "apgi_gui.py"
+    if not gui_script.exists():
+        print(f"⚠️ GUI script not found: {gui_script}")
+        print("The script will still run but may not be able to start the GUI automatically.")
+
     # Create and run documentation generator
-    doc_generator = APGIScreenshotDocumentation(base_dir)
-    doc_generator.generate_comprehensive_documentation()
+    try:
+        doc_generator = APGIScreenshotDocumentation(base_dir)
+        doc_generator.generate_comprehensive_documentation()
+    except KeyboardInterrupt:
+        print("\n❌ Documentation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

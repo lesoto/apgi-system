@@ -4,36 +4,49 @@ This document provides a comprehensive analysis of each file in the `/utils` dir
 
 ## File Categories Overview
 
-The utils directory contains 18 Python files that can be categorized into five main groups:
+The utils directory contains 13 Python files that can be categorized into five main groups:
 
 1. **Simulation & Analysis Scripts** - Core system demonstration and analysis tools
 2. **System Validation & Testing** - Validation, testing, and debugging utilities
 3. **Application Launchers** - GUI and application startup scripts
 4. **Development & Build Tools** - Dependency checking, build validation, and release management
-5. **Documentation & Screenshot Tools** - Automated documentation and screenshot capture utilities
+5. **Utility Libraries** - Reusable utility modules for common operations
 
 ## 1. Simulation & Analysis Scripts
 
 ### `basic_simulation.py`
 
-**Purpose**: A minimal demonstration of APGI System's core simulation capabilities.
+**Purpose**: A configurable demonstration of APGI System's core simulation capabilities with CLI options.
 
 **Key Features**:
 
-- Initializes the APGI System with default configuration
-- Runs a 10-second simulation with sinusoidal sensory input plus noise
-- Displays basic statistics (total steps, ignition events, ignition rate)
-- Shows final system state (allostatic load, metabolic reserves, somatic markers)
-- Generates comprehensive visualization plots saved as PNG
+- **Command-line interface** with argparse for flexible configuration
+- **Configurable parameters**: duration, input size, noise level, output file
+- **Quick mode**: `--quick` flag for 100ms validation runs
+- **Headless support**: `--no-plot` flag for automated environments
+- **Enhanced visualization**: 4-panel plots with customizable output
+- **Time tracking**: Uses `datetime_utils` for performance measurement
+- **Robust error handling**: Graceful handling of dependencies and exceptions
+
+**CLI Options**:
+
+- `--duration`: Simulation duration (default: 1000ms)
+- `--input-size`: Sensory input vector size (default: 256)
+- `--noise-level`: Noise level for input (default: 0.2)
+- `--output`: Output plot filename
+- `--no-plot`: Skip plotting for headless mode
+- `--show`: Show interactive plot window
+- `--config`: Custom configuration file path
+- `--quick`: Quick mode (100ms, no plots)
 
 **Unique Characteristics**:
 
-- **Most basic simulation example** - minimal setup, maximum simplicity
-- **Focus on visualization** - creates 4-panel plot showing ignition events, free energy, precision, and metabolic reserves
-- **Educational purpose** - designed for newcomers to understand system basics
-- **No configuration file** - uses system defaults
+- **Most flexible simulation** - fully configurable via command line
+- **Production-ready** - comprehensive error handling and logging
+- **Automated testing friendly** - supports headless and quick modes
+- **Integration with datetime utilities** - proper timing and duration formatting
 
-**Differentiation**: Unlike other simulation files, this is the simplest entry point with emphasis on visual output rather than detailed analysis.
+**Differentiation**: The most robust and configurable simulation script, suitable for both development and production use.
 
 ### `demo_simulation.py`
 
@@ -42,7 +55,7 @@ The utils directory contains 18 Python files that can be categorized into five m
 **Key Features**:
 
 - Uses explicit configuration file loading (`config/default.yaml`)
-- Runs a shorter 1-second simulation but with richer output
+- Runs a 1-second simulation but with richer output
 - Displays detailed final state across multiple subsystems:
   - Workspace activity status
   - Metabolic and allostatic states
@@ -90,49 +103,31 @@ The utils directory contains 18 Python files that can be categorized into five m
 
 ### `validate_app.py`
 
-**Purpose**: Comprehensive application validation that tests all core functionality without GUI.
+**Purpose**: Comprehensive application validation that tests all core functionality including GUI launch.
 
 **Key Features**:
 
-- **Multi-stage validation** with 6 distinct test categories:
+- **Multi-stage validation** with 7 distinct test categories:
   1. Core dependency imports (numpy, scipy, matplotlib, yaml, tkinter)
   2. Configuration file validation
   3. APGI System initialization
   4. System step execution with state validation
   5. GUI dependency verification
-  6. Experimental task imports
+  6. **GUI launch testing** - opens and closes GUI window automatically
+  7. Experimental task imports
 - **Structured testing** with clear pass/fail reporting
 - **State validation** - checks for required keys in system state output
 - **Configuration validation** - verifies required config sections exist
+- **GUI validation** - tests actual GUI window creation and closing
 
 **Unique Characteristics**:
 
-- **Most comprehensive validation** - tests entire application stack
-- **Non-GUI testing** - validates core system without graphical interface
+- **Most comprehensive validation** - tests entire application stack including GUI
+- **Non-interactive GUI testing** - validates GUI without user interaction
 - **Educational feedback** - provides detailed success/failure information
 - **Readiness assessment** - determines if application is ready for use
 
-**Differentiation**: The most thorough validation tool, covering everything from basic imports to complex system operations.
-
-### `test_gui_launch.py`
-
-**Purpose**: Quick GUI functionality test that opens the interface briefly to verify it works.
-
-**Key Features**:
-
-- **Minimal GUI test** - opens GUI window for exactly 3 seconds
-- **Automated testing** - no user interaction required
-- **Basic validation** - checks window title and geometry
-- **Clean exit** - automatically closes after test period
-
-**Unique Characteristics**:
-
-- **GUI-specific** - only tests graphical interface components
-- **Time-limited** - designed for quick validation, not extended use
-- **Automated workflow** - suitable for CI/CD pipelines
-- **Minimal scope** - focuses only on launch capability
-
-**Differentiation**: The only file that specifically tests GUI launch capability with automated timing.
+**Differentiation**: The most thorough validation tool, covering everything from basic imports to GUI functionality.
 
 ### `test_platform_utils.py`
 
@@ -176,21 +171,257 @@ The utils directory contains 18 Python files that can be categorized into five m
 
 **Differentiation**: The only file focused on web API infrastructure rather than the core simulation system.
 
-### `test_build_windows_validation.py`
+---
 
-**Purpose**: Validation script for Windows build system and PyInstaller configuration.
+## 3. Application Launchers
+
+### `run_gui.py`
+
+**Purpose**: Enhanced GUI launcher supporting both normal operation and testing modes.
 
 **Key Features**:
 
-- **Build system testing** - validates Windows executable creation
-- **PyInstaller integration** - tests spec file generation
-- **Environment validation** - checks build prerequisites
-- **Cross-platform focus** - specifically for Windows deployment
+- **Dual-mode operation**: Normal launch and test mode
+- **Command-line interface** with argparse:
+  - `--test`: Test mode (launches GUI briefly then closes)
+  - `--test-duration`: Duration for test mode (default: 3 seconds)
+- **Normal launch**: Full GUI application with error handling
+- **Test mode**: Automated GUI validation for CI/CD pipelines
+- **Comprehensive error handling**: Graceful handling of all exceptions
+- **User feedback**: Clear status messages and error reporting
+
+**Usage Examples**:
+
+```bash
+# Normal launch
+python utils/run_gui.py
+
+# Test mode (3 seconds)
+python utils/run_gui.py --test
+
+# Custom test duration
+python utils/run_gui.py --test --test-duration 5
+```
 
 **Unique Characteristics**:
 
-- **Platform-specific** - only relevant for Windows builds
-- **Build pipeline** - tests application packaging, not runtime
+- **Consolidated functionality** - replaces separate test script
+- **Production-ready** - robust error handling and user feedback
+- **CI/CD friendly** - supports automated testing workflows
+- **Flexible configuration** - customizable test durations
+
+**Differentiation**: The only launcher that supports both user operation and automated testing, consolidating functionality from multiple scripts.
+
+---
+
+## 4. Development & Build Tools
+
+### `build_common.py`
+
+**Purpose**: Build utilities for packaging and deployment of the APGI system.
+
+**Key Features**:
+
+- **Version management**: Extract and manage version information
+- **Dependency analysis**: Analyze project dependencies from multiple sources
+- **Resource collection**: Gather project resources for packaging
+- **Hidden import detection**: Identify hidden imports for PyInstaller
+- **Build configuration**: Centralized build settings and parameters
+- **Module exclusion**: Define which modules to exclude from packaging
+
+**Unique Characteristics**:
+
+- **Build-focused** - specifically for creating distributable packages
+- **Multi-format support** - handles requirements.txt and pyproject.toml
+- **Packaging integration** - designed for PyInstaller and similar tools
+- **Cross-platform awareness** - considers platform-specific requirements
+
+**Differentiation**: The only file focused on build and packaging workflows rather than system functionality.
+
+### `dependency_checker.py`
+
+**Purpose**: Comprehensive dependency checking with installation guidance.
+
+**Key Features**:
+
+- **Multi-level checking**: Python version, packages, and system services
+- **Platform-specific validation**: Different checks for macOS/Linux
+- **Installation guidance**: Provides specific installation instructions
+- **Service verification**: Checks Redis and PostgreSQL availability
+- **Interactive mode**: Asks user confirmation when issues found
+- **Silent mode**: For automated environments
+
+**Validation Categories**:
+- Python version (3.8+ required)
+- Core scientific packages (numpy, scipy, matplotlib, etc.)
+- Web framework packages (fastapi, uvicorn, etc.)
+- GUI packages (tkinter)
+- System services (Redis, PostgreSQL)
+
+**Unique Characteristics**:
+
+- **Most comprehensive dependency tool** - covers all aspects of system requirements
+- **User-friendly guidance** - provides specific installation commands
+- **Production-ready** - supports both interactive and automated workflows
+- **Service awareness** - checks external dependencies beyond Python packages
+
+**Differentiation**: The most thorough dependency validation tool, covering both Python packages and system services.
+
+### `installer_utils.py`
+
+**Purpose**: Installation utilities for creating distributable packages.
+
+**Key Features**:
+
+- **Virtual environment management**: Create and manage Python virtual environments
+- **Package installation**: Install individual packages or from requirements files
+- **System information gathering**: Collect platform and hardware information
+- **Windows installer generation**: Create Inno Setup scripts for Windows
+- **Registry management**: Generate Windows registry entries
+- **Installation validation**: Verify successful installation
+
+**Unique Characteristics**:
+
+- **Installation-focused** - specifically for setting up the system on new machines
+- **Cross-platform support** - handles Windows, macOS, and Linux differences
+- **Professional packaging** - creates proper installers with registry entries
+- **System integration** - integrates with operating system features
+
+**Differentiation**: The only file focused on installation and setup workflows rather than system operation.
+
+### `release.py`
+
+**Purpose**: Release management utilities for versioning and deployment.
+
+**Key Features**:
+
+- **Version management**: Increment versions (major, minor, patch)
+- **Git integration**: Create and push version tags
+- **Changelog management**: Generate and update changelog entries
+- **Build automation**: Build source distributions and wheels
+- **Release workflow**: Complete release process automation
+
+**Release Process**:
+1. Version incrementing
+2. Changelog updates
+3. Git tag creation
+4. Package building
+5. Distribution preparation
+
+**Unique Characteristics**:
+
+- **Release-focused** - specifically for managing software releases
+- **Git integration** - integrates with version control workflows
+- **Automated building** - handles PyPI package creation
+- **Professional workflow** - follows software release best practices
+
+**Differentiation**: The only file focused on release management and distribution workflows.
+
+---
+
+## 5. Utility Libraries
+
+### `datetime_utils.py`
+
+**Purpose**: Comprehensive datetime utilities for consistent timestamp handling throughout the APGI system.
+
+**Key Features**:
+
+- **Timezone safety**: All functions handle timezone-aware datetime objects
+- **Timestamp parsing**: Support multiple ISO timestamp formats
+- **Duration formatting**: Human-readable duration strings (e.g., "1h 23m 45.6s")
+- **Simulation time utilities**: Specialized functions for simulation timing
+- **Elapsed time tracking**: Calculate and format elapsed time periods
+- **Unix timestamp conversion**: Convert between datetime and Unix timestamps
+- **Duration parsing**: Parse duration strings like "1h 30m" to milliseconds
+
+**Core Functions**:
+- `utc_now()`: Get current UTC time
+- `format_duration_ms()`: Format milliseconds to human-readable strings
+- `parse_timestamp()`: Parse ISO timestamp strings
+- `get_elapsed_ms()`: Calculate elapsed time since datetime
+- `format_simulation_time()`: Format simulation time for display
+- `parse_duration()`: Parse duration strings to milliseconds
+
+**Unique Characteristics**:
+
+- **Comprehensive coverage** - handles all common datetime operations
+- **Simulation-focused** - includes utilities specific to simulation timing
+- **Timezone-safe** - prevents common timezone comparison issues
+- **Performance optimized** - efficient operations for time-critical code
+
+**Differentiation**: The most comprehensive datetime utility library, specifically enhanced for simulation and timing needs.
+
+---
+
+## Usage Recommendations
+
+### For New Users
+1. Start with `validate_app.py` to ensure system readiness
+2. Use `basic_simulation.py --quick` for a quick test run
+3. Launch GUI with `run_gui.py` for interactive exploration
+
+### For Developers
+1. Use `dependency_checker.py` to verify development environment
+2. Run `validate_app.py` after major changes
+3. Use `run_gui.py --test` for automated GUI testing
+4. Leverage `datetime_utils.py` for consistent time handling
+
+### For System Administrators
+1. Use `dependency_checker.py` for environment validation
+2. Use `installer_utils.py` for system-wide installation
+3. Use `release.py` for managed deployments
+
+### For Researchers
+1. Use `basic_simulation.py` with custom parameters for experiments
+2. Use `demo_analysis.py` for detailed system analysis
+3. Use `datetime_utils.py` for precise timing measurements
+
+---
+
+## File Relationships
+
+### Dependencies
+- `basic_simulation.py` → `datetime_utils.py`
+- `validate_app.py` → `run_gui.py` (for GUI testing)
+- `build_common.py` → `installer_utils.py` (for packaging)
+- `release.py` → `build_common.py` (for version management)
+
+### Complementary Tools
+- `dependency_checker.py` and `validate_app.py` provide different levels of validation
+- `basic_simulation.py` and `demo_analysis.py` serve different analysis needs
+- `run_gui.py` consolidates functionality from the deleted `test_gui_launch.py`
+
+### Workflow Integration
+- Development: `dependency_checker.py` → `validate_app.py` → `run_gui.py --test`
+- Research: `basic_simulation.py` → `demo_analysis.py`
+- Deployment: `installer_utils.py` → `release.py` → `build_common.py`
+
+---
+
+## Recent Changes
+
+### Consolidation Improvements
+- **Merged functionality**: `test_gui_launch.py` functionality moved to `run_gui.py`
+- **Enhanced validation**: GUI launch testing added to `validate_app.py`
+- **Improved simulation**: `basic_simulation.py` now fully configurable with CLI options
+- **Enhanced utilities**: `datetime_utils.py` expanded with comprehensive time handling
+
+### Quality Improvements
+- **Error handling**: All scripts now have robust exception handling
+- **Type hints**: Comprehensive type annotations throughout
+- **Documentation**: Enhanced docstrings and usage examples
+- **CLI interfaces**: Consistent argument parsing with help text
+
+### Removed Files
+- `test_gui_launch.py` - Functionality moved to `run_gui.py` and `validate_app.py`
+- `demo_simulation.py` - Marked as redundant (similar to `basic_simulation.py`)
+- `quick_start_docs.py` - Broken references to non-existent scripts
+- `setup_docs_env.py` - Broken references to non-existent scripts
+- `take_screenshots.py` - Broken references to non-existent scripts
+- `test_build_windows_validation.py` - References non-existent build modules
+
+This cleanup reduced the utils directory from 18 to 13 files while consolidating functionality and improving maintainability.application packaging, not runtime
 - **Development tool** - for maintainers creating distributables
 - **External dependency** - requires PyInstaller and Windows build tools
 

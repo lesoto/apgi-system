@@ -25,6 +25,25 @@ from functools import wraps
 import numpy as np
 import csv
 
+# Import core APGI Assistant with error handling
+try:
+    from AI_Assistant import APGIAssistant
+
+    HAS_ASSISTANT = True
+except ImportError as e:
+    HAS_ASSISTANT = False
+    APGIAssistant = None
+    print(f"Warning: Could not import APGIAssistant: {e}")
+    print("Please ensure AI-Assistant.py is available and all dependencies are installed")
+
+try:
+    import torch
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+
 # Matplotlib imports (if available)
 try:
     import matplotlib
@@ -64,10 +83,12 @@ try:
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib import colors
 
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
+    colors = None
 
 # Type variable for decorator
 F = TypeVar("F", bound=Callable[..., Any])
@@ -452,7 +473,7 @@ class ManagedDeque(deque):
         try:
             self.clear()
         except Exception:
-            pass  # Ignore errors during cleanup
+            pass  # Ignore errors during cleanup, especially during garbage collection
 
 
 class DependencyNotifier:
@@ -480,6 +501,9 @@ class DependencyNotifier:
                     "severity": "medium",
                 }
             )
+        else:
+            # torchdiffeq is available, no limitation
+            pass
 
         if not HAS_TRANSFORMERS:
             limitations.append(
@@ -585,7 +609,9 @@ class Debouncer:
             self.pending_calls[key].cancel()
 
         # Schedule new call
-        if hasattr(self, "root"):  # If we have a tkinter root reference
+        if hasattr(self, "root") and hasattr(
+            self.root, "after"
+        ):  # If we have a tkinter root reference
             call_id = self.root.after(
                 self.delay_ms, lambda: self._execute_call(key, func, *args, **kwargs)
             )
@@ -777,16 +803,17 @@ class StatusManager:
         )
 
         # Update main status label if it exists
-        if hasattr(self.status_label, "winfo_exists") and self.status_label.winfo_exists():
-            self.status_label.config(text=full_message)
+        if hasattr(self, "status_label") and self.status_label:
+            if hasattr(self.status_label, "winfo_exists") and self.status_label.winfo_exists():
+                self.status_label.config(text=full_message)
 
         # Update assistant status if provided and exists
-        if (
-            assistant_state is not None
-            and hasattr(self.assistant_status, "winfo_exists")
-            and self.assistant_status.winfo_exists()
-        ):
-            self.assistant_status.config(text=assistant_state)
+        if hasattr(self, "assistant_status") and self.assistant_status:
+            if (
+                hasattr(self.assistant_status, "winfo_exists")
+                and self.assistant_status.winfo_exists()
+            ):
+                self.assistant_status.config(text=assistant_state)
 
     def get_history(self) -> List[Dict[str, Any]]:
         """Get status history
@@ -847,14 +874,14 @@ class DisplayUpdateManager:
                     return
 
                 # FigureCanvasTkAgg doesn't have winfo_exists, check differently
-                if hasattr(widget, "winfo_exists"):
-                    if not widget.winfo_exists():
-                        self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
-                        return
-                elif hasattr(widget, "get_tk_widget"):
+                if hasattr(widget, "get_tk_widget"):
                     # For matplotlib canvases, check the underlying tk widget
                     tk_widget = widget.get_tk_widget()
                     if not tk_widget or not tk_widget.winfo_exists():
+                        self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
+                        return
+                elif hasattr(widget, "winfo_exists"):
+                    if not widget.winfo_exists():
                         self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
                         return
 
@@ -891,6 +918,8 @@ class GUIConfig:
     UPDATE_INTERVAL_MS = 1000
     INIT_CHECK_INTERVAL_MS = 100
     PROGRESS_BAR_UPDATE_MS = 10
+    AUTO_SAVE_INTERVAL_MS = 300000  # 5 minutes
+    GC_INTERVAL = 1000  # Perform GC every 1000 updates
 
     # UI Layout and Styling
     WINDOW_TITLE = "APGI Assistant"
@@ -898,6 +927,7 @@ class GUIConfig:
     PAD_X = 5
     PAD_Y = 5
     BORDER_WIDTH = 2
+    SLIDER_LENGTH = 200
 
     # Fonts
     FONT_FAMILY = "Arial"
@@ -908,6 +938,27 @@ class GUIConfig:
     # Colors
     COLOR_BG = "white"
     COLOR_ACCENT = "#4a7abc"
+
+    # Physiological ranges
+    HR_RANGE = (40, 200)
+    HRV_RANGE = (10, 200)
+    RESP_RANGE = (8, 40)
+    EDA_RANGE = (0.5, 20)
+
+    # Battery thresholds
+    LOW_BATTERY_THRESHOLD = 0.2
+    MEDIUM_BATTERY_THRESHOLD = 0.5
+
+    # Model configuration
+    MODEL_INPUT_MIN = 32
+    MODEL_INPUT_MAX = 1024
+    MODEL_HIDDEN_MIN = 64
+    MODEL_HIDDEN_MAX = 2048
+
+    # History limits
+    MAX_QUERY_LENGTH = 10000
+    MAX_HISTORY_ITEMS = 50
+    MAX_MEMORY_MB = 100
 
     # Theme Color Palettes
     THEMES = {
@@ -1865,7 +1916,9 @@ class CancellableProgress:
                 # Check if frame still exists before destroying
                 if hasattr(self.frame, "winfo_exists") and self.frame.winfo_exists():
                     self.frame.destroy()
-        except Exception:
+        except Exception as e:
+            # Log but don't crash during cleanup
+            print(f"Error during progress frame destruction: {e}")
             pass  # Log error but don't crash - frame might already be destroyed
         finally:
             # Clear references to help garbage collection
@@ -2032,7 +2085,7 @@ class ClearQueryAction:
 
 
 class InputValidator:
-    """Input validation utilities"""
+    """Input validation utilities with comprehensive error checking"""
 
     @staticmethod
     def validate_physiological(hr: int, hrv: int, resp: int, eda: float) -> Tuple[bool, List[str]]:
@@ -2044,17 +2097,35 @@ class InputValidator:
         """
         errors = []
 
-        if not 40 <= hr <= 200:
-            errors.append("Heart rate must be between 40-200 bpm")
+        # Validate heart rate
+        if not isinstance(hr, (int, float)):
+            errors.append("Heart rate must be a number")
+        elif not (40 <= hr <= 200):  # Use hardcoded range as fallback
+            errors.append(f"Heart rate must be between 40-200 bpm")
 
-        if not 10 <= hrv <= 200:
-            errors.append("HRV must be between 10-200 ms")
+        # Validate HRV
+        if not isinstance(hrv, (int, float)):
+            errors.append("HRV must be a number")
+        elif not GUIConfig.HRV_RANGE[0] <= hrv <= GUIConfig.HRV_RANGE[1]:
+            errors.append(
+                f"HRV must be between {GUIConfig.HRV_RANGE[0]}-{GUIConfig.HRV_RANGE[1]} ms"
+            )
 
-        if not 8 <= resp <= 40:
-            errors.append("Respiration must be between 8-40 bpm")
+        # Validate respiration
+        if not isinstance(resp, (int, float)):
+            errors.append("Respiration must be a number")
+        elif not GUIConfig.RESP_RANGE[0] <= resp <= GUIConfig.RESP_RANGE[1]:
+            errors.append(
+                f"Respiration must be between {GUIConfig.RESP_RANGE[0]}-{GUIConfig.RESP_RANGE[1]} bpm"
+            )
 
-        if not 0.5 <= eda <= 20:
-            errors.append("Skin conductance must be between 0.5-20 µS")
+        # Validate EDA
+        if not isinstance(eda, (int, float)):
+            errors.append("Skin conductance must be a number")
+        elif not GUIConfig.EDA_RANGE[0] <= eda <= GUIConfig.EDA_RANGE[1]:
+            errors.append(
+                f"Skin conductance must be between {GUIConfig.EDA_RANGE[0]}-{GUIConfig.EDA_RANGE[1]} µS"
+            )
 
         return len(errors) == 0, errors
 
@@ -2066,6 +2137,12 @@ class InputValidator:
         Returns:
             (is_valid, error_message)
         """
+        if query is None:
+            return False, "Query cannot be None"
+
+        if not isinstance(query, str):
+            return False, "Query must be a string"
+
         if not query or not query.strip():
             return False, "Query cannot be empty"
 
@@ -2084,25 +2161,50 @@ class InputValidator:
         """
         errors = []
 
+        if not isinstance(config, dict):
+            errors.append("Configuration must be a dictionary")
+            return False, errors
+
         if "input_dim" in config:
-            if not 32 <= config["input_dim"] <= 1024:
-                errors.append("Input dimension must be between 32-1024")
+            if not isinstance(config["input_dim"], (int, float)):
+                errors.append("Input dimension must be a number")
+            elif not GUIConfig.MODEL_INPUT_MIN <= config["input_dim"] <= GUIConfig.MODEL_INPUT_MAX:
+                errors.append(
+                    f"Input dimension must be between {GUIConfig.MODEL_INPUT_MIN}-{GUIConfig.MODEL_INPUT_MAX}"
+                )
 
         if "hidden_dim" in config:
-            if not 64 <= config["hidden_dim"] <= 2048:
-                errors.append("Hidden dimension must be between 64-2048")
+            if not isinstance(config["hidden_dim"], (int, float)):
+                errors.append("Hidden dimension must be a number")
+            elif (
+                not GUIConfig.MODEL_HIDDEN_MIN <= config["hidden_dim"] <= GUIConfig.MODEL_HIDDEN_MAX
+            ):
+                errors.append(
+                    f"Hidden dimension must be between {GUIConfig.MODEL_HIDDEN_MIN}-{GUIConfig.MODEL_HIDDEN_MAX}"
+                )
 
         return len(errors) == 0, errors
 
 
 class UsageTracker:
-    """Track usage patterns (privacy-respecting)"""
+    """Track usage patterns (privacy-respecting)
 
-    def __init__(self):
-        self.metrics_log = []
+    This class tracks query metrics locally without transmitting data externally.
+    All data is stored in memory only and cleared on session end.
+    """
 
-    def track_query(self, query_length, response_time, state):
-        """Log query metrics"""
+    def __init__(self) -> None:
+        """Initialize usage tracker with empty metrics log"""
+        self.metrics_log: List[Dict[str, Any]] = []
+
+    def track_query(self, query_length: int, response_time: float, state: str) -> None:
+        """Log query metrics for analytics
+
+        Args:
+            query_length: Length of the query in characters
+            response_time: Response time in seconds
+            state: Cognitive state at time of query
+        """
         metrics = {
             "timestamp": datetime.now().isoformat(),
             "query_length": query_length,
@@ -2112,8 +2214,13 @@ class UsageTracker:
         # Store locally, never transmit
         self.metrics_log.append(metrics)
 
-    def get_usage_summary(self):
-        """Get summary of usage metrics"""
+    def get_usage_summary(self) -> Dict[str, Any]:
+        """Get summary of usage metrics
+
+        Returns:
+            Dictionary containing total queries, average query length,
+            average response time, and last activity timestamp
+        """
         if not self.metrics_log:
             return {}
 
@@ -2155,6 +2262,17 @@ class APGIGUI:
     """Main GUI application for APGI Assistant - Production Ready"""
 
     def __init__(self, root):
+        # Validate dependencies first
+        if not HAS_ASSISTANT:
+            messagebox.showerror(
+                "Missing Dependency",
+                "APGI Assistant core module is not available.\n\n"
+                "Please ensure AI-Assistant.py is in the same directory\n"
+                "and all required dependencies are installed.",
+            )
+            root.destroy()
+            return
+
         self.root = root
         self.root.title("APGI Assistant - Cognitive AI Interface v2.0")
         self.root.geometry("1400x900")
@@ -2216,10 +2334,6 @@ class APGIGUI:
         self.init_safety_timer_id = None  # Safety timer to force hide progress
         self.init_progress = 0.0  # Track initialization progress (0.0 to 1.0)
         self.init_message = ""  # Current initialization status message
-
-        # Performance optimization: Debouncing for rapid updates
-        self.debouncer = Debouncer(delay_ms=300)  # 300ms debounce delay
-        self.debouncer.set_root(root)  # Set tkinter root reference
 
         # Font size management for accessibility
         self.font_size_var = tk.IntVar(value=10)  # Default font size
@@ -2424,13 +2538,15 @@ class APGIGUI:
         help_menu.add_command(label="About", command=self.show_about)
         help_menu.add_command(label="View Logs", command=self.view_logs)
 
-    def update_status(self, message: str, status_type: str = "info"):
+    def update_status(self, message: str, status_type: str = "info") -> None:
         """Update the status label with the given message and status type.
 
         Args:
             message: The status message to display
             status_type: Type of status ('info', 'success', 'error', 'warning', 'processing')
         """
+        if not self.display_manager:
+            return
         self.display_manager.update_display(
             "Status Update",
             lambda: self._do_status_update(message, status_type),
@@ -3612,12 +3728,23 @@ class APGIGUI:
 
     def handle_assistant_init(self, event):
         """Handle assistant initialization completion (success or failure)"""
-        # Prevent multiple simultaneous handlers
+        # Prevent multiple simultaneous handlers with thread-safe check
         if hasattr(self, "_handling_init") and self._handling_init:
             self.logger.debug("Initialization handler already running, skipping")
             return
 
-        self._handling_init = True
+        # Use atomic check-and-set pattern
+        if not hasattr(self, "_handling_init_lock"):
+            import threading
+
+            self._handling_init_lock = threading.Lock()
+
+        with self._handling_init_lock:
+            if hasattr(self, "_handling_init") and self._handling_init:
+                self.logger.debug("Initialization handler already running, skipping")
+                return
+
+            self._handling_init = True
 
         try:
             self.logger.debug("=== Handling Initialization Event ===")
@@ -4409,9 +4536,11 @@ class APGIGUI:
         if "Cognitive Monitoring" in self.tabs_created:
             if hasattr(self, "history_tree") and self.history_tree.winfo_exists():
                 # Debounce history tree updates to prevent excessive UI redraws
-                self.debouncer.debounce(
+                self.debouncer.schedule_update(
+                    self.root,
                     "cognitive_history",
                     lambda: self._update_cognitive_history(timestamp, state, confidence, surprise),
+                    "default",
                 )
 
     def _update_cognitive_history(self, timestamp, state, confidence, surprise):
@@ -4441,9 +4570,6 @@ class APGIGUI:
         children = self.query_tree.get_children()
         if len(children) > 50:
             self.query_tree.delete(children[-1])
-
-        # Store in memory
-        self.query_history.append({"timestamp": timestamp, "query": query, "response": response})
 
     def update_visualizations(self, response):
         """Update visualization displays"""
@@ -5310,9 +5436,7 @@ Energy Usage:
 
                 # Increment update counter and perform periodic garbage collection
                 self.update_count += 1
-                if (
-                    self.update_count % 1000 == 0
-                ):  # Reduced frequency: every 1000 updates instead of 100
+                if self.update_count % GUIConfig.GC_INTERVAL == 0:
                     import gc
 
                     gc.collect()
@@ -5344,8 +5468,11 @@ Energy Usage:
             message: The status message to display
             status_type: Type of status (determines icon and styling)
         """
-        if self.status_mgr:
-            self.status_mgr.set_status(message, status_type)
+        if self.status_mgr and hasattr(self.status_mgr, "set_status"):
+            try:
+                self.status_mgr.set_status(message, status_type)
+            except Exception as e:
+                self.logger.debug(f"Failed to set status: {e}")
 
     def update_assistant_status(self, message: str, status_type: str = "info") -> None:
         """Update assistant status label
@@ -5354,8 +5481,11 @@ Energy Usage:
             message: The status message to display (without 'Assistant: ' prefix)
             status_type: Type of status (determines icon and styling)
         """
-        if self.status_mgr:
-            self.status_mgr.set_status("", status_type, message)
+        if self.status_mgr and hasattr(self.status_mgr, "set_status"):
+            try:
+                self.status_mgr.set_status("", status_type, message)
+            except Exception as e:
+                self.logger.debug(f"Failed to update assistant status: {e}")
 
     def update_system_info(self):
         """Update system information display"""
@@ -5847,18 +5977,26 @@ Energy Usage:
     def save_configuration(self):
         """Save current configuration"""
         try:
-            config = {
-                "input_dim": self.input_dim_var.get(),
-                "hidden_dim": self.hidden_dim_var.get(),
-                "adaptive_processing": self.adaptive_proc_var.get(),
-                "energy_aware": self.energy_aware_var.get(),
-                "language_model": self.language_model_var.get(),
-            }
+            config = {}
 
-            with open(self.config_file, "w") as f:
-                json.dump(config, f, indent=2)
+            # Only save variables that exist (settings tab may not be created yet)
+            if hasattr(self, "input_dim_var"):
+                config["input_dim"] = self.input_dim_var.get()
+            if hasattr(self, "hidden_dim_var"):
+                config["hidden_dim"] = self.hidden_dim_var.get()
+            if hasattr(self, "adaptive_proc_var"):
+                config["adaptive_processing"] = self.adaptive_proc_var.get()
+            if hasattr(self, "energy_aware_var"):
+                config["energy_aware"] = self.energy_aware_var.get()
+            if hasattr(self, "language_model_var"):
+                config["language_model"] = self.language_model_var.get()
 
-            self.logger.info("Configuration saved")
+            if config:  # Only save if we have configuration data
+                with open(self.config_file, "w") as f:
+                    json.dump(config, f, indent=2)
+                self.logger.info("Configuration saved")
+            else:
+                self.logger.debug("No configuration to save")
         except Exception as e:
             self.logger.warning(f"Could not save configuration: {e}")
 
@@ -7030,46 +7168,53 @@ Energy Usage:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
             return
 
-        with ErrorContext("Generate State Timeline", user_facing=True):
-            self.show_progress("Generating timeline...")
+        fig = None
+        try:
+            with ErrorContext("Generate State Timeline", user_facing=True):
+                self.show_progress("Generating timeline...")
 
-            # Create mock data if no assistant or history available
-            if (
-                not self.assistant
-                or not hasattr(self.assistant, "state_history")
-                or not self.assistant.state_history
-            ):
-                # Generate sample state history for demonstration
-                import datetime
-                import random
+                # Create mock data if no assistant or history available
+                if (
+                    not self.assistant
+                    or not hasattr(self.assistant, "state_history")
+                    or not self.assistant.state_history
+                ):
+                    # Generate sample state history for demonstration with correct structure
+                    import datetime
+                    import random
 
-                mock_history = []
-                states = ["WORKING", "IDLE", "PROCESSING", "REFLECTING"]
-                base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
+                    mock_history = []
+                    states = ["WORKING", "IDLE", "PROCESSING", "REFLECTING"]
+                    base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
 
-                for i in range(20):
-                    timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
-                    mock_history.append(
-                        {
-                            "timestamp": timestamp,
-                            "primary_state": random.choice(states),
-                            "confidence": random.uniform(0.6, 1.0),
-                            "surprise": random.uniform(0.0, 0.5),
-                            "coherence": random.uniform(0.5, 0.9),
-                        }
-                    )
+                    for i in range(20):
+                        timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
+                        mock_history.append(
+                            {
+                                "time": timestamp,  # Changed from 'timestamp' to 'time'
+                                "primary": random.choice(
+                                    states
+                                ),  # Changed from 'primary_state' to 'primary'
+                                "confidence": random.uniform(0.6, 1.0),
+                                "surprise": random.uniform(0.0, 0.5),
+                                "coherence": random.uniform(0.5, 0.9),
+                            }
+                        )
 
-                fig = APGIVisualizer.plot_state_timeline(mock_history)
-            else:
-                fig = APGIVisualizer.plot_state_timeline(self.assistant.state_history)
+                    fig = APGIVisualizer.plot_state_timeline(mock_history)
+                else:
+                    fig = APGIVisualizer.plot_state_timeline(self.assistant.state_history)
 
-            if fig:
-                self.display_plot_in_viz_tab(fig)
-                messagebox.showinfo("Success", "State timeline generated")
-                if HAS_MATPLOTLIB:
-                    plt.close(fig)
-            else:
-                messagebox.showwarning("Error", "Failed to generate timeline")
+                if fig:
+                    self.display_plot_in_viz_tab(fig)
+                    messagebox.showinfo("Success", "State timeline generated")
+                else:
+                    messagebox.showwarning("Error", "Failed to generate timeline")
+        finally:
+            # Ensure figure is closed to prevent memory leaks
+            if fig and HAS_MATPLOTLIB:
+                plt.close(fig)
+                fig = None
 
     def generate_energy_plot(self):
         """Generate energy usage plot"""
@@ -7077,45 +7222,50 @@ Energy Usage:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
             return
 
-        with ErrorContext("Generate Energy Plot", user_facing=True):
-            self.show_progress("Generating energy plot...")
+        fig = None
+        try:
+            with ErrorContext("Generate Energy Plot", user_facing=True):
+                self.show_progress("Generating energy plot...")
 
-            # Create mock data if no assistant or energy history available
-            if (
-                not self.assistant
-                or not hasattr(self.assistant, "energy_history")
-                or not self.assistant.energy_history
-            ):
-                # Generate sample energy history for demonstration
-                import datetime
-                import random
+                # Create mock data if no assistant or energy history available
+                if (
+                    not self.assistant
+                    or not hasattr(self.assistant, "energy_history")
+                    or not self.assistant.energy_history
+                ):
+                    # Generate sample energy history for demonstration with correct structure
+                    import datetime
+                    import random
 
-                mock_energy_history = []
-                base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
+                    mock_energy_history = []
+                    base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
 
-                for i in range(20):
-                    timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
-                    mock_energy_history.append(
-                        {
-                            "timestamp": timestamp,
-                            "energy_cost": random.uniform(0.2, 0.8),
-                            "battery_level": max(0.2, 1.0 - (i * 0.02)),  # Gradual drain
-                            "processing_mode": random.choice(["conscious", "unconscious"]),
-                            "query_count": random.randint(1, 5),
-                        }
-                    )
+                    for i in range(20):
+                        timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
+                        mock_energy_history.append(
+                            {
+                                "time": timestamp,  # Changed from 'timestamp' to 'time' to match APGIVisualizer
+                                "energy_cost": random.uniform(0.2, 0.8),
+                                "battery_level": max(0.2, 1.0 - (i * 0.02)),  # Gradual drain
+                                "processing_mode": random.choice(["conscious", "unconscious"]),
+                                "query_count": random.randint(1, 5),
+                            }
+                        )
 
-                fig = APGIVisualizer.plot_energy_usage(mock_energy_history)
-            else:
-                fig = APGIVisualizer.plot_energy_usage(self.assistant.energy_history)
+                    fig = APGIVisualizer.plot_energy_usage(mock_energy_history)
+                else:
+                    fig = APGIVisualizer.plot_energy_usage(self.assistant.energy_history)
 
-            if fig:
-                self.display_plot_in_viz_tab(fig)
-                messagebox.showinfo("Success", "Energy plot generated")
-                if HAS_MATPLOTLIB:
-                    plt.close(fig)
-            else:
-                messagebox.showwarning("Error", "Failed to generate energy plot")
+                if fig:
+                    self.display_plot_in_viz_tab(fig)
+                    messagebox.showinfo("Success", "Energy plot generated")
+                else:
+                    messagebox.showwarning("Error", "Failed to generate energy plot")
+        finally:
+            # Ensure figure is closed to prevent memory leaks
+            if fig and HAS_MATPLOTLIB:
+                plt.close(fig)
+                fig = None
 
     def display_plot_in_viz_tab(self, fig):
         """Display a matplotlib figure in the visualization tab"""
@@ -7782,7 +7932,7 @@ Features:
 • Energy-efficient processing
 • Oscillatory pattern analysis
 • Biofeedback integration
-• Export capabilities (PNG, JPG, SVG, PDF, CSV, JSON)
+• Export capabilities (PNG, SVG, PDF, CSV, JSON)
 
 Font Size: {self.current_font_size}pt
 Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
@@ -8135,6 +8285,29 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         if messagebox.askyesno("Exit", "Exit APGI Assistant?"):
             self.logger.info("Application shutting down")
 
+            # Cancel all pending timers and operations first
+            try:
+                # Stop auto-save timer
+                self.stop_auto_save_timer()
+
+                # Cancel debouncer updates
+                if (
+                    hasattr(self, "debouncer")
+                    and hasattr(self, "root")
+                    and self.root.winfo_exists()
+                ):
+                    self.debouncer.cancel_all(self.root)
+
+                # Cancel any other pending timers
+                if hasattr(self, "init_check_timer_id") and self.init_check_timer_id:
+                    self.root.after_cancel(self.init_check_timer_id)
+                if hasattr(self, "init_safety_timer_id") and self.init_safety_timer_id:
+                    self.root.after_cancel(self.init_safety_timer_id)
+                if hasattr(self, "update_timer_id") and self.update_timer_id:
+                    self.root.after_cancel(self.update_timer_id)
+            except Exception as e:
+                self.logger.debug(f"Error cancelling timers: {e}")
+
             # Save configuration
             with ErrorContext("Save Configuration on Shutdown", user_facing=False):
                 try:
@@ -8145,9 +8318,6 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             # Cleanup
             with ErrorContext("Application Cleanup", user_facing=False):
                 try:
-                    # Stop auto-save timer
-                    self.stop_auto_save_timer()
-
                     # Final auto-save before shutdown
                     self.auto_save_session()
 
@@ -8158,13 +8328,11 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                     if HAS_MATPLOTLIB:
                         plt.close("all")
 
-                    # Cancel any pending after events using debouncer
-                    if (
-                        hasattr(self, "debouncer")
-                        and hasattr(self, "root")
-                        and self.root.winfo_exists()
-                    ):
-                        self.debouncer.cancel_all(self.root)
+                    # Clear widget references to help garbage collection
+                    if hasattr(self, "query_input"):
+                        self.query_input = None
+                    if hasattr(self, "response_display"):
+                        self.response_display = None
 
                     # Perform garbage collection
                     gc.collect()
@@ -8175,12 +8343,6 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             with ErrorContext("Application Shutdown", user_facing=False):
                 try:
                     if hasattr(self, "root") and self.root.winfo_exists():
-                        # Cancel all pending after events first
-                        try:
-                            self.root.after_cancel_all()
-                        except:
-                            pass  # Method may not exist in all Tk versions
-
                         # Quit the mainloop
                         self.root.quit()
 
@@ -8357,6 +8519,13 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
 def main():
     """Main function to run the GUI"""
+    # Validate dependencies before creating GUI
+    if not HAS_ASSISTANT:
+        print("ERROR: APGI Assistant core module is not available.")
+        print("Please ensure AI-Assistant.py is in the same directory")
+        print("and all required dependencies are installed.")
+        sys.exit(1)
+
     try:
         root = tk.Tk()
         app = APGIGUI(root)

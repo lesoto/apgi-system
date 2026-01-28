@@ -149,6 +149,38 @@ def test_experimental_tasks():
         return False
 
 
+def test_gui_launch():
+    """Test that GUI can be launched."""
+    print("\nTesting GUI launch...")
+    try:
+        import tkinter as tk
+        from apgi_gui import APGIGui
+
+        # Create root window
+        root = tk.Tk()
+
+        # Create GUI instance
+        APGIGui(root)
+
+        print("✓ GUI window opened successfully!")
+        print(f"  - Window title: {root.title()}")
+        print(f"  - Window size: {root.geometry()}")
+
+        # Close immediately
+        root.after(100, root.quit)
+
+        # Run main loop
+        root.mainloop()
+
+        print("✓ GUI closed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"✗ GUI launch failed: {e}")
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Run all validation tests."""
     print("=" * 60)
@@ -161,6 +193,7 @@ def main():
         test_apgi_system,
         test_system_step,
         test_gui_imports,
+        test_gui_launch,
         test_experimental_tasks,
     ]
 
