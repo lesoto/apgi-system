@@ -188,6 +188,8 @@ class TestPlotUpdateMechanisms:
                 app.data_buffers["workspace_active"].append(1 if i % 4 == 0 else 0)
                 app.data_buffers["gamma_power"].append(0.5 + np.random.randn() * 0.1)
                 app.data_buffers["beta_power"].append(0.7 + np.random.randn() * 0.1)
+                app.data_buffers["theta_power"].append(0.6 + np.random.randn() * 0.1)
+                app.data_buffers["alpha_power"].append(0.8 + np.random.randn() * 0.1)
                 app.data_buffers["minimal_self_coherence"].append(0.8 + np.random.randn() * 0.05)
                 app.data_buffers["somatic_markers"].append(i)
 

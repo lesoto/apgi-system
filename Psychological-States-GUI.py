@@ -27,6 +27,15 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+# Import theme manager
+try:
+    from apgi_gui.theme_manager import ThemeManager
+
+    THEME_MANAGER_AVAILABLE = True
+except ImportError:
+    THEME_MANAGER_AVAILABLE = False
+    print("Warning: Theme manager not available. Theme support disabled.")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +45,81 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+class ToolTip:
+    """Consistent tooltip implementation for tkinter widgets"""
+
+    def __init__(self, widget, text=""):
+        """Initialize tooltip
+
+        Args:
+            widget: The widget to attach tooltip to
+            text: Tooltip text to display
+        """
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.id = None
+        self._delay = 500
+
+        self.widget.bind("<Enter>", self.on_enter)
+        self.widget.bind("<Leave>", self.on_leave)
+        self.widget.bind("<ButtonPress>", self.on_leave)
+
+    def on_enter(self, event=None):
+        """Show tooltip when mouse enters widget"""
+        self.schedule()
+
+    def on_leave(self, event=None):
+        """Hide tooltip when mouse leaves widget"""
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        """Schedule tooltip display"""
+        self.unschedule()
+        self.id = self.widget.after(self._delay, self.showtip)
+
+    def unschedule(self):
+        """Cancel scheduled tooltip display"""
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def showtip(self):
+        """Display the tooltip"""
+        if self.tipwindow or not self.text:
+            return
+        x, y, cx, cy = self.widget.bbox("insert")
+        x = x + self.widget.winfo_rootx() + 25
+        y = y + self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tw,
+            text=self.text,
+            justify=tk.LEFT,
+            background="#ffffe0",
+            relief=tk.SOLID,
+            borderwidth=1,
+            font=("tahoma", "8", "normal"),
+        )
+        label.pack(padx=1, pady=1)
+
+    def hidetip(self):
+        """Hide the tooltip"""
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+
+    def update_text(self, new_text):
+        """Update tooltip text"""
+        self.text = new_text
+
 
 # Visualization imports with graceful fallbacks
 try:
@@ -1273,6 +1357,11 @@ class APGIVisualizerGUI:
         self.root.title("APGI Psychological States Visualizer - Enhanced GUI")
         self.root.geometry("1400x900")
 
+        # Initialize theme manager
+        self.theme_manager = None
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager = ThemeManager(initial_theme="normal")
+
         # Setup cleanup handlers
         self._setup_cleanup_handlers()
 
@@ -1303,8 +1392,61 @@ class APGIVisualizerGUI:
             self.root.destroy()
             raise
 
+    def _create_menu_bar(self):
+        """Create menu bar with theme options."""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Exit", command=self.quit_application)
+
+        # Theme menu (only if theme manager is available)
+        if self.theme_manager:
+            theme_menu = tk.Menu(menubar, tearoff=0)
+            menubar.add_cascade(label="Theme", menu=theme_menu)
+
+            # Add theme options
+            for theme_name in self.theme_manager.get_available_themes():
+                theme_menu.add_radiobutton(
+                    label=theme_name.capitalize(),
+                    command=lambda t=theme_name: self._set_theme(t),
+                    variable=tk.StringVar(value=self.theme_manager.current_theme),
+                    value=theme_name,
+                )
+
+    def _set_theme(self, theme_name: str):
+        """Set the current theme.
+
+        Args:
+            theme_name: Name of the theme to apply
+        """
+        if not self.theme_manager:
+            return
+
+        if self.theme_manager.set_theme(theme_name):
+            self._apply_theme_to_widgets()
+
+    def _apply_theme_to_widgets(self):
+        """Apply current theme to all widgets."""
+        if not self.theme_manager:
+            return
+
+        # Apply theme to text widgets
+        if hasattr(self, "states_text"):
+            bg_color = self.theme_manager.get_theme_color("bg")
+            fg_color = self.theme_manager.get_theme_color("fg")
+            try:
+                self.states_text.config(bg=bg_color, fg=fg_color, insertbackground=fg_color)
+            except tk.TclError:
+                pass
+
     def setup_gui(self) -> None:
         """Setup the enhanced GUI layout with embedded visualization panel"""
+        # Create menu bar
+        self._create_menu_bar()
+
         # Main container with better layout
         main_frame: ttk.Frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -1364,7 +1506,7 @@ class APGIVisualizerGUI:
             text="States to Compare\n(comma-separated):",
             font=("Arial", 9, "bold"),
         ).grid(row=4, column=0, sticky=tk.W, pady=(5, 2))
-        self.states_text = tk.Text(control_frame, height=3, width=25, font=("Courier", 8))
+        self.states_text = tk.Text(control_frame, height=3, width=25, font=("Courier", 9))
         self.states_text.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         self.states_text.insert("1.0", "flow\nanxiety\ncalm")
 
@@ -1437,15 +1579,19 @@ class APGIVisualizerGUI:
             command=self.run_simulation_with_validation,
         )
         self.generate_button.grid(row=18, column=0, sticky=(tk.W, tk.E), pady=5)
+        ToolTip(self.generate_button, "Run simulation with current parameters")
 
-        ttk.Button(
+        viz_button = ttk.Button(
             control_frame,
             text="Generate Visualization",
             command=self.generate_visualization,
-        ).grid(row=19, column=0, sticky=(tk.W, tk.E), pady=5)
-        ttk.Button(control_frame, text="Clear Display", command=self.clear_display).grid(
-            row=20, column=0, sticky=(tk.W, tk.E), pady=5
         )
+        viz_button.grid(row=19, column=0, sticky=(tk.W, tk.E), pady=5)
+        ToolTip(viz_button, "Generate visualization of selected psychological state")
+
+        clear_button = ttk.Button(control_frame, text="Clear Display", command=self.clear_display)
+        clear_button.grid(row=20, column=0, sticky=(tk.W, tk.E), pady=5)
+        ToolTip(clear_button, "Clear the visualization display")
 
         control_frame.columnconfigure(0, weight=1)
 

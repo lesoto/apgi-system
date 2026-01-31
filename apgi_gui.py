@@ -7,10 +7,15 @@ Provides complete control and visualization of all subsystems.
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
+from collections import deque
+from datetime import datetime
 import numpy as np
 import matplotlib
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import psutil
 import time
+import threading
 from threading import Lock, RLock
 import platform
 
@@ -113,7 +118,7 @@ class APGIGui:
         try:
             self._create_menu_bar()
         except Exception as e:
-            print(f"❌ Error creating menu bar: {e}")
+            self._log_event(f"❌ Error creating menu bar: {e}")
             import traceback
 
             traceback.print_exc()
@@ -122,7 +127,7 @@ class APGIGui:
         try:
             self._create_main_layout()
         except Exception as e:
-            print(f"❌ Error creating main layout: {e}")
+            self._log_event(f"❌ Error creating main layout: {e}")
             import traceback
 
             traceback.print_exc()
@@ -131,7 +136,7 @@ class APGIGui:
         try:
             self._create_status_bar()
         except Exception as e:
-            print(f"❌ Error creating status bar: {e}")
+            self._log_event(f"❌ Error creating status bar: {e}")
             import traceback
 
             traceback.print_exc()
@@ -162,10 +167,13 @@ class APGIGui:
             "workspace_active": deque(maxlen=size),
             "gamma_power": deque(maxlen=size),
             "beta_power": deque(maxlen=size),
+            "theta_power": deque(maxlen=size),
+            "alpha_power": deque(maxlen=size),
             "somatic_markers": deque(maxlen=size),
             "minimal_self_coherence": deque(maxlen=size),
             "performance": deque(maxlen=size),
             "memory_mb": deque(maxlen=size),
+            "delta_power": deque(maxlen=size),
         }
         self.buffer_size = size
         self._log_event(f"Buffer size set to {size} points")
@@ -222,7 +230,7 @@ class APGIGui:
                     except:
                         pass  # Skip if entry doesn't exist
         except Exception as e:
-            print(f"Warning: Could not assign variables to view menu: {e}")
+            self._log_event(f"Warning: Could not assign variables to view menu: {e}")
 
         # Now add the auto-save checkbutton to the file menu
         try:
@@ -255,7 +263,7 @@ class APGIGui:
                     command=self._toggle_auto_save,
                 )
         except Exception as e:
-            print(f"Warning: Could not add auto-save checkbutton: {e}")
+            self._log_event(f"Warning: Could not add auto-save checkbutton: {e}")
 
     def _configure_buffer_size(self):
         """Open dialog to configure buffer size."""
@@ -680,7 +688,7 @@ class APGIGui:
         log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.log_text = scrolledtext.ScrolledText(
-            log_frame, height=8, width=40, font=("Courier", 8)
+            log_frame, height=8, width=40, font=("Courier", 9)
         )
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self._log_event("APGI System initialized")
@@ -1384,6 +1392,16 @@ class APGIGui:
             self.data_buffers["beta_power"].append(
                 state["oscillations"]["band_powers"].get("beta", 0)
             )
+            self.data_buffers["theta_power"].append(
+                state["oscillations"]["band_powers"].get("theta", 0)
+            )
+            self.data_buffers["alpha_power"].append(
+                state["oscillations"]["band_powers"].get("alpha", 0)
+            )
+            # Calculate delta_power as difference between gamma and beta power
+            gamma_power = state["oscillations"]["band_powers"].get("gamma", 0)
+            beta_power = state["oscillations"]["band_powers"].get("beta", 0)
+            self.data_buffers["delta_power"].append(abs(gamma_power - beta_power))
             self.data_buffers["minimal_self_coherence"].append(
                 state["self_model"]["minimal"]["coherence"]
             )

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple GUI to run all utils folder scripts
+GUI to run all utils folder scripts
 ==========================================
 
 A tkinter-based GUI that allows running all scripts in the utils folder
@@ -11,9 +11,93 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+from collections import deque
 from pathlib import Path
 from tkinter import scrolledtext, ttk
 from typing import Dict, List, Optional
+
+# Import theme manager
+try:
+    from apgi_gui.theme_manager import ThemeManager
+
+    THEME_MANAGER_AVAILABLE = True
+except ImportError:
+    THEME_MANAGER_AVAILABLE = False
+    print("Warning: Theme manager not available. Theme support disabled.")
+
+
+class ToolTip:
+    """Consistent tooltip implementation for tkinter widgets"""
+
+    def __init__(self, widget, text=""):
+        """Initialize tooltip
+
+        Args:
+            widget: The widget to attach tooltip to
+            text: Tooltip text to display
+        """
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.id = None
+        self._delay = 500
+
+        self.widget.bind("<Enter>", self.on_enter)
+        self.widget.bind("<Leave>", self.on_leave)
+        self.widget.bind("<ButtonPress>", self.on_leave)
+
+    def on_enter(self, event=None):
+        """Show tooltip when mouse enters widget"""
+        self.schedule()
+
+    def on_leave(self, event=None):
+        """Hide tooltip when mouse leaves widget"""
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        """Schedule tooltip display"""
+        self.unschedule()
+        self.id = self.widget.after(self._delay, self.showtip)
+
+    def unschedule(self):
+        """Cancel scheduled tooltip display"""
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def showtip(self):
+        """Display the tooltip"""
+        if self.tipwindow or not self.text:
+            return
+        x, y, cx, cy = self.widget.bbox("insert")
+        x = x + self.widget.winfo_rootx() + 25
+        y = y + self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tw,
+            text=self.text,
+            justify=tk.LEFT,
+            background="#ffffe0",
+            relief=tk.SOLID,
+            borderwidth=1,
+            font=("tahoma", "8", "normal"),
+        )
+        label.pack(padx=1, pady=1)
+
+    def hidetip(self):
+        """Hide the tooltip"""
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+
+    def update_text(self, new_text):
+        """Update tooltip text"""
+        self.text = new_text
 
 
 class UtilsRunnerGUI:
@@ -28,6 +112,11 @@ class UtilsRunnerGUI:
         self.root.title("APGI Utils Scripts Runner")
         self.root.geometry("800x600")
 
+        # Initialize theme manager
+        self.theme_manager = None
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager = ThemeManager(initial_theme="normal")
+
         # Get utils directory
         self.utils_dir = Path(__file__).parent / "utils"
         self.scripts = self.get_script_list()
@@ -40,6 +129,10 @@ class UtilsRunnerGUI:
         self.TAG_ERROR = "error"
         self.TAG_SUCCESS = "success"
         self.TAG_WARNING = "warning"
+
+        # Bounded output buffer to prevent memory leaks
+        self.output_buffer_size = 10000  # Maximum number of output lines to keep
+        self.output_buffer = deque(maxlen=self.output_buffer_size)
 
         self.setup_ui()
 
@@ -63,12 +156,73 @@ class UtilsRunnerGUI:
                     scripts.append(file_path)
         return sorted(scripts)
 
+    def _create_menu_bar(self):
+        """Create menu bar with theme options."""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Quit", command=self.quit_application)
+
+        # Theme menu (only if theme manager is available)
+        if self.theme_manager:
+            theme_menu = tk.Menu(menubar, tearoff=0)
+            menubar.add_cascade(label="Theme", menu=theme_menu)
+
+            # Add theme options
+            for theme_name in self.theme_manager.get_available_themes():
+                theme_menu.add_radiobutton(
+                    label=theme_name.capitalize(),
+                    command=lambda t=theme_name: self._set_theme(t),
+                    variable=tk.StringVar(value=self.theme_manager.current_theme),
+                    value=theme_name,
+                )
+
+    def _set_theme(self, theme_name: str):
+        """Set the current theme.
+
+        Args:
+            theme_name: Name of the theme to apply
+        """
+        if not self.theme_manager:
+            return
+
+        if self.theme_manager.set_theme(theme_name):
+            self._apply_theme_to_widgets()
+
+    def _apply_theme_to_widgets(self):
+        """Apply current theme to all widgets."""
+        if not self.theme_manager:
+            return
+
+        # Apply theme to output text widget
+        if hasattr(self, "output_text"):
+            bg_color = self.theme_manager.get_theme_color("bg")
+            fg_color = self.theme_manager.get_theme_color("fg")
+            try:
+                self.output_text.config(bg=bg_color, fg=fg_color, insertbackground=fg_color)
+            except tk.TclError:
+                pass
+
+        # Apply theme to status label
+        if hasattr(self, "status_label"):
+            fg_color = self.theme_manager.get_theme_color("fg")
+            try:
+                self.status_label.config(fg=fg_color)
+            except tk.TclError:
+                pass
+
     def setup_ui(self):
         """Setup the user interface.
 
         Creates the main layout with script list, control buttons,
         status display, and output area.
         """
+        # Create menu bar
+        self._create_menu_bar()
+
         # Main container
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -112,11 +266,13 @@ class UtilsRunnerGUI:
             control_frame, text="Run Selected", command=self.run_selected_script
         )
         self.run_button.pack(pady=5, fill=tk.X)
+        ToolTip(self.run_button, "Run the currently selected script")
 
         self.run_all_button = ttk.Button(
             control_frame, text="Run All Scripts", command=self.run_all_scripts
         )
         self.run_all_button.pack(pady=5, fill=tk.X)
+        ToolTip(self.run_all_button, "Run all scripts in sequence")
 
         self.stop_button = ttk.Button(
             control_frame,
@@ -125,14 +281,17 @@ class UtilsRunnerGUI:
             state=tk.DISABLED,
         )
         self.stop_button.pack(pady=5, fill=tk.X)
+        ToolTip(self.stop_button, "Stop the currently running script")
 
         self.clear_button = ttk.Button(
             control_frame, text="Clear Output", command=self.clear_output
         )
         self.clear_button.pack(pady=5, fill=tk.X)
+        ToolTip(self.clear_button, "Clear the output text area")
 
         self.quit_button = ttk.Button(control_frame, text="Quit", command=self.quit_application)
         self.quit_button.pack(pady=5, fill=tk.X)
+        ToolTip(self.quit_button, "Exit the application")
 
         # Status frame
         status_frame = ttk.LabelFrame(control_frame, text="Status", padding="5")
@@ -172,11 +331,20 @@ class UtilsRunnerGUI:
         """
         if tag is None:
             tag = self.TAG_INFO
+        # Store in bounded buffer to prevent memory leaks
+        self.output_buffer.append((message, tag))
         self.root.after_idle(lambda: self._safe_log_output(message, tag))
 
     def _safe_log_output(self, message: str, tag: str):
-        """Thread-safe output logging."""
-        self.output_text.insert(tk.END, message + "\n", tag)
+        """Thread-safe output logging with bounded buffer management."""
+        # Clear and rebuild output if buffer is getting large
+        if len(self.output_buffer) > 5000:
+            self.output_text.delete(1.0, tk.END)
+            # Re-add recent entries from buffer
+            for msg, t in list(self.output_buffer)[-1000:]:
+                self.output_text.insert(tk.END, msg + "\n", t)
+        else:
+            self.output_text.insert(tk.END, message + "\n", tag)
         self.output_text.see(tk.END)
 
     def update_status(self, message: str):
