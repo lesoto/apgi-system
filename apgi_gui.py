@@ -11,18 +11,6 @@ import numpy as np
 import matplotlib
 import psutil
 import time
-
-matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.figure import Figure
-import yaml
-import json
-import csv
-from pathlib import Path
-from datetime import datetime
-from collections import deque
-import threading
-import time
 from threading import Lock, RLock
 import platform
 
@@ -309,9 +297,9 @@ class APGIGui:
         def update_memory_estimate(*args):
             try:
                 size = int(self.buffer_size_var.get())
-                # Estimate memory usage (rough calculation)
+                # Calculate memory usage accurately based on numpy float64 dtype
                 num_buffers = len(self.data_buffers) + 1  # +1 for time buffer
-                bytes_per_point = 8  # Float64
+                bytes_per_point = np.dtype(np.float64).itemsize  # 8 bytes for float64
                 estimated_mb = (size * num_buffers * bytes_per_point) / (1024 * 1024)
                 memory_label.config(text=f"Estimated memory usage: {estimated_mb:.1f} MB")
             except:
@@ -1225,18 +1213,18 @@ class APGIGui:
         try:
             if hasattr(self, "fps_label") and self.fps_label.winfo_exists():
                 self.fps_label.config(text=f"{fps:.1f} FPS")
-        except Exception:
-            # Ignore errors during shutdown
-            pass
+        except Exception as e:
+            # Log errors during shutdown
+            logger.warning(f"Error updating FPS label: {e}")
 
     def _safe_enable_system_controls(self, enabled):
         """Safely enable/disable system controls with existence check."""
         try:
             if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._enable_system_controls(enabled)
-        except Exception:
-            # Ignore errors during shutdown
-            pass
+        except Exception as e:
+            # Log errors during shutdown
+            logger.warning(f"Error enabling/disabling controls: {e}")
 
     def _safe_update_ui_after_error(self):
         """Safely update UI after error with existence check."""
@@ -1630,11 +1618,16 @@ class APGIGui:
         window_size = min(500, len(time_data))
         recent_time = time_data[-window_size:]
 
-        # Generate sample oscillation (would come from system in full implementation)
-        sample_osc = np.sin(2 * np.pi * 20 * recent_time) + 0.5 * np.sin(
-            2 * np.pi * 40 * recent_time
-        )
-        self.osc_signal_line.set_data(recent_time, sample_osc)
+        # Use actual oscillation data from system instead of synthetic
+        oscillation_data = data_copies.get("oscillation", [])
+        if len(oscillation_data) > 0:
+            recent_osc = oscillation_data[-window_size:]
+        else:
+            # Fallback to synthetic data if no actual data available
+            recent_osc = np.sin(2 * np.pi * 20 * recent_time) + 0.5 * np.sin(
+                2 * np.pi * 40 * recent_time
+            )
+        self.osc_signal_line.set_data(recent_time, recent_osc)
 
         self.osc_ax1.set_xlim(recent_time[0], recent_time[-1])
         self.osc_ax1.set_ylim(-2, 2)
@@ -1642,19 +1635,44 @@ class APGIGui:
         # Power spectrum
         if self.osc_bars is None:
             bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
-            powers = [0.5, 0.7, 1.0, 0.8, 0.6]  # Would come from system
-            self.osc_bars = self.osc_ax2.bar(bands, powers)
-            self.osc_ax2.set_ylim(0, 1.5)
-        else:
-            # Update bar heights
-            gamma_power = (
-                data_copies["gamma_power"][-1] if len(data_copies["gamma_power"]) > 0 else 0.6
+            # Initialize with dynamic values from data
+            delta_power = (
+                data_copies["delta_power"][-1] if len(data_copies["delta_power"]) > 0 else 0.5
+            )
+            theta_power = (
+                data_copies["theta_power"][-1] if len(data_copies["theta_power"]) > 0 else 0.7
+            )
+            alpha_power = (
+                data_copies["alpha_power"][-1] if len(data_copies["alpha_power"]) > 0 else 1.0
             )
             beta_power = (
                 data_copies["beta_power"][-1] if len(data_copies["beta_power"]) > 0 else 0.8
             )
+            gamma_power = (
+                data_copies["gamma_power"][-1] if len(data_copies["gamma_power"]) > 0 else 0.6
+            )
+            powers = [delta_power, theta_power, alpha_power, beta_power, gamma_power]
+            self.osc_bars = self.osc_ax2.bar(bands, powers)
+            self.osc_ax2.set_ylim(0, 1.5)
+        else:
+            # Update bar heights with dynamic values
+            delta_power = (
+                data_copies["delta_power"][-1] if len(data_copies["delta_power"]) > 0 else 0.5
+            )
+            theta_power = (
+                data_copies["theta_power"][-1] if len(data_copies["theta_power"]) > 0 else 0.7
+            )
+            alpha_power = (
+                data_copies["alpha_power"][-1] if len(data_copies["alpha_power"]) > 0 else 1.0
+            )
+            beta_power = (
+                data_copies["beta_power"][-1] if len(data_copies["beta_power"]) > 0 else 0.8
+            )
+            gamma_power = (
+                data_copies["gamma_power"][-1] if len(data_copies["gamma_power"]) > 0 else 0.6
+            )
 
-            powers = [0.5, 0.7, 1.0, beta_power, gamma_power]
+            powers = [delta_power, theta_power, alpha_power, beta_power, gamma_power]
             for bar, power in zip(self.osc_bars, powers):
                 bar.set_height(power)
 

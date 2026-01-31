@@ -24,7 +24,6 @@ from api.database.models import SessionState
 from api.database.connection import get_db_context
 from api.models.schemas import SessionCreateRequest
 from apgi_system.system import APGISystem
-import logging
 
 logger = logging.getLogger(__name__)
 

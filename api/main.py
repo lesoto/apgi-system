@@ -267,6 +267,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
     app.include_router(health.router)
     app.include_router(version.router)
 
+    # Configure deprecated endpoints
+    version.configure_deprecated_endpoints({})
+
     logger.info("APGI API application created successfully", version="1.0.0")
     return app
 

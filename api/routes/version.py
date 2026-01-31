@@ -5,6 +5,7 @@ Provides API versioning information including current version,
 supported versions, and deprecation notices.
 """
 
+import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -14,10 +15,10 @@ from fastapi.responses import JSONResponse
 router = APIRouter(prefix="/v1", tags=["Version"])
 
 
-# Version configuration
-CURRENT_VERSION = "1.0.0"
-API_VERSION = "v1"
-SUPPORTED_VERSIONS = ["v1"]
+# Version configuration - use environment variables with defaults
+CURRENT_VERSION = os.getenv("API_VERSION", "1.0.0")
+API_VERSION = os.getenv("API_VERSION_PREFIX", "v1")
+SUPPORTED_VERSIONS = [API_VERSION]
 DEPRECATED_VERSIONS: List[str] = []
 DEPRECATED_ENDPOINTS: Dict[str, Dict[str, str]] = {}
 

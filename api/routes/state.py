@@ -7,7 +7,7 @@ API endpoints for accessing APGI system state, ignition history, and subsystem d
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 
 from api.models.schemas import (
     AllostaticState,
@@ -24,9 +24,12 @@ from api.models.schemas import (
     SelfModelState,
     SystemStateResponse,
     WorkspaceState,
+    PredictionErrorsResponse,
+    SomaticMarkersResponse,
 )
 from api.routes.sessions import get_session_manager
 from api.services.session_manager import SessionManager
+from api.middleware.authentication import is_authenticated
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,11 @@ router = APIRouter(
     summary="Get complete system state",
     description="Retrieve the complete current state of all APGI subsystems for the specified session",
 )
-async def get_system_state(session_id: str, manager: SessionManager = Depends(get_session_manager)):
+async def get_system_state(
+    session_id: str,
+    request: Request,
+    manager: SessionManager = Depends(get_session_manager),
+):
     """
     Get complete system state.
 
@@ -63,6 +70,7 @@ async def get_system_state(session_id: str, manager: SessionManager = Depends(ge
 
     Args:
         session_id: Unique session identifier
+        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -71,6 +79,12 @@ async def get_system_state(session_id: str, manager: SessionManager = Depends(ge
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
+    # Check authentication
+    if not is_authenticated(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -149,6 +163,7 @@ async def get_system_state(session_id: str, manager: SessionManager = Depends(ge
 )
 async def get_ignition_history(  # noqa: C901
     session_id: str,
+    request: Request,
     start_time: Optional[float] = Query(None, description="Filter events after this time (ms)"),
     end_time: Optional[float] = Query(None, description="Filter events before this time (ms)"),
     limit: Optional[int] = Query(
@@ -168,6 +183,7 @@ async def get_ignition_history(  # noqa: C901
 
     Args:
         session_id: Unique session identifier
+        request: HTTP request for authentication check
         start_time: Optional start time filter (milliseconds)
         end_time: Optional end time filter (milliseconds)
         limit: Maximum number of events to return (1-1000)
@@ -180,6 +196,12 @@ async def get_ignition_history(  # noqa: C901
     Raises:
         HTTPException: If session not found or history cannot be retrieved
     """
+    # Check authentication
+    if not is_authenticated(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+
     try:
         # Warn about potentially expensive queries
         if limit and limit > 500:
@@ -208,14 +230,21 @@ async def get_ignition_history(  # noqa: C901
                 if end_time is not None and time_val > end_time:
                     continue
 
-                # Get additional event details from state if available
-                # For now, use placeholder values - in production, these would be stored
+                # Calculate ignition event details from state data
+                ignition_data = state.get("ignition", {})
+                total_signal = ignition_data.get("total_signal", 0.0)
+                threshold = ignition_data.get("threshold", 2.0)
+
+                # Estimate duration based on signal decay (simplified calculation)
+                duration_ms = min(500.0, max(100.0, total_signal * 100))
+
+                # Use actual signal and threshold values
                 events.append(
                     IgnitionEvent(
                         time_ms=time_val,
-                        duration_ms=350.0,  # Default duration
-                        trigger_signal=2.5,  # Placeholder
-                        threshold=2.0,  # Placeholder
+                        duration_ms=duration_ms,
+                        trigger_signal=total_signal,
+                        threshold=threshold,
                     )
                 )
 
@@ -278,7 +307,7 @@ async def get_ignition_history(  # noqa: C901
     description="Retrieve current interoceptive state including physiological parameters",
 )
 async def get_interoceptive_state(
-    session_id: str, manager: SessionManager = Depends(get_session_manager)
+    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
 ):
     """
     Get interoceptive body state.
@@ -290,6 +319,7 @@ async def get_interoceptive_state(
 
     Args:
         session_id: Unique session identifier
+        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -298,6 +328,12 @@ async def get_interoceptive_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
+    # Check authentication
+    if not is_authenticated(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -330,11 +366,12 @@ async def get_interoceptive_state(
 
 @router.get(
     "/{session_id}/prediction-errors",
+    response_model=PredictionErrorsResponse,
     summary="Get prediction errors",
     description="Retrieve hierarchical prediction errors from all levels of the predictive processing hierarchy",
 )
 async def get_prediction_errors(
-    session_id: str, manager: SessionManager = Depends(get_session_manager)
+    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
 ):
     """
     Get prediction errors.
@@ -344,6 +381,7 @@ async def get_prediction_errors(
 
     Args:
         session_id: Unique session identifier
+        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -352,6 +390,12 @@ async def get_prediction_errors(
     Raises:
         HTTPException: If session not found or errors cannot be retrieved
     """
+    # Check authentication
+    if not is_authenticated(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -361,13 +405,13 @@ async def get_prediction_errors(
         prediction_data = state.get("prediction", {})
 
         # Extract prediction errors
-        response = {
-            "session_id": session_id,
-            "time_ms": state.get("time", 0.0),
-            "prediction_errors": prediction_data.get("errors", {}),
-            "exteroceptive_stats": prediction_data.get("exteroceptive_stats", {}),
-            "interoceptive_stats": prediction_data.get("interoceptive_stats", {}),
-        }
+        response = PredictionErrorsResponse(
+            session_id=session_id,
+            time_ms=state.get("time", 0.0),
+            prediction_errors=prediction_data.get("errors", {}),
+            exteroceptive_stats=prediction_data.get("exteroceptive_stats", {}),
+            interoceptive_stats=prediction_data.get("interoceptive_stats", {}),
+        )
 
         logger.info(f"Retrieved prediction errors for session {session_id}")
         return response
@@ -387,11 +431,12 @@ async def get_prediction_errors(
 
 @router.get(
     "/{session_id}/somatic-markers",
+    response_model=SomaticMarkersResponse,
     summary="Get somatic markers",
     description="Retrieve stored somatic markers (context-action-outcome associations)",
 )
 async def get_somatic_markers(
-    session_id: str, manager: SessionManager = Depends(get_session_manager)
+    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
 ):
     """
     Get somatic markers.
@@ -401,6 +446,7 @@ async def get_somatic_markers(
 
     Args:
         session_id: Unique session identifier
+        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -409,6 +455,12 @@ async def get_somatic_markers(
     Raises:
         HTTPException: If session not found or markers cannot be retrieved
     """
+    # Check authentication
+    if not is_authenticated(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -420,15 +472,15 @@ async def get_somatic_markers(
         interoception_data = state.get("interoception", {})
         somatic_data = interoception_data.get("somatic_markers", {})
 
-        response = {
-            "session_id": session_id,
-            "time_ms": state.get("time", 0.0),
-            "num_markers": somatic_data.get("num_markers", 0),
-            "total_retrievals": somatic_data.get("total_retrievals", 0),
-            "successful_retrievals": somatic_data.get("successful_retrievals", 0),
-            "retrieval_rate": somatic_data.get("retrieval_rate", 0.0),
-            "markers": somatic_data.get("markers", []),
-        }
+        response = SomaticMarkersResponse(
+            session_id=session_id,
+            time_ms=state.get("time", 0.0),
+            num_markers=somatic_data.get("num_markers", 0),
+            total_retrievals=somatic_data.get("total_retrievals", 0),
+            successful_retrievals=somatic_data.get("successful_retrievals", 0),
+            retrieval_rate=somatic_data.get("retrieval_rate", 0.0),
+            markers=somatic_data.get("markers", []),
+        )
 
         logger.info(f"Retrieved somatic markers for session {session_id}")
         return response

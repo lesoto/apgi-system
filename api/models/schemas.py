@@ -205,6 +205,28 @@ class SystemStateResponse(BaseModel):
     )
 
 
+class PredictionErrorsResponse(BaseModel):
+    """Prediction errors from hierarchical predictive processing."""
+
+    session_id: str = Field(..., description="Session identifier")
+    time_ms: float = Field(..., description="Simulation time in milliseconds")
+    prediction_errors: Dict[str, Any] = Field(..., description="Hierarchical prediction errors")
+    exteroceptive_stats: Dict[str, Any] = Field(..., description="Exteroceptive statistics")
+    interoceptive_stats: Dict[str, Any] = Field(..., description="Interoceptive statistics")
+
+
+class SomaticMarkersResponse(BaseModel):
+    """Somatic markers (context-action-outcome associations)."""
+
+    session_id: str = Field(..., description="Session identifier")
+    time_ms: float = Field(..., description="Simulation time in milliseconds")
+    num_markers: int = Field(..., description="Number of somatic markers")
+    total_retrievals: int = Field(..., description="Total retrieval attempts")
+    successful_retrievals: int = Field(..., description="Successful retrievals")
+    retrieval_rate: float = Field(..., description="Retrieval success rate")
+    markers: List[Dict[str, Any]] = Field(..., description="Somatic marker data")
+
+
 # ============================================================================
 # Task Models
 # ============================================================================
