@@ -1,667 +1,1621 @@
-# Design Document: API Standalone Migration
+# Design Document: API Migration to Standalone Application
 
 ## Overview
 
-This design document outlines the architecture and implementation approach for migrating the existing APGI API application from its current location in the `api/` directory to a standalone, independently deployable application in a new `apgi-api-standalone/` directory at the workspace root.
-
-The migration will preserve all existing functionality while creating a self-contained application that can be deployed independently on a different domain. The standalone API will include its own dependencies, configuration, database migrations, deployment artifacts, and documentation.
+This design document specifies the architecture and implementation approach for migrating the existing APGI REST API from its current embedded structure to a standalone, independently deployable application. The standalone API will maintain full backward compatibility while enabling independent deployment, scaling, and maintenance.
 
 ### Goals
 
-1. Create a completely independent API application with no dependencies on the main APGI system codebase
-2. Preserve all existing functionality, security features, and integration capabilities
-3. Enable independent deployment, scaling, and maintenance of the API layer
-4. Maintain backward compatibility with existing API clients
-5. Provide comprehensive deployment documentation and scripts
+- Extract API code into a self-contained standalone application
+- Enable independent deployment on a separate domain
+- Maintain backward compatibility with existing clients
+- Support horizontal scaling and high availability
+- Provide comprehensive monitoring and observability
+- Ensure production-ready security and configuration management
 
 ### Non-Goals
 
-1. Modifying or enhancing existing API functionality (this is a migration, not a refactor)
-2. Changing the API contract or response formats
-3. Migrating the main APGI system code (only the API layer)
-4. Creating new features or capabilities
+- Modifying the API interface or breaking existing clients
+- Migrating the main APGI system or GUI components
+- Implementing new API features beyond the migration scope
+- Changing the underlying APGI system algorithms or models
 
 ## Architecture
 
-### High-Level Structure
+### High-Level Architecture
 
-The standalone API will follow a layered architecture pattern:
-
-```
-apgi-api-standalone/
-├── app/                      # Main application package
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application entry point
-│   ├── config.py            # Configuration management
-│   ├── celery_app.py        # Celery configuration
-│   ├── exceptions.py        # Custom exceptions
-│   ├── exception_handlers.py # Exception handlers
-│   ├── database/            # Database layer
-│   │   ├── __init__.py
-│   │   ├── connection.py    # SQLAlchemy engine and session
-│   │   └── models.py        # Database models
-│   ├── models/              # Pydantic schemas
-│   │   ├── __init__.py
-│   │   └── schemas.py       # Request/response schemas
-│   ├── routes/              # API endpoints
-│   │   ├── __init__.py
-│   │   ├── auth.py
-│   │   ├── users.py
-│   │   ├── sessions.py
-│   │   ├── state.py
-│   │   ├── tasks.py
-│   │   ├── export.py
-│   │   ├── metrics.py
-│   │   ├── health.py
-│   │   └── version.py
-│   ├── services/            # Business logic
-│   │   ├── __init__.py
-│   │   ├── auth_manager.py
-│   │   ├── authorization.py
-│   │   ├── session_manager.py
-│   │   ├── task_executor.py
-│   │   ├── user_management.py
-│   │   ├── webhook_manager.py
-│   │   ├── data_export.py
-│   │   ├── health_check.py
-│   │   └── rate_limiter.py
-│   ├── middleware/          # Middleware components
-│   │   ├── __init__.py
-│   │   ├── authentication.py
-│   │   ├── csrf.py
-│   │   ├── rate_limiting.py
-│   │   ├── logging.py
-│   │   ├── metrics.py
-│   │   ├── alerting.py
-│   │   ├── deprecation.py
-│   │   ├── request_size_limit.py
-│   │   └── schema_validation.py
-│   ├── tasks/               # Celery tasks
-│   │   ├── __init__.py
-│   │   ├── experimental_tasks.py
-│   │   └── task_registry.py
-│   ├── logging/             # Logging configuration
-│   │   ├── __init__.py
-│   │   └── filters.py
-│   └── utils/               # Utility functions
-│       └── __init__.py
-├── alembic/                 # Database migrations
-│   ├── versions/
-│   ├── env.py
-│   └── script.py.mako
-├── tests/                   # Test suite
-│   ├── __init__.py
-│   ├── conftest.py
-│   ├── unit/
-│   ├── integration/
-│   └── property/
-├── scripts/                 # Deployment and utility scripts
-│   ├── init_db.sh
-│   ├── run_migrations.sh
-│   ├── create_admin_user.py
-│   ├── start_services.sh
-│   └── health_check.sh
-├── docs/                    # Documentation
-│   ├── API.md
-│   ├── DEPLOYMENT.md
-│   ├── CONFIGURATION.md
-│   └── DEVELOPMENT.md
-├── .env.example             # Environment variable template
-├── .gitignore
-├── alembic.ini              # Alembic configuration
-├── Dockerfile               # Container image definition
-├── docker-compose.yml       # Multi-service orchestration
-├── requirements.txt         # Production dependencies
-├── requirements-dev.txt     # Development dependencies
-├── pyproject.toml           # Package metadata
-├── Makefile                 # Common commands
-└── README.md                # Setup and usage guide
+```mermaid
+graph TB
+    subgraph "Standalone API Application"
+        LB[Load Balancer]
+        API1[API Instance 1]
+        API2[API Instance 2]
+        API3[API Instance N]
+        Worker1[Celery Worker 1]
+        Worker2[Celery Worker N]
+    end
+    
+    subgraph "Data Layer"
+        PG[(PostgreSQL)]
+        Redis[(Redis Cache)]
+    end
+    
+    subgraph "Clients"
+        Web[Web Frontend]
+        Mobile[Mobile App]
+        CLI[CLI Tools]
+    end
+    
+    Web --> LB
+    Mobile --> LB
+    CLI --> LB
+    
+    LB --> API1
+    LB --> API2
+    LB --> API3
+    
+    API1 --> PG
+    API2 --> PG
+    API3 --> PG
+    
+    API1 --> Redis
+    API2 --> Redis
+    API3 --> Redis
+    
+    Worker1 --> Redis
+    Worker2 --> Redis
+    Worker1 --> PG
+    Worker2 --> PG
 ```
 
-### Component Layers
+### Directory Structure
 
-#### 1. Presentation Layer (Routes)
-- FastAPI route handlers organized by resource type
-- Request validation using Pydantic schemas
-- Response serialization
-- OpenAPI documentation generation
 
-#### 2. Business Logic Layer (Services)
-- Domain logic and business rules
-- Session management and lifecycle
-- Authentication and authorization
-- Task execution and scheduling
-- Data export and transformation
-- Health monitoring
+The standalone API will be organized in a new `standalone-api/` directory:
 
-#### 3. Data Access Layer (Database)
-- SQLAlchemy ORM models
-- Database connection management
-- Session lifecycle management
-- Migration scripts
+```
+standalone-api/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI application entry point
+│   ├── config.py               # Configuration management
+│   ├── exceptions.py           # Custom exception definitions
+│   ├── exception_handlers.py  # Exception handler registration
+│   ├── logging_config.py       # Structured logging configuration
+│   ├── celery_app.py          # Celery configuration
+│   ├── alembic.ini            # Alembic configuration
+│   │
+│   ├── database/
+│   │   ├── __init__.py
+│   │   ├── connection.py      # Database connection and session management
+│   │   └── models.py          # SQLAlchemy ORM models
+│   │
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   ├── authentication.py  # JWT authentication middleware
+│   │   ├── csrf.py            # CSRF protection
+│   │   ├── rate_limiting.py   # Rate limiting middleware
+│   │   ├── logging.py         # Request logging middleware
+│   │   ├── metrics.py         # Prometheus metrics middleware
+│   │   ├── alerting.py        # Error alerting middleware
+│   │   ├── deprecation.py     # API deprecation warnings
+│   │   ├── request_size_limit.py  # Request size limiting
+│   │   └── schema_validation.py   # Response schema validation
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py         # Pydantic request/response models
+│   │
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── auth.py            # Authentication endpoints
+│   │   ├── users.py           # User management endpoints
+│   │   ├── sessions.py        # Session management endpoints
+│   │   ├── state.py           # State query endpoints
+│   │   ├── tasks.py           # Async task endpoints
+│   │   ├── export.py          # Data export endpoints
+│   │   ├── health.py          # Health check endpoints
+│   │   ├── metrics.py         # Metrics endpoints
+│   │   └── version.py         # Version and deprecation info
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_manager.py    # JWT token management
+│   │   ├── authorization.py   # Permission checking
+│   │   ├── user_management.py # User CRUD operations
+│   │   ├── session_manager.py # Session lifecycle management
+│   │   ├── task_executor.py   # Celery task execution
+│   │   ├── data_export.py     # Data export service
+│   │   ├── health_check.py    # Health check service
+│   │   ├── rate_limiter.py    # Rate limiting service
+│   │   └── webhook_manager.py # Webhook notification service
+│   │
+│   ├── tasks/
+│   │   ├── __init__.py
+│   │   ├── task_registry.py   # Task registration
+│   │   └── experimental_tasks.py  # Experimental task definitions
+│   │
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── dependency_checker.py  # Startup dependency validation
+│   │
+│   └── alembic/
+│       ├── env.py             # Alembic environment configuration
+│       ├── script.py.mako     # Migration script template
+│       └── versions/          # Database migration scripts
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py            # Pytest configuration and fixtures
+│   ├── unit/                  # Unit tests
+│   ├── integration/           # Integration tests
+│   └── property/              # Property-based tests
+│
+├── deployment/
+│   ├── Dockerfile             # Production Docker image
+│   ├── Dockerfile.dev         # Development Docker image
+│   ├── docker-compose.yml     # Local development orchestration
+│   ├── docker-compose.prod.yml  # Production orchestration
+│   └── k8s/                   # Kubernetes manifests (optional)
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── ingress.yaml
+│       └── configmap.yaml
+│
+├── docs/
+│   ├── README.md              # Main documentation
+│   ├── DEPLOYMENT.md          # Deployment guide
+│   ├── CONFIGURATION.md       # Configuration reference
+│   ├── API.md                 # API documentation
+│   └── MIGRATION.md           # Migration guide from legacy API
+│
+├── scripts/
+│   ├── start.sh               # Start script for development
+│   ├── migrate.sh             # Database migration script
+│   └── health_check.sh        # Health check script
+│
+├── .env.example               # Example environment configuration
+├── .env.development           # Development environment defaults
+├── .env.production            # Production environment template
+├── requirements.txt           # Python dependencies
+├── requirements-dev.txt       # Development dependencies
+├── pyproject.toml             # Package metadata and build config
+├── setup.py                   # Package installation script
+└── README.md                  # Quick start guide
+```
 
-#### 4. Cross-Cutting Concerns (Middleware)
-- Authentication (JWT token verification)
-- Authorization (permission checking)
-- CORS configuration
-- Rate limiting
-- Request logging
-- Metrics collection
-- CSRF protection
-- Schema validation
-- Request size limiting
-
-#### 5. Asynchronous Processing (Celery)
-- Long-running task execution
-- Task queuing and routing
-- Result storage and retrieval
-- Task monitoring
-
-### Technology Stack
-
-- **Web Framework**: FastAPI 0.104+
-- **ASGI Server**: Uvicorn with Gunicorn for production
-- **Database**: PostgreSQL 14+
-- **ORM**: SQLAlchemy 2.0+
-- **Migrations**: Alembic
-- **Cache/Broker**: Redis 7+
-- **Task Queue**: Celery 5+
-- **Authentication**: JWT (PyJWT)
-- **Validation**: Pydantic 2+
-- **Testing**: pytest, pytest-asyncio, hypothesis
-- **Metrics**: Prometheus client
-- **Containerization**: Docker, Docker Compose
 
 ## Components and Interfaces
 
-### 1. FastAPI Application (main.py)
+### 1. Application Entry Point (main.py)
 
-**Responsibilities:**
-- Application initialization and configuration
-- Middleware registration
-- Route registration
-- Lifespan management (startup/shutdown)
-- Exception handler registration
+The main application module creates and configures the FastAPI application with all middleware, routes, and lifecycle management.
 
-**Key Functions:**
-- `create_app(test_mode: bool = False) -> FastAPI`: Factory function to create configured FastAPI instance
-- `lifespan(app: FastAPI)`: Async context manager for startup/shutdown events
+**Key Responsibilities:**
+- Create FastAPI application instance
+- Configure middleware stack in correct order
+- Register route handlers
+- Manage application lifecycle (startup/shutdown)
+- Initialize database and Redis connections
+- Configure CORS and security settings
 
-**Interfaces:**
-- Exposes HTTP REST API on configurable host:port
-- Provides OpenAPI documentation at `/docs` and `/redoc`
-- Health check at `/health`
-- Metrics at `/metrics`
+**Interface:**
 
-### 2. Configuration System (config.py)
+```python
+def create_app(test_mode: bool = False) -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+    
+    Args:
+        test_mode: If True, disables authentication and CSRF for testing
+        
+    Returns:
+        Configured FastAPI application instance
+    """
+    
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events.
+    Handles resource initialization and cleanup.
+    """
+```
 
-**Responsibilities:**
+**Middleware Stack Order (outer to inner):**
+1. RequestSizeLimitMiddleware - Reject oversized requests early
+2. GZipMiddleware - Compress responses
+3. PrometheusMetricsMiddleware - Track all requests
+4. RequestLoggingMiddleware - Log all requests
+5. AuthenticationMiddleware - Extract and verify JWT tokens
+6. ResponseSchemaValidationMiddleware - Validate response schemas
+7. CSRFMiddleware - CSRF protection for state-changing operations
+8. DeprecationMiddleware - Track deprecated endpoint usage
+9. RateLimitingMiddleware - Rate limit requests per user/IP
+10. CORSMiddleware - Handle cross-origin requests
+
+### 2. Configuration Management (config.py)
+
+Centralized configuration system that loads settings from environment variables with validation and security checks.
+
+**Key Responsibilities:**
 - Load configuration from environment variables
+- Provide sensible defaults for development
 - Validate security-critical settings
-- Provide configuration defaults for development
-- Enforce production security requirements
+- Fail fast on missing production requirements
+- Support multiple environments (dev, staging, prod)
 
-**Key Classes:**
-- `Settings`: Configuration container with validation
+**Interface:**
 
-**Configuration Categories:**
-- API settings (title, version, description)
-- Server settings (host, port, reload)
-- Database settings (DATABASE_URL)
-- Redis settings (REDIS_URL)
-- Celery settings (broker, backend)
-- Authentication settings (JWT secret, algorithm, expiration)
-- CORS settings (origins, credentials, methods, headers)
-- Rate limiting settings (enabled, per-minute limit)
-- Logging settings (log level)
-- Security settings (CSRF, schema validation, request size limits)
-- Alerting settings (webhooks, thresholds, cooldowns)
+```python
+class Settings:
+    """API configuration settings."""
+    
+    # API Settings
+    api_title: str
+    api_version: str
+    
+    # Server Settings
+    host: str
+    port: int
+    
+    # Database Settings
+    database_url: str
+    
+    # Redis Settings
+    redis_url: str
+    
+    # Celery Settings
+    celery_broker_url: str
+    celery_result_backend: str
+    
+    # Authentication Settings
+    jwt_secret_key: str
+    jwt_algorithm: str
+    jwt_access_token_expire_minutes: int
+    
+    # CORS Settings
+    cors_origins: List[str]
+    cors_allow_credentials: bool
+    
+    # Rate Limiting
+    rate_limit_enabled: bool
+    rate_limit_per_minute: int
+    
+    # Logging
+    log_level: str
+    
+    def __post_init__(self):
+        """Validate security settings after initialization."""
 
-**Validation Rules:**
-- JWT secret must be set in production
-- JWT secret must be at least 32 characters
-- CORS wildcard with credentials is forbidden
-- Known insecure defaults trigger errors in production
+settings = Settings()  # Global settings instance
+```
 
-### 3. Database Layer
+**Security Validations:**
+- JWT secret key must be set and secure (32+ characters) in production
+- CORS origins must be explicitly configured (no wildcard with credentials)
+- Database URL must use secure connection in production
+- All security warnings logged during startup
 
-#### Connection Management (database/connection.py)
+### 3. Database Layer (database/)
 
-**Responsibilities:**
-- Create and configure SQLAlchemy engine
-- Manage database sessions
-- Initialize database schema
-- Create default users
-- Handle connection pooling
+SQLAlchemy-based database layer with connection pooling, session management, and ORM models.
 
-**Key Functions:**
-- `init_db()`: Create tables and default user
-- `get_db() -> Generator[Session, None, None]`: Dependency for route handlers
-- `get_db_context() -> Generator[Session, None, None]`: Context manager for services
-- `close_db()`: Cleanup connections on shutdown
-- `create_default_user()`: Create secure default user for session management
+**Key Responsibilities:**
+- Manage database connections with pooling
+- Provide session factory for request-scoped sessions
+- Define ORM models for all entities
+- Initialize database schema on startup
+- Create default users for testing
 
-**Configuration:**
-- Connection pool size: 10
-- Max overflow: 20
-- Pre-ping enabled for connection health checks
+**Interface:**
 
-#### Database Models (database/models.py)
+```python
+# Connection Management
+engine: Engine  # SQLAlchemy engine with connection pooling
+SessionLocal: sessionmaker  # Session factory
 
-**Responsibilities:**
-- Define SQLAlchemy ORM models
-- Define table schemas and relationships
-- Provide model methods for common operations
+def init_db() -> None:
+    """Initialize database by creating all tables."""
+    
+def close_db() -> None:
+    """Close database connections."""
+    
+def get_db() -> Generator[Session, None, None]:
+    """Dependency function to get database session."""
+    
+@contextmanager
+def get_db_context() -> Generator[Session, None, None]:
+    """Context manager for database session."""
 
-**Key Models:**
-- `User`: User accounts with authentication
-- `Session`: Simulation session metadata
-- Additional models as needed for API functionality
+# ORM Models
+class User(Base):
+    """User model for authentication and authorization."""
+    __tablename__ = "users"
+    
+    id: int
+    user_id: str
+    username: str
+    email: str
+    password_hash: str
+    roles: List[str]
+    created_at: datetime
+    updated_at: datetime
 
-### 4. Authentication and Authorization
+class Session(Base):
+    """Session model for simulation sessions."""
+    __tablename__ = "sessions"
+    
+    id: int
+    session_id: str
+    user_id: str
+    state: str
+    config: dict
+    created_at: datetime
+    updated_at: datetime
+```
 
-#### Authentication Manager (services/auth_manager.py)
+**Connection Pooling Configuration:**
+- Pool size: 10 connections
+- Max overflow: 20 connections
+- Pre-ping: Enabled (verify connections before use)
+- Pool recycle: 3600 seconds
 
-**Responsibilities:**
-- Hash and verify passwords (bcrypt)
-- Generate and verify JWT tokens
-- Manage token lifecycle (access and refresh tokens)
-- Extract user identity from tokens
+### 4. Authentication and Authorization (services/auth_manager.py, services/authorization.py)
 
-**Key Methods:**
-- `hash_password(password: str) -> str`: Hash password with bcrypt
-- `verify_password(password: str, hashed: str) -> bool`: Verify password
-- `create_access_token(user_id: str, roles: List[str]) -> str`: Generate access token
-- `create_refresh_token(user_id: str) -> str`: Generate refresh token
-- `verify_token(token: str, expected_type: str) -> TokenPayload`: Verify and decode token
+JWT-based authentication system with role-based access control.
+
+**Key Responsibilities:**
+- Generate and verify JWT access and refresh tokens
+- Hash and verify passwords using bcrypt
+- Manage token expiration and refresh
+- Enforce role-based permissions
+- Provide authentication middleware
+
+**Interface:**
+
+```python
+class AuthManager:
+    """JWT token and password management."""
+    
+    def __init__(self, db: Session):
+        """Initialize with database session."""
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash password using bcrypt."""
+    
+    @staticmethod
+    def verify_password(password: str, password_hash: str) -> bool:
+        """Verify password against hash."""
+    
+    def create_access_token(self, user_id: str, roles: List[str]) -> str:
+        """Create JWT access token."""
+    
+    def create_refresh_token(self, user_id: str) -> str:
+        """Create JWT refresh token."""
+    
+    def verify_token(self, token: str, expected_type: str) -> TokenPayload:
+        """Verify JWT token and extract payload."""
+    
+    def refresh_access_token(self, refresh_token: str) -> str:
+        """Generate new access token from refresh token."""
+
+class Permission(Enum):
+    """Permission definitions."""
+    SESSION_CREATE = "session:create"
+    SESSION_READ = "session:read"
+    SESSION_CONTROL = "session:control"
+    SESSION_DELETE = "session:delete"
+    USER_MANAGE = "user:manage"
+    EXPORT_DATA = "export:data"
+
+def require_permission(permission: Permission):
+    """Dependency to require specific permission."""
+    
+def get_current_user(request: Request) -> TokenPayload:
+    """Dependency to get current authenticated user."""
+```
 
 **Token Structure:**
+- Access tokens: 30 minute expiration
+- Refresh tokens: 7 day expiration
+- Algorithm: HS256
+- Payload includes: user_id, roles, token_type, exp, iat
+
+
+### 5. Session Management (services/session_manager.py)
+
+Manages simulation session lifecycle with Redis caching and PostgreSQL persistence.
+
+**Key Responsibilities:**
+- Create and configure simulation sessions
+- Manage session state transitions (created → running → paused → stopped)
+- Store session state in Redis for fast access
+- Persist session metadata in PostgreSQL for durability
+- Handle concurrent session access
+- Clean up expired sessions
+
+**Interface:**
+
 ```python
-{
-    "sub": "user_id",
-    "type": "access" | "refresh",
-    "roles": ["user", "admin"],
-    "exp": timestamp,
-    "iat": timestamp
-}
+class SessionLifecycleState(Enum):
+    """Session lifecycle states."""
+    CREATED = "created"
+    RUNNING = "running"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+class SessionManager:
+    """Manages simulation session lifecycle."""
+    
+    def __init__(self, redis_client: redis.Redis, db_session_factory):
+        """Initialize with Redis and database session factory."""
+    
+    async def create_session(self, request: SessionCreateRequest) -> str:
+        """Create new simulation session."""
+    
+    async def get_session(self, session_id: str) -> SimulationSession:
+        """Retrieve session by ID."""
+    
+    async def update_session_state(
+        self, session_id: str, state: SessionLifecycleState
+    ) -> None:
+        """Update session state."""
+    
+    async def delete_session(self, session_id: str) -> None:
+        """Delete session and clean up resources."""
+    
+    async def list_user_sessions(self, user_id: str) -> List[str]:
+        """List all sessions for a user."""
+    
+    async def cleanup_expired_sessions(self) -> int:
+        """Clean up sessions inactive for 24+ hours."""
+
+class SimulationSession:
+    """Represents an active simulation session."""
+    
+    session_id: str
+    state: SessionLifecycleState
+    config: dict
+    created_at: datetime
+    updated_at: datetime
+    
+    async def start(self) -> dict:
+        """Start or resume simulation."""
+    
+    async def pause(self) -> dict:
+        """Pause simulation."""
+    
+    async def stop(self) -> dict:
+        """Stop simulation."""
+    
+    async def reset(self) -> dict:
+        """Reset simulation to initial state."""
+    
+    async def get_state(self) -> dict:
+        """Get current simulation state."""
 ```
 
-#### Authorization Service (services/authorization.py)
+**State Transition Rules:**
+- CREATED → RUNNING (start)
+- RUNNING → PAUSED (pause)
+- PAUSED → RUNNING (start/resume)
+- RUNNING → STOPPED (stop)
+- PAUSED → STOPPED (stop)
+- STOPPED → CREATED (reset)
+- Any state → FAILED (on error)
 
-**Responsibilities:**
-- Define permission model
-- Check user permissions
-- Provide dependency for protected endpoints
+**Caching Strategy:**
+- Session state stored in Redis with 24-hour TTL
+- Session metadata persisted in PostgreSQL
+- Cache invalidation on state changes
+- Lazy loading from database if not in cache
 
-**Key Components:**
-- `Permission` enum: Defined permissions (SESSION_CREATE, SESSION_READ, etc.)
-- `require_permission(permission: Permission)`: Dependency factory for route protection
-- `get_current_user()`: Dependency to extract authenticated user
+### 6. Task Queue (celery_app.py, tasks/)
 
-#### Authentication Middleware (middleware/authentication.py)
+Celery-based asynchronous task execution for long-running operations.
 
-**Responsibilities:**
-- Extract JWT tokens from Authorization headers
-- Verify tokens on each request
-- Attach user identity to request state
-- Handle token expiration and errors
+**Key Responsibilities:**
+- Execute experimental tasks asynchronously
+- Track task status and results
+- Handle task timeouts and failures
+- Support task cancellation
+- Provide task result retrieval
 
-**Flow:**
-1. Check if path is public (skip authentication)
-2. Extract token from `Authorization: Bearer <token>` header
-3. Verify token signature and expiration
-4. Attach `TokenPayload` to `request.state.user`
-5. Set `request.state.authenticated = True`
-6. Return 401 for invalid/expired tokens
+**Interface:**
 
-### 5. Session Management
+```python
+# Celery Application
+celery_app = Celery(
+    "apgi_tasks",
+    broker=settings.celery_broker_url,
+    backend=settings.celery_result_backend,
+)
 
-#### Session Manager (services/session_manager.py)
+# Task Configuration
+celery_app.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    task_time_limit=3600,      # 1 hour hard limit
+    task_soft_time_limit=3300,  # 55 minute soft limit
+    result_expires=86400,       # 24 hour result expiration
+)
 
-**Responsibilities:**
-- Create and manage simulation sessions
-- Store session metadata in PostgreSQL
-- Store session state in Redis
-- Manage session lifecycle (created, running, paused, stopped)
-- Clean up session resources
+# Task Definitions
+@celery_app.task(name="experimental.attentional_blink")
+def run_attentional_blink_task(session_id: str, config: dict) -> dict:
+    """Execute attentional blink experiment."""
 
-**Key Methods:**
-- `create_session(request: SessionCreateRequest) -> str`: Create new session
-- `get_session(session_id: str) -> SimulationSession`: Retrieve session
-- `update_session_state(session_id: str, state: SessionLifecycleState)`: Update state
-- `delete_session(session_id: str)`: Delete session and cleanup
+@celery_app.task(name="experimental.binocular_rivalry")
+def run_binocular_rivalry_task(session_id: str, config: dict) -> dict:
+    """Execute binocular rivalry experiment."""
 
-**Session Lifecycle States:**
-- `CREATED`: Initial state after creation
-- `RUNNING`: Simulation is actively running
-- `PAUSED`: Simulation is paused
-- `STOPPED`: Simulation is stopped
-- `ERROR`: Simulation encountered an error
+@celery_app.task(name="experimental.change_blindness")
+def run_change_blindness_task(session_id: str, config: dict) -> dict:
+    """Execute change blindness experiment."""
 
-### 6. Middleware Stack
-
-#### Rate Limiting (middleware/rate_limiting.py)
-
-**Responsibilities:**
-- Limit requests per client per time window
-- Use Redis for distributed rate limiting
-- Return 429 Too Many Requests when limit exceeded
-
-**Configuration:**
-- Default: 60 requests per minute per IP
-- Configurable via `RATE_LIMIT_PER_MINUTE` environment variable
-
-#### CORS Middleware
-
-**Responsibilities:**
-- Handle cross-origin requests
-- Validate origin against allowed list
-- Set appropriate CORS headers
-
-**Configuration:**
-- Allowed origins from `CORS_ORIGINS` environment variable
-- Credentials support via `CORS_ALLOW_CREDENTIALS`
-- Allowed methods and headers configurable
-
-#### CSRF Protection (middleware/csrf.py)
-
-**Responsibilities:**
-- Generate CSRF tokens
-- Validate CSRF tokens on state-changing requests
-- Set CSRF token cookie
-
-**Flow:**
-1. Generate token on first request
-2. Set token in cookie
-3. Require token in `X-CSRF-Token` header for POST/PUT/DELETE
-4. Validate token matches cookie
-
-#### Request Logging (middleware/logging.py)
-
-**Responsibilities:**
-- Log all incoming requests
-- Log request method, path, status, duration
-- Use structured logging (JSON format)
-- Filter sensitive data from logs
-
-**Log Format:**
-```json
-{
-  "timestamp": "2024-01-01T12:00:00Z",
-  "level": "INFO",
-  "component": "api",
-  "method": "GET",
-  "path": "/v1/sessions/abc123",
-  "status_code": 200,
-  "duration_ms": 45.2,
-  "user_id": "user_123"
-}
+# Task Registry
+class TaskRegistry:
+    """Registry of available experimental tasks."""
+    
+    @staticmethod
+    def get_available_tasks() -> List[str]:
+        """Get list of available task names."""
+    
+    @staticmethod
+    def get_task_info(task_name: str) -> dict:
+        """Get task metadata and parameters."""
 ```
 
-#### Metrics Collection (middleware/metrics.py)
+**Task Execution Flow:**
+1. Client submits task via API endpoint
+2. API creates task record in database
+3. Task queued to Celery via Redis
+4. Worker picks up task from queue
+5. Worker executes task with timeout
+6. Worker stores result in Redis backend
+7. Client polls for task status/result
 
-**Responsibilities:**
-- Collect Prometheus metrics
-- Track request counts, durations, error rates
-- Expose metrics at `/metrics` endpoint
+### 7. Route Handlers (routes/)
 
-**Metrics:**
-- `http_requests_total`: Counter of total requests by method, path, status
-- `http_request_duration_seconds`: Histogram of request durations
-- `http_requests_in_progress`: Gauge of concurrent requests
+FastAPI route handlers organized by resource type.
 
-### 7. Celery Task Processing
+**Key Routes:**
 
-#### Celery Application (celery_app.py)
+```python
+# Authentication Routes (auth.py)
+POST   /v1/auth/login          # User login, returns access + refresh tokens
+POST   /v1/auth/refresh        # Refresh access token
+POST   /v1/auth/logout         # Logout (invalidate tokens)
 
-**Responsibilities:**
-- Configure Celery with Redis broker
-- Define task routing
-- Set task time limits and worker configuration
+# User Routes (users.py)
+GET    /v1/users/me            # Get current user profile
+PUT    /v1/users/me            # Update current user profile
+POST   /v1/users               # Create new user (admin only)
+GET    /v1/users/{user_id}     # Get user by ID (admin only)
 
-**Configuration:**
-- Broker: Redis (separate database from cache)
-- Result backend: Redis
-- Task serialization: JSON
-- Task time limit: 1 hour hard, 55 minutes soft
-- Result expiration: 24 hours
+# Session Routes (sessions.py)
+POST   /v1/sessions            # Create new session
+GET    /v1/sessions/{id}       # Get session details
+POST   /v1/sessions/{id}/start # Start/resume session
+POST   /v1/sessions/{id}/pause # Pause session
+POST   /v1/sessions/{id}/stop  # Stop session
+POST   /v1/sessions/{id}/reset # Reset session
+DELETE /v1/sessions/{id}       # Delete session
 
-#### Task Executor (services/task_executor.py)
+# State Routes (state.py)
+GET    /v1/sessions/{id}/state # Get current simulation state
+GET    /v1/sessions/{id}/metrics # Get simulation metrics
 
-**Responsibilities:**
-- Submit tasks to Celery
-- Monitor task status
-- Retrieve task results
-- Handle task errors
+# Task Routes (tasks.py)
+POST   /v1/tasks               # Submit async task
+GET    /v1/tasks/{task_id}     # Get task status
+GET    /v1/tasks/{task_id}/result # Get task result
+DELETE /v1/tasks/{task_id}     # Cancel task
 
-**Key Methods:**
-- `submit_task(task_name: str, **kwargs) -> str`: Submit task and return task ID
-- `get_task_status(task_id: str) -> TaskStatus`: Get task status
-- `get_task_result(task_id: str) -> Any`: Get task result
-- `cancel_task(task_id: str)`: Cancel running task
+# Export Routes (export.py)
+GET    /v1/sessions/{id}/export/json # Export session as JSON
+GET    /v1/sessions/{id}/export/csv  # Export session as CSV
 
-### 8. Health Monitoring
+# Health Routes (health.py)
+GET    /health                 # Basic health check
+GET    /health/ready           # Readiness probe (checks dependencies)
+GET    /health/live            # Liveness probe
 
-#### Health Check Service (services/health_check.py)
+# Metrics Routes (metrics.py)
+GET    /metrics                # Prometheus metrics
 
-**Responsibilities:**
-- Check database connectivity
-- Check Redis connectivity
-- Check Celery worker availability
-- Aggregate health status
-
-**Health Check Response:**
-```json
-{
-  "status": "healthy" | "degraded" | "unhealthy",
-  "timestamp": "2024-01-01T12:00:00Z",
-  "version": "1.0.0",
-  "checks": {
-    "database": {"status": "healthy", "latency_ms": 5.2},
-    "redis": {"status": "healthy", "latency_ms": 1.8},
-    "celery": {"status": "healthy", "workers": 2}
-  }
-}
+# Version Routes (version.py)
+GET    /version                # API version info
+GET    /deprecated             # List of deprecated endpoints
 ```
 
-### 9. Data Export Service
+**Route Handler Pattern:**
 
-#### Export Service (services/data_export.py)
+```python
+@router.post("/v1/sessions", response_model=SessionCreateResponse)
+async def create_session(
+    request: SessionCreateRequest,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
+    _: None = Depends(require_permission(Permission.SESSION_CREATE)),
+):
+    """Create new simulation session."""
+    session_id = await manager.create_session(request)
+    return SessionCreateResponse(session_id=session_id, ...)
+```
 
-**Responsibilities:**
-- Export session data in various formats (JSON, CSV)
-- Stream large exports
-- Apply data transformations
-- Handle export errors
+### 8. Middleware Components (middleware/)
 
-**Key Methods:**
-- `export_session_data(session_id: str, format: str) -> bytes`: Export session data
-- `export_metrics(session_id: str, format: str) -> bytes`: Export metrics
-- `stream_export(session_id: str, format: str) -> AsyncIterator[bytes]`: Stream large exports
+**Authentication Middleware (authentication.py):**
+- Extracts JWT token from Authorization header
+- Verifies token signature and expiration
+- Attaches user identity to request.state
+- Returns 401 for invalid/expired tokens
+- Skips public endpoints (/, /health, /docs, /auth/*)
+
+**CSRF Middleware (csrf.py):**
+- Generates CSRF tokens for sessions
+- Validates CSRF tokens on state-changing requests (POST, PUT, DELETE)
+- Stores tokens in secure HTTP-only cookies
+- Validates X-CSRF-Token header matches cookie
+- Returns 403 for CSRF validation failures
+
+**Rate Limiting Middleware (rate_limiting.py):**
+- Tracks request counts per user/IP in Redis
+- Enforces configurable rate limits (default: 60 req/min)
+- Returns 429 Too Many Requests when limit exceeded
+- Includes Retry-After header in rate limit responses
+- Supports different limits for different endpoints
+
+**Request Logging Middleware (logging.py):**
+- Logs all incoming requests with structured JSON
+- Includes: method, path, status, duration, user_id, request_id
+- Generates unique request ID for tracing
+- Logs request/response bodies for debugging (configurable)
+- Integrates with centralized logging systems
+
+**Metrics Middleware (metrics.py):**
+- Tracks Prometheus metrics for all requests
+- Metrics: request_count, request_duration, active_requests, error_rate
+- Labels: method, path, status_code
+- Exposes metrics at /metrics endpoint
+- Supports custom business metrics
+
 
 ## Data Models
 
-### Database Models (SQLAlchemy)
+### Database Schema
 
-#### User Model
+**Users Table:**
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    roles JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 
-```python
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, unique=True, index=True, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
-    roles = Column(ARRAY(String), default=["user"])
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
+CREATE INDEX idx_users_user_id ON users(user_id);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
 ```
 
-#### Session Model
+**Sessions Table:**
+```sql
+CREATE TABLE sessions (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(255) UNIQUE NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id),
+    state VARCHAR(50) NOT NULL,
+    config JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 
-```python
-class Session(Base):
-    __tablename__ = "sessions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String, unique=True, index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    state = Column(String, nullable=False)  # created, running, paused, stopped, error
-    config = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    user = relationship("User", backref="sessions")
+CREATE INDEX idx_sessions_session_id ON sessions(session_id);
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_state ON sessions(state);
+CREATE INDEX idx_sessions_created_at ON sessions(created_at);
 ```
 
-### API Schemas (Pydantic)
+**Tasks Table:**
+```sql
+CREATE TABLE tasks (
+    id SERIAL PRIMARY KEY,
+    task_id VARCHAR(255) UNIQUE NOT NULL,
+    session_id VARCHAR(255) REFERENCES sessions(session_id),
+    task_name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    result JSONB,
+    error TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 
-#### Authentication Schemas
+CREATE INDEX idx_tasks_task_id ON tasks(task_id);
+CREATE INDEX idx_tasks_session_id ON tasks(session_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+```
+
+### Pydantic Models
+
+**Request Models:**
 
 ```python
+class SessionCreateRequest(BaseModel):
+    """Request to create a new session."""
+    config: dict
+    description: Optional[str] = None
+
+class SessionActionRequest(BaseModel):
+    """Request for session action (start/pause/stop)."""
+    pass  # No body needed, action in URL
+
 class LoginRequest(BaseModel):
+    """User login request."""
     username: str
     password: str
 
+class RefreshTokenRequest(BaseModel):
+    """Token refresh request."""
+    refresh_token: str
+
+class TaskSubmitRequest(BaseModel):
+    """Request to submit async task."""
+    task_name: str
+    session_id: str
+    config: dict
+```
+
+**Response Models:**
+
+```python
+class SessionCreateResponse(BaseModel):
+    """Response for session creation."""
+    session_id: str
+    status: str
+    created_at: datetime
+    config: dict
+
+class SessionResponse(BaseModel):
+    """Response for session details."""
+    session_id: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    config: dict
+    description: Optional[str]
+
+class SessionActionResponse(BaseModel):
+    """Response for session action."""
+    session_id: str
+    status: str
+    timestamp: datetime
+
 class LoginResponse(BaseModel):
+    """Response for successful login."""
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
 
-class TokenPayload(BaseModel):
-    sub: str  # user_id
-    type: str  # access or refresh
-    roles: List[str]
-    exp: int
-    iat: int
-```
-
-#### Session Schemas
-
-```python
-class SessionCreateRequest(BaseModel):
-    config: Dict[str, Any]
-    description: Optional[str] = None
-
-class SessionCreateResponse(BaseModel):
-    session_id: str
+class TaskResponse(BaseModel):
+    """Response for task submission."""
+    task_id: str
     status: str
     created_at: datetime
-    config: Dict[str, Any]
 
-class SessionResponse(BaseModel):
-    session_id: str
+class TaskStatusResponse(BaseModel):
+    """Response for task status."""
+    task_id: str
     status: str
+    result: Optional[dict]
+    error: Optional[str]
     created_at: datetime
     updated_at: datetime
-    config: Dict[str, Any]
-    description: Optional[str] = None
 
-class SessionActionResponse(BaseModel):
-    session_id: str
+class HealthResponse(BaseModel):
+    """Response for health check."""
     status: str
     timestamp: datetime
-```
-
-#### Error Schemas
-
-```python
-class ErrorDetail(BaseModel):
-    code: str
-    message: str
-    timestamp: str
-    details: Optional[Dict[str, Any]] = None
+    version: str
+    dependencies: Optional[dict]
 
 class ErrorResponse(BaseModel):
+    """Standard error response."""
     error: ErrorDetail
+
+class ErrorDetail(BaseModel):
+    """Error detail structure."""
+    code: str
+    message: str
+    timestamp: datetime
+    details: Optional[dict]
 ```
 
 ### Redis Data Structures
 
-#### Session State Cache
-
+**Session State Cache:**
 ```
 Key: session:{session_id}:state
 Type: Hash
-Fields:
-  - state: "running" | "paused" | "stopped"
-  - updated_at: ISO timestamp
-  - metrics: JSON string
 TTL: 24 hours
+Fields:
+  - state: current state (running/paused/stopped)
+  - config: JSON-encoded configuration
+  - updated_at: last update timestamp
 ```
 
-#### Rate Limiting
-
+**Rate Limiting:**
 ```
-Key: ratelimit:{ip_address}:{minute}
+Key: ratelimit:{user_id}:{minute}
 Type: String (counter)
-Value: Request count
 TTL: 60 seconds
+Value: request count in current minute
 ```
 
-#### Session Lock
-
+**CSRF Tokens:**
 ```
-Key: lock:session:{session_id}
+Key: csrf:{session_id}
 Type: String
-Value: Lock owner ID
-TTL: 30 seconds
+TTL: 60 minutes
+Value: CSRF token
 ```
 
-### Configuration Data
-
-#### Environment Variables
-
-```bash
-# API Settings
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/apgi_api
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Celery
-CELERY_BROKER_URL=redis://localhost:6379/1
-CELERY_RESULT_BACKEND=redis://localhost:6379/2
-
-# Authentication
-JWT_SECRET_KEY=<secure-random-key-min-32-chars>
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# CORS
-CORS_ORIGINS=https://app.example.com,https://admin.example.com
-CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
-CORS_ALLOW_HEADERS=*
-
-# Security
-CSRF_PROTECTION_ENABLED=true
-SCHEMA_VALIDATION_ENABLED=true
-REQUEST_SIZE_LIMIT_MB=10
-
-# Rate Limiting
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_PER_MINUTE=60
-
-# Logging
-LOG_LEVEL=INFO
-
-# Alerting
-ALERT_WEBHOOK_URLS=https://hooks.slack.com/services/xxx
-ALERT_ERROR_RATE_THRESHOLD=10
-ALERT_ERROR_RATE_WINDOW_MINUTES=1
-ALERT_COOLDOWN_MINUTES=5
-
-# Environment
-ENVIRONMENT=production
+**Task Results:**
 ```
+Key: celery-task-meta-{task_id}
+Type: Hash
+TTL: 24 hours
+Fields: (managed by Celery)
+  - status: task status
+  - result: JSON-encoded result
+  - traceback: error traceback if failed
+```
+
+
+## Correctness Properties
+
+A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.
+
+### Property Reflection
+
+After analyzing all acceptance criteria, several properties can be consolidated to avoid redundancy:
+
+**Consolidated Properties:**
+- Multiple CORS-related properties (7.3, 7.4) can be combined into a single comprehensive CORS header property
+- Multiple error response properties (19.2-19.7) can be consolidated into fewer comprehensive error handling properties
+- Multiple logging properties (10.1, 10.2, 10.3, 10.7) can be combined into comprehensive logging properties
+- Multiple authentication/authorization properties (8.4, 19.3, 19.4) can be consolidated
+- Multiple health check examples (9.1-9.7) are specific test cases, not separate properties
+- Multiple backward compatibility properties (11.2-11.4) can be combined into a single compatibility property
+
+### Core Properties
+
+**Property 1: Configuration Environment Variable Override**
+*For any* configuration setting, when an environment variable is set for that setting, the environment variable value should override the default value.
+**Validates: Requirements 2.2**
+
+**Property 2: Configuration Validation Error Logging**
+*For any* configuration validation failure, the system should log the specific configuration key and validation error before exiting.
+**Validates: Requirements 2.5**
+
+**Property 3: Database Migration Round-Trip**
+*For any* database migration, running upgrade followed by downgrade should return the database to its original state.
+**Validates: Requirements 3.6**
+
+**Property 4: CORS Headers on All Responses**
+*For any* HTTP response when CORS is enabled, the response should include Access-Control-Allow-Origin, Access-Control-Allow-Methods, and Access-Control-Allow-Headers.
+**Validates: Requirements 7.3, 7.4**
+
+**Property 5: JWT Token Validation on Protected Routes**
+*For any* protected route, requests without valid JWT tokens should be rejected with 401 Unauthorized status.
+**Validates: Requirements 8.4**
+
+**Property 6: Password Hashing with Bcrypt**
+*For any* password, hashing it with bcrypt should produce a hash that can be verified against the original password, and the hash should not be verifiable against any other password.
+**Validates: Requirements 8.7**
+
+**Property 7: Structured JSON Logging Format**
+*For any* log message, it should be valid JSON containing at minimum: timestamp, level, message, and component fields.
+**Validates: Requirements 10.1**
+
+**Property 8: Request Logging Completeness**
+*For any* HTTP request, a log entry should be created containing method, path, status_code, response_time, and request_id fields.
+**Validates: Requirements 10.2**
+
+**Property 9: Request ID Propagation**
+*For any* HTTP request, all log messages generated during that request should contain the same request_id value.
+**Validates: Requirements 10.3**
+
+**Property 10: Error Logging with Context**
+*For any* error that occurs during request processing, the error log should contain the exception type, message, stack trace, and request context.
+**Validates: Requirements 10.7**
+
+**Property 11: Backward Compatibility - Request Format**
+*For any* valid request accepted by the Legacy_API, the Standalone_API should accept the same request format and return a successful response.
+**Validates: Requirements 11.2**
+
+**Property 12: Backward Compatibility - Response Format**
+*For any* request, the response schema from the Standalone_API should match the response schema from the Legacy_API (same fields, same types).
+**Validates: Requirements 11.3**
+
+**Property 13: Backward Compatibility - Status Codes**
+*For any* request, the HTTP status code returned by the Standalone_API should match the status code returned by the Legacy_API for the same request.
+**Validates: Requirements 11.4**
+
+**Property 14: Task Status Retrieval**
+*For any* submitted task, querying the task status by task_id should return the current status (pending, running, completed, or failed).
+**Validates: Requirements 15.4**
+
+**Property 15: Task Result Retrieval**
+*For any* completed task, querying the task result by task_id should return the result data that was produced by the task execution.
+**Validates: Requirements 15.5**
+
+**Property 16: Task Serialization Round-Trip**
+*For any* task with parameters and result, serializing to JSON and deserializing should preserve the task data without loss.
+**Validates: Requirements 15.8**
+
+**Property 17: Deprecation Headers on Deprecated Endpoints**
+*For any* endpoint marked as deprecated, responses should include a Deprecation header with deprecation information.
+**Validates: Requirements 16.3, 16.6**
+
+**Property 18: Deprecated Endpoint Logging**
+*For any* request to a deprecated endpoint, a log entry should be created indicating the endpoint path and deprecation status.
+**Validates: Requirements 16.4**
+
+**Property 19: Export Authorization**
+*For any* user attempting to export session data, they should only be able to export sessions that belong to them (user_id matches).
+**Validates: Requirements 17.3**
+
+**Property 20: Export Metadata Completeness**
+*For any* exported session, the export should include session_id, created_at, updated_at, config, and state fields.
+**Validates: Requirements 17.4**
+
+**Property 21: Export Content-Type Headers**
+*For any* export request, the response should include appropriate Content-Type (application/json or text/csv) and Content-Disposition headers.
+**Validates: Requirements 17.6**
+
+**Property 22: Session Concurrent Modification Prevention**
+*For any* session, when two concurrent requests attempt to modify the session state, only one should succeed and the other should receive a conflict error.
+**Validates: Requirements 18.8**
+
+**Property 23: Request Validation Error Response**
+*For any* request with invalid payload, the response should be 422 Unprocessable Entity with a detailed error message indicating which fields failed validation.
+**Validates: Requirements 19.1, 19.2**
+
+**Property 24: Authentication Failure Response**
+*For any* request with invalid or missing authentication, the response should be 401 Unauthorized with a WWW-Authenticate header.
+**Validates: Requirements 19.3**
+
+**Property 25: Authorization Failure Response**
+*For any* request where the authenticated user lacks required permissions, the response should be 403 Forbidden with an explanation.
+**Validates: Requirements 19.4**
+
+**Property 26: Not Found Response**
+*For any* request for a non-existent resource, the response should be 404 Not Found.
+**Validates: Requirements 19.5**
+
+**Property 27: Server Error Response and Logging**
+*For any* unhandled exception during request processing, the response should be 500 Internal Server Error and the full error should be logged with stack trace.
+**Validates: Requirements 19.6**
+
+**Property 28: Sensitive Information Exclusion from Errors**
+*For any* error response sent to clients, the response should not contain sensitive information such as database connection strings, internal file paths, or stack traces.
+**Validates: Requirements 19.7**
+
+**Property 29: Response Compression for Large Responses**
+*For any* response with body size greater than 1KB, when the client supports gzip encoding, the response should be compressed.
+**Validates: Requirements 20.1**
+
+**Property 30: Request Size Limiting**
+*For any* request with body size exceeding the configured limit (default 10MB), the request should be rejected with 413 Payload Too Large before processing.
+**Validates: Requirements 20.2**
+
+
+## Error Handling
+
+### Error Categories
+
+**1. Configuration Errors (Startup)**
+- Missing required environment variables
+- Invalid configuration values
+- Insecure production settings
+- Action: Log specific error, exit with non-zero code
+
+**2. Authentication Errors (Runtime)**
+- Missing JWT token
+- Invalid JWT token signature
+- Expired JWT token
+- Action: Return 401 Unauthorized with WWW-Authenticate header
+
+**3. Authorization Errors (Runtime)**
+- Insufficient permissions for operation
+- Attempting to access another user's resources
+- Action: Return 403 Forbidden with explanation
+
+**4. Validation Errors (Runtime)**
+- Invalid request payload
+- Missing required fields
+- Type mismatches
+- Action: Return 422 Unprocessable Entity with field-level errors
+
+**5. Resource Errors (Runtime)**
+- Session not found
+- User not found
+- Task not found
+- Action: Return 404 Not Found
+
+**6. State Errors (Runtime)**
+- Invalid state transition (e.g., pausing a stopped session)
+- Concurrent modification conflict
+- Action: Return 409 Conflict with current state
+
+**7. Dependency Errors (Runtime)**
+- Database connection failure
+- Redis connection failure
+- Celery broker unavailable
+- Action: Return 503 Service Unavailable, log error, trigger alert
+
+**8. Rate Limiting Errors (Runtime)**
+- Too many requests from user/IP
+- Action: Return 429 Too Many Requests with Retry-After header
+
+**9. Internal Errors (Runtime)**
+- Unhandled exceptions
+- Programming errors
+- Action: Return 500 Internal Server Error, log full error with stack trace, trigger alert
+
+### Error Response Format
+
+All error responses follow a consistent JSON structure:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "details": {
+      "field": "Additional context",
+      "request_id": "req_abc123"
+    }
+  }
+}
+```
+
+### Error Handling Strategy
+
+**Fail Fast:**
+- Configuration errors prevent startup
+- Dependency errors during startup prevent startup
+- Invalid requests rejected immediately
+
+**Graceful Degradation:**
+- Redis unavailable: Disable rate limiting, continue serving requests
+- Celery unavailable: Return 503 for task submission, continue serving other endpoints
+
+**Error Propagation:**
+- Database errors: Rollback transaction, return 500
+- External service errors: Return 503 with retry guidance
+- Validation errors: Return 422 with field-level details
+
+**Logging:**
+- All errors logged with full context
+- Error rate monitored for alerting
+- Stack traces logged server-side, never sent to clients
+
+### Circuit Breaker Pattern
+
+For external dependencies (database, Redis, Celery):
+- Track failure rate over sliding window
+- Open circuit after threshold failures (e.g., 5 failures in 1 minute)
+- Return 503 immediately when circuit open
+- Attempt recovery after cooldown period (e.g., 30 seconds)
+- Close circuit after successful health check
+
+## Testing Strategy
+
+### Dual Testing Approach
+
+The testing strategy employs both unit tests and property-based tests as complementary approaches:
+
+**Unit Tests:**
+- Specific examples demonstrating correct behavior
+- Edge cases and boundary conditions
+- Integration points between components
+- Error conditions and failure scenarios
+- Mock external dependencies for isolation
+
+**Property-Based Tests:**
+- Universal properties that hold for all inputs
+- Comprehensive input coverage through randomization
+- Minimum 100 iterations per property test
+- Each test references its design document property
+- Tag format: `Feature: api-migration, Property N: [property text]`
+
+### Testing Layers
+
+**1. Unit Tests (tests/unit/)**
+
+Test individual components in isolation:
+- Configuration loading and validation
+- JWT token generation and verification
+- Password hashing and verification
+- Session state transitions
+- Request/response serialization
+- Middleware behavior
+
+Example unit tests:
+```python
+def test_config_loads_from_env():
+    """Test that configuration loads from environment variables."""
+    
+def test_jwt_token_expires():
+    """Test that JWT tokens expire after configured time."""
+    
+def test_password_hash_verification():
+    """Test that password hashes can be verified."""
+    
+def test_session_state_transition_created_to_running():
+    """Test valid state transition from created to running."""
+    
+def test_invalid_state_transition_raises_error():
+    """Test that invalid state transitions raise errors."""
+```
+
+**2. Integration Tests (tests/integration/)**
+
+Test component interactions:
+- API endpoint to database flow
+- Authentication middleware to route handler flow
+- Session manager to Redis and PostgreSQL
+- Celery task submission to worker execution
+- Health checks verifying all dependencies
+
+Example integration tests:
+```python
+async def test_create_session_end_to_end():
+    """Test session creation from API request to database persistence."""
+    
+async def test_authentication_flow():
+    """Test login, token generation, and authenticated request."""
+    
+async def test_task_submission_and_retrieval():
+    """Test submitting task, checking status, and retrieving result."""
+    
+async def test_health_check_with_dependencies():
+    """Test health check verifies database and Redis connectivity."""
+```
+
+**3. Property-Based Tests (tests/property/)**
+
+Test universal properties across many generated inputs:
+
+```python
+from hypothesis import given, strategies as st
+
+@given(st.text(min_size=1))
+def test_property_1_config_env_override(config_key):
+    """
+    Feature: api-migration, Property 1: Configuration Environment Variable Override
+    For any configuration setting, environment variable should override default.
+    """
+    
+@given(st.text(min_size=8))
+def test_property_6_password_hashing(password):
+    """
+    Feature: api-migration, Property 6: Password Hashing with Bcrypt
+    For any password, bcrypt hash should verify correctly.
+    """
+    
+@given(st.dictionaries(st.text(), st.text()))
+def test_property_16_task_serialization_roundtrip(task_data):
+    """
+    Feature: api-migration, Property 16: Task Serialization Round-Trip
+    For any task data, JSON serialization round-trip should preserve data.
+    """
+```
+
+### Test Configuration
+
+**Property-Based Test Settings:**
+- Library: Hypothesis (Python)
+- Iterations: 100 minimum per property
+- Seed: Fixed for reproducibility in CI
+- Shrinking: Enabled to find minimal failing examples
+- Deadline: 1000ms per example
+
+**Test Database:**
+- Separate test database instance
+- Reset between test runs
+- Use transactions for test isolation
+- Seed with test fixtures
+
+**Test Redis:**
+- Separate Redis database (db=15)
+- Flush between test runs
+- Mock for unit tests, real for integration tests
+
+**Test Coverage Goals:**
+- Line coverage: 80% minimum
+- Branch coverage: 75% minimum
+- Critical paths: 100% coverage
+- Error handling: 100% coverage
+
+### Continuous Integration
+
+**Pre-commit Checks:**
+- Code formatting (black, isort)
+- Linting (flake8, mypy)
+- Unit tests
+- Fast property tests (10 iterations)
+
+**CI Pipeline:**
+- Full unit test suite
+- Full integration test suite
+- Full property test suite (100 iterations)
+- Coverage report generation
+- Security scanning (bandit)
+- Dependency vulnerability scanning
+
+**Test Environments:**
+- Development: Local Docker Compose
+- CI: GitHub Actions with Docker services
+- Staging: Kubernetes cluster with test data
+- Production: Smoke tests only (health checks)
+
+
+## Deployment Architecture
+
+### Local Development
+
+**Docker Compose Setup:**
+```yaml
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: apgi_api_dev
+      POSTGRES_USER: apgi_dev
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+      
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://apgi_dev:dev_password@postgres:5432/apgi_api_dev
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - postgres
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://apgi_dev:dev_password@postgres:5432/apgi_api_dev
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app.celery_app worker --loglevel=info
+```
+
+**Development Workflow:**
+1. Clone repository
+2. Copy `.env.example` to `.env`
+3. Run `docker-compose up`
+4. API available at http://localhost:8000
+5. API docs at http://localhost:8000/docs
+6. Run migrations: `docker-compose exec api alembic upgrade head`
+
+### Production Deployment
+
+**Multi-Stage Dockerfile:**
+```dockerfile
+# Build stage
+FROM python:3.11-slim as builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y gcc postgresql-client
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.11-slim
+WORKDIR /app
+
+# Create non-root user
+RUN useradd -m -u 1000 apgi && chown -R apgi:apgi /app
+USER apgi
+
+# Copy dependencies from builder
+COPY --from=builder --chown=apgi:apgi /root/.local /home/apgi/.local
+ENV PATH=/home/apgi/.local/bin:$PATH
+
+# Copy application code
+COPY --chown=apgi:apgi app/ ./app/
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**Kubernetes Deployment:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apgi-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: apgi-api
+  template:
+    metadata:
+      labels:
+        app: apgi-api
+    spec:
+      containers:
+      - name: api
+        image: apgi-api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: redis-url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: jwt-secret
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apgi-api
+spec:
+  selector:
+    app: apgi-api
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apgi-celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: apgi-celery-worker
+  template:
+    metadata:
+      labels:
+        app: apgi-celery-worker
+    spec:
+      containers:
+      - name: worker
+        image: apgi-api:latest
+        command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: redis-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+```
+
+### Scaling Strategy
+
+**Horizontal Scaling:**
+- API instances: Scale based on CPU/memory usage
+- Celery workers: Scale based on queue depth
+- Database: Read replicas for read-heavy workloads
+- Redis: Redis Cluster for high availability
+
+**Load Balancing:**
+- Round-robin for API instances
+- Sticky sessions not required (stateless API)
+- Health check-based routing
+- Automatic failover for unhealthy instances
+
+**Auto-scaling Rules:**
+- Scale up API when CPU > 70% for 5 minutes
+- Scale down API when CPU < 30% for 10 minutes
+- Scale up workers when queue depth > 100 for 5 minutes
+- Minimum 2 API instances, maximum 10
+- Minimum 1 worker, maximum 5
+
+### Monitoring and Observability
+
+**Metrics Collection:**
+- Prometheus scrapes /metrics endpoint
+- Grafana dashboards for visualization
+- Key metrics:
+  - Request rate (requests/second)
+  - Response time (p50, p95, p99)
+  - Error rate (errors/second)
+  - Active sessions
+  - Queue depth
+  - Database connection pool usage
+  - Cache hit rate
+
+**Logging:**
+- Structured JSON logs to stdout
+- Log aggregation with ELK stack or CloudWatch
+- Log levels: DEBUG (dev), INFO (staging), WARNING (prod)
+- Request tracing with correlation IDs
+- Error logs trigger alerts
+
+**Alerting:**
+- Error rate > 10 errors/minute for 5 minutes
+- Response time p95 > 1000ms for 5 minutes
+- Health check failures
+- Database connection failures
+- Redis connection failures
+- Celery worker failures
+- Disk space < 10%
+
+**Tracing:**
+- Distributed tracing with OpenTelemetry
+- Trace requests across API, database, Redis, Celery
+- Identify slow queries and bottlenecks
+- Visualize request flow
+
+### Security Considerations
+
+**Network Security:**
+- API behind load balancer with TLS termination
+- Database and Redis in private subnet
+- Security groups restrict access
+- VPC peering for cross-region communication
+
+**Application Security:**
+- JWT tokens with short expiration
+- CSRF protection for state-changing operations
+- Rate limiting per user/IP
+- Input validation on all endpoints
+- SQL injection prevention (parameterized queries)
+- XSS prevention (output encoding)
+- Secrets in environment variables, never in code
+
+**Data Security:**
+- Passwords hashed with bcrypt
+- Database encryption at rest
+- TLS for all network communication
+- Audit logging for sensitive operations
+- Regular security scanning (Snyk, Bandit)
+
+**Compliance:**
+- GDPR: User data deletion support
+- SOC 2: Audit logging, access controls
+- HIPAA: Encryption, access logging (if applicable)
+
+### Backup and Disaster Recovery
+
+**Database Backups:**
+- Automated daily backups
+- Point-in-time recovery (PITR)
+- Backup retention: 30 days
+- Cross-region backup replication
+- Regular restore testing
+
+**Redis Backups:**
+- RDB snapshots every 6 hours
+- AOF for durability
+- Backup retention: 7 days
+- Redis Cluster for high availability
+
+**Disaster Recovery:**
+- RTO (Recovery Time Objective): 1 hour
+- RPO (Recovery Point Objective): 15 minutes
+- Multi-region deployment for critical systems
+- Automated failover procedures
+- Regular DR drills
+
+### Migration Strategy
+
+**Phase 1: Parallel Deployment**
+- Deploy standalone API alongside legacy API
+- Route 10% of traffic to standalone API
+- Monitor for errors and performance issues
+- Gradually increase traffic to 50%, then 100%
+
+**Phase 2: Data Migration**
+- Migrate existing sessions to new database schema
+- Verify data integrity
+- Keep legacy API running for rollback
+
+**Phase 3: Cutover**
+- Route 100% traffic to standalone API
+- Monitor for 48 hours
+- Decommission legacy API if stable
+
+**Rollback Plan:**
+- Keep legacy API running for 2 weeks
+- Database backups before migration
+- Feature flag to route traffic back to legacy
+- Automated rollback on error rate threshold
 
