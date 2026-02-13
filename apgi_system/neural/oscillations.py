@@ -5,7 +5,7 @@ Generates multi-band oscillations and phase-amplitude coupling.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 

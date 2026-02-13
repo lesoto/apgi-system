@@ -21,11 +21,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Add environment-specific validation (development vs production)
     - _Requirements: 2.1, 2.2, 2.3, 2.6, 13.1, 13.2, 13.3_
   
-  - [ ]* 2.2 Write property test for configuration environment variable override
+  - [x] 2.2 Write property test for configuration environment variable override
     - **Property 1: Configuration Environment Variable Override**
     - **Validates: Requirements 2.2**
   
-  - [ ]* 2.3 Write property test for configuration validation error logging
+  - [x] 2.3 Write property test for configuration validation error logging
     - **Property 2: Configuration Validation Error Logging**
     - **Validates: Requirements 2.5**
   
@@ -49,11 +49,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Create initial migration from existing models
     - _Requirements: 3.1, 3.2, 3.3_
   
-  - [ ]* 3.3 Write property test for database migration round-trip
+  - [~] 3.3 Write property test for database migration round-trip
     - **Property 3: Database Migration Round-Trip**
     - **Validates: Requirements 3.6**
   
-  - [ ]* 3.4 Write unit tests for database connection and initialization
+  - [~] 3.4 Write unit tests for database connection and initialization
     - Test database initialization creates all tables
     - Test connection pooling configuration
     - Test database health check on startup
@@ -67,15 +67,15 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure JWT secret key validation is present
     - _Requirements: 8.1, 8.2, 8.3, 8.7_
   
-  - [ ]* 4.2 Write property test for JWT token validation on protected routes
+  - [~] 4.2 Write property test for JWT token validation on protected routes
     - **Property 5: JWT Token Validation on Protected Routes**
     - **Validates: Requirements 8.4**
   
-  - [ ]* 4.3 Write property test for password hashing with bcrypt
+  - [~] 4.3 Write property test for password hashing with bcrypt
     - **Property 6: Password Hashing with Bcrypt**
     - **Validates: Requirements 8.7**
   
-  - [ ]* 4.4 Write unit tests for JWT token generation and verification
+  - [~] 4.4 Write unit tests for JWT token generation and verification
     - Test access token creation and verification
     - Test refresh token creation and verification
     - Test token expiration handling
@@ -95,7 +95,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure environment variable configuration works
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
   
-  - [ ]* 6.3 Write property test for CORS headers on all responses
+  - [~] 6.3 Write property test for CORS headers on all responses
     - **Property 4: CORS Headers on All Responses**
     - **Validates: Requirements 7.3, 7.4**
   
@@ -111,18 +111,18 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Update all import paths to be self-contained
     - _Requirements: 8.5, 8.6, 10.2, 10.4, 16.3, 20.1, 20.2_
   
-  - [ ]* 6.5 Write property tests for logging middleware
+  - [~] 6.5 Write property tests for logging middleware
     - **Property 7: Structured JSON Logging Format**
     - **Property 8: Request Logging Completeness**
     - **Property 9: Request ID Propagation**
     - **Property 10: Error Logging with Context**
     - **Validates: Requirements 10.1, 10.2, 10.3, 10.7**
   
-  - [ ]* 6.6 Write property test for request size limiting
+  - [~] 6.6 Write property test for request size limiting
     - **Property 30: Request Size Limiting**
     - **Validates: Requirements 20.2**
   
-  - [ ]* 6.7 Write property test for response compression
+  - [~] 6.7 Write property test for response compression
     - **Property 29: Response Compression for Large Responses**
     - **Validates: Requirements 20.1**
 
@@ -133,11 +133,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure Redis and PostgreSQL integration works
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7_
   
-  - [ ]* 7.2 Write property test for session concurrent modification prevention
+  - [~] 7.2 Write property test for session concurrent modification prevention
     - **Property 22: Session Concurrent Modification Prevention**
     - **Validates: Requirements 18.8**
   
-  - [ ]* 7.3 Write unit tests for session lifecycle
+  - [~] 7.3 Write unit tests for session lifecycle
     - Test session creation
     - Test session state transitions (created → running → paused → stopped)
     - Test invalid state transition rejection
@@ -153,19 +153,19 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure Redis broker and backend configuration works
     - _Requirements: 15.1, 15.2, 15.3, 15.6_
   
-  - [ ]* 8.2 Write property test for task status retrieval
+  - [~] 8.2 Write property test for task status retrieval
     - **Property 14: Task Status Retrieval**
     - **Validates: Requirements 15.4**
   
-  - [ ]* 8.3 Write property test for task result retrieval
+  - [~] 8.3 Write property test for task result retrieval
     - **Property 15: Task Result Retrieval**
     - **Validates: Requirements 15.5**
   
-  - [ ]* 8.4 Write property test for task serialization round-trip
+  - [~] 8.4 Write property test for task serialization round-trip
     - **Property 16: Task Serialization Round-Trip**
     - **Validates: Requirements 15.8**
   
-  - [ ]* 8.5 Write unit tests for task execution
+  - [~] 8.5 Write unit tests for task execution
     - Test task submission
     - Test task status checking
     - Test task result retrieval
@@ -203,7 +203,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Update import paths to be self-contained
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 17.1, 17.2_
   
-  - [ ]* 10.7 Write property tests for export functionality
+  - [~] 10.7 Write property tests for export functionality
     - **Property 19: Export Authorization**
     - **Property 20: Export Metadata Completeness**
     - **Property 21: Export Content-Type Headers**
@@ -225,7 +225,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Update import paths to be self-contained
     - _Requirements: 16.1, 16.2, 16.5_
   
-  - [ ]* 10.11 Write property tests for deprecation handling
+  - [~] 10.11 Write property tests for deprecation handling
     - **Property 17: Deprecation Headers on Deprecated Endpoints**
     - **Property 18: Deprecated Endpoint Logging**
     - **Validates: Requirements 16.3, 16.4, 16.6**
@@ -237,7 +237,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Update import paths to be self-contained
     - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7_
   
-  - [ ]* 11.2 Write property tests for error responses
+  - [~] 11.2 Write property tests for error responses
     - **Property 23: Request Validation Error Response**
     - **Property 24: Authentication Failure Response**
     - **Property 25: Authorization Failure Response**
@@ -255,7 +255,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure lifespan events handle startup and shutdown
     - _Requirements: 1.3, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7_
   
-  - [ ]* 12.2 Write unit tests for application startup and shutdown
+  - [~] 12.2 Write unit tests for application startup and shutdown
     - Test application starts successfully with valid configuration
     - Test application refuses to start with invalid production configuration
     - Test graceful shutdown closes database connections
@@ -319,14 +319,14 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - _Requirements: 5.4, 6.1_
 
 - [ ] 15. Create deployment validation tests
-  - [ ]* 20.1 Write smoke tests for deployed application
+  - [~] 15.1 Write smoke tests for deployed application
     - Test health endpoints respond correctly
     - Test authentication flow works end-to-end
     - Test session creation and management works
     - Test task submission and retrieval works
     - _Requirements: 9.1, 9.2, 9.3_
   
-  - [ ]* 20.2 Write load tests for performance validation
+  - [~] 15.2 Write load tests for performance validation
     - Test API handles expected load (requests per second)
     - Test response times under load
     - Test graceful degradation under overload
@@ -385,5 +385,5 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - _Requirements: 9.1, 9.2_
 
 
-- [ ] 18. Final checkpoint - Complete system validation
+- [~] 18. Final checkpoint - Complete system validation
   - Ensure all tests pass, ask the user if questions arise.
