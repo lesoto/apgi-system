@@ -869,7 +869,7 @@ class PsychologicalState:
     """Enhanced state with Π vs Π̂ distinction for anxiety modeling"""
 
     name: str
-    category: StateCategory
+    category: "StateCategory"
     description: str
     phenomenology: List[str]
 
@@ -2568,9 +2568,7 @@ class EnhancedSurpriseIgnitionSystem:
         )
 
         # Compute accumulated signal (dimensionally correct)
-        S_input = self.ignition_system.accumulated_signal(
-            Pi_e_input, self.eps_e, Pi_i_eff, self.eps_i
-        )
+        self.ignition_system.accumulated_signal(Pi_e_input, self.eps_e, Pi_i_eff, self.eps_i)
 
         # ========== COMPLETE DYNAMICAL SYSTEM ==========
         # Signal dynamics: dS/dt = -τ_S⁻¹S + ½Π^e(ε^e)² + ½Π^i_eff(ε^i)² + σ_Sξ_S
@@ -3456,13 +3454,13 @@ def _check_ignition_system() -> bool:
         )
         sigmoid = 1.0 / (1.0 + np.exp(-0.5))
         expected = 2.0 * (1.0 + sigmoid)
-        assert abs(Pi_i_eff - expected) < 1e-6, f"Effective precision incorrect"
+        assert abs(Pi_i_eff - expected) < 1e-6, "Effective precision incorrect"
         print("   Effective interoceptive precision: ✓")
 
         # Test ignition probability
         P = ignition.ignition_probability(S=2.0, theta=1.0, alpha=5.0)
         expected = 1.0 / (1.0 + np.exp(-5.0 * 1.0))
-        assert abs(P - expected) < 1e-6, f"Ignition probability incorrect"
+        assert abs(P - expected) < 1e-6, "Ignition probability incorrect"
         print("   Ignition probability: ✓")
 
         return True

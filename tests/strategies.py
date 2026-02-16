@@ -104,7 +104,7 @@ def belief_state_strategy(draw, num_levels=4, level_dims=None):
     Precision values are constrained to [0.1, 10.0] for realistic uncertainty.
     """
     if level_dims is None:
-        level_dims = [256, 128, 64, 32][:num_levels]
+        level_dims = [64, 32, 16, 8][:num_levels]  # Reduced from [256, 128, 64, 32]
 
     beliefs = []
     for dim in level_dims:

@@ -37,7 +37,7 @@ import numpy as np
 import pytest
 
 from apgi_system.system import APGISystem
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask, DeckType
+from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
@@ -48,7 +48,7 @@ pytestmark = pytest.mark.slow
 class TestIowaGamblingTaskProperties:
     """Tests for Iowa Gambling Task using specific examples."""
 
-    def test_property_iowa_gambling_learning(self):
+    def test_property_iowa_gambling_learning(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 25: Iowa Gambling Task learning**
 
@@ -114,7 +114,7 @@ class TestIowaGamblingTaskProperties:
 class TestMaskingParadigmProperties:
     """Tests for Masking Paradigm Task using specific examples."""
 
-    def test_property_masking_soa_effect(self):
+    def test_property_masking_soa_effect(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 26: Masking SOA effect**
 
@@ -132,7 +132,7 @@ class TestMaskingParadigmProperties:
 
         # Create masking task with minimal trials
         task = MaskingParadigmTask(
-            soas=sorted_soas,
+            soas=[float(s) for s in sorted_soas],
             num_trials_per_condition=5,
             target_duration_ms=50.0,
             mask_duration_ms=100.0,
@@ -183,7 +183,7 @@ class TestMaskingParadigmProperties:
 class TestAttentionalBlinkProperties:
     """Tests for Attentional Blink Task using specific examples."""
 
-    def test_property_attentional_blink_effect(self):
+    def test_property_attentional_blink_effect(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 27: Attentional blink effect**
 
@@ -260,7 +260,7 @@ class TestAttentionalBlinkProperties:
 class TestTaskResultCompletenessProperties:
     """Tests for task result completeness using specific examples."""
 
-    def test_property_iowa_gambling_result_completeness(self):
+    def test_property_iowa_gambling_result_completeness(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 28: Task result completeness**
 
@@ -327,7 +327,7 @@ class TestTaskResultCompletenessProperties:
             assert hasattr(result, "ignition_strength")
             assert hasattr(result, "somatic_marker_strength")
 
-    def test_property_masking_result_completeness(self):
+    def test_property_masking_result_completeness(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 28: Task result completeness**
 
@@ -342,7 +342,9 @@ class TestTaskResultCompletenessProperties:
         # Create and run Masking Paradigm Task with minimal trials
         soas = [0, 50, 100, 200]
         num_trials_per_condition = 5
-        task = MaskingParadigmTask(soas=soas, num_trials_per_condition=num_trials_per_condition)
+        task = MaskingParadigmTask(
+            soas=[float(s) for s in soas], num_trials_per_condition=num_trials_per_condition
+        )
         apgi_system = APGISystem()
         analysis = task.run_all_trials(apgi_system)
 
@@ -388,7 +390,7 @@ class TestTaskResultCompletenessProperties:
             len(task.results) == expected_trials
         ), f"Should have {expected_trials} trial results, got {len(task.results)}"
 
-    def test_property_attentional_blink_result_completeness(self):
+    def test_property_attentional_blink_result_completeness(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 28: Task result completeness**
 

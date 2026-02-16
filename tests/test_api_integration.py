@@ -8,8 +8,6 @@ Tests the complete API integration including:
 - Protected endpoint access
 """
 
-import asyncio
-import json
 import requests
 from typing import Dict, Any, Optional
 
@@ -177,7 +175,7 @@ class APITestClient:
             return False
 
 
-def run_api_integration_tests():
+def run_api_integration_tests() -> None:
     """Run comprehensive API integration tests."""
     print("=" * 80)
     print("APGI API INTEGRATION TESTS")

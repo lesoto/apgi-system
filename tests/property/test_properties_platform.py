@@ -9,7 +9,6 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import os
 import sys
 import platform
 from pathlib import Path
@@ -41,7 +40,7 @@ settings.load_profile("property_tests")
 class TestPlatformDetectionProperties:
     """Property-based tests for platform detection and utilities."""
 
-    def test_property_platform_detection_accuracy(self):
+    def test_property_platform_detection_accuracy(self) -> None:
         """
         **Feature: cross-platform-executable, Property 2: Platform detection accuracy**
 
@@ -87,7 +86,7 @@ class TestPlatformDetectionProperties:
             max_size=3,
         )
     )
-    def test_property_resource_path_resolution_consistency(self, relative_paths):
+    def test_property_resource_path_resolution_consistency(self, relative_paths: list[str]) -> None:
         """
         **Feature: cross-platform-executable, Property 1: Resource path resolution consistency**
 
@@ -138,7 +137,7 @@ class TestPlatformDetectionProperties:
             max_size=4,
         )
     )
-    def test_property_cross_platform_path_compatibility(self, path_components):
+    def test_property_cross_platform_path_compatibility(self, path_components: list[str]) -> None:
         """
         **Feature: cross-platform-executable, Property 6: Cross-platform path compatibility**
 
@@ -183,7 +182,7 @@ class TestPlatformDetectionProperties:
         # Should be absolute
         assert resource_path.is_absolute(), f"Resource path should be absolute: {resource_path}"
 
-    def test_property_config_dir_writable(self):
+    def test_property_config_dir_writable(self) -> None:
         """
         Test that config directory is writable.
 
@@ -195,7 +194,7 @@ class TestPlatformDetectionProperties:
         config_dir = get_config_dir()
 
         # Should return a Path object
-        assert isinstance(config_dir, Path), f"get_config_dir should return Path object"
+        assert isinstance(config_dir, Path), "get_config_dir should return Path object"
 
         # Should be an absolute path
         assert config_dir.is_absolute(), f"Config dir should be absolute: {config_dir}"
@@ -213,7 +212,7 @@ class TestPlatformDetectionProperties:
         except Exception as e:
             pytest.fail(f"Config directory should be writable: {e}")
 
-    def test_property_data_dir_writable(self):
+    def test_property_data_dir_writable(self) -> None:
         """
         Test that data directory is writable.
 
@@ -225,7 +224,7 @@ class TestPlatformDetectionProperties:
         data_dir = get_data_dir()
 
         # Should return a Path object
-        assert isinstance(data_dir, Path), f"get_data_dir should return Path object"
+        assert isinstance(data_dir, Path), "get_data_dir should return Path object"
 
         # Should be an absolute path
         assert data_dir.is_absolute(), f"Data dir should be absolute: {data_dir}"
@@ -243,7 +242,7 @@ class TestPlatformDetectionProperties:
         except Exception as e:
             pytest.fail(f"Data directory should be writable: {e}")
 
-    def test_property_bundled_detection_consistency(self):
+    def test_property_bundled_detection_consistency(self) -> None:
         """
         Test that is_bundled() returns consistent results.
 
@@ -272,7 +271,7 @@ class TestPlatformDetectionProperties:
         ), f"is_bundled() result should match sys attributes: bundled={bundled}, frozen={has_frozen}, meipass={has_meipass}"
 
     @given(num_calls=st.integers(min_value=1, max_value=10))
-    def test_property_platform_detection_idempotent(self, num_calls):
+    def test_property_platform_detection_idempotent(self, num_calls: int) -> None:
         """
         Test that platform detection is idempotent.
 
@@ -288,7 +287,7 @@ class TestPlatformDetectionProperties:
         ), f"get_platform() should return consistent results: {results}"
 
     @given(num_calls=st.integers(min_value=1, max_value=10))
-    def test_property_config_dir_idempotent(self, num_calls):
+    def test_property_config_dir_idempotent(self, num_calls: int) -> None:
         """
         Test that config directory resolution is idempotent.
 
@@ -304,7 +303,7 @@ class TestPlatformDetectionProperties:
         ), f"get_config_dir() should return consistent results: {results}"
 
     @given(num_calls=st.integers(min_value=1, max_value=10))
-    def test_property_data_dir_idempotent(self, num_calls):
+    def test_property_data_dir_idempotent(self, num_calls: int) -> None:
         """
         Test that data directory resolution is idempotent.
 

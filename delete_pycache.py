@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path
 from typing import Iterable, List, Optional, Set, Dict, Any
 
 # Essential files and directories to NEVER remove
@@ -780,11 +779,14 @@ def delete_temporary_items(
     max_depth: Optional[int] = None,
     config: Optional[Dict[str, Any]] = None,
     backup_dir: Optional[str] = None,
-):
+) -> None:
     """Enhanced deletion of temporary directories and files with safety checks."""
     # Load configuration
     if config is None:
         config = DEFAULT_CONFIG
+
+    # Ensure config is properly typed
+    assert isinstance(config, dict)
 
     temp_dir_names = set(config.get("temp_dirs", TEMP_DIR_NAMES))
     temp_file_patterns = config.get("temp_files", TEMP_FILE_PATTERNS)
@@ -926,7 +928,7 @@ def delete_temporary_items(
             print(f"Skipped {skipped_essential} essential items")
 
 
-def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True):
+def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True) -> None:
     """Remove empty directories after cleanup."""
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
         # don't prune the root itself
@@ -945,7 +947,7 @@ def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True)
             print(f"Error pruning directory {dirpath}: {e}")
 
 
-def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = True):
+def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = True) -> int:
     """Handle special cleanup cases that might be missed by pattern matching."""
     special_patterns = [
         # Python cache directories with various naming patterns
@@ -1026,7 +1028,7 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
 
 def clear_log_files(
     root_dir: str, delete_logs_dir: bool = False, dry_run: bool = False, verbose: bool = True
-):
+) -> None:
     """Either truncate files under a `logs` dir, or delete the logs directory entirely.
 
     - If delete_logs_dir is True, the whole logs directory is removed.
@@ -1069,7 +1071,7 @@ def clear_log_files(
                 print(f"Error clearing {file_path}: {str(e)}")
 
 
-def parse_args(argv: List[str] = None):
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Enhanced temporary file and folder cleaner with safety checks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1189,7 +1191,7 @@ Examples:
     return p.parse_args(argv)
 
 
-def main(argv: List[str] = None):
+def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_directory = os.path.abspath(args.root) if args.root else current_dir

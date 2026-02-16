@@ -6,10 +6,18 @@ This module provides common build and development utilities.
 
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Set, TypedDict
 
 
-def run_command(cmd: List[str], cwd: str = None, check: bool = True) -> subprocess.CompletedProcess:
+class Dependencies(TypedDict):
+    requirements_txt: Set[str]
+    pyproject_toml: Set[str]
+    total_dependencies: int
+
+
+def run_command(
+    cmd: List[str], cwd: Optional[str] = None, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     """Run a command and return the result.
 
     Parameters
@@ -103,99 +111,131 @@ def check_build_environment() -> Dict[str, bool]:
     return checks
 
 
-def analyze_dependencies(project_path: str = None) -> Dict[str, Any]:
-    """Analyze project dependencies.
+def analyze_dependencies(entry_point: Optional[str] = None) -> Dependencies:
+    """Analyze project dependencies from requirements.txt and pyproject.toml.
 
     Parameters
     ----------
-    project_path : str, optional
-        Path to project, by default None (current directory)
+    entry_point : str, optional
+        Path to Python entry point file to analyze, by default None (apgi_gui.py)
 
     Returns
     -------
-    Dict[str, Any]
-        Dependency analysis results
+    dict
+        Dictionary with keys: requirements_txt, pyproject_toml, total_dependencies
     """
-    if project_path is None:
-        project_path = get_project_root()
+    project_root = get_project_root()
 
-    project_path = Path(project_path)
-
-    # Read requirements.txt if exists
-    requirements_file = project_path / "requirements.txt"
-    dependencies = []
-
-    if requirements_file.exists():
-        with open(requirements_file) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    dependencies.append(line)
-
-    # Read pyproject.toml if exists
-    pyproject_file = project_path / "pyproject.toml"
-    pyproject_deps = []
-
-    if pyproject_file.exists():
-        try:
-            import toml
-
-            config = toml.load(pyproject_file)
-            pyproject_deps = config.get("project", {}).get("dependencies", [])
-        except ImportError:
-            pass
-
-    return {
-        "requirements_txt": dependencies,
-        "pyproject_toml": pyproject_deps,
-        "total_dependencies": len(dependencies) + len(pyproject_deps),
+    dependencies: Dependencies = {
+        "requirements_txt": set(),
+        "pyproject_toml": set(),
+        "total_dependencies": 0,
     }
 
+    # Analyze requirements.txt
+    requirements_file = project_root / "requirements.txt"
+    if requirements_file.exists():
+        try:
+            content = requirements_file.read_text()
+            for line in content.splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    # Extract package name (before ==, >=, etc.)
+                    package = (
+                        line.split()[0].split("==")[0].split(">=")[0].split("<=")[0].split("!=")[0]
+                    )
+                    if package:
+                        dependencies["requirements_txt"].add(package)
+        except Exception:
+            pass
 
-def collect_resources(project_path: str = None) -> Dict[str, List[str]]:
-    """Collect project resources.
+    # Analyze pyproject.toml
+    pyproject_file = project_root / "pyproject.toml"
+    if pyproject_file.exists():
+        try:
+            import toml  # type: ignore[import-untyped]
+
+            config = toml.load(pyproject_file)
+            deps = config.get("project", {}).get("dependencies", [])
+            for dep in deps:
+                # Extract package name
+                package = dep.split()[0].split("==")[0].split(">=")[0].split("<=")[0].split("!=")[0]
+                if package:
+                    dependencies["pyproject_toml"].add(package)
+        except Exception:
+            pass
+
+    # Calculate total unique dependencies
+    all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]
+    dependencies["total_dependencies"] = len(all_deps)
+
+    return dependencies
+
+
+def collect_resources(
+    project_path: Optional[str] = None, resource_dirs: Optional[List[str]] = None
+) -> Dict[str, List[str]]:
+    """Collect project resources from specified directories.
 
     Parameters
     ----------
     project_path : str, optional
         Path to project, by default None (current directory)
+    resource_dirs : List[str], optional
+        List of directory names to collect from, by default None (all)
 
     Returns
     -------
-    Dict[str, List[str]]
-        Resource files by type
+    dict
+        Dictionary with keys: config_files, data_files, resource_files, icon_files
     """
     if project_path is None:
-        project_path = get_project_root()
+        project_path_obj = get_project_root()
+    else:
+        project_path_obj = Path(project_path)
 
-    project_path = Path(project_path)
-    resources = {"config_files": [], "data_files": [], "resource_files": [], "icon_files": []}
+    resources: Dict[str, List[str]] = {
+        "config_files": [],
+        "data_files": [],
+        "resource_files": [],
+        "icon_files": [],
+    }
 
-    # Collect config files
-    for pattern in ["*.yaml", "*.yml", "*.json", "*.toml", "*.ini"]:
-        resources["config_files"].extend(project_path.rglob(pattern))
+    # If no specific directories provided, use defaults
+    if resource_dirs is None:
+        resource_dirs = ["config", "resources"]
 
-    # Collect data files
-    for pattern in ["*.csv", "*.txt", "*.md"]:
-        resources["data_files"].extend(project_path.rglob(pattern))
+    # Collect from each specified directory
+    for dir_name in resource_dirs:
+        dir_path = project_path_obj / dir_name
+        if dir_path.exists() and dir_path.is_dir():
+            # Collect all files in this directory recursively
+            for file_path in dir_path.rglob("*"):
+                if file_path.is_file():
+                    # Create relative destination path
+                    try:
+                        rel_path = file_path.relative_to(project_path_obj)
+                        file_str = str(rel_path)
 
-    # Collect resource files
-    resources_dir = project_path / "resources"
-    if resources_dir.exists():
-        resources["resource_files"] = list(resources_dir.rglob("*"))
+                        # Categorize files
+                        if dir_name == "config":
+                            resources["config_files"].append(file_str)
+                        elif dir_name == "resources":
+                            if file_path.suffix in [".ico", ".icns", ".png"]:
+                                resources["icon_files"].append(file_str)
+                            else:
+                                resources["resource_files"].append(file_str)
+                        else:
+                            resources["data_files"].append(file_str)
 
-    # Collect icon files
-    for pattern in ["*.ico", "*.icns", "*.png", "*.jpg"]:
-        resources["icon_files"].extend(project_path.rglob(pattern))
-
-    # Convert to strings
-    for key in resources:
-        resources[key] = [str(p) for p in resources[key]]
+                    except ValueError:
+                        # File not under project root, skip
+                        continue
 
     return resources
 
 
-def get_version(project_path: str = None) -> str:
+def get_version(project_path: Optional[str] = None) -> str:
     """Get project version.
 
     Parameters
@@ -209,17 +249,17 @@ def get_version(project_path: str = None) -> str:
         Project version
     """
     if project_path is None:
-        project_path = get_project_root()
-
-    project_path = Path(project_path)
+        project_path_obj = get_project_root()
+    else:
+        project_path_obj = Path(project_path)
 
     # Try VERSION file
-    version_file = project_path / "VERSION"
+    version_file = project_path_obj / "VERSION"
     if version_file.exists():
         return version_file.read_text().strip()
 
     # Try pyproject.toml
-    pyproject_file = project_path / "pyproject.toml"
+    pyproject_file = project_path_obj / "pyproject.toml"
     if pyproject_file.exists():
         try:
             import toml
@@ -232,7 +272,7 @@ def get_version(project_path: str = None) -> str:
     return "0.1.0"
 
 
-def detect_hidden_imports(project_path: str = None) -> List[str]:
+def detect_hidden_imports(project_path: Optional[str] = None) -> List[str]:
     """Detect hidden imports in the project.
 
     Parameters
@@ -246,9 +286,10 @@ def detect_hidden_imports(project_path: str = None) -> List[str]:
         List of hidden imports
     """
     if project_path is None:
-        project_path = get_project_root()
+        project_path_obj = get_project_root()
+    else:
+        project_path_obj = Path(project_path)
 
-    project_path = Path(project_path)
     hidden_imports = []
 
     # Common hidden imports for scientific packages
@@ -266,7 +307,7 @@ def detect_hidden_imports(project_path: str = None) -> List[str]:
     ]
 
     # Check if these packages are used
-    python_files = list(project_path.rglob("*.py"))
+    python_files = list(project_path_obj.rglob("*.py"))
 
     for py_file in python_files:
         try:

@@ -10,7 +10,6 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 from collections import deque
 from datetime import datetime
 import numpy as np
-import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import psutil
@@ -18,17 +17,22 @@ import time
 import threading
 from threading import Lock, RLock
 import platform
+import yaml
+import json
+import csv
+from pathlib import Path
+from typing import Dict, Optional, Union, Any, cast
 
 from apgi_system.system import APGISystem
 from apgi_system.config_validator import validate_config_file, ConfigValidationError
 from apgi_system.platform_utils import (
     get_resource_path,
     get_data_dir,
-    load_resource_with_fallback,
-    safe_write_file,
-    check_required_libraries,
 )
 import logging
+
+# Import theme manager
+from apgi_gui.theme_manager import get_theme_manager
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)
@@ -46,7 +50,7 @@ logging.basicConfig(
 class APGIGui:
     """Main GUI application for APGI System."""
 
-    def __init__(self, root):
+    def __init__(self, root: tk.Tk) -> None:
         """Initialize GUI application."""
         self.root = root
         self.root.title("APGI Consciousness Modeling Framework")
@@ -75,25 +79,29 @@ class APGIGui:
         # Platform-specific modifier key for shortcuts
         self.modifier_key = "Command" if platform.system() == "Darwin" else "Ctrl"
 
+        # Initialize theme manager
+        self.theme_manager = get_theme_manager()
+        self._apply_theme_to_root()
+
         # System state
-        self.apgi_system = None
-        self.is_running = False
-        self.is_paused = False
-        self.simulation_thread = None
-        self.config_path = get_resource_path("config/default.yaml")
+        self.apgi_system: Optional[APGISystem] = None
+        self.is_running: bool = False
+        self.is_paused: bool = False
+        self.simulation_thread: Optional[threading.Thread] = None
+        self.config_path: Path = get_resource_path("config/default.yaml")
 
         # Data buffers for plotting with configurable sizes
-        self.buffer_size = 1000  # Default buffer size
-        self.min_buffer_size = 100  # Minimum buffer size
-        self.max_buffer_size = 10000  # Maximum buffer size
+        self.buffer_size: int = 1000  # Default buffer size
+        self.min_buffer_size: int = 100  # Minimum buffer size
+        self.max_buffer_size: int = 10000  # Maximum buffer size
 
         # Initialize buffers with default size
         self._initialize_buffers(self.buffer_size)
 
         # Performance tracking
         self.last_frame_time = time.time()
-        self.fps_buffer = deque(maxlen=100)
-        self.memory_buffer = deque(maxlen=1000)
+        self.fps_buffer: deque[float] = deque(maxlen=100)
+        self.memory_buffer: deque[float] = deque(maxlen=1000)
 
         # Thread safety locks
         self.data_lock = RLock()  # Reentrant lock for data buffers
@@ -101,12 +109,12 @@ class APGIGui:
         self.system_lock = RLock()  # Reentrant lock for system access
 
         # Logging with bounded buffer to prevent memory leaks
-        self.log_buffer_size = 10000  # Maximum number of log entries to keep
-        self.log_data = deque(maxlen=self.log_buffer_size)
-        self.auto_save = False
+        self.log_buffer_size: int = 10000  # Maximum number of log entries to keep
+        self.log_data: deque[str] = deque(maxlen=self.log_buffer_size)
+        self.auto_save: bool = False
 
         # Initialize view variables as regular Python variables first
-        self.view_vars = {
+        self.view_vars: Dict[str, Union[bool, tk.BooleanVar]] = {
             "control_panel": True,
             "neural_activity": True,
             "interoception": True,
@@ -152,10 +160,105 @@ class APGIGui:
         # Use a longer delay to ensure the window is fully ready
         self.root.after(200, self._convert_to_tkinter_variables)
 
-    def _initialize_buffers(self, size):
+        # Apply theme to all components after GUI is fully created
+        self.root.after(300, self.apply_theme_to_gui)
+
+    def _apply_theme_to_root(self) -> None:
+        """Apply current theme to root window."""
+        theme_bg = self.theme_manager.get_theme_color("bg")
+
+        try:
+            self.root.configure(bg=theme_bg)
+        except tk.TclError:
+            pass  # Some themes may not support bg configuration
+
+    def apply_theme_to_gui(self) -> None:
+        """Apply current theme to all GUI components."""
+        # Apply to root
+        self._apply_theme_to_root()
+
+        # Apply to canvases if they exist
+        if hasattr(self, "neural_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.neural_canvas, self.theme_manager.current_theme
+            )
+
+        if hasattr(self, "intero_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.intero_canvas, self.theme_manager.current_theme
+            )
+
+        if hasattr(self, "metrics_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.metrics_canvas, self.theme_manager.current_theme
+            )
+
+        if hasattr(self, "self_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.self_canvas, self.theme_manager.current_theme
+            )
+
+        if hasattr(self, "osc_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.osc_canvas, self.theme_manager.current_theme
+            )
+
+        if hasattr(self, "state_canvas"):
+            self.theme_manager.apply_theme_to_canvas(
+                self.state_canvas, self.theme_manager.current_theme
+            )
+
+        # Force redraw of all components
+        self.root.update_idletasks()
+
+    def _change_theme(self, theme_name: str) -> None:
+        """Change the current theme."""
+        if self.theme_manager.set_theme(theme_name):
+            self.apply_theme_to_gui()
+            self._log_event(f"Theme changed to: {theme_name}")
+        else:
+            messagebox.showerror("Theme Error", f"Unknown theme: {theme_name}")
+
+    def _create_theme_menu(self) -> None:
+        """Create theme selection menu."""
+        # Add theme menu to view menu if it exists
+        if hasattr(self, "menu_bar"):
+            for i in range(self.menu_bar.index("end") or 0):
+                if self.menu_bar.entrycget(i, "label") == "View":
+                    view_menu = self.menu_bar.nametowidget(self.menu_bar.entrycget(i, "menu"))
+                    if view_menu:
+                        # Add theme submenu
+                        theme_menu = tk.Menu(view_menu, tearoff=0)
+                        view_menu.add_cascade(label="Theme", menu=theme_menu)
+
+                        # Add theme options
+                        for theme_name in self.theme_manager.get_available_themes():
+                            theme_menu.add_command(
+                                label=theme_name.title(),
+                                command=lambda t=theme_name: self._change_theme(t),  # type: ignore
+                            )
+
+                        # Add separator and high contrast toggle
+                        theme_menu.add_separator()
+                        theme_menu.add_command(
+                            label="Toggle High Contrast", command=self._toggle_high_contrast
+                        )
+                    break
+
+    def _toggle_high_contrast(self) -> None:
+        """Toggle between normal and high contrast themes."""
+        current_theme = self.theme_manager.current_theme
+        if "high_contrast" in current_theme:
+            # Switch to normal theme
+            self._change_theme("normal")
+        else:
+            # Switch to high contrast
+            self._change_theme("high_contrast_dark")
+
+    def _initialize_buffers(self, size: int) -> None:
         """Initialize data buffers with specified size."""
-        self.time_buffer = deque(maxlen=size)
-        self.data_buffers = {
+        self.time_buffer: deque[float] = deque(maxlen=size)
+        self.data_buffers: Dict[str, deque[float]] = {
             "ignition": deque(maxlen=size),
             "free_energy": deque(maxlen=size),
             "extero_precision": deque(maxlen=size),
@@ -178,7 +281,7 @@ class APGIGui:
         self.buffer_size = size
         self._log_event(f"Buffer size set to {size} points")
 
-    def _convert_to_tkinter_variables(self):
+    def _convert_to_tkinter_variables(self) -> None:
         """Convert Python variables to tkinter variables after GUI is created."""
         # Convert buffer size variable
         self.buffer_size_var = tk.IntVar(master=self.root, value=self.buffer_size)
@@ -186,8 +289,8 @@ class APGIGui:
         # Convert view variables to tkinter variables
         old_view_vars = self.view_vars.copy()
         self.view_vars = {}
-        for key, value in old_view_vars.items():
-            self.view_vars[key] = tk.BooleanVar(master=self.root, value=value)
+        for key, var in old_view_vars.items():
+            self.view_vars[key] = tk.BooleanVar(master=self.root, value=var.get())
 
         # Convert auto-save variable
         self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
@@ -200,7 +303,8 @@ class APGIGui:
 
         # Convert parameter variables and assign to scales
         for key, value in self.param_vars.items():
-            var = tk.DoubleVar(master=self.root, value=value)
+            var_value = value.get() if isinstance(value, tk.Variable) else value
+            var = tk.DoubleVar(master=self.root, value=var_value)
             self.param_vars[key] = var
 
             # Assign to scale if it exists
@@ -211,7 +315,9 @@ class APGIGui:
             if key in self.param_labels:
                 var.trace_add(
                     "write",
-                    lambda *args, v=var, l=self.param_labels[key]: l.config(text=f"{v.get():.2f}"),
+                    lambda *args, v=var, label=self.param_labels[key]: label.config(
+                        text=f"{v.get():.2f}"
+                    ),
                 )
 
         # Assign variables to existing view menu checkbuttons
@@ -227,25 +333,26 @@ class APGIGui:
                 for i, (label, key) in enumerate(checkbuttons):
                     try:
                         self._view_menu.entryconfig(i, variable=self.view_vars[key])
-                    except:
+                    except tk.TclError:
                         pass  # Skip if entry doesn't exist
         except Exception as e:
             self._log_event(f"Warning: Could not assign variables to view menu: {e}")
 
         # Now add the auto-save checkbutton to the file menu
         try:
-            file_menu = self.menu_bar.winfo_children()[0]  # File menu is first
+            file_menu = cast(tk.Menu, self.menu_bar.winfo_children()[0])  # File menu is first
             # Find the index of the "Exit" command and insert before it
             exit_index = None
             last_index = file_menu.index("end")
-            for i in range(last_index + 1):
-                try:
-                    label = file_menu.entrycget(i, "label")
-                    if label == "Exit":
-                        exit_index = i
-                        break
-                except:
-                    continue
+            if last_index is not None:
+                for i in range(int(last_index) + 1):
+                    try:
+                        label = file_menu.entrycget(i, "label")
+                        if label == "Exit":
+                            exit_index = i
+                            break
+                    except tk.TclError:
+                        continue
 
             if exit_index is not None:
                 # Insert auto-save checkbutton before Exit
@@ -265,7 +372,7 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Warning: Could not add auto-save checkbutton: {e}")
 
-    def _configure_buffer_size(self):
+    def _configure_buffer_size(self) -> None:
         """Open dialog to configure buffer size."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Buffer Configuration")
@@ -302,7 +409,7 @@ class APGIGui:
         memory_label = ttk.Label(frame, text="")
         memory_label.pack(pady=10)
 
-        def update_memory_estimate(*args):
+        def update_memory_estimate(*args: Any) -> None:
             try:
                 size = int(self.buffer_size_var.get())
                 # Calculate memory usage accurately based on numpy float64 dtype
@@ -310,7 +417,7 @@ class APGIGui:
                 bytes_per_point = np.dtype(np.float64).itemsize  # 8 bytes for float64
                 estimated_mb = (size * num_buffers * bytes_per_point) / (1024 * 1024)
                 memory_label.config(text=f"Estimated memory usage: {estimated_mb:.1f} MB")
-            except:
+            except (ValueError, tk.TclError):
                 memory_label.config(text="Invalid buffer size")
 
         self.buffer_size_var.trace_add("write", update_memory_estimate)
@@ -320,7 +427,7 @@ class APGIGui:
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=10)
 
-        def apply_buffer_size():
+        def apply_buffer_size() -> None:
             try:
                 new_size = int(self.buffer_size_var.get())
                 if self.min_buffer_size <= new_size <= self.max_buffer_size:
@@ -341,10 +448,12 @@ class APGIGui:
 
         # Add to View menu
         view_menu = None
-        for i in range(self.menu_bar.index("end")):
-            if self.menu_bar.entrycget(i, "label") == "View":
-                view_menu = self.menu_bar.nametowidget(self.menu_bar.entrycget(i, "menu"))
-                break
+        last_index = self.menu_bar.index("end")
+        if last_index is not None:
+            for i in range(last_index + 1):
+                if self.menu_bar.entrycget(i, "label") == "View":
+                    view_menu = self.menu_bar.nametowidget(self.menu_bar.entrycget(i, "menu"))
+                    break
 
         if view_menu:
             view_menu.add_separator()
@@ -405,13 +514,13 @@ class APGIGui:
         # Start update loop
         self._update_displays()
 
-    def _create_menu_bar(self):
+    def _create_menu_bar(self) -> None:
         """Create comprehensive menu bar."""
-        self.menu_bar = tk.Menu(self.root)
+        self.menu_bar: tk.Menu = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
 
         # File Menu
-        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        file_menu: tk.Menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(
             label="New Session", command=self._new_session, accelerator=f"{self.modifier_key}+N"
@@ -523,6 +632,9 @@ class APGIGui:
         help_menu.add_separator()
         help_menu.add_command(label="About APGI System", command=self._show_about)
 
+        # Create theme menu
+        self._create_theme_menu()
+
         # Bind keyboard shortcuts
         self.root.bind("<Control-n>", lambda e: self._new_session())
         self.root.bind("<Control-o>", lambda e: self._load_config())
@@ -545,7 +657,7 @@ class APGIGui:
         self.root.bind("<Control-Tab>", lambda e: self._cycle_notebook_tabs(1))
         self.root.bind("<Control-Shift-Tab>", lambda e: self._cycle_notebook_tabs(-1))
 
-    def _create_main_layout(self):
+    def _create_main_layout(self) -> None:
         """Create main application layout."""
         # Create main container with paned window
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -565,7 +677,7 @@ class APGIGui:
         # Build right panel with tabs
         self._create_visualization_panel(right_panel)
 
-    def _create_control_panel(self, parent):
+    def _create_control_panel(self, parent: tk.Widget) -> None:
         """Create control panel."""
         # Simulation Controls
         control_frame = ttk.LabelFrame(parent, text="Simulation Control", padding=10)
@@ -646,9 +758,9 @@ class APGIGui:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Add parameter controls
-        self.param_vars = {}
-        self.param_scales = {}
-        self.param_labels = {}
+        self.param_vars: Dict[str, Union[float, tk.DoubleVar]] = {}
+        self.param_scales: Dict[str, ttk.Scale] = {}
+        self.param_labels: Dict[str, ttk.Label] = {}
         parameters = [
             ("Ignition Threshold", "baseline_threshold", 1.0, 5.0, 2.0),
             ("Extero Precision", "extero_precision", 0.1, 10.0, 1.0),
@@ -921,7 +1033,6 @@ class APGIGui:
 
     def _create_state_space(self, parent):
         """Create 3D state space visualization."""
-        from mpl_toolkits.mplot3d import Axes3D
 
         fig = Figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection="3d")
@@ -943,7 +1054,7 @@ class APGIGui:
 
         self.state_canvas = canvas
 
-    def _create_status_bar(self):
+    def _create_status_bar(self) -> None:
         """Create status bar."""
         status_bar = ttk.Frame(self.root)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
@@ -956,7 +1067,7 @@ class APGIGui:
 
     # System Control Methods
 
-    def _initialize_system(self):
+    def _initialize_system(self) -> None:
         """Initialize APGI system with proper error handling."""
         try:
             self.apgi_system = APGISystem(config_path=str(self.config_path))
@@ -1010,7 +1121,7 @@ class APGIGui:
                 )
                 if reset_result:
                     self._reset_to_default_config()
-            except:
+            except Exception:
                 pass
 
     def _reset_to_default_config(self):
@@ -1057,7 +1168,7 @@ class APGIGui:
         # Menu items that require system (these would need to be stored as references)
         # For now, we'll handle this in the individual menu methods
 
-    def _start_simulation(self):
+    def _start_simulation(self) -> None:
         """Start simulation with system validation."""
         if self.is_running:
             return
@@ -1084,7 +1195,7 @@ class APGIGui:
         self.simulation_thread = threading.Thread(target=self._simulation_loop, daemon=True)
         self.simulation_thread.start()
 
-    def _pause_simulation(self):
+    def _pause_simulation(self) -> None:
         """Pause/resume simulation."""
         self.is_paused = not self.is_paused
 
@@ -1104,7 +1215,7 @@ class APGIGui:
         self.stop_btn.config(state=tk.DISABLED)
         self._update_status("Simulation stopped due to error")
 
-    def _stop_simulation(self):
+    def _stop_simulation(self) -> None:
         """Stop simulation."""
         self.is_running = False
         self.is_paused = False
@@ -1116,7 +1227,7 @@ class APGIGui:
         self._log_event("Simulation stopped")
         self._update_status("Stopped")
 
-    def _reset_simulation(self):
+    def _reset_simulation(self) -> None:
         """Reset simulation (thread-safe) with system validation."""
         was_running = self.is_running
         if was_running:
@@ -1386,21 +1497,22 @@ class APGIGui:
             self.data_buffers["workspace_active"].append(
                 1 if state["workspace"]["is_broadcasting"] else 0
             )
-            self.data_buffers["gamma_power"].append(
-                state["oscillations"]["band_powers"].get("gamma", 0)
-            )
-            self.data_buffers["beta_power"].append(
-                state["oscillations"]["band_powers"].get("beta", 0)
-            )
-            self.data_buffers["theta_power"].append(
-                state["oscillations"]["band_powers"].get("theta", 0)
-            )
-            self.data_buffers["alpha_power"].append(
-                state["oscillations"]["band_powers"].get("alpha", 0)
-            )
+            # Extract oscillation data safely
+            oscillations = state.get("oscillations", {})
+            if isinstance(oscillations, dict):
+                band_powers = oscillations.get("band_powers", {})
+                gamma_power = band_powers.get("gamma", 0)
+                beta_power = band_powers.get("beta", 0)
+                theta_power = band_powers.get("theta", 0)
+                alpha_power = band_powers.get("alpha", 0)
+            else:
+                gamma_power = beta_power = theta_power = alpha_power = 0
+
+            self.data_buffers["gamma_power"].append(gamma_power)
+            self.data_buffers["beta_power"].append(beta_power)
+            self.data_buffers["theta_power"].append(theta_power)
+            self.data_buffers["alpha_power"].append(alpha_power)
             # Calculate delta_power as difference between gamma and beta power
-            gamma_power = state["oscillations"]["band_powers"].get("gamma", 0)
-            beta_power = state["oscillations"]["band_powers"].get("beta", 0)
             self.data_buffers["delta_power"].append(abs(gamma_power - beta_power))
             self.data_buffers["minimal_self_coherence"].append(
                 state["self_model"]["minimal"]["coherence"]
@@ -1436,7 +1548,7 @@ class APGIGui:
         with self.log_lock:
             self.log_data.append(log_entry)
 
-    def _update_displays(self):
+    def _update_displays(self) -> None:
         """Update all displays (called periodically)."""
         # Calculate FPS
         current_time = time.time()
@@ -1450,7 +1562,7 @@ class APGIGui:
         try:
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
             self.memory_buffer.append(memory_mb)
-        except:
+        except Exception:
             pass
 
         if self.is_running and not self.is_paused:
@@ -1707,7 +1819,6 @@ class APGIGui:
         load = data_copies["allostatic_load"]
 
         # Color by time
-        colors = np.linspace(0, 1, len(fe))
 
         self.state_scatter._offsets3d = (fe, prec, load)
 
@@ -1732,7 +1843,7 @@ class APGIGui:
 
     # Menu Command Methods
 
-    def _new_session(self):
+    def _new_session(self) -> None:
         """Start new session (thread-safe)."""
         if messagebox.askyesno("New Session", "Start a new session? Current data will be lost."):
             self._reset_simulation()
@@ -1740,7 +1851,7 @@ class APGIGui:
                 self.log_data.clear()
             self._log_event("New session started")
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load configuration file."""
         filename = filedialog.askopenfilename(
             title="Load Configuration", filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")]
@@ -1748,7 +1859,7 @@ class APGIGui:
         if filename:
             try:
                 with open(filename, "r") as f:
-                    config = yaml.safe_load(f)
+                    yaml.safe_load(f)
 
                 # Validate configuration before using it
                 try:
@@ -1769,7 +1880,7 @@ class APGIGui:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load configuration:\n{str(e)}")
 
-    def _save_config(self):
+    def _save_config(self) -> None:
         """Save configuration file."""
         filename = filedialog.asksaveasfilename(
             title="Save Configuration",
@@ -1787,7 +1898,7 @@ class APGIGui:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save configuration:\n{str(e)}")
 
-    def _export_data(self):
+    def _export_data(self) -> None:
         """Export simulation data (thread-safe)."""
         with self.log_lock:
             if not self.log_data:
@@ -1826,7 +1937,7 @@ class APGIGui:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export data:\n{str(e)}")
 
-    def _export_plot(self):
+    def _export_plot(self) -> None:
         """Export current plot."""
         filename = filedialog.asksaveasfilename(
             title="Export Plot",
@@ -1841,34 +1952,34 @@ class APGIGui:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export plot:\n{str(e)}")
 
-    def _toggle_auto_save(self):
+    def _toggle_auto_save(self) -> None:
         """Toggle auto-save feature."""
         self.auto_save = self.auto_save_var.get()
         status = "enabled" if self.auto_save else "disabled"
         self._log_event(f"Auto-save {status}")
 
-    def _toggle_control_panel(self):
+    def _toggle_control_panel(self) -> None:
         """Toggle control panel visibility."""
         # Implementation would show/hide control panel
         visible = self.view_vars["control_panel"].get()
         self._log_event(f"Control panel {'shown' if visible else 'hidden'}")
 
-    def _toggle_neural_activity(self):
+    def _toggle_neural_activity(self) -> None:
         """Toggle neural activity panel visibility."""
         visible = self.view_vars["neural_activity"].get()
         self._log_event(f"Neural activity panel {'shown' if visible else 'hidden'}")
 
-    def _toggle_interoception(self):
+    def _toggle_interoception(self) -> None:
         """Toggle interoception panel visibility."""
         visible = self.view_vars["interoception"].get()
         self._log_event(f"Interoception panel {'shown' if visible else 'hidden'}")
 
-    def _toggle_system_metrics(self):
+    def _toggle_system_metrics(self) -> None:
         """Toggle system metrics panel visibility."""
         visible = self.view_vars["system_metrics"].get()
         self._log_event(f"System metrics panel {'shown' if visible else 'hidden'}")
 
-    def _auto_save_data(self):
+    def _auto_save_data(self) -> None:
         """Auto-save data to file (thread-safe)."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         data_dir = get_data_dir()
@@ -1882,7 +1993,7 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Auto-save failed: {str(e)}")
 
-    def _exit_app(self):
+    def _exit_app(self) -> None:
         """Exit application."""
         if self.is_running:
             if not messagebox.askyesno("Exit", "Simulation is running. Exit anyway?"):
@@ -1901,9 +2012,9 @@ class APGIGui:
                 if isinstance(widget, tk.Toplevel):
                     try:
                         widget.destroy()
-                    except:
+                    except Exception:
                         pass
-        except:
+        except Exception:
             pass
 
     def _edit_parameters(self):
@@ -1968,7 +2079,7 @@ class APGIGui:
             val_label.pack(side=tk.LEFT)
 
             var.trace_add(
-                "write", lambda *args, v=var, l=val_label: l.config(text=f"{v.get():.3f}")
+                "write", lambda *args, v=var, label=val_label: label.config(text=f"{v.get():.3f}")
             )
 
         # Button frame
@@ -2290,7 +2401,7 @@ class APGIGui:
                         lambda p=progress, i=trial_idx, t=total_trials: (
                             progress_var.set(p),
                             (
-                                status_label.config(text=f"Trial {i+1} of {t}")
+                                status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
@@ -2329,7 +2440,7 @@ class APGIGui:
                 analysis = task.analyze_results()
 
                 # Display summary
-                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
                 summary += f"Overall T1 Accuracy: {analysis['overall_t1_accuracy']:.1%}\n"
                 summary += f"Overall T2 Accuracy: {analysis['overall_t2_accuracy']:.1%}\n"
@@ -2456,7 +2567,7 @@ class APGIGui:
                         lambda p=progress, i=trial_idx, t=total_trials: (
                             progress_var.set(p),
                             (
-                                status_label.config(text=f"Trial {i+1} of {t}")
+                                status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
@@ -2496,7 +2607,7 @@ class APGIGui:
                 analysis = task.analyze_results()
 
                 # Display summary
-                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
                 summary += f"Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
                 summary += f"Blindness Rate: {analysis['overall_blindness_rate']:.1%}\n"
@@ -2626,7 +2737,7 @@ class APGIGui:
                         lambda p=progress, i=trial_idx, t=total_trials: (
                             progress_var.set(p),
                             (
-                                status_label.config(text=f"Trial {i+1} of {t}")
+                                status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
@@ -2668,7 +2779,7 @@ class APGIGui:
                 analysis = task.analyze_results()
 
                 # Display summary
-                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
                 summary += (
                     f"Avg Dominance Duration: {analysis['avg_dominance_duration_ms']:.0f} ms\n"
@@ -2789,7 +2900,7 @@ class APGIGui:
                         lambda p=progress, i=trial_idx, t=total_trials: (
                             progress_var.set(p),
                             (
-                                status_label.config(text=f"Trial {i+1} of {t}")
+                                status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
@@ -2828,7 +2939,7 @@ class APGIGui:
 
                 analysis = task.analyze_results()
 
-                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
                 summary += f"Overall Detection Rate: {analysis['overall_detection_rate']:.1%}\n"
                 summary += f"Overall Suppression Rate: {analysis['overall_suppression_rate']:.1%}\n"
@@ -2951,7 +3062,7 @@ class APGIGui:
                         lambda p=progress, i=trial_idx, t=total_trials: (
                             progress_var.set(p),
                             (
-                                status_label.config(text=f"Trial {i+1} of {t}")
+                                status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
@@ -2995,7 +3106,7 @@ class APGIGui:
                 analysis = task.analyze_results()
 
                 # Display summary
-                summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
                 summary += f"Final Balance: ${analysis['final_balance']}\n"
                 summary += f"Total Earnings: ${analysis['total_earnings']}\n"
@@ -3128,7 +3239,7 @@ class APGIGui:
                         self.root.after(
                             0,
                             lambda i=i, total=len(results), sl=status_label: (
-                                sl.config(text=f"Trial {i+1} of {total}")
+                                sl.config(text=f"Trial {i + 1} of {total}")
                                 if sl.winfo_exists()
                                 else None
                             ),
@@ -3169,7 +3280,7 @@ class APGIGui:
                     analysis = task.analyze_results()
 
                     # Display summary
-                    summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                    summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                     summary += f"Total Trials: {analysis['total_trials']}\n"
                     summary += f"Overall Accuracy: {analysis['overall_accuracy']:.1%}\n"
                     summary += f"Mean RT: {analysis['mean_response_time_ms']:.0f}ms\n\n"
@@ -3317,7 +3428,7 @@ class APGIGui:
                         self.root.after(
                             0,
                             lambda i=i, total=len(results), sl=status_label: (
-                                sl.config(text=f"Trial {i+1} of {total}")
+                                sl.config(text=f"Trial {i + 1} of {total}")
                                 if sl.winfo_exists()
                                 else None
                             ),
@@ -3358,7 +3469,7 @@ class APGIGui:
                     analysis = task.analyze_results()
 
                     # Display summary
-                    summary = f"\n{'='*50}\nRESULTS:\n{'='*50}\n"
+                    summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                     summary += f"Total Trials: {analysis['total_trials']}\n"
                     summary += f"Hit Rate: {analysis['hit_rate']:.1%}\n"
                     summary += f"False Alarm Rate: {analysis['false_alarm_rate']:.1%}\n"
@@ -3439,7 +3550,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _zoom_in(self):
+    def _zoom_in(self) -> None:
         """Zoom in on all matplotlib plots."""
         try:
             # Zoom in on neural plots
@@ -3480,7 +3591,7 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Error zooming in: {str(e)}")
 
-    def _zoom_out(self):
+    def _zoom_out(self) -> None:
         """Zoom out on all matplotlib plots."""
         try:
             # Zoom out on neural plots
@@ -3521,7 +3632,7 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Error zooming out: {str(e)}")
 
-    def _zoom_fit(self):
+    def _zoom_fit(self) -> None:
         """Reset zoom to fit all data on all matplotlib plots."""
         try:
             # Force a plot update to recalculate limits
@@ -3974,7 +4085,6 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 from apgi_system.analysis import SystemAnalyzer
 
                 analyzer = SystemAnalyzer(self.apgi_system.config)
-                analysis_results = analyzer.analyze_system(self.apgi_system)
 
                 # Correlation analysis
                 text_widget.insert(tk.END, "CORRELATION ANALYSIS\n")
@@ -4156,7 +4266,7 @@ For more information, visit the project repository.
 
     # Helper Methods
 
-    def _log_event(self, message):
+    def _log_event(self, message: str) -> None:
         """Log event to event log (thread-safe)."""
         if hasattr(self, "log_text") and self.log_text is not None:
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -4164,7 +4274,7 @@ For more information, visit the project repository.
             # Schedule GUI update on main thread
             self.root.after(0, lambda msg=log_message: self._safe_log_to_gui(msg))
 
-    def _safe_log_to_gui(self, message):
+    def _safe_log_to_gui(self, message: str) -> None:
         """Safely log message to GUI with existence check."""
         try:
             if hasattr(self, "log_text") and self.log_text.winfo_exists():
@@ -4174,13 +4284,13 @@ For more information, visit the project repository.
             # Ignore errors during shutdown
             pass
 
-    def _update_status(self, message):
+    def _update_status(self, message: str) -> None:
         """Update status bar message (thread-safe)."""
         if hasattr(self, "status_text") and self.status_text is not None:
             # Schedule GUI update on main thread
             self.root.after(0, lambda msg=message: self._safe_update_status(msg))
 
-    def _safe_update_status(self, message):
+    def _safe_update_status(self, message: str) -> None:
         """Safely update status bar with existence check."""
         try:
             if hasattr(self, "status_text") and self.status_text.winfo_exists():
@@ -4189,7 +4299,7 @@ For more information, visit the project repository.
             # Ignore errors during shutdown
             pass
 
-    def _update_speed_cache(self):
+    def _update_speed_cache(self) -> None:
         """Update thread-safe speed cache and label."""
         try:
             if hasattr(self, "speed_var") and hasattr(self, "speed_label"):
@@ -4200,7 +4310,7 @@ For more information, visit the project repository.
             # Ignore errors during shutdown
             pass
 
-    def _setup_param_cache(self):
+    def _setup_param_cache(self) -> None:
         """Set up thread-safe parameter cache with traces."""
         if hasattr(self, "param_vars"):
             for param_name, var in self.param_vars.items():
@@ -4215,7 +4325,7 @@ For more information, visit the project repository.
                     # Regular variable
                     self._param_cache[param_name] = var
 
-    def _update_param_cache(self, param_name):
+    def _update_param_cache(self, param_name: str) -> None:
         """Update parameter cache when tkinter variable changes."""
         try:
             if hasattr(self, "param_vars") and param_name in self.param_vars:
@@ -4225,11 +4335,11 @@ For more information, visit the project repository.
         except Exception:
             pass
 
-    def _show_help(self):
+    def _show_help(self) -> None:
         """Show help dialog."""
         self._show_docs()
 
-    def _toggle_parameter_panel(self):
+    def _toggle_parameter_panel(self) -> None:
         """Toggle parameter panel visibility."""
         try:
             if hasattr(self, "param_frame"):
@@ -4243,7 +4353,7 @@ For more information, visit the project repository.
         except Exception as e:
             self._log_event(f"Error toggling parameter panel: {e}")
 
-    def _toggle_log_panel(self):
+    def _toggle_log_panel(self) -> None:
         """Toggle log panel visibility."""
         try:
             if hasattr(self, "log_frame"):
@@ -4257,17 +4367,17 @@ For more information, visit the project repository.
         except Exception as e:
             self._log_event(f"Error toggling log panel: {e}")
 
-    def _handle_tab_navigation(self, event):
+    def _handle_tab_navigation(self, event: tk.Event) -> Optional[str]:
         """Handle Tab key navigation."""
         # Let tkinter handle default tab navigation
         return None
 
-    def _handle_shift_tab_navigation(self, event):
+    def _handle_shift_tab_navigation(self, event: tk.Event) -> Optional[str]:
         """Handle Shift+Tab key navigation."""
         # Let tkinter handle default shift+tab navigation
         return None
 
-    def _cycle_notebook_tabs(self, direction):
+    def _cycle_notebook_tabs(self, direction: int) -> None:
         """Cycle through notebook tabs."""
         try:
             # Find the notebook widget
@@ -4320,7 +4430,8 @@ def main():
                     "See QUICKSTART_GUI.txt for details.",
                 )
                 error_root.destroy()
-            except:
+
+            except Exception:
                 pass
 
             return

@@ -11,7 +11,6 @@ import json
 from typing import Dict, Any, List, Optional
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 
@@ -40,31 +39,31 @@ class SimpleMonitor:
         self.update_interval = update_interval
 
         # Data buffers
-        self.time_buffer = deque(maxlen=buffer_size)
-        self.ignition_buffer = deque(maxlen=buffer_size)
-        self.free_energy_buffer = deque(maxlen=buffer_size)
-        self.precision_buffer = deque(maxlen=buffer_size)
-        self.energy_reserves_buffer = deque(maxlen=buffer_size)
-        self.coherence_buffer = deque(maxlen=buffer_size)
+        self.time_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.ignition_buffer: deque[int] = deque(maxlen=buffer_size)
+        self.free_energy_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.precision_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.energy_reserves_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.coherence_buffer: deque[float] = deque(maxlen=buffer_size)
 
         # System state
         self.is_monitoring = False
         self.system_status = "Stopped"
-        self.current_metrics = {}
-        self.alerts = []
+        self.current_metrics: Dict[str, Any] = {}
+        self.alerts: List[Dict[str, Any]] = []
 
         # Statistics
         self.total_updates = 0
-        self.start_time = None
+        self.start_time: Optional[float] = None
 
         # Thread safety
         self._lock = threading.Lock()
 
         # Background thread for monitoring
-        self.monitor_thread = None
+        self.monitor_thread: Optional[threading.Thread] = None
         self.stop_event = threading.Event()
 
-    def start_monitoring(self):
+    def start_monitoring(self) -> None:
         """Start real-time monitoring."""
         with self._lock:
             if not self.is_monitoring:
@@ -80,7 +79,7 @@ class SimpleMonitor:
 
                 print("Simple monitoring started")
 
-    def stop_monitoring(self):
+    def stop_monitoring(self) -> None:
         """Stop real-time monitoring."""
         with self._lock:
             if self.is_monitoring:
@@ -93,7 +92,7 @@ class SimpleMonitor:
 
                 print("Simple monitoring stopped")
 
-    def clear_buffers(self):
+    def clear_buffers(self) -> None:
         """Clear all data buffers."""
         with self._lock:
             self.time_buffer.clear()
@@ -106,7 +105,7 @@ class SimpleMonitor:
             self.total_updates = 0
             print("Data buffers cleared")
 
-    def update_data(self, system_state: Dict[str, Any]):
+    def update_data(self, system_state: Dict[str, Any]) -> None:
         """
         Update monitoring data with new system state.
 
@@ -150,7 +149,7 @@ class SimpleMonitor:
             # Check for alerts
             self._check_alerts(system_state)
 
-    def _check_alerts(self, system_state: Dict[str, Any]):
+    def _check_alerts(self, system_state: Dict[str, Any]) -> None:
         """Check for system alerts and warnings."""
         current_time = datetime.now().isoformat()
 
@@ -194,7 +193,7 @@ class SimpleMonitor:
         if len(self.alerts) > 100:
             self.alerts = self.alerts[-50:]
 
-    def _monitor_loop(self):
+    def _monitor_loop(self) -> None:
         """Background monitoring loop."""
         while not self.stop_event.is_set():
             try:
@@ -208,7 +207,7 @@ class SimpleMonitor:
                 print(f"Error in monitor loop: {e}")
                 break
 
-    def _periodic_check(self):
+    def _periodic_check(self) -> None:
         """Perform periodic monitoring checks."""
         # Check for system health issues
         if len(self.time_buffer) > 0:
@@ -293,8 +292,9 @@ class SimpleMonitor:
                 return {"error": "No data available"}
 
             # Calculate basic statistics
-            stats = {}
+            stats: Dict[str, Any] = {}
 
+            # Metric statistics
             for metric_name, buffer in [
                 ("ignition_signal", self.ignition_buffer),
                 ("free_energy", self.free_energy_buffer),
@@ -327,16 +327,21 @@ class SimpleMonitor:
                 }
 
             # Alert statistics
-            alert_levels = {}
+            alert_levels: Dict[str, int] = {}
             for alert in self.alerts:
                 level = alert["level"]
                 alert_levels[level] = alert_levels.get(level, 0) + 1
 
-            stats["alerts"] = {"total_alerts": len(self.alerts), "by_level": alert_levels}
+            # Create alert stats as a separate structure
+            alert_stats = {
+                "total_alerts": float(len(self.alerts)),
+                "by_level": {k: float(v) for k, v in alert_levels.items()},
+            }
+            stats.update(alert_stats)
 
             return stats
 
-    def print_status(self):
+    def print_status(self) -> None:
         """Print current monitoring status to console."""
         status = self.get_status()
         stats = self.get_statistics()

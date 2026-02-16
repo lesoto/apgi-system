@@ -357,7 +357,9 @@ def client(
     app.router.on_startup = []
     app.router.on_shutdown = []
 
-    return TestClient(app)
+    # Use patch to mock is_authenticated in state routes
+    with patch("api.routes.state.is_authenticated", return_value=True):
+        yield TestClient(app)
 
 
 class TestCompleteSimulationWorkflow:

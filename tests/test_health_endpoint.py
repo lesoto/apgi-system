@@ -12,20 +12,20 @@ from api.services.health_check import HealthCheckService
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create a test client for the API."""
     app = create_app()
     return TestClient(app)
 
 
 @pytest.fixture
-def mock_health_service():
+def mock_health_service() -> Mock:
     """Create a mock health check service."""
     service = Mock(spec=HealthCheckService)
     return service
 
 
-def test_health_endpoint_all_healthy(client):
+def test_health_endpoint_all_healthy(client: TestClient) -> None:
     """Test health endpoint when all components are healthy."""
     # Mock the health service to return healthy status
     with patch("api.routes.health.health_service") as mock_service:
@@ -55,7 +55,7 @@ def test_health_endpoint_all_healthy(client):
         assert data["checks"]["celery"]["status"] == "healthy"
 
 
-def test_health_endpoint_database_unhealthy(client):
+def test_health_endpoint_database_unhealthy(client: TestClient) -> None:
     """Test health endpoint when database is unhealthy."""
     with patch("api.routes.health.health_service") as mock_service:
         mock_service.perform_health_check = AsyncMock(
@@ -82,7 +82,7 @@ def test_health_endpoint_database_unhealthy(client):
         assert data["checks"]["database"]["status"] == "unhealthy"
 
 
-def test_health_endpoint_redis_unhealthy(client):
+def test_health_endpoint_redis_unhealthy(client: TestClient) -> None:
     """Test health endpoint when Redis is unhealthy."""
     with patch("api.routes.health.health_service") as mock_service:
         mock_service.perform_health_check = AsyncMock(
@@ -109,7 +109,7 @@ def test_health_endpoint_redis_unhealthy(client):
         assert data["checks"]["redis"]["status"] == "unhealthy"
 
 
-def test_health_endpoint_celery_unhealthy(client):
+def test_health_endpoint_celery_unhealthy(client: TestClient) -> None:
     """Test health endpoint when Celery is unhealthy."""
     with patch("api.routes.health.health_service") as mock_service:
         mock_service.perform_health_check = AsyncMock(
@@ -133,7 +133,7 @@ def test_health_endpoint_celery_unhealthy(client):
         assert data["checks"]["celery"]["status"] == "unhealthy"
 
 
-def test_health_endpoint_service_not_initialized(client):
+def test_health_endpoint_service_not_initialized(client: TestClient) -> None:
     """Test health endpoint when service is not initialized."""
     with patch("api.routes.health.health_service", None):
         response = client.get("/v1/health")
@@ -145,7 +145,7 @@ def test_health_endpoint_service_not_initialized(client):
         assert "not initialized" in data["error"]
 
 
-def test_health_service_check_database_success():
+def test_health_service_check_database_success() -> None:
     """Test health service database check when successful."""
     service = HealthCheckService()
 
@@ -162,7 +162,7 @@ def test_health_service_check_database_success():
         assert "successful" in message.lower()
 
 
-def test_health_service_check_database_failure():
+def test_health_service_check_database_failure() -> None:
     """Test health service database check when it fails."""
     service = HealthCheckService()
 
@@ -176,7 +176,7 @@ def test_health_service_check_database_failure():
 
 
 @pytest.mark.asyncio
-async def test_health_service_check_redis_success():
+async def test_health_service_check_redis_success() -> None:
     """Test health service Redis check when successful."""
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
@@ -189,7 +189,7 @@ async def test_health_service_check_redis_success():
 
 
 @pytest.mark.asyncio
-async def test_health_service_check_redis_failure():
+async def test_health_service_check_redis_failure() -> None:
     """Test health service Redis check when it fails."""
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(side_effect=Exception("Connection refused"))
@@ -202,7 +202,7 @@ async def test_health_service_check_redis_failure():
 
 
 @pytest.mark.asyncio
-async def test_health_service_check_redis_not_initialized():
+async def test_health_service_check_redis_not_initialized() -> None:
     """Test health service Redis check when client is not initialized."""
     service = HealthCheckService(redis_client=None)
     status, message = await service.check_redis()
@@ -211,7 +211,7 @@ async def test_health_service_check_redis_not_initialized():
     assert "not initialized" in message.lower()
 
 
-def test_health_service_check_celery_success():
+def test_health_service_check_celery_success() -> None:
     """Test health service Celery check when successful."""
     mock_celery = Mock()
     mock_inspect = Mock()
@@ -225,7 +225,7 @@ def test_health_service_check_celery_success():
     assert "active" in message.lower()
 
 
-def test_health_service_check_celery_no_workers():
+def test_health_service_check_celery_no_workers() -> None:
     """Test health service Celery check when no workers are active."""
     mock_celery = Mock()
     mock_inspect = Mock()
@@ -239,7 +239,7 @@ def test_health_service_check_celery_no_workers():
     assert "no active" in message.lower()
 
 
-def test_health_service_check_celery_none_response():
+def test_health_service_check_celery_none_response() -> None:
     """Test health service Celery check when inspect returns None."""
     mock_celery = Mock()
     mock_inspect = Mock()
@@ -253,7 +253,7 @@ def test_health_service_check_celery_none_response():
     assert "no celery workers available" in message.lower()
 
 
-def test_health_service_check_celery_failure():
+def test_health_service_check_celery_failure() -> None:
     """Test health service Celery check when it fails."""
     mock_celery = Mock()
     mock_celery.control.inspect.side_effect = Exception("Connection error")

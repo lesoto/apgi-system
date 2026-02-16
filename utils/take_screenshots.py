@@ -16,14 +16,14 @@ import subprocess
 import time
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 import json
 from datetime import datetime
 
 try:
     import pyautogui
     import pygetwindow as gw
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image
     import cv2
     import numpy as np
 
@@ -121,10 +121,15 @@ class APGIScreenshotDocumentation:
         print("   5. Press Enter to continue or Ctrl+C to cancel...")
 
         try:
-            input()  # Wait for user confirmation
+            if sys.stdin.isatty():
+                input()  # Wait for user confirmation
+            else:
+                print("Running in non-interactive mode, proceeding automatically...")
         except KeyboardInterrupt:
             print("\n❌ Documentation cancelled by user")
             return
+        except EOFError:
+            print("Non-interactive mode detected, proceeding automatically...")
 
         try:
             # 1. Start GUI application
@@ -191,7 +196,7 @@ class APGIScreenshotDocumentation:
                 break
             else:
                 if attempt < max_attempts - 1:  # Don't wait after last attempt
-                    print(f"  ⏳ Waiting 2 seconds before retry...")
+                    print("  ⏳ Waiting 2 seconds before retry...")
                     time.sleep(2)
 
         if not self.gui_window:
@@ -207,17 +212,19 @@ class APGIScreenshotDocumentation:
         )
         print("Is this the correct APGI application window? (y/n)")
         try:
-            response = input().strip().lower()
-            if response not in ["y", "yes", ""]:
-                print("🔄 Let's try manual window selection...")
-                self.gui_window = self._manual_window_selection()
-                if not self.gui_window:
-                    print("❌ No window selected, using fallback mode")
-                    self._use_fallback_discovery()
+            if sys.stdin.isatty():
+                response = input().strip().lower()
+                if response not in ["y", "yes"]:
+                    print("❌ User cancelled - window not confirmed")
                     return False
-        except KeyboardInterrupt:
-            print("\n❌ Documentation cancelled by user")
-            return False
+            else:
+                print("Non-interactive mode: assuming 'yes' for window confirmation")
+        except (KeyboardInterrupt, EOFError):
+            if sys.stdin.isatty():
+                print("\n❌ Documentation cancelled by user")
+                return False
+            else:
+                print("Non-interactive mode: proceeding with window")
 
         # Activate and maximize window
         try:
@@ -230,7 +237,7 @@ class APGIScreenshotDocumentation:
 
         # Verify window is active by taking a test screenshot
         try:
-            test_screenshot = pyautogui.screenshot(
+            pyautogui.screenshot(
                 region=(
                     self.gui_window.left,
                     self.gui_window.top,
@@ -272,9 +279,6 @@ class APGIScreenshotDocumentation:
         self._discover_sliders(screenshot)
         self._discover_menu_items()
 
-        total_elements = (
-            len(self.button_locations) + len(self.tab_locations) + len(self.slider_locations)
-        )
         print(
             f"✅ Found {len(self.button_locations)} buttons, {len(self.tab_locations)} tabs, {len(self.slider_locations)} sliders"
         )
@@ -436,7 +440,7 @@ class APGIScreenshotDocumentation:
                                                 owner_name
                                             )
                                             return True
-                                        except:
+                                        except Exception:
                                             return False
 
                                 return SimpleWindow(window_title, bounds)
@@ -475,7 +479,7 @@ class APGIScreenshotDocumentation:
                                             self.left + self.width // 2, self.top + self.height // 2
                                         )
                                         return True
-                                    except:
+                                    except Exception:
                                         return False
 
                             return EstimatedWindow(title)
@@ -750,7 +754,6 @@ class APGIScreenshotDocumentation:
         try:
             # Convert to OpenCV format
             img_cv = np.array(screenshot)
-            img_hsv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2HSV)
 
             height, width = img_cv.shape[:2]
 
@@ -1377,7 +1380,6 @@ class APGIScreenshotDocumentation:
             # Find speed slider (it's a separate slider from the parameter sliders)
             if self.gui_window:
                 # Speed slider is typically in the control panel
-                speed_y = 150  # Estimated position
                 speed_x = self.gui_window.left + 200
 
                 # Try different positions
@@ -1401,7 +1403,7 @@ class APGIScreenshotDocumentation:
                         pyautogui.click(speed_x, y)
                         time.sleep(0.5)
                         break
-                    except:
+                    except Exception:
                         continue
 
         except Exception as e:
@@ -1453,7 +1455,7 @@ class APGIScreenshotDocumentation:
             # Force window activation and verification before EVERY screenshot
             success = self._ensure_app_is_active()
             if not success:
-                print(f"    ⚠️ Could not activate app window, using full screen")
+                print("    ⚠️ Could not activate app window, using full screen")
 
             # Always try to capture the app window specifically
             if self.gui_window:
@@ -1482,7 +1484,7 @@ class APGIScreenshotDocumentation:
                             f"    📸 Captured window region: {self.gui_window.left},{self.gui_window.top} {self.gui_window.width}x{self.gui_window.height}"
                         )
                     else:
-                        print(f"    ⚠️ Invalid window coordinates, using full screen")
+                        print("    ⚠️ Invalid window coordinates, using full screen")
                         screenshot = pyautogui.screenshot()
                 except Exception as e:
                     print(f"    ⚠️ Window capture failed: {e}")
@@ -1808,23 +1810,6 @@ class APGIScreenshotDocumentation:
             else 0
         )
 
-        # Total documentation coverage
-        total_documented_screens = (
-            1  # Initial state
-            + element_stats["tabs"]  # Each tab
-            + element_stats["buttons"]  # Each button
-            + (element_stats["sliders"] * 2)  # Each slider (min/max)
-            + len(self.menu_items)
-            + total_menu_items  # Menus and submenu items
-            + 5  # Simulation states (running, paused, resumed, stopped, reset)
-            + element_stats["dialogs"]  # Dialog windows
-            + element_stats["view_toggles"]
-            + element_stats["zoom_controls"]  # View controls
-            + 2  # Speed control (min/max)
-            + 2  # Status bar and event log
-            + 1  # Final state
-        )
-
         html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -1833,102 +1818,102 @@ class APGIScreenshotDocumentation:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APGI System - Desktop App Screenshot Documentation</title>
     <style>
-        body {{ 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; padding: 20px; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            min-height: 100vh; 
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }}
-        .container {{ 
-            max-width: 1400px; margin: 0 auto; 
-            background: white; border-radius: 15px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
-            overflow: hidden; 
+        .container {{
+            max-width: 1400px; margin: 0 auto;
+            background: white; border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
         }}
-        .header {{ 
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); 
-            color: white; padding: 40px; text-align: center; 
+        .header {{
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white; padding: 40px; text-align: center;
         }}
         .header h1 {{ margin: 0; font-size: 2.5em; font-weight: 300; }}
         .header p {{ margin: 10px 0 0 0; opacity: 0.9; font-size: 1.1em; }}
         .content {{ padding: 40px; }}
-        .section {{ 
-            background: #f8f9fa; margin: 30px 0; padding: 30px; 
-            border-radius: 10px; border-left: 5px solid #3498db; 
+        .section {{
+            background: #f8f9fa; margin: 30px 0; padding: 30px;
+            border-radius: 10px; border-left: 5px solid #3498db;
         }}
         .section h2 {{ color: #2c3e50; margin-top: 0; font-size: 1.8em; }}
-        .stats {{ 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-            gap: 20px; margin: 30px 0; 
+        .stats {{
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px; margin: 30px 0;
         }}
-        .stat {{ 
-            background: linear-gradient(135deg, #3498db, #2980b9); 
-            color: white; padding: 25px; border-radius: 10px; text-align: center; 
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3); 
+        .stat {{
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white; padding: 25px; border-radius: 10px; text-align: center;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
             transition: transform 0.3s ease;
         }}
         .stat:hover {{ transform: translateY(-5px); }}
         .stat h3 {{ margin: 0; font-size: 2em; font-weight: bold; }}
         .stat p {{ margin: 5px 0 0 0; opacity: 0.9; }}
-        .discovery-stats {{ 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
-            gap: 15px; margin: 20px 0; 
+        .discovery-stats {{
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px; margin: 20px 0;
         }}
-        .discovery-stat {{ 
-            background: linear-gradient(135deg, #27ae60, #229954); 
-            color: white; padding: 20px; border-radius: 8px; text-align: center; 
+        .discovery-stat {{
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white; padding: 20px; border-radius: 8px; text-align: center;
         }}
         .discovery-stat h4 {{ margin: 0; font-size: 1.5em; }}
         .discovery-stat p {{ margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9em; }}
-        .screenshot-grid {{ 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-            gap: 30px; margin: 30px 0; 
+        .screenshot-grid {{
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px; margin: 30px 0;
         }}
-        .screenshot {{ 
-            background: white; border-radius: 10px; overflow: hidden; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-            transition: transform 0.3s ease, box-shadow 0.3s ease; 
+        .screenshot {{
+            background: white; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }}
         .screenshot:hover {{ transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.15); }}
         .screenshot img {{ width: 100%; height: auto; display: block; }}
-        .screenshot-info {{ 
-            padding: 20px; background: #f8f9fa; 
+        .screenshot-info {{
+            padding: 20px; background: #f8f9fa;
         }}
-        .screenshot-info h3 {{ 
-            margin: 0 0 10px 0; color: #2c3e50; 
+        .screenshot-info h3 {{
+            margin: 0 0 10px 0; color: #2c3e50;
         }}
-        .screenshot-info p {{ 
-            margin: 5px 0; color: #7f8c8d; font-size: 0.9em; 
+        .screenshot-info p {{
+            margin: 5px 0; color: #7f8c8d; font-size: 0.9em;
         }}
-        .system-info {{ 
-            background: #ecf0f1; padding: 20px; border-radius: 8px; 
-            margin: 20px 0; 
+        .system-info {{
+            background: #ecf0f1; padding: 20px; border-radius: 8px;
+            margin: 20px 0;
         }}
         .system-info h3 {{ margin-top: 0; color: #2c3e50; }}
-        .footer {{ 
-            background: #34495e; color: white; padding: 30px; text-align: center; 
+        .footer {{
+            background: #34495e; color: white; padding: 30px; text-align: center;
         }}
-        .badge {{ 
-            display: inline-block; background: #e74c3c; color: white; 
-            padding: 5px 15px; border-radius: 20px; font-size: 0.8em; 
-            margin-left: 10px; 
+        .badge {{
+            display: inline-block; background: #e74c3c; color: white;
+            padding: 5px 15px; border-radius: 20px; font-size: 0.8em;
+            margin-left: 10px;
         }}
         .timestamp {{ color: #95a5a6; font-size: 0.9em; }}
-        .progress-bar {{ 
-            background: #ecf0f1; border-radius: 10px; overflow: hidden; 
-            margin: 10px 0; height: 20px; 
+        .progress-bar {{
+            background: #ecf0f1; border-radius: 10px; overflow: hidden;
+            margin: 10px 0; height: 20px;
         }}
-        .progress-fill {{ 
-            background: linear-gradient(90deg, #27ae60, #2ecc71); 
-            height: 100%; transition: width 0.3s ease; 
+        .progress-fill {{
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+            height: 100%; transition: width 0.3s ease;
         }}
-        .feature-grid {{ 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-            gap: 20px; margin: 20px 0; 
+        .feature-grid {{
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; margin: 20px 0;
         }}
-        .feature {{ 
-            background: white; padding: 20px; border-radius: 8px; 
-            border-left: 4px solid #3498db; box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        .feature {{
+            background: white; padding: 20px; border-radius: 8px;
+            border-left: 4px solid #3498db; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }}
         .feature h4 {{ margin: 0 0 10px 0; color: #2c3e50; }}
         .feature p {{ margin: 0; color: #7f8c8d; font-size: 0.9em; }}
@@ -1971,7 +1956,7 @@ class APGIScreenshotDocumentation:
                         <p>Dialogs Documented</p>
                     </div>
                 </div>
-                
+
                 <h3>🔧 GUI Element Discovery Statistics</h3>
                 <div class="discovery-stats">
                     <div class="discovery-stat">
@@ -2007,7 +1992,7 @@ class APGIScreenshotDocumentation:
                         <p>Speed Control</p>
                     </div>
                 </div>
-                
+
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: {discovery_rate}%"></div>
                 </div>
@@ -2030,7 +2015,7 @@ class APGIScreenshotDocumentation:
             <div class="section">
                 <h2>📱 GUI Application Screenshots</h2>
                 <p>Comprehensive documentation of the Tkinter-based desktop application including all tabs, controls, buttons, and simulation states.</p>
-                
+
                 <div class="screenshot-grid">
 """
 
@@ -2120,7 +2105,7 @@ class APGIScreenshotDocumentation:
                     </div>
                 </div>
             </div>
-            
+
             <div class="section">
                 <h2>📑 Documentation Coverage Summary</h2>
                 <ul>

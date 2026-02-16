@@ -14,6 +14,12 @@ from sqlalchemy.orm import Session as DBSession
 
 from api.database.models import WebhookDelivery
 
+# Import circuit breaker utilities
+from utils.circuit_breaker import (
+    circuit_breaker,
+    CircuitBreakerException,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +48,7 @@ class WebhookManager:
     # HTTP timeout configuration
     REQUEST_TIMEOUT_SECONDS = 30
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize webhook manager."""
         self.http_client = httpx.AsyncClient(
             timeout=self.REQUEST_TIMEOUT_SECONDS, follow_redirects=True
@@ -130,38 +136,73 @@ class WebhookManager:
         Returns:
             True if delivery succeeded, False otherwise
         """
-        # Get delivery record
-        delivery = (
-            db.query(WebhookDelivery).filter(WebhookDelivery.delivery_id == delivery_id).first()  # type: ignore[arg-type]
-        )
+        # Get delivery record with circuit breaker protection
+        delivery = await self._get_delivery_record_safe(db, delivery_id)
 
         if not delivery:
             logger.error(f"Webhook delivery {delivery_id} not found")
             return False
 
-        # Update attempt count and timestamp
-        delivery.attempts += 1  # type: ignore[assignment]
-        delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
-        delivery.status = cast(  # type: ignore[assignment]
-            str,
-            WebhookStatus.RETRYING.value if delivery.attempts > 1 else WebhookStatus.PENDING.value,
-        )
-        db.commit()
+        # Update attempt count and timestamp with circuit breaker
+        await self._update_delivery_attempt_safe(db, delivery)
 
+        # Deliver webhook with circuit breaker protection
+        return await self._deliver_webhook_request_safe(db, delivery)
+
+    @circuit_breaker(name="webhook_delivery_get_record", failure_threshold=5, recovery_timeout=30.0)  # type: ignore[no-untyped-decorator]
+    async def _get_delivery_record_safe(
+        self, db: DBSession, delivery_id: str
+    ) -> Optional[WebhookDelivery]:
+        """Get delivery record with circuit breaker protection."""
+        try:
+            delivery = (
+                db.query(WebhookDelivery).filter(WebhookDelivery.delivery_id == delivery_id).first()
+            )
+            return delivery
+        except Exception as e:
+            logger.error(f"Database error getting delivery record {delivery_id}: {e}")
+            raise CircuitBreakerException(f"Database operation failed: {e}")
+
+    @circuit_breaker(name="webhook_delivery_update", failure_threshold=3, recovery_timeout=15.0)  # type: ignore[no-untyped-decorator]
+    async def _update_delivery_attempt_safe(self, db: DBSession, delivery: WebhookDelivery) -> None:
+        """Update delivery attempt with circuit breaker protection."""
+        try:
+            # Update attempt count and timestamp
+            delivery.attempts += 1  # type: ignore[assignment]
+            delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
+            delivery.status = cast(
+                str,
+                (
+                    WebhookStatus.RETRYING.value
+                    if delivery.attempts > 1
+                    else WebhookStatus.PENDING.value
+                ),
+            )
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Database error updating delivery attempt for {delivery.delivery_id}: {e}"
+            )
+            raise CircuitBreakerException(f"Database operation failed: {e}")
+
+    @circuit_breaker(name="webhook_http_delivery", failure_threshold=3, recovery_timeout=120.0)  # type: ignore[no-untyped-decorator]
+    async def _deliver_webhook_request_safe(self, db: DBSession, delivery: WebhookDelivery) -> bool:
+        """Deliver webhook request with circuit breaker protection."""
         try:
             # Send POST request to webhook URL
             logger.info(
-                f"Attempting webhook delivery {delivery_id} "
+                f"Attempting webhook delivery {delivery.delivery_id} "
                 f"(attempt {delivery.attempts}/{self.MAX_RETRIES}) to {delivery.webhook_url}"
             )
 
             response = await self.http_client.post(
-                delivery.webhook_url,
+                delivery.webhook_url,  # type: ignore[arg-type]
                 json=delivery.payload,
                 headers={
                     "Content-Type": "application/json",
                     "User-Agent": "APGI-API-Webhook/1.0",
-                    "X-Webhook-Delivery-ID": delivery_id,
+                    "X-Webhook-Delivery-ID": str(delivery.delivery_id),
                     "X-Webhook-Attempt": str(delivery.attempts),
                 },
             )
@@ -174,35 +215,39 @@ class WebhookManager:
             if 200 <= response.status_code < 300:
                 delivery.status = WebhookStatus.DELIVERED.value  # type: ignore[assignment]
                 delivery.next_retry_at = None  # type: ignore[assignment]
-                db.commit()
 
                 logger.info(
-                    f"Webhook delivery {delivery_id} succeeded " f"(status: {response.status_code})"
+                    f"Webhook delivery {delivery.delivery_id} succeeded "
+                    f"(status: {response.status_code})"
                 )
                 return True
             else:
                 # Non-2xx response - schedule retry
                 logger.warning(
-                    f"Webhook delivery {delivery_id} failed with status {response.status_code}"
+                    f"Webhook delivery {delivery.delivery_id} failed with status {response.status_code}"
                 )
+                delivery.error_message = f"HTTP {response.status_code}: {response.text}"  # type: ignore[assignment]
                 await self._schedule_retry(db, delivery)
                 return False
 
         except httpx.TimeoutException as e:
-            logger.warning(f"Webhook delivery {delivery_id} timed out: {e}")
+            logger.warning(f"Webhook delivery {delivery.delivery_id} timed out: {e}")
             delivery.error_message = f"Request timeout: {str(e)}"  # type: ignore[assignment]
             await self._schedule_retry(db, delivery)
             return False
 
         except httpx.RequestError as e:
-            logger.warning(f"Webhook delivery {delivery_id} failed with request error: {e}")
+            logger.warning(
+                f"Webhook delivery {delivery.delivery_id} failed with request error: {e}"
+            )
             delivery.error_message = f"Request error: {str(e)}"  # type: ignore[assignment]
             await self._schedule_retry(db, delivery)
             return False
 
         except Exception as e:
             logger.error(
-                f"Webhook delivery {delivery_id} failed with unexpected error: {e}", exc_info=True
+                f"Webhook delivery {delivery.delivery_id} failed with unexpected error: {e}",
+                exc_info=True,
             )
             delivery.error_message = f"Unexpected error: {str(e)}"  # type: ignore[assignment]
             await self._schedule_retry(db, delivery)

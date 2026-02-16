@@ -6,16 +6,14 @@ Tests universal properties for request logging, error logging, and metrics.
 
 import pytest
 import json
-import re
 from hypothesis import given, strategies as st, settings
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from datetime import datetime
-from io import StringIO
+from typing import Callable, Any
 
-from api.middleware.logging import StructuredLogger, RequestLoggingMiddleware, ErrorLoggingHandler
-from api.middleware.metrics import request_counter, request_duration, error_counter, active_requests
+from api.middleware.logging import StructuredLogger, ErrorLoggingHandler
+from api.middleware.metrics import request_counter, request_duration, error_counter
 from fastapi import Request
-from starlette.responses import Response
 
 # ============================================================================
 # Strategies for generating test data
@@ -23,13 +21,13 @@ from starlette.responses import Response
 
 
 @st.composite
-def http_method_strategy(draw):
+def http_method_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate valid HTTP methods."""
     return draw(st.sampled_from(["GET", "POST", "PUT", "DELETE", "PATCH"]))
 
 
 @st.composite
-def http_path_strategy(draw):
+def http_path_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate valid HTTP paths."""
     paths = [
         "/v1/sessions",
@@ -45,25 +43,25 @@ def http_path_strategy(draw):
 
 
 @st.composite
-def http_status_code_strategy(draw):
+def http_status_code_strategy(draw: Callable[[Any], Any]) -> int:
     """Generate valid HTTP status codes."""
     return draw(st.sampled_from([200, 201, 400, 401, 403, 404, 422, 429, 500, 502, 503]))
 
 
 @st.composite
-def client_id_strategy(draw):
+def client_id_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate client identifiers (IP addresses)."""
     return draw(st.from_regex(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", fullmatch=True))
 
 
 @st.composite
-def duration_ms_strategy(draw):
+def duration_ms_strategy(draw: Callable[[Any], Any]) -> float:
     """Generate request durations in milliseconds."""
     return draw(st.floats(min_value=0.1, max_value=10000.0))
 
 
 @st.composite
-def error_type_strategy(draw):
+def error_type_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate error type names."""
     return draw(
         st.sampled_from(
@@ -94,8 +92,8 @@ def error_type_strategy(draw):
 )
 @settings(max_examples=100)
 def test_property_request_logging_completeness(
-    message, method, path, status_code, duration_ms, client_id
-):
+    message: str, method: str, path: str, status_code: int, duration_ms: float, client_id: str
+) -> None:
     """
     **Feature: api-rest-interface, Property 22: Request logging completeness**
 
@@ -159,7 +157,9 @@ def test_property_request_logging_completeness(
     client_id=client_id_strategy(),
 )
 @settings(max_examples=100)
-def test_property_error_logging_completeness(error_type, error_message, method, path, client_id):
+def test_property_error_logging_completeness(
+    error_type: str, error_message: str, method: str, path: str, client_id: str
+) -> None:
     """
     **Feature: api-rest-interface, Property 23: Error logging completeness**
 
@@ -169,7 +169,7 @@ def test_property_error_logging_completeness(error_type, error_message, method, 
     Validates: Requirements 10.2
     """
     # Create error logging handler
-    error_logger = ErrorLoggingHandler()
+    error_logger = ErrorLoggingHandler()  # type: ignore
 
     # Create a mock exception
     try:
@@ -224,7 +224,7 @@ def test_property_error_logging_completeness(error_type, error_message, method, 
     status_code=http_status_code_strategy(),
 )
 @settings(max_examples=100)
-def test_property_metrics_exposure(method, endpoint, status_code):
+def test_property_metrics_exposure(method: str, endpoint: str, status_code: int) -> None:
     """
     **Feature: api-rest-interface, Property 24: Metrics exposure**
 
@@ -280,7 +280,7 @@ def test_property_metrics_exposure(method, endpoint, status_code):
 
 @given(log_level=st.sampled_from(["INFO", "WARNING", "ERROR", "DEBUG"]))
 @settings(max_examples=20)
-def test_structured_logger_json_format(log_level):
+def test_structured_logger_json_format(log_level: str) -> None:
     """
     Verify that structured logger always outputs valid JSON.
     """

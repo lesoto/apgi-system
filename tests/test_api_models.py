@@ -29,14 +29,16 @@ from api.models import (
 class TestPydanticModels:
     """Test Pydantic request/response models."""
 
-    def test_session_create_request_minimal(self):
+    def test_session_create_request_minimal(self) -> None:
         """Test SessionCreateRequest with minimal data."""
-        request = SessionCreateRequest(config_path="config/default.yaml")
+        request = SessionCreateRequest(
+            config_path="config/default.yaml", custom_config=None, description=None
+        )
         assert request.config_path == "config/default.yaml"
         assert request.custom_config is None
         assert request.description is None
 
-    def test_session_create_request_full(self):
+    def test_session_create_request_full(self) -> None:
         """Test SessionCreateRequest with all fields."""
         request = SessionCreateRequest(
             config_path="config/default.yaml",
@@ -47,7 +49,7 @@ class TestPydanticModels:
         assert request.custom_config == {"timestep_ms": 10.0}
         assert request.description == "Test session"
 
-    def test_session_create_response(self):
+    def test_session_create_response(self) -> None:
         """Test SessionCreateResponse."""
         response = SessionCreateResponse(
             session_id="test-123",
@@ -59,7 +61,7 @@ class TestPydanticModels:
         assert response.status == "created"
         assert response.config == {"timestep_ms": 10.0}
 
-    def test_system_state_response(self):
+    def test_system_state_response(self) -> None:
         """Test SystemStateResponse with nested models."""
         state = SystemStateResponse(
             time_ms=5000.0,
@@ -87,14 +89,16 @@ class TestPydanticModels:
         assert state.metabolism.reserves == 850.0
         assert state.self_model.minimal.coherence == 0.75
 
-    def test_task_execute_request(self):
+    def test_task_execute_request(self) -> None:
         """Test TaskExecuteRequest."""
-        request = TaskExecuteRequest(task_type="iowa_gambling", parameters={"num_trials": 100})
+        request = TaskExecuteRequest(
+            task_type="iowa_gambling", parameters={"num_trials": 100}, webhook_url=None
+        )
         assert request.task_type == "iowa_gambling"
         assert request.parameters == {"num_trials": 100}
         assert request.webhook_url is None
 
-    def test_task_result(self):
+    def test_task_result(self) -> None:
         """Test TaskResult."""
         result = TaskResult(
             task_id="task-123",
@@ -103,13 +107,14 @@ class TestPydanticModels:
             result_data={"summary": {"score": 0.65}},
             started_at=datetime.utcnow(),
             completed_at=datetime.utcnow(),
+            error_message=None,
         )
         assert result.task_id == "task-123"
         assert result.status == TaskStatusEnum.COMPLETED
         assert result.progress == 100
         assert result.result_data == {"summary": {"score": 0.65}}
 
-    def test_error_response(self):
+    def test_error_response(self) -> None:
         """Test ErrorResponse."""
         error = ErrorResponse(
             error={
@@ -123,30 +128,34 @@ class TestPydanticModels:
         assert error.error["code"] == "SESSION_NOT_FOUND"
         assert error.error["message"] == "Session not found"
 
-    def test_model_json_serialization(self):
+    def test_model_json_serialization(self) -> None:
         """Test that models can be serialized to JSON."""
-        request = SessionCreateRequest(config_path="config/default.yaml", description="Test")
+        request = SessionCreateRequest(
+            config_path="config/default.yaml", custom_config=None, description="Test"
+        )
         json_data = request.model_dump_json()
         assert isinstance(json_data, str)
         assert "config/default.yaml" in json_data
 
-    def test_model_validation_error(self):
+    def test_model_validation_error(self) -> None:
         """Test that invalid data raises validation error."""
         with pytest.raises(Exception):  # Pydantic ValidationError
             # Missing required fields
-            SystemStateResponse(time_ms=5000.0)
+            SystemStateResponse(time_ms=5000.0)  # type: ignore[call-arg]
 
 
 class TestSQLAlchemyModels:
     """Test SQLAlchemy database models."""
 
-    def test_user_model_structure(self):
+    def test_user_model_structure(self) -> None:
         """Test User model structure."""
         # Import directly from models to avoid connection issues
         import sys
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
+        if spec is None or spec.loader is None:
+            pytest.skip("Cannot load models module")
         models = importlib.util.module_from_spec(spec)
         sys.modules["models"] = models
         spec.loader.exec_module(models)
@@ -166,12 +175,14 @@ class TestSQLAlchemyModels:
         assert user.email == "test@example.com"
         assert user.roles == ["researcher"]
 
-    def test_session_model_structure(self):
+    def test_session_model_structure(self) -> None:
         """Test Session model structure."""
         import sys
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
+        if spec is None or spec.loader is None:
+            pytest.skip("Cannot load models module")
         models = importlib.util.module_from_spec(spec)
         sys.modules["models"] = models
         spec.loader.exec_module(models)
@@ -190,12 +201,14 @@ class TestSQLAlchemyModels:
         assert session.config == {"timestep_ms": 10.0}
         assert session.state == "created"
 
-    def test_task_model_structure(self):
+    def test_task_model_structure(self) -> None:
         """Test Task model structure."""
         import sys
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
+        if spec is None or spec.loader is None:
+            pytest.skip("Cannot load models module")
         models = importlib.util.module_from_spec(spec)
         sys.modules["models"] = models
         spec.loader.exec_module(models)
@@ -215,12 +228,14 @@ class TestSQLAlchemyModels:
         assert task.task_type == "iowa_gambling"
         assert task.status == "pending"
 
-    def test_session_data_model_structure(self):
+    def test_session_data_model_structure(self) -> None:
         """Test SessionData model structure."""
         import sys
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
+        if spec is None or spec.loader is None:
+            pytest.skip("Cannot load models module")
         models = importlib.util.module_from_spec(spec)
         sys.modules["models"] = models
         spec.loader.exec_module(models)

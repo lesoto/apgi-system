@@ -6,7 +6,6 @@ with platform-appropriate directories.
 """
 
 import pytest
-import tempfile
 import yaml
 import json
 from pathlib import Path
@@ -19,7 +18,7 @@ from apgi_system.system import APGISystem
 class TestConfigLoading:
     """Test configuration file loading with new path handling."""
 
-    def test_config_loads_with_default_path(self):
+    def test_config_loads_with_default_path(self) -> None:
         """Test that system loads config from default path using get_resource_path."""
         # This should work in both dev and bundled environments
         system = APGISystem()
@@ -28,14 +27,14 @@ class TestConfigLoading:
         assert "system" in system.config
         assert "timestep_ms" in system.config["system"]
 
-    def test_config_loads_with_relative_path(self):
+    def test_config_loads_with_relative_path(self) -> None:
         """Test that system loads config from relative path."""
         system = APGISystem(config_path="config/default.yaml")
 
         assert system.config is not None
         assert "system" in system.config
 
-    def test_config_loads_with_absolute_path(self):
+    def test_config_loads_with_absolute_path(self) -> None:
         """Test that system loads config from absolute path."""
         config_path = get_resource_path("config/default.yaml")
         system = APGISystem(config_path=str(config_path))
@@ -43,7 +42,7 @@ class TestConfigLoading:
         assert system.config is not None
         assert "system" in system.config
 
-    def test_config_path_resolution(self):
+    def test_config_path_resolution(self) -> None:
         """Test that config path is resolved correctly."""
         config_path = get_resource_path("config/default.yaml")
 
@@ -55,14 +54,14 @@ class TestConfigLoading:
 class TestResourceAccess:
     """Test resource file access in GUI and system."""
 
-    def test_resource_path_returns_valid_path(self):
+    def test_resource_path_returns_valid_path(self) -> None:
         """Test that get_resource_path returns valid paths."""
         config_path = get_resource_path("config/default.yaml")
 
         assert isinstance(config_path, Path)
         assert config_path.exists()
 
-    def test_resource_path_works_for_nested_paths(self):
+    def test_resource_path_works_for_nested_paths(self) -> None:
         """Test that get_resource_path works for nested directory structures."""
         # Test with a path that should exist
         config_path = get_resource_path("config/default.yaml")
@@ -71,7 +70,7 @@ class TestResourceAccess:
         # The path should be absolute
         assert config_path.is_absolute()
 
-    def test_config_file_is_readable(self):
+    def test_config_file_is_readable(self) -> None:
         """Test that config file can be read and parsed."""
         config_path = get_resource_path("config/default.yaml")
 
@@ -86,7 +85,7 @@ class TestResourceAccess:
 class TestDataExport:
     """Test data export with platform-appropriate directories."""
 
-    def test_data_dir_is_writable(self):
+    def test_data_dir_is_writable(self) -> None:
         """Test that data directory is writable."""
         data_dir = get_data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +103,7 @@ class TestDataExport:
             if test_file.exists():
                 test_file.unlink()
 
-    def test_data_export_to_json(self):
+    def test_data_export_to_json(self) -> None:
         """Test exporting data to JSON in data directory."""
         data_dir = get_data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -127,7 +126,7 @@ class TestDataExport:
             if export_file.exists():
                 export_file.unlink()
 
-    def test_config_dir_is_accessible(self):
+    def test_config_dir_is_accessible(self) -> None:
         """Test that config directory is accessible."""
         config_dir = get_config_dir()
         config_dir.mkdir(parents=True, exist_ok=True)
@@ -135,7 +134,7 @@ class TestDataExport:
         assert config_dir.exists()
         assert config_dir.is_dir()
 
-    def test_platform_dirs_are_different(self):
+    def test_platform_dirs_are_different(self) -> None:
         """Test that data and config dirs are in appropriate locations."""
         data_dir = get_data_dir()
         config_dir = get_config_dir()
@@ -156,7 +155,7 @@ class TestGUIPathHandling:
     """Test GUI-specific path handling."""
 
     @patch("apgi_system.platform_utils.get_resource_path")
-    def test_gui_uses_get_resource_path_for_config(self, mock_get_resource):
+    def test_gui_uses_get_resource_path_for_config(self, mock_get_resource: MagicMock) -> None:
         """Test that GUI uses get_resource_path for config loading."""
         # Mock the return value
         mock_config_path = Path("/mock/path/config/default.yaml")
@@ -170,14 +169,14 @@ class TestGUIPathHandling:
 
         # This will fail because we're mocking, but we can check the call
         try:
-            gui = APGIGui(mock_root)
-        except:
+            APGIGui(mock_root)
+        except Exception:
             pass  # Expected to fail due to mocking
 
         # Verify get_resource_path was called
         mock_get_resource.assert_called()
 
-    def test_gui_config_path_is_path_object(self):
+    def test_gui_config_path_is_path_object(self) -> None:
         """Test that GUI stores config path as Path object."""
         # We can't fully test GUI without a display, but we can test the path logic
         config_path = get_resource_path("config/default.yaml")
@@ -189,14 +188,14 @@ class TestGUIPathHandling:
 class TestCrossPlatformCompatibility:
     """Test cross-platform path compatibility."""
 
-    def test_paths_use_forward_slashes_internally(self):
+    def test_paths_use_forward_slashes_internally(self) -> None:
         """Test that paths work with forward slashes on all platforms."""
         # get_resource_path should handle forward slashes on all platforms
         config_path = get_resource_path("config/default.yaml")
 
         assert config_path.exists()
 
-    def test_paths_are_absolute(self):
+    def test_paths_are_absolute(self) -> None:
         """Test that resolved paths are absolute."""
         config_path = get_resource_path("config/default.yaml")
         data_dir = get_data_dir()
@@ -206,7 +205,7 @@ class TestCrossPlatformCompatibility:
         assert data_dir.is_absolute()
         assert config_dir.is_absolute()
 
-    def test_path_objects_used_throughout(self):
+    def test_path_objects_used_throughout(self) -> None:
         """Test that Path objects are used instead of strings."""
         config_path = get_resource_path("config/default.yaml")
 

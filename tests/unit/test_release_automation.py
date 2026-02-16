@@ -18,13 +18,11 @@ import tempfile
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+from typing import Generator
 from datetime import datetime
 
 # Import release module
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
 from utils.release import ReleaseManager, ReleaseError
 
 
@@ -32,12 +30,12 @@ class TestVersionValidation:
     """Test version string validation."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self) -> ReleaseManager:
         """Create a release manager in dry-run mode."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            return ReleaseManager(Path(tmpdir), dry_run=True)
+            return ReleaseManager(tmpdir)
 
-    def test_valid_version_formats(self, manager):
+    def test_valid_version_formats(self, manager: ReleaseManager) -> None:
         """Test that valid version formats are accepted."""
         valid_versions = [
             "1.0.0",
@@ -52,7 +50,7 @@ class TestVersionValidation:
         for version in valid_versions:
             assert manager.validate_version(version), f"Version {version} should be valid"
 
-    def test_invalid_version_formats(self, manager):
+    def test_invalid_version_formats(self, manager: ReleaseManager) -> None:
         """Test that invalid version formats are rejected."""
         invalid_versions = [
             "v1.0.0",  # No 'v' prefix
@@ -72,7 +70,7 @@ class TestVersionBumping:
     """Test version bumping functionality."""
 
     @pytest.fixture
-    def temp_project(self):
+    def temp_project(self) -> Generator[Path, None, None]:
         """Create a temporary project structure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
@@ -95,16 +93,16 @@ class TestVersionBumping:
 
             yield project_root
 
-    def test_get_current_version(self, temp_project):
+    def test_get_current_version(self, temp_project: Path) -> None:
         """Test extracting current version from __init__.py."""
-        manager = ReleaseManager(temp_project, dry_run=True)
+        manager = ReleaseManager(str(temp_project))
         version = manager.get_current_version()
 
         assert version == "0.1.0", "Should extract correct version"
 
-    def test_bump_version_dry_run(self, temp_project):
+    def test_bump_version_dry_run(self, temp_project: Path) -> None:
         """Test version bumping in dry-run mode."""
-        manager = ReleaseManager(temp_project, dry_run=True)
+        manager = ReleaseManager(str(temp_project))
 
         # Should not raise error
         manager.bump_version("1.0.0")
@@ -114,9 +112,9 @@ class TestVersionBumping:
         content = init_file.read_text()
         assert "0.1.0" in content, "Version should not change in dry-run"
 
-    def test_bump_version_actual(self, temp_project):
+    def test_bump_version_actual(self, temp_project: Path) -> None:
         """Test actual version bumping."""
-        manager = ReleaseManager(temp_project, dry_run=False)
+        manager = ReleaseManager(str(temp_project))
 
         manager.bump_version("1.0.0")
 
@@ -131,9 +129,9 @@ class TestVersionBumping:
         content = pyproject_file.read_text()
         assert "1.0.0" in content, "Version should be updated in pyproject.toml"
 
-    def test_bump_version_invalid_format(self, temp_project):
+    def test_bump_version_invalid_format(self, temp_project: Path) -> None:
         """Test that invalid version format raises error."""
-        manager = ReleaseManager(temp_project, dry_run=False)
+        manager = ReleaseManager(str(temp_project))
 
         with pytest.raises(ReleaseError) as exc_info:
             manager.bump_version("invalid-version")
@@ -145,12 +143,12 @@ class TestChangelogGeneration:
     """Test changelog generation functionality."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self) -> ReleaseManager:
         """Create a release manager in dry-run mode."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            return ReleaseManager(Path(tmpdir), dry_run=True)
+            return ReleaseManager(tmpdir)
 
-    def test_categorize_commits_features(self, manager):
+    def test_categorize_commits_features(self, manager: ReleaseManager) -> None:
         """Test that feature commits are categorized correctly."""
         commits = [
             "feat: Add new feature",
@@ -165,7 +163,7 @@ class TestChangelogGeneration:
         # Note: "Add new functionality" might be categorized as Other if it doesn't match patterns
         assert len(categories["Features"]) >= 3, "Should categorize most feature commits"
 
-    def test_categorize_commits_bug_fixes(self, manager):
+    def test_categorize_commits_bug_fixes(self, manager: ReleaseManager) -> None:
         """Test that bug fix commits are categorized correctly."""
         commits = [
             "fix: Resolve memory leak",
@@ -178,7 +176,7 @@ class TestChangelogGeneration:
         assert "Bug Fixes" in categories, "Should have Bug Fixes category"
         assert len(categories["Bug Fixes"]) == 3, "Should categorize all bug fix commits"
 
-    def test_categorize_commits_mixed(self, manager):
+    def test_categorize_commits_mixed(self, manager: ReleaseManager) -> None:
         """Test categorization of mixed commit types."""
         commits = [
             "feat: Add feature",
@@ -204,14 +202,14 @@ class TestChangelogGeneration:
         assert "Build" in categories
         assert "Other" in categories
 
-    def test_generate_changelog_entry_empty(self, manager):
+    def test_generate_changelog_entry_empty(self, manager: ReleaseManager) -> None:
         """Test changelog generation with no commits."""
         entry = manager.generate_changelog_entry("1.0.0", [])
 
         assert "1.0.0" in entry, "Should include version"
         assert "Initial release" in entry, "Should indicate initial release"
 
-    def test_generate_changelog_entry_with_commits(self, manager):
+    def test_generate_changelog_entry_with_commits(self, manager: ReleaseManager) -> None:
         """Test changelog generation with commits."""
         commits = [
             "feat: Add new feature",
@@ -226,7 +224,7 @@ class TestChangelogGeneration:
         assert "Add new feature" in entry, "Should include feature commit"
         assert "Fix critical bug" in entry, "Should include bug fix commit"
 
-    def test_generate_changelog_entry_date(self, manager):
+    def test_generate_changelog_entry_date(self, manager: ReleaseManager) -> None:
         """Test that changelog entry includes current date."""
         entry = manager.generate_changelog_entry("1.0.0", [])
 
@@ -238,7 +236,7 @@ class TestChecksumGeneration:
     """Test checksum generation functionality."""
 
     @pytest.fixture
-    def temp_dist(self):
+    def temp_dist(self) -> Generator[Path, None, None]:
         """Create temporary distribution directory with test files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             dist_dir = Path(tmpdir) / "dist"
@@ -253,9 +251,9 @@ class TestChecksumGeneration:
 
             yield dist_dir
 
-    def test_calculate_checksum_sha256(self, temp_dist):
+    def test_calculate_checksum_sha256(self, temp_dist: Path) -> None:
         """Test SHA256 checksum calculation."""
-        manager = ReleaseManager(temp_dist.parent, dry_run=False)
+        manager = ReleaseManager(str(temp_dist.parent))
 
         test_file = temp_dist / "windows" / "test.exe"
         checksum = manager.calculate_checksum(test_file, "sha256")
@@ -264,9 +262,9 @@ class TestChecksumGeneration:
         assert len(checksum) == 64, "SHA256 checksum should be 64 characters"
         assert checksum.isalnum(), "Checksum should be alphanumeric"
 
-    def test_generate_checksums(self, temp_dist):
+    def test_generate_checksums(self, temp_dist: Path) -> None:
         """Test checksum generation for distribution files."""
-        manager = ReleaseManager(temp_dist.parent, dry_run=False)
+        manager = ReleaseManager(str(temp_dist.parent))
         manager.dist_dir = temp_dist
 
         checksums = manager.generate_checksums([temp_dist / "windows"])
@@ -279,9 +277,9 @@ class TestChecksumGeneration:
             assert "size" in data, "Should include file size"
             assert isinstance(data["size"], int), "Size should be integer"
 
-    def test_save_checksums_json(self, temp_dist):
+    def test_save_checksums_json(self, temp_dist: Path) -> None:
         """Test saving checksums to JSON file."""
-        manager = ReleaseManager(temp_dist.parent, dry_run=False)
+        manager = ReleaseManager(str(temp_dist.parent))
         manager.dist_dir = temp_dist
 
         checksums = {"windows/test.exe": {"sha256": "abc123", "size": 1024}}
@@ -309,17 +307,17 @@ class TestChecksumGeneration:
 class TestEnvironmentValidation:
     """Test environment validation functionality."""
 
-    def test_validate_environment_no_git(self):
+    def test_validate_environment_no_git(self) -> None:
         """Test that validation fails without git repository."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = ReleaseManager(Path(tmpdir), dry_run=False)
+            manager = ReleaseManager(tmpdir)
 
             with pytest.raises(ReleaseError) as exc_info:
                 manager.validate_environment()
 
             assert "git repository" in str(exc_info.value).lower()
 
-    def test_validate_environment_missing_version_file(self):
+    def test_validate_environment_missing_version_file(self) -> None:
         """Test that validation fails without version file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
@@ -339,14 +337,14 @@ class TestEnvironmentValidation:
                 ["git", "config", "user.name", "Test"], cwd=project_root, capture_output=True
             )
 
-            manager = ReleaseManager(project_root, dry_run=False)
+            manager = ReleaseManager(str(project_root))
 
             with pytest.raises(ReleaseError) as exc_info:
                 manager.validate_environment()
 
             assert "Version file not found" in str(exc_info.value)
 
-    def test_validate_environment_dry_run_allows_uncommitted(self):
+    def test_validate_environment_dry_run_allows_uncommitted(self) -> None:
         """Test that dry-run mode allows uncommitted changes."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
@@ -361,7 +359,7 @@ class TestEnvironmentValidation:
             init_file = apgi_dir / "__init__.py"
             init_file.write_text('__version__ = "0.1.0"\n')
 
-            manager = ReleaseManager(project_root, dry_run=True)
+            manager = ReleaseManager(str(project_root))
 
             # Should not raise error in dry-run mode
             # (even though we can't actually check git status in temp dir)
@@ -376,7 +374,7 @@ class TestPlatformBuilding:
     """Test platform-specific building functionality."""
 
     @pytest.fixture
-    def temp_project(self):
+    def temp_project(self) -> Generator[Path, None, None]:
         """Create temporary project structure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
@@ -396,9 +394,9 @@ class TestPlatformBuilding:
             yield project_root
 
     @patch("subprocess.run")
-    def test_build_platform_windows(self, mock_run, temp_project):
+    def test_build_platform_windows(self, mock_run: Mock, temp_project: Path) -> None:
         """Test building for Windows platform."""
-        manager = ReleaseManager(temp_project, dry_run=False)
+        manager = ReleaseManager(str(temp_project))
 
         # Create build script
         build_script = temp_project / "build" / "build_windows.py"
@@ -414,9 +412,9 @@ class TestPlatformBuilding:
             assert result is not None, "Should return build path"
             assert mock_run.called, "Should call build script"
 
-    def test_build_platform_skip_wrong_platform(self, temp_project):
+    def test_build_platform_skip_wrong_platform(self, temp_project: Path) -> None:
         """Test that building skips when on wrong platform."""
-        manager = ReleaseManager(temp_project, dry_run=False)
+        manager = ReleaseManager(str(temp_project))
 
         # Try to build for platform we're not on
         if sys.platform == "win32":
@@ -426,9 +424,9 @@ class TestPlatformBuilding:
 
         assert result is None, "Should skip build for wrong platform"
 
-    def test_build_platform_dry_run(self, temp_project):
+    def test_build_platform_dry_run(self, temp_project: Path) -> None:
         """Test building in dry-run mode."""
-        manager = ReleaseManager(temp_project, dry_run=True)
+        manager = ReleaseManager(str(temp_project))
 
         result = manager.build_platform("windows")
 
@@ -438,26 +436,26 @@ class TestPlatformBuilding:
 class TestReleaseManagerInitialization:
     """Test ReleaseManager initialization."""
 
-    def test_initialization_with_project_root(self):
+    def test_initialization_with_project_root(self) -> None:
         """Test initialization with explicit project root."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = ReleaseManager(Path(tmpdir))
+            manager = ReleaseManager(tmpdir)
 
             assert manager.project_root == Path(tmpdir), "Should use provided root"
             assert manager.build_dir == Path(tmpdir) / "build"
             assert manager.dist_dir == Path(tmpdir) / "dist"
 
-    def test_initialization_dry_run_mode(self):
+    def test_initialization_dry_run_mode(self) -> None:
         """Test initialization in dry-run mode."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = ReleaseManager(Path(tmpdir), dry_run=True)
+            manager = ReleaseManager(tmpdir)
 
             assert manager.dry_run is True, "Should be in dry-run mode"
 
-    def test_initialization_default_paths(self):
+    def test_initialization_default_paths(self) -> None:
         """Test that default paths are set correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = ReleaseManager(Path(tmpdir))
+            manager = ReleaseManager(tmpdir)
 
             assert manager.version_file.name == "__init__.py"
             assert manager.changelog_file.name == "CHANGELOG.md"
@@ -467,14 +465,14 @@ class TestReleaseManagerInitialization:
 class TestErrorHandling:
     """Test error handling in release process."""
 
-    def test_release_error_exception(self):
+    def test_release_error_exception(self) -> None:
         """Test that ReleaseError can be raised and caught."""
         with pytest.raises(ReleaseError) as exc_info:
             raise ReleaseError("Test error message")
 
         assert "Test error message" in str(exc_info.value)
 
-    def test_invalid_version_raises_error(self):
+    def test_invalid_version_raises_error(self) -> None:
         """Test that invalid version raises appropriate error."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
@@ -485,7 +483,7 @@ class TestErrorHandling:
             init_file = apgi_dir / "__init__.py"
             init_file.write_text('__version__ = "0.1.0"\n')
 
-            manager = ReleaseManager(project_root, dry_run=False)
+            manager = ReleaseManager(str(project_root))
 
             with pytest.raises(ReleaseError) as exc_info:
                 manager.bump_version("invalid")

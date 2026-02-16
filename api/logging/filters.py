@@ -7,7 +7,7 @@ sensitive data masking and performance tracking.
 
 import logging
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional, Any
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -77,7 +77,7 @@ class SensitiveDataFilter(logging.Filter):
 
         # Also filter args if present
         if hasattr(record, "args") and record.args:
-            filtered_args = []
+            filtered_args: List[Any] = []
             for arg in record.args:
                 if isinstance(arg, str):
                     filtered_arg = arg
@@ -165,9 +165,9 @@ class ContextFilter(logging.Filter):
             name: Filter name
         """
         super().__init__(name)
-        self._context = {}
+        self._context: Dict[str, Any] = {}
 
-    def set_context(self, **kwargs):
+    def set_context(self, **kwargs: Any) -> None:
         """
         Set context information.
 
@@ -176,7 +176,7 @@ class ContextFilter(logging.Filter):
         """
         self._context.update(kwargs)
 
-    def clear_context(self):
+    def clear_context(self) -> None:
         """Clear all context information."""
         self._context.clear()
 
@@ -238,7 +238,10 @@ class ModuleFilter(logging.Filter):
     """
 
     def __init__(
-        self, name: str = "", included_modules: List[str] = None, excluded_modules: List[str] = None
+        self,
+        name: str = "",
+        included_modules: Optional[List[str]] = None,
+        excluded_modules: Optional[List[str]] = None,
     ):
         """
         Initialize module filter.
@@ -290,7 +293,7 @@ def get_context_filter() -> ContextFilter:
     return _context_filter
 
 
-def set_log_context(**kwargs):
+def set_log_context(**kwargs: Any) -> None:
     """
     Set global logging context.
 
@@ -300,6 +303,6 @@ def set_log_context(**kwargs):
     _context_filter.set_context(**kwargs)
 
 
-def clear_log_context():
+def clear_log_context() -> None:
     """Clear global logging context."""
     _context_filter.clear_context()

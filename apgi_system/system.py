@@ -7,13 +7,13 @@ Integrates all subsystems into a cohesive consciousness model.
 import numpy as np
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
+from numpy.typing import NDArray
 
 from apgi_system.platform_utils import get_resource_path
 from apgi_system.config_validator import ConfigValidator, ConfigValidationError
 from apgi_system.core import (
     ActiveInferenceEngine,
-    FreeEnergyCalculator,
     HierarchicalPredictor,
     PrecisionWeighting,
 )
@@ -51,17 +51,18 @@ class APGISystem:
             config_path: Path to YAML configuration file (relative to project root or absolute)
         """
         # Load configuration
+        config_file_path: str
         if config_path is None:
-            config_path = get_resource_path("config/default.yaml")
+            config_file_path = str(get_resource_path("config/default.yaml"))
         else:
             # If provided path is relative, resolve it using get_resource_path
             config_path_obj = Path(config_path)
             if not config_path_obj.is_absolute():
-                config_path = get_resource_path(config_path)
+                config_file_path = str(get_resource_path(config_path))
             else:
-                config_path = config_path_obj
+                config_file_path = str(config_path_obj)
 
-        with open(config_path, "r") as f:
+        with open(config_file_path, "r") as f:
             self.config = yaml.safe_load(f)
 
         # Validate configuration
@@ -83,7 +84,7 @@ class APGISystem:
         max_history_size = self.config.get("system", {}).get("max_history_size", 10000)
         from collections import deque
 
-        self.history = {
+        self.history: Dict[str, Any] = {
             "time": deque(maxlen=max_history_size),
             "ignitions": deque(maxlen=max_history_size),
             "free_energy": deque(maxlen=max_history_size),
@@ -91,7 +92,7 @@ class APGISystem:
             "metabolic_reserves": deque(maxlen=max_history_size),
         }
 
-    def _initialize_subsystems(self):
+    def _initialize_subsystems(self) -> None:
         """Initialize all subsystems."""
         # Core active inference
         self.active_inference = ActiveInferenceEngine(self.config)
@@ -127,7 +128,7 @@ class APGISystem:
         self.performance_monitor = PerformanceMonitor(self.config)
 
     def step(
-        self, extero_input: np.ndarray, context: Optional[Dict[str, Any]] = None
+        self, extero_input: NDArray[np.floating], context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Single timestep of the integrated system.
@@ -154,13 +155,20 @@ class APGISystem:
 
         # 3. Predictive processing
         prediction_results = self.predictor.predict(
-            extero_input=extero_input, intero_input=intero_vector, dt_ms=dt
+            extero_input=extero_input.astype(np.float64), intero_input=intero_vector, dt_ms=dt
         )
         errors = self.predictor.get_prediction_errors()
 
         # 4. Precision weighting
-        extero_variance = errors["exteroceptive_stats"].get("mean_error", 1.0) ** 2
-        intero_variance = errors["interoceptive_stats"].get("mean_error", 1.0) ** 2
+        extero_stats: Any = errors.get("exteroceptive_stats", {})
+        intero_stats: Any = errors.get("interoceptive_stats", {})
+
+        extero_variance = (
+            extero_stats.get("mean_error", 1.0) ** 2 if isinstance(extero_stats, dict) else 1.0
+        )
+        intero_variance = (
+            intero_stats.get("mean_error", 1.0) ** 2 if isinstance(intero_stats, dict) else 1.0
+        )
 
         precision_info = self.precision.update(
             extero_error_variance=extero_variance,
@@ -176,24 +184,36 @@ class APGISystem:
 
         # 6. Active inference step
         ai_action, ai_info = self.active_inference.step(
-            observation=extero_input, available_actions=[action]
+            observation=extero_input.astype(np.float64), available_actions=[action]
         )
 
         # 7. Ignition threshold computation
         # Get actual exteroceptive prediction errors from predictor
         predictor_errors = self.predictor.get_prediction_errors()
-        extero_error = predictor_errors.get("exteroceptive", np.zeros(len(extero_input)))
+        extero_error: float | NDArray[np.floating] = predictor_errors.get(
+            "exteroceptive", np.zeros(len(extero_input))
+        )
 
-        # Ensure extero_error has correct shape
-        if len(extero_error) != len(extero_input):
+        # Ensure extero_error has correct shape and type
+        if isinstance(extero_error, (int, float)):
+            extero_error = np.array([extero_error], dtype=np.float64)
+        elif isinstance(extero_error, np.ndarray) and extero_error.shape != extero_input.shape:
             # Fallback to computed prediction error if predictor output is malformed
             prediction = prediction_results.get("prediction", np.zeros_like(extero_input))
             extero_error = extero_input - prediction
 
+        # Ensure proper shape and dtype for ignition computation
+        if isinstance(extero_error, np.ndarray):
+            if extero_error.ndim == 1:
+                extero_error = extero_error.reshape(1, -1)
+            extero_error = extero_error.astype(np.float64)
+        else:
+            extero_error = np.array([extero_error], dtype=np.float64)
+
         intero_error = body_info["prediction_error"]
 
         ignition_occurred, ignition_info = self.ignition_threshold.compute_ignition_signal(
-            extero_error=extero_error,
+            extero_error=extero_error,  # type: ignore
             extero_precision=precision_info["exteroceptive"],
             intero_error=intero_error,
             intero_precision=precision_info["interoceptive"],
@@ -214,7 +234,7 @@ class APGISystem:
         # 8. Global workspace update
         workspace_info = self.global_workspace.update(
             ignition_occurred=ignition_occurred,
-            candidate_content=extero_input,
+            candidate_content=extero_input.astype(np.float64),
             source="sensory",
             dt=dt,
         )
@@ -267,6 +287,7 @@ class APGISystem:
         # Compile complete state
         state = {
             "time": self.time,
+            "free_energy": ai_info["free_energy"],
             "ignition": ignition_info,
             "workspace": workspace_info,
             "timeline": timeline_info,
@@ -297,7 +318,9 @@ class APGISystem:
         return state
 
     def run(
-        self, duration_ms: float = 1000.0, extero_input_fn: Optional[callable] = None
+        self,
+        duration_ms: float = 1000.0,
+        extero_input_fn: Optional[Callable[[float], NDArray[np.floating]]] = None,
     ) -> Dict[str, Any]:
         """
         Run simulation for specified duration.
@@ -320,7 +343,11 @@ class APGISystem:
 
         # Default input function
         if extero_input_fn is None:
-            extero_input_fn = lambda t: np.random.randn(256) * 0.5
+
+            def default_extero_input(t: float) -> NDArray[np.floating]:
+                return np.random.randn(256).astype(np.float64) * 0.5
+
+            extero_input_fn = default_extero_input
 
         results = []
 
@@ -339,7 +366,13 @@ class APGISystem:
             "history": self.history,
         }
 
-    def _record_history(self, ignition, free_energy, precision, metabolism):
+    def _record_history(
+        self,
+        ignition: bool,
+        free_energy: float,
+        precision: Dict[str, Any],
+        metabolism: Dict[str, Any],
+    ) -> None:
         """Record metrics for analysis."""
         self.history["time"].append(self.time)
         self.history["ignitions"].append(1 if ignition else 0)
@@ -347,24 +380,24 @@ class APGISystem:
         self.history["precision"].append(precision["exteroceptive"])
         self.history["metabolic_reserves"].append(metabolism["reserves"])
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all subsystems."""
         self.active_inference.reset()
         self.predictor.reset()
         self.precision.reset()
-        self.body_model.reset()
-        self.allostasis.reset()
-        self.somatic_markers.reset()
+        self.body_model.reset()  # type: ignore
+        self.allostasis.reset()  # type: ignore
+        self.somatic_markers.reset()  # type: ignore
         self.ignition_threshold.reset()
         self.global_workspace.reset()
         self.ignition_timeline.reset()
-        self.networks.reset()
-        self.minimal_self.reset()
-        self.narrative_self.reset()
-        self.coherence.reset()
-        self.metabolism.reset()
-        self.entropy.reset()
-        self.oscillations.reset()
+        self.networks.reset()  # type: ignore
+        self.minimal_self.reset()  # type: ignore
+        self.narrative_self.reset()  # type: ignore
+        self.coherence.reset()  # type: ignore
+        self.metabolism.reset()  # type: ignore
+        self.entropy.reset()  # type: ignore
+        self.oscillations.reset()  # type: ignore
         self.performance_monitor.reset()
 
         self.time = 0.0

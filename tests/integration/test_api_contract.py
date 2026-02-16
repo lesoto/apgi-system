@@ -8,12 +8,9 @@ Requirements tested:
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 import redis.asyncio as redis
 from typing import Dict, Any
-
-from api.main import create_app
 from api.routes import sessions, state, export, tasks
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 from api.services.task_executor import TaskExecutor
@@ -21,7 +18,7 @@ from api.services.data_export import DataExportService
 
 
 @pytest.fixture
-def mock_redis():
+def mock_redis() -> AsyncMock:
     """Create a mock Redis client."""
     mock_client = AsyncMock(spec=redis.Redis)
     mock_client.ping = AsyncMock()
@@ -36,7 +33,7 @@ def mock_redis():
 
 
 @pytest.fixture
-def mock_apgi_system():
+def mock_apgi_system() -> Mock:
     """Create a mock APGI system with realistic state."""
     mock_system = Mock()
     mock_system.time = 0.0
@@ -83,15 +80,15 @@ def mock_apgi_system():
 
 
 @pytest.fixture
-def mock_session_manager(mock_apgi_system):
+def mock_session_manager(mock_apgi_system: Mock) -> Mock:
     """Create a mock SessionManager."""
     manager = Mock(spec=SessionManager)
 
-    async def mock_create_session(request, user_id="default_user"):
+    async def mock_create_session(request: Dict[str, Any], user_id: str = "default_user") -> str:
         session_id = "test-session-123"
         return session_id
 
-    async def mock_get_session(session_id):
+    async def mock_get_session(session_id: str):
         if session_id == "test-session-123":
             mock_sim = Mock(spec=SimulationSession)
             mock_sim.session_id = session_id
@@ -101,10 +98,10 @@ def mock_session_manager(mock_apgi_system):
             mock_sim.config = {"config_path": "config/default.yaml"}
             mock_sim.apgi_system = mock_apgi_system
 
-            async def mock_start():
+            async def mock_start() -> Dict[str, Any]:
                 return {"session_id": session_id, "status": "running"}
 
-            async def mock_get_state():
+            async def mock_get_state() -> Dict[str, Any]:
                 return mock_apgi_system.get_state()
 
             mock_sim.start = AsyncMock(side_effect=mock_start)
@@ -180,6 +177,7 @@ def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task
     from api.main import create_app
     from fastapi.testclient import TestClient
     from api.services.authorization import get_current_user, require_permission
+    from api.middleware.authentication import is_authenticated
     from api.services.auth_manager import TokenPayload
     from datetime import datetime, timedelta
 
@@ -222,7 +220,9 @@ def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task
     app.router.on_startup = []
     app.router.on_shutdown = []
 
-    return TestClient(app)
+    # Use patch to mock is_authenticated in state routes
+    with patch("api.routes.state.is_authenticated", return_value=True):
+        yield TestClient(app)
 
 
 @pytest.fixture

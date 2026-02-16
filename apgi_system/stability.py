@@ -7,7 +7,7 @@ Detects NaN, Inf, and overflow conditions with configurable thresholds.
 
 import numpy as np
 import warnings
-from typing import Union, Dict, Any, Optional
+from typing import Union, Dict, Any, Optional, Tuple
 
 from apgi_system.types import FloatArray, ConfigDict
 
@@ -313,8 +313,8 @@ class NumericalStabilityMonitor:
         self,
         array: FloatArray,
         context: str,
-        expected_shape: Optional[tuple] = None,
-        expected_range: Optional[tuple] = None,
+        expected_shape: Optional[Tuple[int, ...]] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
     ) -> Dict[str, Any]:
         """
         Check array properties including stability, shape, and value range.

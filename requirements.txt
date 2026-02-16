@@ -45,3 +45,4 @@ mkdocs-material>=9.5.0
 python-dotenv>=1.0.0
 setuptools>=69.0.0
 wheel
+types-toml>=0.10.0

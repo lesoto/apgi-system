@@ -7,10 +7,8 @@ coherence metrics computation, and advanced statistical analysis.
 
 import numpy as np
 import scipy.stats as stats
-from scipy import signal
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Tuple
-from apgi_system.types import FloatArray
+from typing import Dict, Any, List, Union
 
 
 @dataclass
@@ -154,7 +152,7 @@ class SystemAnalyzer:
         )
 
     def compute_ignition_statistics(
-        self, ignition_threshold: Any, history: Dict[str, List]
+        self, ignition_threshold: Any, history: Dict[str, List[Any]]
     ) -> Dict[str, float]:
         """Compute statistics about ignition events.
 
@@ -165,7 +163,7 @@ class SystemAnalyzer:
         ----------
         ignition_threshold : IgnitionThreshold
             Ignition threshold component with event history
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing ignition events
 
         Returns
@@ -226,7 +224,7 @@ class SystemAnalyzer:
         }
 
     def compute_energy_budget_summary(
-        self, metabolism: Any, history: Dict[str, List]
+        self, metabolism: Any, history: Dict[str, List[Any]]
     ) -> Dict[str, float]:
         """Compute summary of metabolic energy consumption.
 
@@ -237,7 +235,7 @@ class SystemAnalyzer:
         ----------
         metabolism : MetabolicBudget
             Metabolic budget component
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing metabolic data
 
         Returns
@@ -368,7 +366,7 @@ class SystemAnalyzer:
         }
 
     def extract_temporal_dynamics(
-        self, history: Dict[str, List], ignition_threshold: Any
+        self, history: Dict[str, List[Any]], ignition_threshold: Any
     ) -> Dict[str, List[float]]:
         """Extract time series data for key metrics.
 
@@ -377,7 +375,7 @@ class SystemAnalyzer:
 
         Parameters
         ----------
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing time series data
         ignition_threshold : IgnitionThreshold
             Ignition threshold component with signal history
@@ -402,7 +400,9 @@ class SystemAnalyzer:
             "metabolic_reserves": list(history.get("metabolic_reserves", [])),
         }
 
-    def compute_correlation_analysis(self, history: Dict[str, List]) -> Dict[str, Dict[str, float]]:
+    def compute_correlation_analysis(
+        self, history: Dict[str, List[Any]]
+    ) -> Dict[str, Dict[str, Dict[str, Union[float, int]]]]:
         """Compute correlations between key system variables.
 
         Analyzes relationships between different system metrics to identify
@@ -410,7 +410,7 @@ class SystemAnalyzer:
 
         Parameters
         ----------
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing time series data
 
         Returns
@@ -426,7 +426,7 @@ class SystemAnalyzer:
             if key in history and len(history[key]) > 1:
                 variables[key] = np.array(history[key])
 
-        correlations = {}
+        correlations: Dict[str, Dict[str, Dict[str, Union[float, int]]]] = {}
         var_names = list(variables.keys())
 
         for i, var1 in enumerate(var_names):
@@ -449,7 +449,7 @@ class SystemAnalyzer:
         return correlations
 
     def compute_frequency_analysis(
-        self, history: Dict[str, List], sample_rate: float = 20.0
+        self, history: Dict[str, List[Any]], sample_rate: float = 20.0
     ) -> Dict[str, Dict[str, Any]]:
         """Perform frequency domain analysis on system signals.
 
@@ -458,7 +458,7 @@ class SystemAnalyzer:
 
         Parameters
         ----------
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing time series data
         sample_rate : float, optional
             Sampling rate in Hz (default: 20.0)
@@ -512,7 +512,7 @@ class SystemAnalyzer:
         return results
 
     def compute_stationarity_analysis(
-        self, history: Dict[str, List], window_size: int = 100
+        self, history: Dict[str, List[Any]], window_size: int = 100
     ) -> Dict[str, Dict[str, float]]:
         """Analyze stationarity of system signals.
 
@@ -521,7 +521,7 @@ class SystemAnalyzer:
 
         Parameters
         ----------
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing time series data
         window_size : int, optional
             Size of rolling window for analysis (default: 100)
@@ -553,7 +553,7 @@ class SystemAnalyzer:
                 # Augmented Dickey-Fuller test
                 try:
                     adf_stat, adf_pvalue, _, _, _, _ = stats.adfuller(signal_data)
-                except:
+                except Exception:
                     adf_stat, adf_pvalue = 0.0, 1.0
 
                 # Trend strength (linear regression slope)
@@ -570,7 +570,9 @@ class SystemAnalyzer:
 
         return results
 
-    def compute_phase_space_analysis(self, history: Dict[str, List]) -> Dict[str, Dict[str, Any]]:
+    def compute_phase_space_analysis(
+        self, history: Dict[str, List[Any]]
+    ) -> Dict[str, Dict[str, Any]]:
         """Analyze phase space dynamics and attractors.
 
         Examines the system's behavior in phase space to identify
@@ -578,7 +580,7 @@ class SystemAnalyzer:
 
         Parameters
         ----------
-        history : Dict[str, List]
+        history : Dict[str, List[Any]]
             System history containing time series data
 
         Returns
@@ -614,8 +616,9 @@ class SystemAnalyzer:
                     correlation_sums.append(correlation_sum)
 
                 # Estimate correlation dimension
-                log_eps = np.log(epsilons[correlation_sums > 0])
-                log_corr = np.log(np.array(correlation_sums)[correlation_sums > 0])
+                correlation_array = np.array(correlation_sums)
+                log_eps = np.log(epsilons[correlation_array > 0])
+                log_corr = np.log(correlation_array[correlation_array > 0])
 
                 if len(log_eps) > 1 and len(log_corr) > 1:
                     corr_dim = -np.polyfit(log_eps, log_corr, 1)[0]
@@ -695,7 +698,6 @@ class SystemAnalyzer:
     def _interpret_energy_stats(self, stats: Dict[str, float]) -> str:
         """Generate interpretation of energy statistics."""
         depletion = stats.get("reserve_depletion_rate", 0.0)
-        final_reserves = stats.get("final_reserves", 1.0)
 
         if depletion < 0.001:
             return "Minimal energy consumption - system operating efficiently"

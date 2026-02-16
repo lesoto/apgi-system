@@ -8,13 +8,20 @@ import logging
 import secrets
 import string
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any, Dict, Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.config import settings
 from api.database.models import Base, User
+
+# Import circuit breaker utilities
+from utils.circuit_breaker import (
+    circuit_breaker,
+    CircuitBreakerException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +69,7 @@ def generate_secure_username(prefix: str = "user") -> str:
     return f"{prefix}_{random_suffix}"
 
 
-def init_db():
+def init_db() -> None:
     """
     Initialize database by creating all tables and default user.
 
@@ -81,7 +88,8 @@ def init_db():
         raise
 
 
-def create_default_user():
+@circuit_breaker(name="database_init", failure_threshold=2, recovery_timeout=30.0)
+def create_default_user() -> None:
     """
     Create a default user for session management with secure random credentials.
 
@@ -128,6 +136,10 @@ def create_default_user():
         db.commit()
         logger.info(f"Default user created with secure credentials: {secure_username}")
 
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error creating default user: {e}")
+        raise CircuitBreakerException(f"Database operation failed: {e}")
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create default user: {e}")
@@ -173,6 +185,10 @@ def get_db_context() -> Generator[Session, None, None]:
     try:
         yield db
         db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database operation failed in context: {e}")
+        raise CircuitBreakerException(f"Database operation failed: {e}")
     except Exception:
         db.rollback()
         raise
@@ -180,7 +196,76 @@ def get_db_context() -> Generator[Session, None, None]:
         db.close()
 
 
-def close_db():
+@circuit_breaker(name="database_health_check", failure_threshold=3, recovery_timeout=15.0)
+def check_database_health() -> bool:
+    """
+    Check database connectivity and health.
+
+    Returns:
+        bool: True if database is healthy, False otherwise
+    """
+    try:
+        db = SessionLocal()
+        try:
+            # Simple health check query
+            db.execute(text("SELECT 1"))
+            logger.debug("Database health check passed")
+            return True
+        finally:
+            db.close()
+    except SQLAlchemyError as e:
+        logger.error(f"Database health check failed: {e}")
+        raise CircuitBreakerException(f"Database health check failed: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error during database health check: {e}")
+        raise
+
+
+@circuit_breaker(name="database_connection_test", failure_threshold=2, recovery_timeout=10.0)
+def test_database_connection() -> Dict[str, Any]:
+    """
+    Test database connection and return connection details.
+
+    Returns:
+        Dict containing connection test results
+    """
+    try:
+        import time
+
+        start_time = time.time()
+
+        db = SessionLocal()
+        try:
+            # Test basic connectivity
+            result = db.execute(text("SELECT version()"))
+            version = result.scalar()
+
+            # Test write operation (if possible)
+            db.execute(text("CREATE TEMP TABLE test_table (id INTEGER)"))
+            db.execute(text("DROP TABLE test_table"))
+
+            connection_time = time.time() - start_time
+
+            return {
+                "status": "healthy",
+                "version": version,
+                "connection_time": connection_time,
+                "pool_size": engine.pool.size() if hasattr(engine.pool, "size") else "unknown",
+                "checked_at": time.time(),
+            }
+
+        finally:
+            db.close()
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database connection test failed: {e}")
+        raise CircuitBreakerException(f"Database connection test failed: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error during database connection test: {e}")
+        raise
+
+
+def close_db() -> None:
     """
     Close database connections.
 

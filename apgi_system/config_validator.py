@@ -6,7 +6,7 @@ including parameter range validation, schema validation, and helpful
 error messages for common configuration mistakes.
 """
 
-from typing import Dict, Any, List, Tuple, Optional, Union
+from typing import Dict, Any, List, Tuple, Union
 import warnings
 
 
@@ -40,11 +40,11 @@ class ConfigValidator:
     ...     print(f"Found {len(errors)} validation errors")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the configuration validator."""
         self._define_schema()
 
-    def _define_schema(self):
+    def _define_schema(self) -> None:
         """Define the configuration schema with validation rules."""
         self.schema = {
             "system": {
@@ -353,17 +353,48 @@ class ConfigValidator:
         errors = []
 
         # Type validation
-        expected_type = field_schema.get("type")
-        if expected_type:
-            if not isinstance(field_value, expected_type):
-                type_name = self._get_type_name(expected_type)
-                errors.append(
-                    f"Field '{field_path}' has wrong type: "
-                    f"expected {type_name}, got {type(field_value).__name__}"
-                )
-                return errors  # Don't continue if type is wrong
+        type_errors = self._validate_field_type(field_path, field_value, field_schema)
+        errors.extend(type_errors)
+        if type_errors:
+            return errors  # Don't continue if type is wrong
 
         # Range validation for numeric types
+        range_errors = self._validate_field_range(field_path, field_value, field_schema)
+        errors.extend(range_errors)
+
+        # Length validation for lists
+        length_errors = self._validate_field_length(field_path, field_value, field_schema)
+        errors.extend(length_errors)
+
+        # Validate list elements are numeric for range fields
+        element_errors = self._validate_list_elements(field_path, field_value, field_schema)
+        errors.extend(element_errors)
+
+        # Validate range lists have min < max
+        range_order_errors = self._validate_range_order(field_path, field_value, field_schema)
+        errors.extend(range_order_errors)
+
+        return errors
+
+    def _validate_field_type(
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
+    ) -> List[str]:
+        """Validate field type."""
+        errors = []
+        expected_type = field_schema.get("type")
+        if expected_type and not isinstance(field_value, expected_type):
+            type_name = self._get_type_name(expected_type)
+            errors.append(
+                f"Field '{field_path}' has wrong type: "
+                f"expected {type_name}, got {type(field_value).__name__}"
+            )
+        return errors
+
+    def _validate_field_range(
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
+    ) -> List[str]:
+        """Validate field range for numeric types."""
+        errors = []
         if "range" in field_schema and isinstance(field_value, (int, float)):
             min_val, max_val = field_schema["range"]
             if field_value < min_val or field_value > max_val:
@@ -371,8 +402,13 @@ class ConfigValidator:
                     f"Field '{field_path}' value {field_value} is out of range "
                     f"[{min_val}, {max_val}]"
                 )
+        return errors
 
-        # Length validation for lists
+    def _validate_field_length(
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
+    ) -> List[str]:
+        """Validate field length for lists."""
+        errors = []
         if "length" in field_schema and isinstance(field_value, list):
             expected_length = field_schema["length"]
             if len(field_value) != expected_length:
@@ -380,16 +416,26 @@ class ConfigValidator:
                     f"Field '{field_path}' has wrong length: "
                     f"expected {expected_length}, got {len(field_value)}"
                 )
+        return errors
 
-        # Validate list elements are numeric for range fields
+    def _validate_list_elements(
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
+    ) -> List[str]:
+        """Validate list elements are numeric for range fields."""
+        errors = []
         if isinstance(field_value, list) and "length" in field_schema:
             for i, val in enumerate(field_value):
                 if not isinstance(val, (int, float)):
                     errors.append(
-                        f"Field '{field_path}[{i}]' must be numeric, " f"got {type(val).__name__}"
+                        f"Field '{field_path}[{i}]' must be numeric, got {type(val).__name__}"
                     )
+        return errors
 
-        # Validate range lists have min < max
+    def _validate_range_order(
+        self, field_path: str, field_value: Any, field_schema: Dict[str, Any]
+    ) -> List[str]:
+        """Validate range lists have min < max."""
+        errors = []
         if isinstance(field_value, list) and field_schema.get("length") == 2:
             if len(field_value) == 2 and all(isinstance(v, (int, float)) for v in field_value):
                 if field_value[0] >= field_value[1]:
@@ -397,7 +443,6 @@ class ConfigValidator:
                         f"Field '{field_path}' range invalid: "
                         f"min ({field_value[0]}) must be less than max ({field_value[1]})"
                     )
-
         return errors
 
     def _get_type_name(self, type_spec: Union[type, Tuple[type, ...]]) -> str:
@@ -441,6 +486,26 @@ class ConfigValidator:
         warnings_list = []
 
         # Validate thermodynamic consistency
+        thermo_warnings = self._validate_thermodynamic_consistency(config)
+        warnings_list.extend(thermo_warnings)
+
+        # Validate ignition timing consistency
+        ignition_warnings = self._validate_ignition_consistency(config)
+        warnings_list.extend(ignition_warnings)
+
+        # Validate precision range consistency
+        precision_warnings = self._validate_precision_consistency(config)
+        warnings_list.extend(precision_warnings)
+
+        # Validate hierarchy consistency
+        hierarchy_warnings = self._validate_hierarchy_consistency(config)
+        warnings_list.extend(hierarchy_warnings)
+
+        return warnings_list
+
+    def _validate_thermodynamic_consistency(self, config: Dict[str, Any]) -> List[str]:
+        """Validate thermodynamic configuration consistency."""
+        warnings_list = []
         if "thermodynamic" in config:
             thermo = config["thermodynamic"]
             if all(
@@ -468,8 +533,11 @@ class ConfigValidator:
                             f"of total_energy_budget ({total}). "
                             "Consider lowering the threshold."
                         )
+        return warnings_list
 
-        # Validate ignition timing consistency
+    def _validate_ignition_consistency(self, config: Dict[str, Any]) -> List[str]:
+        """Validate ignition timing configuration consistency."""
+        warnings_list = []
         if "ignition" in config:
             ignition = config["ignition"]
             if all(k in ignition for k in ["amplification_duration_ms", "refractory_period_ms"]):
@@ -483,8 +551,11 @@ class ConfigValidator:
                         f"refractory_period_ms ({refractory}). "
                         "This may cause unexpected behavior."
                     )
+        return warnings_list
 
-        # Validate precision range consistency
+    def _validate_precision_consistency(self, config: Dict[str, Any]) -> List[str]:
+        """Validate precision range configuration consistency."""
+        warnings_list = []
         if "active_inference" in config:
             ai = config["active_inference"]
             if "precision_range" in ai and "precision_init" in ai:
@@ -499,8 +570,11 @@ class ConfigValidator:
                             f"precision_range [{prec_range[0]}, {prec_range[1]}]. "
                             "Initial precision will be clamped to range."
                         )
+        return warnings_list
 
-        # Validate hierarchy consistency
+    def _validate_hierarchy_consistency(self, config: Dict[str, Any]) -> List[str]:
+        """Validate hierarchy configuration consistency."""
+        warnings_list = []
         if "hierarchy" in config:
             hierarchy = config["hierarchy"]
             if "num_levels" in hierarchy and "level_configs" in hierarchy:
@@ -514,7 +588,6 @@ class ConfigValidator:
                         f"number of level_configs ({len(level_configs)}). "
                         "This may cause initialization errors."
                     )
-
         return warnings_list
 
     def get_common_mistakes_help(self) -> str:

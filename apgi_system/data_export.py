@@ -6,7 +6,6 @@ including scientific formats, statistical analysis, and visualization exports.
 """
 
 import json
-import csv
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -16,10 +15,10 @@ import h5py
 import scipy.io
 from datetime import datetime
 import matplotlib.pyplot as plt
-import seaborn as sns
+
+from numpy.typing import NDArray
 
 from apgi_system.analysis import AnalysisResults
-from apgi_system.types import FloatArray
 
 
 class DataExporter:
@@ -73,46 +72,52 @@ class DataExporter:
 
             # Create DataFrame for easier CSV export
             if "temporal_dynamics" in export_data and include_temporal:
-                # Export temporal data as main table
-                temporal_data = export_data["temporal_dynamics"]
-                df = pd.DataFrame(temporal_data)
-
-                # Add metadata as header comments
-                if self.include_metadata:
-                    with open(filepath, "w", newline="") as f:
-                        # Write metadata as comments
-                        f.write(f"# APGI System Data Export\n")
-                        f.write(f"# Export Date: {datetime.now().isoformat()}\n")
-                        f.write(f"# Data Type: Temporal Dynamics\n")
-
-                        # Write summary statistics as comments
-                        for category, stats in export_data.items():
-                            if category != "temporal_dynamics" and isinstance(stats, dict):
-                                f.write(f"# {category.title()}:\n")
-                                for key, value in stats.items():
-                                    f.write(f"#   {key}: {value}\n")
-                        f.write("#\n")
-
-                        # Write CSV data
-                        df.to_csv(f, index=False, float_format=f"%.{self.default_precision}f")
-                else:
-                    df.to_csv(filepath, index=False, float_format=f"%.{self.default_precision}f")
+                return self._export_temporal_csv(export_data, filepath)
             else:
-                # Export summary statistics as table
-                rows = []
-                for category, stats in export_data.items():
-                    if isinstance(stats, dict):
-                        for key, value in stats.items():
-                            rows.append({"category": category, "metric": key, "value": value})
-
-                df = pd.DataFrame(rows)
-                df.to_csv(filepath, index=False)
-
-            return True
+                return self._export_summary_csv(export_data, filepath)
 
         except Exception as e:
             print(f"Error exporting to CSV: {e}")
             return False
+
+    def _export_temporal_csv(self, export_data: Dict[str, Any], filepath: Path) -> bool:
+        """Export temporal dynamics data to CSV."""
+        temporal_data = export_data["temporal_dynamics"]
+        df = pd.DataFrame(temporal_data)
+
+        # Add metadata as header comments
+        if self.include_metadata:
+            with open(filepath, "w", newline="") as f:
+                # Write metadata as comments
+                f.write("# APGI System Data Export\n")
+                f.write(f"# Export Date: {datetime.now().isoformat()}\n")
+                f.write("# Data Type: Temporal Dynamics\n")
+
+                # Write summary statistics as comments
+                for category, stats in export_data.items():
+                    if category != "temporal_dynamics" and isinstance(stats, dict):
+                        f.write(f"# {category.title()}:\n")
+                        for key, value in stats.items():
+                            f.write(f"#   {key}: {value}\n")
+                f.write("#\n")
+
+                # Write CSV data
+                df.to_csv(f, index=False, float_format=f"%.{self.default_precision}f")
+        else:
+            df.to_csv(filepath, index=False, float_format=f"%.{self.default_precision}f")
+        return True
+
+    def _export_summary_csv(self, export_data: Dict[str, Any], filepath: Path) -> bool:
+        """Export summary statistics to CSV."""
+        rows = []
+        for category, stats in export_data.items():
+            if isinstance(stats, dict):
+                for key, value in stats.items():
+                    rows.append({"category": category, "metric": key, "value": value})
+
+        df = pd.DataFrame(rows)
+        df.to_csv(filepath, index=False)
+        return True
 
     def export_json(
         self,
@@ -405,7 +410,7 @@ class DataExporter:
         else:
             return obj
 
-    def _write_hdf5_group(self, group: h5py.Group, data: Dict[str, Any], compression: str):
+    def _write_hdf5_group(self, group: h5py.Group, data: Dict[str, Any], compression: str) -> None:
         """Recursively write data to HDF5 group."""
         for key, value in data.items():
             if isinstance(value, dict):
@@ -431,9 +436,10 @@ class DataExporter:
             if isinstance(value, dict):
                 matlab_data[matlab_key] = self._convert_for_matlab(value)
             elif isinstance(value, list):
-                matlab_data[matlab_key] = np.array(value)
+                converted_array = np.array(value, dtype=np.float64)
+                matlab_data[matlab_key] = converted_array.tolist()
             elif isinstance(value, np.ndarray):
-                matlab_data[matlab_key] = value
+                matlab_data[matlab_key] = value.tolist()
             else:
                 matlab_data[matlab_key] = value
 
@@ -574,11 +580,13 @@ class AdvancedAnalytics:
     Advanced statistical analysis and machine learning tools for APGI data.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize advanced analytics."""
         pass
 
-    def compute_correlation_matrix(self, temporal_data: Dict[str, List[float]]) -> np.ndarray:
+    def compute_correlation_matrix(
+        self, temporal_data: Dict[str, List[float]]
+    ) -> NDArray[np.floating]:
         """Compute correlation matrix between temporal variables."""
         df = pd.DataFrame(temporal_data)
         return df.corr().values
@@ -603,7 +611,7 @@ class AdvancedAnalytics:
 
     def compute_spectral_analysis(
         self, signal: List[float], sampling_rate: float = 1.0
-    ) -> Dict[str, np.ndarray]:
+    ) -> Dict[str, Any]:
         """Perform spectral analysis on signal data."""
         from scipy import signal as scipy_signal
 
@@ -617,70 +625,66 @@ class AdvancedAnalytics:
         dominant_frequency = frequencies[dominant_freq_idx]
 
         return {
-            "frequencies": frequencies,
-            "power_spectral_density": psd,
-            "dominant_frequency": dominant_frequency,
-            "total_power": np.sum(psd),
+            "dominant_frequency": float(dominant_frequency),
+            "frequencies": frequencies.tolist(),
+            "psd": psd.tolist(),
         }
+
+    @staticmethod
+    def _sample_entropy(data: NDArray[np.floating], m: int = 2, r: float = 0.2) -> float:
+        """Compute sample entropy for a signal."""
+        N = len(data)
+
+        def _maxdist(xi: NDArray[np.floating], xj: NDArray[np.floating]) -> float:
+            return float(max(abs(ua - va) for ua, va in zip(xi, xj)))
+
+        phi = np.zeros(2)
+        for m_i in [m, m + 1]:
+            patterns_m = np.array([data[i : i + m_i] for i in range(N - m_i + 1)])
+            C = np.zeros(N - m_i + 1)
+
+            for i in range(N - m_i + 1):
+                template = patterns_m[i]
+                matches = sum(
+                    [1 for j in range(N - m_i + 1) if _maxdist(template, patterns_m[j]) <= r]
+                )
+                C[i] = matches / (N - m_i + 1.0)
+
+            phi[m_i - m] = np.mean(np.log(C))
+
+        return phi[0] - phi[1]
+
+    @staticmethod
+    def _approximate_entropy(data: NDArray[np.floating], m: int = 2, r: float = 0.2) -> float:
+        """Compute approximate entropy for a signal."""
+        N = len(data)
+
+        def _maxdist(xi: NDArray[np.floating], xj: NDArray[np.floating]) -> float:
+            return float(max(abs(ua - va) for ua, va in zip(xi, xj)))
+
+        def _phi(m_val: int) -> float:
+            patterns = np.array([data[i : i + m_val] for i in range(N - m_val + 1)])
+            C = np.zeros(N - m_val + 1)
+
+            for i in range(N - m_val + 1):
+                template = patterns[i]
+                matches = sum(
+                    [1 for j in range(N - m_val + 1) if _maxdist(template, patterns[j]) <= r]
+                )
+                C[i] = matches / (N - m_val + 1.0)
+
+            return float(np.mean(np.log(C)))
+
+        return _phi(m) - _phi(m + 1)
 
     def compute_complexity_measures(self, signal: List[float]) -> Dict[str, float]:
         """Compute complexity measures for signal analysis."""
         signal_array = np.array(signal)
 
-        # Sample entropy (simplified version)
-        def sample_entropy(data, m=2, r=0.2):
-            N = len(data)
-            patterns = np.array([data[i : i + m] for i in range(N - m + 1)])
-
-            def _maxdist(xi, xj, m):
-                return max([abs(ua - va) for ua, va in zip(xi, xj)])
-
-            phi = np.zeros(2)
-            for m_i in [m, m + 1]:
-                patterns_m = np.array([data[i : i + m_i] for i in range(N - m_i + 1)])
-                C = np.zeros(N - m_i + 1)
-
-                for i in range(N - m_i + 1):
-                    template = patterns_m[i]
-                    matches = sum(
-                        [
-                            1
-                            for j in range(N - m_i + 1)
-                            if _maxdist(template, patterns_m[j], m_i) <= r
-                        ]
-                    )
-                    C[i] = matches / (N - m_i + 1.0)
-
-                phi[m_i - m] = np.mean(np.log(C))
-
-            return phi[0] - phi[1]
-
-        # Approximate entropy
-        def approximate_entropy(data, m=2, r=0.2):
-            N = len(data)
-
-            def _maxdist(xi, xj):
-                return max([abs(ua - va) for ua, va in zip(xi, xj)])
-
-            def _phi(m):
-                patterns = np.array([data[i : i + m] for i in range(N - m + 1)])
-                C = np.zeros(N - m + 1)
-
-                for i in range(N - m + 1):
-                    template = patterns[i]
-                    matches = sum(
-                        [1 for j in range(N - m + 1) if _maxdist(template, patterns[j]) <= r]
-                    )
-                    C[i] = matches / (N - m + 1.0)
-
-                return np.mean(np.log(C))
-
-            return _phi(m) - _phi(m + 1)
-
         try:
-            sample_ent = sample_entropy(signal_array)
-            approx_ent = approximate_entropy(signal_array)
-        except:
+            sample_ent = self._sample_entropy(signal_array)
+            approx_ent = self._approximate_entropy(signal_array)
+        except Exception:
             sample_ent = np.nan
             approx_ent = np.nan
 

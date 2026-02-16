@@ -7,10 +7,10 @@ Cross-Site Request Forgery attacks.
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 

@@ -5,18 +5,26 @@ This module verifies that fixtures, strategies, and Hypothesis
 configuration are working correctly.
 """
 
+import sys
+from pathlib import Path
+
 import pytest
 import numpy as np
-from hypothesis import given, settings, HealthCheck
+from typing import Any, Dict
+from hypothesis import given, settings
+
+# Add project root to path first
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from tests.strategies import (
     body_state_strategy,
     observation_strategy,
     belief_state_strategy,
     error_variance_strategy,
-)
+)  # noqa: E402
 
 
-def test_config_fixture(config):
+def test_config_fixture(config: Any) -> None:
     """Test that config fixture loads successfully."""
     assert config is not None
     assert "system" in config
@@ -24,18 +32,18 @@ def test_config_fixture(config):
     assert "ignition" in config
 
 
-def test_apgi_system_fixture(apgi_system):
+def test_apgi_system_fixture(apgi_system: Any) -> None:
     """Test that apgi_system fixture initializes correctly."""
     assert apgi_system is not None
     assert apgi_system.time == 0.0
 
 
-def test_body_model_fixture(body_model):
+def test_body_model_fixture(body_model: Any) -> None:
     """Test that body_model fixture initializes correctly."""
     assert body_model is not None
 
 
-def test_random_observation_fixture(random_observation):
+def test_random_observation_fixture(random_observation: np.ndarray[Any, Any]) -> None:
     """Test that random_observation fixture generates valid data."""
     assert isinstance(random_observation, np.ndarray)
     assert random_observation.shape == (256,)
@@ -43,7 +51,7 @@ def test_random_observation_fixture(random_observation):
     assert not np.any(np.isinf(random_observation))
 
 
-def test_random_body_state_fixture(random_body_state):
+def test_random_body_state_fixture(random_body_state: Dict[str, Any]) -> None:
     """Test that random_body_state fixture generates valid data."""
     assert isinstance(random_body_state, dict)
     assert "heart_rate" in random_body_state
@@ -59,7 +67,7 @@ def test_random_body_state_fixture(random_body_state):
 
 
 @given(body_state=body_state_strategy())
-def test_body_state_strategy_generates_valid_states(body_state):
+def test_body_state_strategy_generates_valid_states(body_state: Dict[str, Any]) -> None:
     """Test that body_state_strategy generates physiologically valid states."""
     assert isinstance(body_state, dict)
     assert "heart_rate" in body_state
@@ -75,7 +83,7 @@ def test_body_state_strategy_generates_valid_states(body_state):
 
 
 @given(obs=observation_strategy())
-def test_observation_strategy_generates_valid_observations(obs):
+def test_observation_strategy_generates_valid_observations(obs: np.ndarray[Any, Any]) -> None:
     """Test that observation_strategy generates valid observation vectors."""
     assert isinstance(obs, np.ndarray)
     assert obs.shape == (256,)
@@ -85,16 +93,17 @@ def test_observation_strategy_generates_valid_observations(obs):
     assert np.all(obs <= 10.0)
 
 
-def test_belief_state_strategy_generates_valid_beliefs():
+def test_belief_state_strategy_generates_valid_beliefs() -> None:
     """Test that belief_state_strategy can generate valid belief states."""
     # Test with a single manual generation to avoid Hypothesis health check issues
     # The strategy generates large amounts of data which is expected for belief states
     from hypothesis import find
 
-    beliefs = find(belief_state_strategy(), lambda x: True)
+    # Use smaller dimensions to avoid hanging during test generation
+    beliefs = find(belief_state_strategy(num_levels=2, level_dims=[4, 2]), lambda x: True)
 
     assert isinstance(beliefs, list)
-    assert len(beliefs) == 4  # Default num_levels
+    assert len(beliefs) == 2  # Reduced num_levels
 
     for belief in beliefs:
         assert "mean" in belief
@@ -115,7 +124,7 @@ def test_belief_state_strategy_generates_valid_beliefs():
 
 
 @given(variance=error_variance_strategy())
-def test_error_variance_strategy_generates_valid_variances(variance):
+def test_error_variance_strategy_generates_valid_variances(variance: float) -> None:
     """Test that error_variance_strategy generates valid variance values."""
     assert isinstance(variance, float)
     assert variance >= 0.01
@@ -123,7 +132,7 @@ def test_error_variance_strategy_generates_valid_variances(variance):
     assert np.isfinite(variance)
 
 
-def test_hypothesis_profile_loaded():
+def test_hypothesis_profile_loaded() -> None:
     """Test that Hypothesis profile is properly configured."""
     # This test verifies that the Hypothesis settings are loaded
     # by checking that a property test runs with the expected number of examples
@@ -132,7 +141,7 @@ def test_hypothesis_profile_loaded():
 
     @given(x=error_variance_strategy())
     @settings(max_examples=5)  # Override for this specific test
-    def count_examples(x):
+    def count_examples(x: Any) -> None:
         call_count[0] += 1
 
     count_examples()

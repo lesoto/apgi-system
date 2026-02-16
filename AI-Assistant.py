@@ -18,7 +18,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from collections import deque, Counter
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union
 import warnings
 import logging
 
@@ -59,9 +59,8 @@ except ImportError:
     warnings.warn("psutil not available. Install with: pip install psutil")
 
 try:
-    import tkinter
-
-    HAS_TKINTER = True
+    # tkinter import removed - unused
+    HAS_TKINTER = False
 except ImportError:
     HAS_TKINTER = False
     warnings.warn("tkinter not available. Install with: pip install tkinter")
@@ -96,11 +95,11 @@ class ODEFunc(nn.Module):
         # Cached input context
         self.input_context = None
 
-    def set_input_context(self, x):
+    def set_input_context(self, x: torch.Tensor) -> None:
         """Cache input for use during ODE solving"""
         self.input_context = x
 
-    def forward(self, t, h):
+    def forward(self, t: float, h: torch.Tensor) -> torch.Tensor:
         """
         Compute dh/dt for the neural ODE
 
@@ -133,7 +132,7 @@ class LiquidTimeConstantLayers(nn.Module):
     Implements continuous-time neural dynamics with adaptive time constants.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__()
         self.input_dim = config.get("input_dim", 128)
         self.hidden_dim = config.get("hidden_dim", 256)
@@ -159,11 +158,11 @@ class LiquidTimeConstantLayers(nn.Module):
         self.hidden_state = None
         self.reset_states()
 
-    def reset_states(self):
+    def reset_states(self) -> None:
         """Reset the internal states of the LTC layers"""
         self.hidden_state = None
 
-    def forward(self, x, dt=0.1):
+    def forward(self, x: torch.Tensor, dt: float = 0.1) -> torch.Tensor:
         """
         Forward pass through the LTC network with Neural ODE integration.
 
@@ -232,7 +231,7 @@ class LinOSSDecomposer(nn.Module):
     Each mode is a damped harmonic oscillator: d²x/dt² + 2ζω(dx/dt) + ω²x = 0
     """
 
-    def __init__(self, n_modes=128, hidden_dim=256):
+    def __init__(self, n_modes: int = 128, hidden_dim: int = 256) -> None:
         super().__init__()
         self.n_modes = n_modes
         self.hidden_dim = hidden_dim
@@ -252,7 +251,7 @@ class LinOSSDecomposer(nn.Module):
         # Optional: learnable quality factors
         self.quality_factors = nn.Parameter(torch.ones(n_modes) * 10.0)
 
-    def decompose(self, hidden_state):
+    def decompose(self, hidden_state: torch.Tensor) -> Dict[str, Any]:
         """
         Decompose hidden state into oscillatory modes.
 
@@ -283,7 +282,7 @@ class LinOSSDecomposer(nn.Module):
             "n_modes": self.n_modes,
         }
 
-    def synthesize(self, osc_state, t):
+    def synthesize(self, osc_state: Dict[str, Any], t: Union[torch.Tensor, float]) -> torch.Tensor:
         """
         Reconstruct signal from oscillator modes at time t.
 
@@ -313,7 +312,7 @@ class LinOSSDecomposer(nn.Module):
 
         return signal
 
-    def compute_power_spectrum(self, osc_state):
+    def compute_power_spectrum(self, osc_state: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         """
         Compute power in standard frequency bands.
 
@@ -346,7 +345,7 @@ class LinOSSDecomposer(nn.Module):
 
         return power_spectrum
 
-    def compute_coherence_metrics(self, osc_state):
+    def compute_coherence_metrics(self, osc_state: Dict[str, Any]) -> Dict[str, float]:
         """
         Compute coherence and synchronization metrics.
 
@@ -390,13 +389,18 @@ class SurpriseAccumulator(nn.Module):
     Implements: dS/dt = -S/τ + weighted_error + noise
     """
 
-    def __init__(self, tau=0.2, sigma=0.1):
+    def __init__(self, tau: float = 0.2, sigma: float = 0.1) -> None:
         super().__init__()
         self.tau = tau  # Decay time constant (200ms)
         self.sigma = sigma  # Noise level
         self.register_buffer("S_t", torch.tensor(0.0))
 
-    def update(self, weighted_error_e, weighted_error_i=None, dt=0.01):
+    def update(
+        self,
+        weighted_error_e: torch.Tensor,
+        weighted_error_i: Optional[torch.Tensor] = None,
+        dt: float = 0.01,
+    ) -> torch.Tensor:
         """
         Update surprise accumulator.
 
@@ -424,11 +428,11 @@ class SurpriseAccumulator(nn.Module):
 
         return self.S_t
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset surprise to zero"""
         self.S_t = torch.tensor(0.0)
 
-    def get_surprise(self):
+    def get_surprise(self) -> torch.Tensor:
         """Get current surprise level"""
         return self.S_t
 
@@ -440,7 +444,13 @@ class DynamicThreshold(nn.Module):
     Implements: dθ/dt = γ(θ_0 - θ) + δ·B + urgency
     """
 
-    def __init__(self, theta_0=1.0, gamma=2.0, delta=0.4, lambda_urgency=0.2):
+    def __init__(
+        self,
+        theta_0: float = 1.0,
+        gamma: float = 2.0,
+        delta: float = 0.4,
+        lambda_urgency: float = 0.2,
+    ) -> None:
         super().__init__()
         self.theta_0 = theta_0  # Baseline threshold
         self.gamma = gamma  # Homeostatic recovery rate
@@ -452,7 +462,7 @@ class DynamicThreshold(nn.Module):
         self.threshold_history = []  # Track threshold changes for adaptation measurement
         self.last_dS_dt = 0.0
 
-    def update(self, S_t, dt=0.01):
+    def update(self, S_t: torch.Tensor, dt: float = 0.01) -> torch.Tensor:
         """
         Update threshold with homeostatic regulation.
 
@@ -490,7 +500,7 @@ class DynamicThreshold(nn.Module):
 
         return self.theta_t
 
-    def post_ignition_update(self):
+    def post_ignition_update(self) -> None:
         """Called when ignition occurs - adds refractory period"""
         self.ignition_history.append(time.time())
 
@@ -498,7 +508,7 @@ class DynamicThreshold(nn.Module):
         cutoff = time.time() - 2.0
         self.ignition_history = [t for t in self.ignition_history if t > cutoff]
 
-    def compute_threshold(self, surprise):
+    def compute_threshold(self, surprise: torch.Tensor) -> float:
         """Compute threshold based on current surprise"""
         return (
             self.theta_0 + self.gamma * surprise.item()
@@ -506,7 +516,7 @@ class DynamicThreshold(nn.Module):
             else self.theta_0
         )
 
-    def get_threshold(self):
+    def get_threshold(self) -> torch.Tensor:
         """Get current threshold value"""
         return self.theta_t
 
@@ -518,7 +528,7 @@ class PrecisionNetwork(nn.Module):
     Precision = 1 / (aleatoric_uncertainty + epistemic_uncertainty)
     """
 
-    def __init__(self, hidden_dim=128):
+    def __init__(self, hidden_dim: int = 128) -> None:
         super().__init__()
         self.hidden_dim = hidden_dim
 
@@ -547,7 +557,12 @@ class PrecisionNetwork(nn.Module):
             }
         )
 
-    def forward(self, x, context=None, modality="exteroceptive"):
+    def forward(
+        self,
+        x: torch.Tensor,
+        context: Optional[torch.Tensor] = None,
+        modality: str = "exteroceptive",
+    ) -> torch.Tensor:
         """
         Estimate precision for predictions.
 
@@ -598,7 +613,7 @@ class PrecisionNetwork(nn.Module):
 
         return torch.clamp(precision, min=0.1, max=2.0)
 
-    def update_statistics(self, errors):
+    def update_statistics(self, errors: torch.Tensor) -> None:
         """
         Online update of error statistics using exponential moving average.
 
@@ -626,7 +641,7 @@ class PrecisionNetwork(nn.Module):
 class FastShallowLTC(nn.Module):
     """Fast shallow network for unconscious processing pathway"""
 
-    def __init__(self, input_dim=128, hidden_dim=128, depth=2):
+    def __init__(self, input_dim: int = 128, hidden_dim: int = 128, depth: int = 2) -> None:
         super().__init__()
         self.depth = depth
         self.input_dim = input_dim
@@ -643,7 +658,7 @@ class FastShallowLTC(nn.Module):
 
         self.network = nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Fast forward pass"""
         if x.dim() == 1:
             x = x.unsqueeze(0)
@@ -664,7 +679,7 @@ class FastShallowLTC(nn.Module):
 class DeepGlobalLTC(nn.Module):
     """Deep network for conscious processing pathway"""
 
-    def __init__(self, input_dim=128, hidden_dim=256, depth=8):
+    def __init__(self, input_dim: int = 128, hidden_dim: int = 256, depth: int = 8) -> None:
         super().__init__()
         self.depth = depth
         self.input_dim = input_dim
@@ -686,7 +701,9 @@ class DeepGlobalLTC(nn.Module):
 
         self.output_layer = nn.Linear(hidden_dim, 128)  # Match unconscious pathway dimension
 
-    def forward(self, x, h_unconscious=None):
+    def forward(
+        self, x: torch.Tensor, h_unconscious: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """Deep forward pass with optional unconscious input"""
         if x.dim() == 1:
             x = x.unsqueeze(0)
@@ -737,7 +754,7 @@ class DeepGlobalLTC(nn.Module):
 class EnergyBudget:
     """Energy budget management for adaptive computation"""
 
-    def __init__(self, max_conscious_ratio=0.3):
+    def __init__(self, max_conscious_ratio: float = 0.3) -> None:
         self.max_conscious_ratio = max_conscious_ratio
         self.conscious_cost = 0.8  # High computational cost
         self.unconscious_cost = 0.2  # Low computational cost
@@ -746,7 +763,7 @@ class EnergyBudget:
         self.total_queries = 0
         self.conscious_queries = 0
 
-    def can_allocate_conscious(self):
+    def can_allocate_conscious(self) -> bool:
         """Check if we can afford conscious processing"""
         if self.total_queries == 0:
             return True
@@ -754,19 +771,19 @@ class EnergyBudget:
         current_ratio = self.conscious_queries / self.total_queries
         return current_ratio < self.max_conscious_ratio
 
-    def compute_cost(self, ignition_prob):
+    def compute_cost(self, ignition_prob: Union[torch.Tensor, float]) -> float:
         """Compute energy cost based on ignition probability"""
         prob = ignition_prob.item() if hasattr(ignition_prob, "item") else ignition_prob
         cost = prob * self.conscious_cost + (1 - prob) * self.unconscious_cost
         return cost
 
-    def record_usage(self, used_conscious):
+    def record_usage(self, used_conscious: bool) -> None:
         """Record query usage"""
         self.total_queries += 1
         if used_conscious:
             self.conscious_queries += 1
 
-    def get_usage_stats(self):
+    def get_usage_stats(self) -> Dict[str, Union[float, int]]:
         """Get usage statistics"""
         if self.total_queries == 0:
             return {"conscious_ratio": 0.0, "total_queries": 0}
@@ -781,7 +798,7 @@ class EnergyBudget:
 class BatteryMonitor:
     """Battery monitoring for edge deployment"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.has_psutil = HAS_PSUTIL
         if HAS_PSUTIL:
             try:
@@ -797,7 +814,7 @@ class BatteryMonitor:
         # Initialize simulated battery for testing
         self._simulated_battery = 0.85  # Start at 85%
 
-    def get_level(self):
+    def get_level(self) -> float:
         """Get battery level (0.0 to 1.0)"""
         if not self.has_battery or not self.has_psutil:
             # Simulate battery for testing with more realistic levels
@@ -818,7 +835,7 @@ class BatteryMonitor:
             LOGGER.debug(f"Battery level reading failed: {e}")
             return 1.0
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset simulated battery to initial state"""
         self._simulated_battery = 0.85
 
@@ -835,7 +852,7 @@ class APGI_LFM2(nn.Module):
     Implements dual-pathway processing with surprise-driven gating.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__()
         self.config = config
         self.hidden_dim = config.get("hidden_dim", 256)
@@ -869,15 +886,17 @@ class APGI_LFM2(nn.Module):
         self.alpha = nn.Parameter(torch.tensor(5.0))  # Sigmoid gain
         self.beta = nn.Parameter(torch.tensor(0.5))  # Interoceptive weight
 
-    def predict_from_unconscious(self, h_unconscious):
+    def predict_from_unconscious(self, h_unconscious: torch.Tensor) -> torch.Tensor:
         """Generate prediction from unconscious processing"""
         return self.prediction_head(h_unconscious)
 
-    def compute_prediction_error(self, x, x_pred):
+    def compute_prediction_error(self, x: torch.Tensor, x_pred: torch.Tensor) -> torch.Tensor:
         """Compute prediction error"""
         return torch.norm(x - x_pred, dim=-1, keepdim=True)
 
-    def compute_interoceptive_error(self, interoceptive_signals):
+    def compute_interoceptive_error(
+        self, interoceptive_signals: Optional[Dict[str, float]]
+    ) -> torch.Tensor:
         """Compute interoceptive prediction error"""
         if interoceptive_signals is None:
             return torch.tensor(0.0)
@@ -900,7 +919,9 @@ class APGI_LFM2(nn.Module):
 
         return error.mean()
 
-    def compute_somatic_bias(self, interoceptive_signals):
+    def compute_somatic_bias(
+        self, interoceptive_signals: Optional[Dict[str, float]]
+    ) -> torch.Tensor:
         """Compute somatic bias from interoceptive signals"""
         if interoceptive_signals is None:
             return torch.tensor(1.0)
@@ -915,7 +936,9 @@ class APGI_LFM2(nn.Module):
 
         return torch.clamp(bias, min=0.5, max=2.0)
 
-    def _process_interoceptive_signals(self, interoceptive_signals):
+    def _process_interoceptive_signals(
+        self, interoceptive_signals: Union[Dict[str, float], torch.Tensor]
+    ) -> torch.Tensor:
         """Convert interoceptive signals to tensor"""
         if isinstance(interoceptive_signals, dict):
             signals = []
@@ -945,7 +968,11 @@ class APGI_LFM2(nn.Module):
 
         return tensor
 
-    def forward(self, x, interoceptive_signals=None):
+    def forward(
+        self,
+        x: Union[Dict[str, Any], torch.Tensor],
+        interoceptive_signals: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
         """
         Forward pass through APGI-LFM2.
 
@@ -1076,7 +1103,7 @@ class APGI_LFM2(nn.Module):
 class LanguageModelWrapper(nn.Module):
     """Wrapper for integrating language models with APGI"""
 
-    def __init__(self, model_name="gpt2", freeze_base=True):
+    def __init__(self, model_name: str = "gpt2", freeze_base: bool = True) -> None:
         super().__init__()
 
         if not HAS_TRANSFORMERS:
@@ -1107,7 +1134,7 @@ class LanguageModelWrapper(nn.Module):
             self.enabled = False
             self.hidden_size = 128
 
-    def encode_text(self, text):
+    def encode_text(self, text: str) -> torch.Tensor:
         """Encode text to embeddings"""
         if not self.enabled:
             # Return random embedding as fallback
@@ -1129,14 +1156,14 @@ class LanguageModelWrapper(nn.Module):
             warnings.warn(f"Text encoding failed: {e}")
             return torch.randn(1, self.hidden_size)
 
-    def _project_hidden_state(self, hidden_state):
+    def _project_hidden_state(self, hidden_state: torch.Tensor) -> torch.Tensor:
         """Project hidden state to model dimension if needed"""
         if hidden_state.shape[-1] != self.hidden_size:
             projection = nn.Linear(hidden_state.shape[-1], self.hidden_size).to(hidden_state.device)
             return projection(hidden_state)
         return hidden_state
 
-    def _create_contextual_prompt(self, hidden_state, user_input):
+    def _create_contextual_prompt(self, hidden_state: torch.Tensor, user_input: str) -> str:
         """Create contextual prompt based on hidden state and user input"""
         hidden_mean = hidden_state.mean().item()
         hidden_std = hidden_state.std().item()
@@ -1146,7 +1173,7 @@ class LanguageModelWrapper(nn.Module):
         else:
             return self._create_fallback_prompt(hidden_mean, hidden_std)
 
-    def _create_user_prompt(self, hidden_mean, hidden_std, user_input):
+    def _create_user_prompt(self, hidden_mean: float, hidden_std: float, user_input: str) -> str:
         """Create prompt for actual user input"""
         if hidden_mean > 0.5:
             return f"Question: {user_input}\nAnswer: "
@@ -1155,7 +1182,7 @@ class LanguageModelWrapper(nn.Module):
         else:
             return f"Q: {user_input}\nA: "
 
-    def _create_fallback_prompt(self, hidden_mean, hidden_std):
+    def _create_fallback_prompt(self, hidden_mean: float, hidden_std: float) -> str:
         """Create fallback prompt for empty input"""
         if hidden_mean > 0.5:
             return "I understand your query and can provide a detailed response: "
@@ -1164,11 +1191,13 @@ class LanguageModelWrapper(nn.Module):
         else:
             return "Here's my response to your question: "
 
-    def _generate_with_model(self, input_ids, max_length, num_beams, temperature):
+    def _generate_with_model(
+        self, input_ids: torch.Tensor, max_length: int, num_beams: int, temperature: float
+    ) -> torch.Tensor:
         """Generate text using the language model"""
         return self.model.generate(
             input_ids=input_ids,
-            max_length=min(max_length, input_ids.shape[1] + 50),
+            max_new_tokens=max_length,
             num_beams=num_beams,
             temperature=temperature,
             do_sample=temperature > 0,
@@ -1179,7 +1208,7 @@ class LanguageModelWrapper(nn.Module):
             no_repeat_ngram_size=2,
         )
 
-    def _clean_generated_text(self, text, prompt):
+    def _clean_generated_text(self, text: str, prompt: str) -> str:
         """Clean up and validate generated text"""
         if text.startswith(prompt):
             text = text[len(prompt) :].strip()
@@ -1190,8 +1219,13 @@ class LanguageModelWrapper(nn.Module):
         return text
 
     def generate_text(
-        self, hidden_state, user_input="", max_length=100, num_beams=1, temperature=0.7
-    ):
+        self,
+        hidden_state: torch.Tensor,
+        user_input: str = "",
+        max_length: int = 100,
+        num_beams: int = 1,
+        temperature: float = 0.7,
+    ) -> str:
         """Generate text from hidden state"""
         if not self.enabled:
             return "Language model not available. Install transformers package."
@@ -1245,7 +1279,7 @@ class APGIAssistant:
         enable_energy_aware=True,
         enable_language_model=False,
         language_model="gpt2",
-    ):
+    ) -> None:
         """
         Initialize the assistant.
 
@@ -1323,14 +1357,14 @@ class APGIAssistant:
         # Explanation templates
         self.explanation_templates = self._initialize_explanation_templates()
 
-    def reset_energy_state(self):
+    def reset_energy_state(self) -> None:
         """Reset energy monitoring state for fresh demo runs"""
         if self.enable_energy_aware and hasattr(self, "energy_monitor"):
             self.energy_monitor.reset()
             self.energy_history.clear()
             self.performance_metrics["energy_consumption"] = []
 
-    def calibrate(self, resting_data: List[Dict]):
+    def calibrate(self, resting_data: List[Dict]) -> None:
         """
         Calibrate baseline physiology.
 
@@ -1391,7 +1425,7 @@ class APGIAssistant:
 
     def process_with_introspection(
         self, user_input, context=None, metadata=None, physiological_data=None
-    ):
+    ) -> Dict[str, Any]:
         """
         Process input with full introspection and state tracking.
 
@@ -1521,7 +1555,9 @@ class APGIAssistant:
 
         return response
 
-    def interpret_state(self, output, physiological_data=None, include_detailed_metrics=False):
+    def interpret_state(
+        self, output, physiological_data=None, include_detailed_metrics=False
+    ) -> Dict[str, Any]:
         """
         Interpret APGI output as cognitive state.
 
@@ -1621,7 +1657,7 @@ class APGIAssistant:
 
         return state
 
-    def classify_mental_state(self, model_output, physio_data):
+    def classify_mental_state(self, model_output, physio_data) -> Dict[str, Any]:
         """
         Classify mental state from APGI + physiology.
 
@@ -1676,7 +1712,7 @@ class APGIAssistant:
                 "confidence": "medium",
             }
 
-    def explain_reasoning(self, output, state, detail_level="normal"):
+    def explain_reasoning(self, output, state, detail_level="normal") -> str:
         """
         Generate natural language explanation.
 
@@ -1768,7 +1804,7 @@ class APGIAssistant:
 
         return explanation
 
-    def _get_generation_params(self, depth):
+    def _get_generation_params(self, depth) -> Dict[str, Any]:
         """Get generation parameters based on depth"""
         if depth >= 2:
             return {"max_length": 200, "num_beams": 5, "temperature": 0.7}
@@ -1777,14 +1813,14 @@ class APGIAssistant:
         else:
             return {"max_length": 100, "num_beams": 1, "temperature": 0.9}
 
-    def _generate_language_model_response(self, output, user_input, depth):
+    def _generate_language_model_response(self, output, user_input, depth) -> str:
         """Generate response using language model"""
         hidden_state = output["hidden_state"]
         params = self._get_generation_params(depth)
 
         return self.language_model.generate_text(hidden_state, user_input=user_input, **params)
 
-    def _generate_quick_response(self, user_input):
+    def _generate_quick_response(self, user_input) -> str:
         """Generate quick response for depth 0"""
         responses = [
             f"Quick response to: '{user_input[:30]}...'",
@@ -1793,7 +1829,7 @@ class APGIAssistant:
         ]
         return random.choice(responses)
 
-    def _generate_depth1_response(self, output, user_input):
+    def _generate_depth1_response(self, output, user_input) -> str:
         """Generate response for depth 1"""
         ignition = (
             output["ignition_probability"].item()
@@ -1815,7 +1851,7 @@ class APGIAssistant:
             ]
         return random.choice(responses)
 
-    def _generate_deep_response(self, output, user_input):
+    def _generate_deep_response(self, output, user_input) -> str:
         """Generate response for depth >= 2"""
         surprise = (
             output["surprise"].item() if hasattr(output["surprise"], "item") else output["surprise"]
@@ -1854,7 +1890,7 @@ class APGIAssistant:
         ]
         return random.choice(responses)
 
-    def _generate_fallback_response(self, output, user_input, depth):
+    def _generate_fallback_response(self, output, user_input, depth) -> str:
         """Generate fallback response when language model is not available"""
         if depth == 0:
             return self._generate_quick_response(user_input)
@@ -1863,7 +1899,7 @@ class APGIAssistant:
         else:
             return self._generate_deep_response(output, user_input)
 
-    def generate_response(self, output, user_input, depth=1):
+    def generate_response(self, output, user_input, depth=1) -> str:
         """
         Generate response based on output and depth.
 
@@ -1883,7 +1919,7 @@ class APGIAssistant:
 
         return self._generate_fallback_response(output, user_input, depth)
 
-    def compute_confidence(self, output, state):
+    def compute_confidence(self, output, state) -> Union[str, Dict[str, Union[str, float]]]:
         """Compute confidence from output and state"""
         if "confidence" in state and isinstance(state["confidence"], dict):
             return state["confidence"]
@@ -1905,7 +1941,7 @@ class APGIAssistant:
 
     def get_cognitive_report(
         self, timeframe="current", include_trends=False, include_energy_stats=False
-    ):
+    ) -> Dict[str, Any]:
         """
         Generate cognitive state report.
 
@@ -1982,7 +2018,7 @@ class APGIAssistant:
 
         return report
 
-    def get_energy_report(self):
+    def get_energy_report(self) -> Dict[str, Any]:
         """Generate energy usage report"""
         if not self.enable_energy_aware:
             return {"status": "disabled", "message": "Energy awareness not enabled"}
@@ -2011,7 +2047,7 @@ class APGIAssistant:
             ),
         }
 
-    def get_performance_metrics(self):
+    def get_performance_metrics(self) -> Dict[str, Any]:
         """Get comprehensive performance metrics"""
         metrics = {
             "total_queries": self.performance_metrics["total_queries"],
@@ -3667,7 +3703,6 @@ def demonstrate_apgi_assistant_enhanced():
         # Add realistic processing delay based on query complexity
         # Complex queries take longer to process
         # Note: time.sleep is for demo purposes only
-        complexity_delay = 0.5 if len(query) > 40 else 0.3
 
         # Measure time including the delay
         start_time = time.time()

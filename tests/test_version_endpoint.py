@@ -10,24 +10,24 @@ from api.main import app
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create a test client for the API."""
     return TestClient(app)
 
 
-def test_version_endpoint_returns_200(client):
+def test_version_endpoint_returns_200(client: TestClient) -> None:
     """Test that version endpoint returns 200 OK."""
     response = client.get("/v1/version")
     assert response.status_code == 200
 
 
-def test_version_endpoint_returns_json(client):
+def test_version_endpoint_returns_json(client: TestClient) -> None:
     """Test that version endpoint returns JSON content."""
     response = client.get("/v1/version")
     assert response.headers["content-type"] == "application/json"
 
 
-def test_version_endpoint_has_required_fields(client):
+def test_version_endpoint_has_required_fields(client: TestClient) -> None:
     """Test that version endpoint returns all required fields."""
     response = client.get("/v1/version")
     data = response.json()
@@ -46,7 +46,7 @@ def test_version_endpoint_has_required_fields(client):
         assert field in data, f"Missing required field: {field}"
 
 
-def test_version_endpoint_current_version_format(client):
+def test_version_endpoint_current_version_format(client: TestClient) -> None:
     """Test that current_version follows semantic versioning."""
     response = client.get("/v1/version")
     data = response.json()
@@ -63,7 +63,7 @@ def test_version_endpoint_current_version_format(client):
         assert part.isdigit(), f"Version part '{part}' should be numeric"
 
 
-def test_version_endpoint_api_version_format(client):
+def test_version_endpoint_api_version_format(client: TestClient) -> None:
     """Test that api_version follows expected format."""
     response = client.get("/v1/version")
     data = response.json()
@@ -77,7 +77,7 @@ def test_version_endpoint_api_version_format(client):
     assert version_num.isdigit(), "API version number should be numeric"
 
 
-def test_version_endpoint_supported_versions_is_list(client):
+def test_version_endpoint_supported_versions_is_list(client: TestClient) -> None:
     """Test that supported_versions is a non-empty list."""
     response = client.get("/v1/version")
     data = response.json()
@@ -87,7 +87,7 @@ def test_version_endpoint_supported_versions_is_list(client):
     assert len(supported_versions) > 0, "Should have at least one supported version"
 
 
-def test_version_endpoint_current_api_in_supported(client):
+def test_version_endpoint_current_api_in_supported(client: TestClient) -> None:
     """Test that current API version is in supported versions."""
     response = client.get("/v1/version")
     data = response.json()
@@ -100,7 +100,7 @@ def test_version_endpoint_current_api_in_supported(client):
     ), f"Current API version '{api_version}' should be in supported versions"
 
 
-def test_version_endpoint_deprecated_versions_is_list(client):
+def test_version_endpoint_deprecated_versions_is_list(client: TestClient) -> None:
     """Test that deprecated_versions is a list."""
     response = client.get("/v1/version")
     data = response.json()
@@ -109,7 +109,7 @@ def test_version_endpoint_deprecated_versions_is_list(client):
     assert isinstance(deprecated_versions, list)
 
 
-def test_version_endpoint_no_overlap_deprecated_supported(client):
+def test_version_endpoint_no_overlap_deprecated_supported(client: TestClient) -> None:
     """Test that deprecated versions are not in supported versions."""
     response = client.get("/v1/version")
     data = response.json()
@@ -123,7 +123,7 @@ def test_version_endpoint_no_overlap_deprecated_supported(client):
         ), f"Version '{deprecated}' cannot be both deprecated and supported"
 
 
-def test_version_endpoint_api_spec_url_format(client):
+def test_version_endpoint_api_spec_url_format(client: TestClient) -> None:
     """Test that api_spec_url is a valid path."""
     response = client.get("/v1/version")
     data = response.json()
@@ -133,7 +133,7 @@ def test_version_endpoint_api_spec_url_format(client):
     assert api_spec_url.startswith("/"), "API spec URL should be a valid path"
 
 
-def test_version_endpoint_documentation_url_format(client):
+def test_version_endpoint_documentation_url_format(client: TestClient) -> None:
     """Test that documentation_url is a valid path."""
     response = client.get("/v1/version")
     data = response.json()
@@ -143,7 +143,7 @@ def test_version_endpoint_documentation_url_format(client):
     assert docs_url.startswith("/"), "Documentation URL should be a valid path"
 
 
-def test_version_endpoint_timestamp_format(client):
+def test_version_endpoint_timestamp_format(client: TestClient) -> None:
     """Test that timestamp is in ISO 8601 format with UTC timezone."""
     from datetime import datetime
 
@@ -161,7 +161,7 @@ def test_version_endpoint_timestamp_format(client):
         pytest.fail(f"Timestamp '{timestamp}' is not valid ISO 8601 format")
 
 
-def test_version_endpoint_validates_requirements_6_1(client):
+def test_version_endpoint_validates_requirements_6_1(client: TestClient) -> None:
     """
     Test that version endpoint validates Requirements 6.1.
 
@@ -175,7 +175,7 @@ def test_version_endpoint_validates_requirements_6_1(client):
     assert "/v1/version" == "/v1/version"
 
 
-def test_version_endpoint_validates_requirements_6_4(client):
+def test_version_endpoint_validates_requirements_6_4(client: TestClient) -> None:
     """
     Test that version endpoint validates Requirements 6.4.
 

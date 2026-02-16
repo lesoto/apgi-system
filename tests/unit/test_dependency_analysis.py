@@ -5,25 +5,23 @@ Tests module exclusion logic, hidden import detection, and resource file discove
 _Requirements: 12.1, 12.2_
 """
 
-import pytest
 from pathlib import Path
 import tempfile
 import shutil
 import sys
-
-# Add project root to path to import build module
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 from utils.build_common import (
     analyze_dependencies,
     detect_hidden_imports,
     collect_resources,
     get_version,
-    get_project_root,
-    get_excluded_modules,
     should_exclude_module,
+    get_excluded_modules,
 )
+
+# Add project root to path to import build module
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 
 class TestModuleExclusion:
@@ -227,13 +225,11 @@ class TestDependencyAnalysis:
     def test_analyze_simple_imports(self):
         """Test analysis of simple import statements."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 import sys
 import numpy
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
@@ -244,12 +240,10 @@ import numpy
     def test_analyze_from_imports(self):
         """Test analysis of from...import statements."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 from pathlib import Path
 from scipy import stats
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
@@ -259,13 +253,11 @@ from scipy import stats
     def test_analyze_with_exclusions(self):
         """Test analysis with module exclusions."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import numpy
 import pytest
 import hypothesis
-"""
-        )
+""")
 
         exclude = {"pytest", "hypothesis"}
         deps = analyze_dependencies(str(test_file), exclude_modules=exclude)
@@ -277,12 +269,10 @@ import hypothesis
     def test_analyze_dotted_imports(self):
         """Test that dotted imports return top-level package."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import scipy.stats
 from matplotlib.pyplot import plot
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
@@ -304,12 +294,10 @@ from matplotlib.pyplot import plot
     def test_analyze_invalid_syntax(self):
         """Test that files with syntax errors are handled gracefully."""
         test_file = self.temp_path / "invalid.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import numpy
 this is invalid python syntax!!!
-"""
-        )
+""")
 
         # Should not raise exception
         deps = analyze_dependencies(str(test_file))

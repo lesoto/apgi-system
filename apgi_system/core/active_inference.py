@@ -6,9 +6,8 @@ and hierarchical Bayesian filtering.
 """
 
 import numpy as np
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Deque
 from dataclasses import dataclass
-from functools import lru_cache
 from collections import deque
 import threading
 
@@ -132,8 +131,8 @@ class HierarchicalGaussianFilter:
 
         # Projection matrix cache with LRU eviction
         self._projection_cache_max_size = self.config.get("projection_cache_size", 100)
-        self._projection_cache = {}
-        self._cache_access_order = deque()  # Track access order for LRU (O(1) operations)
+        self._projection_cache: Dict[Tuple[int, int, int], np.ndarray] = {}
+        self._cache_access_order: Deque[Tuple[int, int, int]] = deque()
         self._cache_lock = threading.Lock()  # Thread safety for cache access
 
     def update(self, observation: FloatArray, dt: float = 0.001) -> Tuple[List[BeliefState], float]:
@@ -338,7 +337,7 @@ class HierarchicalGaussianFilter:
 
             # Update precision (with smoothing)
             new_precision = 1.0 / error_variance
-            self.beliefs[level].precision = (
+            self.beliefs[level].precision = float(
                 0.9 * self.beliefs[level].precision + 0.1 * new_precision
             )
 
@@ -374,7 +373,7 @@ class HierarchicalGaussianFilter:
 
     def _get_projection_matrix(
         self, from_level: int, target_dim: int, source_dim: int
-    ) -> np.ndarray:
+    ) -> np.ndarray[Any, Any]:
         """
         Get projection matrix with LRU cache management.
 

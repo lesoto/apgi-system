@@ -6,9 +6,9 @@ calculations for active inference.
 """
 
 import numpy as np
-from typing import Tuple, Optional, Dict, Any, Union
-from scipy import linalg
-from scipy.special import xlogy
+from typing import List, Tuple, Optional, Dict, Union, Any
+from scipy import linalg  # type: ignore
+from scipy.special import xlogy  # type: ignore
 
 from apgi_system.validation import InputValidator
 from apgi_system.types import FloatArray, ConfigDict
@@ -194,9 +194,10 @@ class FreeEnergyCalculator:
 
         # Validate precision
         if np.isscalar(precision):
-            InputValidator.validate_scalar(precision, "precision", positive=True)
+            InputValidator.validate_scalar(float(precision), "precision", positive=True)  # type: ignore[arg-type]
         else:
-            InputValidator.validate_array(precision, "precision")
+            precision_array: np.ndarray[Any, np.dtype[Any]] = np.asarray(precision)
+            InputValidator.validate_array(precision_array, "precision")
             # Check precision is positive
             if np.any(precision <= 0):
                 raise ValueError("precision must be positive")
@@ -222,17 +223,20 @@ class FreeEnergyCalculator:
             # Clamp precision to prevent numerical instability
             precision = np.clip(precision, self.precision_min, self.precision_max)
             precision_matrix = precision * np.eye(len(error))
-        elif precision.ndim == 1:
-            # Clamp vector precision
-            precision = np.clip(precision, self.precision_min, self.precision_max)
-            precision_matrix = np.diag(precision)
         else:
-            # Clamp matrix precision (clamp diagonal elements)
-            precision = precision.copy()
-            np.fill_diagonal(
-                precision, np.clip(np.diag(precision), self.precision_min, self.precision_max)
-            )
-            precision_matrix = precision
+            # Use precision as array
+            precision_arr = np.asarray(precision)
+            if precision_arr.ndim == 1:
+                # Clamp vector precision
+                precision = np.clip(precision_arr, self.precision_min, self.precision_max)
+                precision_matrix = np.diag(precision)
+            else:
+                # Clamp matrix precision (clamp diagonal elements)
+                precision = precision_arr.copy()
+                np.fill_diagonal(
+                    precision, np.clip(np.diag(precision), self.precision_min, self.precision_max)
+                )
+                precision_matrix = precision
 
         accuracy = 0.5 * error.T @ precision_matrix @ error
 
@@ -263,7 +267,7 @@ class FreeEnergyCalculator:
     def compute_expected_free_energy(
         self,
         policy: FloatArray,
-        predicted_states: FloatArray,
+        predicted_states: List[FloatArray],
         predicted_observations: FloatArray,
         preferences: FloatArray,
         state_uncertainty: FloatArray,
@@ -428,14 +432,14 @@ class FreeEnergyCalculator:
         # Compute terms
         try:
             # Use pseudoinverse for better numerical stability
-            sigma_p_inv = linalg.pinv(sigma_p, rcond=1e-10)
+            sigma_p_inv = linalg.pinv(sigma_p)
 
             # Check condition number to detect near-singular matrices
             cond_num = np.linalg.cond(sigma_p)
             if cond_num > 1e12:
                 # Matrix is ill-conditioned, use regularization
                 sigma_p_reg = sigma_p + 1e-6 * np.eye(d)
-                sigma_p_inv = linalg.pinv(sigma_p_reg, rcond=1e-10)
+                sigma_p_inv = linalg.pinv(sigma_p_reg)
 
             log_det_ratio = np.log(linalg.det(sigma_p) + self.eps) - np.log(
                 linalg.det(sigma_q) + self.eps
@@ -511,15 +515,17 @@ class FreeEnergyCalculator:
         error = observation - prediction
 
         if precision is None:
-            precision = np.ones_like(error)
+            precision_weights = np.ones_like(error)
         elif np.isscalar(precision):
-            precision = precision * np.ones_like(error)
+            precision_weights = float(precision) * np.ones_like(error)  # type: ignore
+        else:
+            precision_weights = precision * np.ones_like(error)
 
         # Raw error
         raw_error = np.linalg.norm(error)
 
         # Precision-weighted error
-        weighted_error = np.sqrt(error.T @ np.diag(precision) @ error)
+        weighted_error = np.sqrt(error.T @ np.diag(precision_weights) @ error)
 
         # Element-wise errors
         element_errors = np.abs(error)
@@ -529,7 +535,7 @@ class FreeEnergyCalculator:
             "weighted_error": float(weighted_error),
             "mean_absolute_error": float(np.mean(element_errors)),
             "max_error": float(np.max(element_errors)),
-            "precision_weighted_elements": (precision * element_errors).tolist(),
+            "precision_weighted_elements": (precision_weights * element_errors).tolist(),
         }
 
     def compute_surprise(self, observation: FloatArray, generative_density: FloatArray) -> float:
@@ -576,14 +582,150 @@ class FreeEnergyCalculator:
         surprise = -np.log(prob)
         return float(np.mean(surprise))
 
+    def compute_accuracy(
+        self,
+        observation: FloatArray,
+        prediction: FloatArray,
+        precision: Union[float, FloatArray] = 1.0,
+    ) -> float:
+        """
+        Compute accuracy term of variational free energy.
+
+        Parameters
+        ----------
+        observation : np.ndarray
+            Observed data
+        prediction : np.ndarray
+            Predicted data
+        precision : float or np.ndarray
+            Precision weights
+
+        Returns
+        -------
+        float
+            Accuracy value
+        """
+        error = observation - prediction
+
+        if np.isscalar(precision):
+            precision_clipped = np.clip(precision, self.precision_min, self.precision_max)
+            precision_matrix = precision_clipped * np.eye(len(error))
+        elif hasattr(precision, "ndim") and precision.ndim == 1:
+            precision_clipped = np.clip(precision, self.precision_min, self.precision_max)
+            precision_matrix = np.diag(precision_clipped)
+        else:
+            precision_matrix = np.asarray(precision).copy()
+            np.fill_diagonal(
+                precision_matrix,
+                np.clip(np.diag(precision_matrix), self.precision_min, self.precision_max),
+            )
+
+        accuracy = 0.5 * error.T @ precision_matrix @ error
+        return float(accuracy)
+
+    def compute_complexity(
+        self,
+        posterior_mean: FloatArray,
+        posterior_cov: FloatArray,
+        prior_mean: FloatArray,
+        prior_cov: FloatArray,
+    ) -> float:
+        """
+        Compute complexity term of variational free energy.
+
+        Parameters
+        ----------
+        posterior_mean : np.ndarray
+            Posterior mean
+        posterior_cov : np.ndarray
+            Posterior covariance
+        prior_mean : np.ndarray
+            Prior mean
+        prior_cov : np.ndarray
+            Prior covariance
+
+        Returns
+        -------
+        float
+            Complexity value
+        """
+        return self._kl_divergence_gaussian(posterior_mean, posterior_cov, prior_mean, prior_cov)
+
+    def compute_epistemic_value(
+        self,
+        policy: FloatArray,
+        predicted_states: FloatArray,
+        state_uncertainty: FloatArray,
+        horizon: int = 3,
+    ) -> float:
+        """
+        Compute epistemic value component of expected free energy.
+
+        Parameters
+        ----------
+        policy : np.ndarray
+            Policy
+        predicted_states : np.ndarray
+            Predicted states
+        state_uncertainty : np.ndarray
+            State uncertainty
+        horizon : int
+            Planning horizon
+
+        Returns
+        -------
+        float
+            Epistemic value
+        """
+        epistemic_value = 0.0
+        for t in range(min(horizon, len(predicted_states))):
+            epistemic_value -= np.mean(state_uncertainty[t])
+        return float(epistemic_value)
+
+    def compute_pragmatic_value(
+        self,
+        predicted_observations: FloatArray,
+        preferences: FloatArray,
+        horizon: int = 3,
+    ) -> float:
+        """
+        Compute pragmatic value component of expected free energy.
+
+        Parameters
+        ----------
+        predicted_observations : np.ndarray
+            Predicted observations
+        preferences : np.ndarray
+            Preferences
+        horizon : int
+            Planning horizon
+
+        Returns
+        -------
+        float
+            Pragmatic value
+        """
+        pragmatic_value = 0.0
+        for t in range(min(horizon, len(predicted_observations))):
+            pred_obs = predicted_observations[t]
+            pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)
+            pref = preferences / (np.sum(preferences) + self.eps)
+            kl_div = np.sum(xlogy(pred_obs, pred_obs / (pref + self.eps)))
+            pragmatic_value += kl_div
+        return float(pragmatic_value)
+
 
 # Standalone wrapper functions for backward compatibility and easier testing
 def compute_variational_free_energy(
     observation: FloatArray,
     prediction: FloatArray,
-    precision: FloatArray,
+    precision: Union[float, FloatArray],
+    posterior_mean: FloatArray,
+    posterior_cov: FloatArray,
+    prior_mean: FloatArray,
+    prior_cov: FloatArray,
     config: Optional[ConfigDict] = None,
-) -> tuple[float, dict]:
+) -> Tuple[float, Dict[str, float]]:
     """
     Standalone wrapper for computing variational free energy.
 
@@ -593,8 +735,16 @@ def compute_variational_free_energy(
         Observed data
     prediction : np.ndarray
         Predicted data
-    precision : np.ndarray
+    precision : float or np.ndarray
         Precision weights
+    posterior_mean : np.ndarray
+        Posterior mean
+    posterior_cov : np.ndarray
+        Posterior covariance
+    prior_mean : np.ndarray
+        Prior mean
+    prior_cov : np.ndarray
+        Prior covariance
     config : dict, optional
         Configuration parameters
 
@@ -604,16 +754,20 @@ def compute_variational_free_energy(
         Total free energy and component breakdown
     """
     calc = FreeEnergyCalculator(config)
-    return calc.compute_variational_free_energy(observation, prediction, precision)
+    return calc.compute_variational_free_energy(
+        observation, prediction, precision, posterior_mean, posterior_cov, prior_mean, prior_cov
+    )
 
 
 def compute_expected_free_energy(
     policy: FloatArray,
-    predicted_states: FloatArray,
-    desired_states: FloatArray,
-    precision: FloatArray,
+    predicted_states: List[FloatArray],
+    predicted_observations: FloatArray,
+    preferences: FloatArray,
+    state_uncertainty: FloatArray,
+    horizon: int = 3,
     config: Optional[ConfigDict] = None,
-) -> tuple[float, dict]:
+) -> Tuple[float, Dict[str, float]]:
     """
     Standalone wrapper for computing expected free energy.
 
@@ -623,10 +777,14 @@ def compute_expected_free_energy(
         Policy parameters
     predicted_states : np.ndarray
         Predicted states under policy
-    desired_states : np.ndarray
-        Desired states
-    precision : np.ndarray
-        Precision weights
+    predicted_observations : np.ndarray
+        Predicted observations
+    preferences : np.ndarray
+        Preferences
+    state_uncertainty : np.ndarray
+        State uncertainty
+    horizon : int
+        Planning horizon
     config : dict, optional
         Configuration parameters
 
@@ -636,7 +794,9 @@ def compute_expected_free_energy(
         Total expected free energy and component breakdown
     """
     calc = FreeEnergyCalculator(config)
-    return calc.compute_expected_free_energy(policy, predicted_states, desired_states, precision)
+    return calc.compute_expected_free_energy(
+        policy, predicted_states, predicted_observations, preferences, state_uncertainty, horizon
+    )
 
 
 def compute_accuracy(
@@ -664,17 +824,25 @@ def compute_accuracy(
 
 
 def compute_complexity(
-    prediction: FloatArray, prior_prediction: FloatArray, config: Optional[ConfigDict] = None
+    posterior_mean: FloatArray,
+    posterior_cov: FloatArray,
+    prior_mean: FloatArray,
+    prior_cov: FloatArray,
+    config: Optional[ConfigDict] = None,
 ) -> float:
     """
     Standalone wrapper for computing complexity term.
 
     Parameters
     ----------
-    prediction : np.ndarray
-        Current prediction
-    prior_prediction : np.ndarray
-        Prior prediction
+    posterior_mean : np.ndarray
+        Posterior mean
+    posterior_cov : np.ndarray
+        Posterior covariance
+    prior_mean : np.ndarray
+        Prior mean
+    prior_cov : np.ndarray
+        Prior covariance
     config : dict, optional
         Configuration parameters
 
@@ -684,11 +852,15 @@ def compute_complexity(
         Complexity value
     """
     calc = FreeEnergyCalculator(config)
-    return calc.compute_complexity(prediction, prior_prediction)
+    return calc.compute_complexity(posterior_mean, posterior_cov, prior_mean, prior_cov)
 
 
 def compute_epistemic_value(
-    policy: FloatArray, predicted_states: FloatArray, config: Optional[ConfigDict] = None
+    policy: FloatArray,
+    predicted_states: FloatArray,
+    state_uncertainty: FloatArray,
+    horizon: int = 3,
+    config: Optional[ConfigDict] = None,
 ) -> float:
     """
     Standalone wrapper for computing epistemic value.
@@ -699,6 +871,10 @@ def compute_epistemic_value(
         Policy parameters
     predicted_states : np.ndarray
         Predicted states
+    state_uncertainty : np.ndarray
+        State uncertainty
+    horizon : int
+        Planning horizon
     config : dict, optional
         Configuration parameters
 
@@ -708,21 +884,26 @@ def compute_epistemic_value(
         Epistemic value
     """
     calc = FreeEnergyCalculator(config)
-    return calc.compute_epistemic_value(policy, predicted_states)
+    return calc.compute_epistemic_value(policy, predicted_states, state_uncertainty, horizon)
 
 
 def compute_pragmatic_value(
-    predicted_states: FloatArray, desired_states: FloatArray, config: Optional[ConfigDict] = None
+    predicted_observations: FloatArray,
+    preferences: FloatArray,
+    horizon: int = 3,
+    config: Optional[ConfigDict] = None,
 ) -> float:
     """
     Standalone wrapper for computing pragmatic value.
 
     Parameters
     ----------
-    predicted_states : np.ndarray
-        Predicted states
-    desired_states : np.ndarray
-        Desired states
+    predicted_observations : np.ndarray
+        Predicted observations
+    preferences : np.ndarray
+        Preferences
+    horizon : int
+        Planning horizon
     config : dict, optional
         Configuration parameters
 
@@ -732,4 +913,4 @@ def compute_pragmatic_value(
         Pragmatic value
     """
     calc = FreeEnergyCalculator(config)
-    return calc.compute_pragmatic_value(predicted_states, desired_states)
+    return calc.compute_pragmatic_value(predicted_observations, preferences, horizon)

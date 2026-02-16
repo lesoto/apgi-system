@@ -5,7 +5,6 @@ Tests the schema validation middleware functionality.
 """
 
 import pytest
-import json
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
@@ -14,7 +13,7 @@ from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
 
 @pytest.fixture
-def app_with_validation():
+def app_with_validation() -> FastAPI:
     """Create a test FastAPI app with schema validation middleware."""
     app = FastAPI()
 
@@ -23,27 +22,27 @@ def app_with_validation():
 
     # Define test endpoints
     @app.get("/test/valid", response_model=dict)
-    async def valid_endpoint():
+    async def valid_endpoint() -> dict:
         """Endpoint that returns valid response."""
         return {"status": "ok", "data": {"value": 123}}
 
     @app.get("/test/invalid-type")
-    async def invalid_type_endpoint():
+    async def invalid_type_endpoint() -> JSONResponse:
         """Endpoint that returns wrong type."""
         return JSONResponse(status_code=200, content={"status": 123})  # Should be string
 
     @app.get("/test/missing-field")
-    async def missing_field_endpoint():
+    async def missing_field_endpoint() -> JSONResponse:
         """Endpoint that returns response with missing required field."""
         return JSONResponse(status_code=200, content={"data": "test"})  # Missing 'status' field
 
     @app.get("/test/empty")
-    async def empty_endpoint():
+    async def empty_endpoint() -> Response:
         """Endpoint that returns empty response."""
         return Response(status_code=204)
 
     @app.get("/test/error")
-    async def error_endpoint():
+    async def error_endpoint() -> JSONResponse:
         """Endpoint that returns error."""
         return JSONResponse(status_code=500, content={"error": "Internal error"})
 
@@ -51,12 +50,12 @@ def app_with_validation():
 
 
 @pytest.fixture
-def client(app_with_validation):
+def client(app_with_validation: FastAPI) -> TestClient:
     """Create test client."""
     return TestClient(app_with_validation)
 
 
-def test_middleware_initialization():
+def test_middleware_initialization() -> None:
     """Test that middleware can be initialized."""
     app = FastAPI()
 
@@ -67,14 +66,14 @@ def test_middleware_initialization():
     assert middleware.openapi_schema is None
 
 
-def test_middleware_disabled():
+def test_middleware_disabled() -> None:
     """Test that middleware can be disabled."""
     app = FastAPI()
 
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=False)
 
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> dict:
         return {"status": "ok"}
 
     client = TestClient(app)
@@ -83,7 +82,7 @@ def test_middleware_disabled():
     assert response.status_code == 200
 
 
-def test_valid_response(client):
+def test_valid_response(client: TestClient) -> None:
     """Test that valid responses pass validation."""
     response = client.get("/test/valid")
 
@@ -93,7 +92,7 @@ def test_valid_response(client):
     assert "data" in data
 
 
-def test_empty_response(client):
+def test_empty_response(client: TestClient) -> None:
     """Test that empty responses are handled correctly."""
     response = client.get("/test/empty")
 
@@ -101,7 +100,7 @@ def test_empty_response(client):
     assert response.status_code == 204
 
 
-def test_error_response_not_validated(client):
+def test_error_response_not_validated(client: TestClient) -> None:
     """Test that 5xx error responses are not validated."""
     response = client.get("/test/error")
 
@@ -109,12 +108,12 @@ def test_error_response_not_validated(client):
     assert response.status_code == 500
 
 
-def test_get_response_schema():
+def test_get_response_schema() -> None:
     """Test schema extraction from OpenAPI spec."""
     app = FastAPI()
 
     @app.get("/test/{item_id}")
-    async def test_endpoint(item_id: str):
+    async def test_endpoint(item_id: str) -> dict:
         return {"id": item_id}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)
@@ -128,12 +127,12 @@ def test_get_response_schema():
     assert schema is not None
 
 
-def test_find_matching_path():
+def test_find_matching_path() -> None:
     """Test path matching with parameters."""
     app = FastAPI()
 
     @app.get("/sessions/{session_id}")
-    async def get_session(session_id: str):
+    async def get_session(session_id: str) -> dict:
         return {"session_id": session_id}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)
@@ -147,7 +146,7 @@ def test_find_matching_path():
     assert path_item is not None
 
 
-def test_validate_schema_basic():
+def test_validate_schema_basic() -> None:
     """Test basic schema validation."""
     middleware = ResponseSchemaValidationMiddleware(app=FastAPI(), enabled=True)
 
@@ -169,7 +168,7 @@ def test_validate_schema_basic():
     assert len(errors) == 0
 
 
-def test_validate_schema_missing_required():
+def test_validate_schema_missing_required() -> None:
     """Test validation with missing required field."""
     middleware = ResponseSchemaValidationMiddleware(app=FastAPI(), enabled=True)
 
@@ -191,7 +190,7 @@ def test_validate_schema_missing_required():
     assert any("data" in str(error) for error in errors)
 
 
-def test_validate_schema_wrong_type():
+def test_validate_schema_wrong_type() -> None:
     """Test validation with wrong field type."""
     middleware = ResponseSchemaValidationMiddleware(app=FastAPI(), enabled=True)
 
@@ -208,7 +207,7 @@ def test_validate_schema_wrong_type():
     assert len(errors) > 0
 
 
-def test_validate_field_types():
+def test_validate_field_types() -> None:
     """Test field type validation."""
     middleware = ResponseSchemaValidationMiddleware(app=FastAPI(), enabled=True)
 
@@ -237,12 +236,12 @@ def test_validate_field_types():
     assert len(errors) > 0
 
 
-def test_schema_cache():
+def test_schema_cache() -> None:
     """Test that schemas are cached."""
     app = FastAPI()
 
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> dict:
         return {"status": "ok"}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)
@@ -265,7 +264,7 @@ def test_schema_cache():
 
 
 @pytest.mark.asyncio
-async def test_get_response_body():
+async def test_get_response_body() -> None:
     """Test response body extraction."""
     middleware = ResponseSchemaValidationMiddleware(app=FastAPI(), enabled=True)
 

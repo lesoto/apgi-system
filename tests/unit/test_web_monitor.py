@@ -5,19 +5,18 @@ Tests the web monitor functionality including data updates,
 WebSocket communication, and dashboard features.
 """
 
-import pytest
 import time
-import json
 import threading
 from unittest.mock import patch, MagicMock
 
 from apgi_system.visualization.simple_monitor import SimpleMonitor, MonitoringIntegration
+from apgi_system.visualization.web_monitor import WebMonitor
 
 
 class TestSimpleMonitor:
     """Test the SimpleMonitor class."""
 
-    def test_monitor_initialization(self):
+    def test_monitor_initialization(self) -> None:
         """Test SimpleMonitor initialization."""
         monitor = SimpleMonitor(buffer_size=500, update_interval=0.2)
 
@@ -27,7 +26,7 @@ class TestSimpleMonitor:
         assert monitor.system_status == "Stopped"
         assert len(monitor.time_buffer) == 0
 
-    def test_monitor_default_initialization(self):
+    def test_monitor_default_initialization(self) -> None:
         """Test SimpleMonitor with default parameters."""
         monitor = SimpleMonitor()
 
@@ -35,7 +34,7 @@ class TestSimpleMonitor:
         assert monitor.update_interval == 0.1
         assert monitor.is_monitoring is False
 
-    def test_start_stop_monitoring(self):
+    def test_start_stop_monitoring(self) -> None:
         """Test starting and stopping monitoring."""
         monitor = SimpleMonitor()
 
@@ -54,7 +53,7 @@ class TestSimpleMonitor:
         assert monitor.is_monitoring is False
         assert monitor.system_status == "Stopped"
 
-    def test_clear_buffers(self):
+    def test_clear_buffers(self) -> None:
         """Test clearing data buffers."""
         monitor = SimpleMonitor()
 
@@ -83,7 +82,7 @@ class TestSimpleMonitor:
         assert len(monitor.free_energy_buffer) == 0
         assert len(monitor.alerts) == 0
 
-    def test_update_data_basic(self):
+    def test_update_data_basic(self) -> None:
         """Test basic data update functionality."""
         monitor = SimpleMonitor(buffer_size=10)
 
@@ -111,7 +110,7 @@ class TestSimpleMonitor:
         assert monitor.current_metrics["ignition_signal"] == 2.5
         assert monitor.current_metrics["ignition_occurred"] is True
 
-    def test_update_data_buffer_overflow(self):
+    def test_update_data_buffer_overflow(self) -> None:
         """Test data update with buffer overflow."""
         monitor = SimpleMonitor(buffer_size=3)
 
@@ -132,7 +131,7 @@ class TestSimpleMonitor:
         assert list(monitor.time_buffer) == [2000.0, 3000.0, 4000.0]
         assert list(monitor.ignition_buffer) == [2.0, 3.0, 4.0]
 
-    def test_check_alerts_low_energy(self):
+    def test_check_alerts_low_energy(self) -> None:
         """Test alert generation for low energy."""
         monitor = SimpleMonitor()
 
@@ -155,7 +154,7 @@ class TestSimpleMonitor:
         assert "energy reserves" in latest_alert["message"].lower()
         assert latest_alert["level"] == "warning"
 
-    def test_check_alerts_critical_energy(self):
+    def test_check_alerts_critical_energy(self) -> None:
         """Test alert generation for critical energy."""
         monitor = SimpleMonitor()
 
@@ -174,7 +173,7 @@ class TestSimpleMonitor:
         latest_alert = monitor.alerts[-1]
         assert latest_alert["level"] == "critical"
 
-    def test_get_status(self):
+    def test_get_status(self) -> None:
         """Test getting monitor status."""
         monitor = SimpleMonitor()
 
@@ -190,7 +189,7 @@ class TestSimpleMonitor:
         assert status["system_status"] == "Stopped"
         assert status["total_updates"] == 0
 
-    def test_get_data(self):
+    def test_get_data(self) -> None:
         """Test getting monitoring data."""
         monitor = SimpleMonitor()
 
@@ -215,7 +214,7 @@ class TestSimpleMonitor:
         assert data["time"][0] == 1000.0
         assert data["ignition_signal"][0] == 2.0
 
-    def test_export_data(self):
+    def test_export_data(self) -> None:
         """Test data export functionality."""
         monitor = SimpleMonitor()
 
@@ -239,7 +238,7 @@ class TestSimpleMonitor:
         assert "current_metrics" in export_data
         assert "statistics" in export_data
 
-    def test_get_statistics(self):
+    def test_get_statistics(self) -> None:
         """Test statistics calculation."""
         monitor = SimpleMonitor()
 
@@ -270,7 +269,7 @@ class TestSimpleMonitor:
         assert ignition_stats["min"] == 0.0
         assert ignition_stats["max"] == 4.0
 
-    def test_check_alerts_high_free_energy(self):
+    def test_check_alerts_high_free_energy(self) -> None:
         """Test alert generation for high free energy."""
         monitor = WebMonitor()
 
@@ -290,7 +289,7 @@ class TestSimpleMonitor:
         assert "free energy" in latest_alert["message"].lower()
         assert latest_alert["level"] == "warning"
 
-    def test_check_alerts_low_coherence(self):
+    def test_check_alerts_low_coherence(self) -> None:
         """Test alert generation for low coherence."""
         monitor = WebMonitor()
 
@@ -310,7 +309,7 @@ class TestSimpleMonitor:
         assert "coherence" in latest_alert["message"].lower()
         assert latest_alert["level"] == "info"
 
-    def test_alerts_limit(self):
+    def test_alerts_limit(self) -> None:
         """Test that alerts are limited to prevent memory issues."""
         monitor = WebMonitor()
 
@@ -330,7 +329,7 @@ class TestSimpleMonitor:
         assert len(monitor.alerts) <= 100
 
     @patch("apgi_system.visualization.web_monitor.SocketIO")
-    def test_socketio_emit(self, mock_socketio):
+    def test_socketio_emit(self, mock_socketio) -> None:
         """Test WebSocket data emission."""
         monitor = WebMonitor()
         monitor.is_monitoring = True
@@ -349,7 +348,7 @@ class TestSimpleMonitor:
         # Should emit data update
         monitor.socketio.emit.assert_called()
 
-    def test_create_dashboard_template(self):
+    def test_create_dashboard_template(self) -> None:
         """Test dashboard template creation."""
         monitor = WebMonitor()
 
@@ -357,16 +356,6 @@ class TestSimpleMonitor:
         monitor.create_dashboard_template()
 
         # Verify template file exists
-        from pathlib import Path
-
-        template_path = (
-            Path(__file__).parent.parent.parent
-            / "apgi_system"
-            / "visualization"
-            / "templates"
-            / "dashboard.html"
-        )
-
         # Template should be created (or at least the method should not fail)
         # We can't easily test file creation in unit tests, so we just verify no exceptions
 
@@ -374,7 +363,7 @@ class TestSimpleMonitor:
 class TestMonitoringIntegration:
     """Test the MonitoringIntegration class."""
 
-    def test_integration_initialization(self):
+    def test_integration_initialization(self) -> None:
         """Test MonitoringIntegration initialization."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -382,7 +371,7 @@ class TestMonitoringIntegration:
         assert integration.monitor is monitor
         assert integration.is_connected is False
 
-    def test_connect_system_with_callback_support(self):
+    def test_connect_system_with_callback_support(self) -> None:
         """Test connecting system that supports monitoring callbacks."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -396,7 +385,7 @@ class TestMonitoringIntegration:
         assert integration.is_connected is True
         mock_system.add_monitor_callback.assert_called_once_with(monitor.update_data)
 
-    def test_connect_system_without_callback_support(self):
+    def test_connect_system_without_callback_support(self) -> None:
         """Test connecting system that doesn't support monitoring callbacks."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -409,7 +398,7 @@ class TestMonitoringIntegration:
 
         assert integration.is_connected is False
 
-    def test_disconnect_system(self):
+    def test_disconnect_system(self) -> None:
         """Test disconnecting system from monitor."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -429,7 +418,7 @@ class TestMonitoringIntegration:
         assert integration.is_connected is False
         mock_system.remove_monitor_callback.assert_called_once_with(monitor.update_data)
 
-    def test_simulate_data_basic(self):
+    def test_simulate_data_basic(self) -> None:
         """Test basic data simulation."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -445,7 +434,7 @@ class TestMonitoringIntegration:
         assert all(val >= 0 for val in monitor.ignition_buffer)
         assert all(0 <= val <= 1 for val in monitor.energy_reserves_buffer)
 
-    def test_simulate_data_threading(self):
+    def test_simulate_data_threading(self) -> None:
         """Test data simulation in separate thread."""
         monitor = WebMonitor()
         integration = MonitoringIntegration(monitor)
@@ -471,7 +460,7 @@ class TestMonitoringIntegration:
 class TestWebMonitorIntegration:
     """Integration tests for web monitor functionality."""
 
-    def test_full_monitoring_cycle(self):
+    def test_full_monitoring_cycle(self) -> None:
         """Test complete monitoring cycle."""
         monitor = WebMonitor(buffer_size=50)
 
@@ -499,7 +488,7 @@ class TestWebMonitorIntegration:
         monitor.stop_monitoring()
         assert monitor.is_monitoring is False
 
-    def test_monitoring_with_alerts(self):
+    def test_monitoring_with_alerts(self) -> None:
         """Test monitoring with alert generation."""
         monitor = WebMonitor()
 
@@ -546,7 +535,7 @@ class TestWebMonitorIntegration:
         assert any("free energy" in msg for msg in alert_messages)
         assert any("coherence" in msg for msg in alert_messages)
 
-    def test_performance_with_large_dataset(self):
+    def test_performance_with_large_dataset(self) -> None:
         """Test monitor performance with large dataset."""
         monitor = WebMonitor(buffer_size=5000)
 
@@ -574,11 +563,11 @@ class TestWebMonitorIntegration:
         assert monitor.time_buffer[0] == 0.0
         assert monitor.time_buffer[-1] == 9990.0
 
-    def test_concurrent_access(self):
+    def test_concurrent_access(self) -> None:
         """Test concurrent access to monitor data."""
         monitor = WebMonitor()
 
-        def update_data_worker(worker_id, num_updates):
+        def update_data_worker(worker_id: int, num_updates: int):
             """Worker function for concurrent updates."""
             for i in range(num_updates):
                 test_state = {

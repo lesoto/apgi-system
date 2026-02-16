@@ -4,20 +4,21 @@ import pytest
 import numpy as np
 import yaml
 from pathlib import Path
+from typing import Dict, Any
 
 from apgi_system.core import FreeEnergyCalculator, ActiveInferenceEngine
 from apgi_system.core import PrecisionWeighting
 
 
 @pytest.fixture
-def config():
+def config() -> Dict[str, Any]:
     """Load default configuration."""
     config_path = Path(__file__).parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
 
-def test_free_energy_calculator():
+def test_free_energy_calculator() -> None:
     """Test free energy calculation."""
     calc = FreeEnergyCalculator()
 
@@ -39,7 +40,7 @@ def test_free_energy_calculator():
     assert "complexity" in components
 
 
-def test_precision_weighting(config):
+def test_precision_weighting(config: Dict[str, Any]) -> None:
     """Test precision weighting system."""
     precision = PrecisionWeighting(config)
 
@@ -54,7 +55,7 @@ def test_precision_weighting(config):
     assert result["interoceptive"] > 0
 
 
-def test_active_inference_engine(config):
+def test_active_inference_engine(config: Dict[str, Any]) -> None:
     """Test active inference engine."""
     engine = ActiveInferenceEngine(config)
 
@@ -66,7 +67,7 @@ def test_active_inference_engine(config):
     assert "beliefs" in info
 
 
-def test_system_initialization(config):
+def test_system_initialization(config: Dict[str, Any]) -> None:
     """Test that system can be initialized."""
     from apgi_system.system import APGISystem
 
@@ -75,7 +76,7 @@ def test_system_initialization(config):
     assert system.time == 0.0
 
 
-def test_system_step(config):
+def test_system_step(config: Dict[str, Any]) -> None:
     """Test single system step."""
     from apgi_system.system import APGISystem
 

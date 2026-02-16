@@ -8,16 +8,16 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch
 import redis.asyncio as redis
-import json
 
 from api.main import create_app
 from api.routes import sessions, export
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 from api.services.data_export import DataExportService
+from typing import Dict, Any, Generator
 
 
 @pytest.fixture
-def mock_redis():
+def mock_redis() -> AsyncMock:
     """Create a mock Redis client."""
     mock_client = AsyncMock(spec=redis.Redis)
     mock_client.ping = AsyncMock()
@@ -29,19 +29,19 @@ def mock_redis():
 
 
 @pytest.fixture
-def mock_session_manager():
+def mock_session_manager() -> Mock:
     """Create a mock SessionManager with test data."""
     manager = Mock(spec=SessionManager)
 
     # Mock get_session
-    async def mock_get_session(session_id):
+    async def mock_get_session(session_id: str) -> Mock:
         if session_id == "test-session-id-123":
             mock_sim = Mock(spec=SimulationSession)
             mock_sim.session_id = session_id
             mock_sim.state = SessionLifecycleState.RUNNING
 
             # Mock get_state with history data
-            async def mock_get_state():
+            async def mock_get_state() -> Dict[str, Any]:
                 return {
                     "time": 5000.0,
                     "history": {
@@ -68,9 +68,9 @@ def mock_session_manager():
 
 
 @pytest.fixture
-def client(mock_redis, mock_session_manager):
+def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> Generator[TestClient, None, None]:
     """Create a test client with mocked dependencies."""
-    app = create_app()
+    app = create_app(test_mode=True)
 
     # Override the session manager dependency
     sessions._session_manager = mock_session_manager
@@ -83,12 +83,24 @@ def client(mock_redis, mock_session_manager):
     app.router.on_startup = []
     app.router.on_shutdown = []
 
-    return TestClient(app)
+    # Mock authentication dependencies
+    mock_user = Mock()
+    mock_user.user_id = "test_user"
+    mock_user.username = "testuser"
+    mock_user.roles = ["researcher"]
+
+    with (patch("api.services.auth_manager.AuthManager.verify_token", return_value=mock_user),):
+
+        yield TestClient(app)
 
 
-def test_export_session_data_json(client):
+def test_export_session_data_json(client: TestClient) -> None:
     """Test exporting session data as JSON."""
-    response = client.get("/v1/sessions/test-session-id-123/export", params={"format": "json"})
+    response = client.get(
+        "/v1/sessions/test-session-id-123/export",
+        params={"format": "json"},
+        headers={"Authorization": "Bearer fake_token"},
+    )
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
@@ -102,7 +114,7 @@ def test_export_session_data_json(client):
     assert "time" in data["history"]
 
 
-def test_export_session_data_csv(client):
+def test_export_session_data_csv(client: TestClient) -> None:
     """Test exporting session data as CSV."""
     response = client.get("/v1/sessions/test-session-id-123/export", params={"format": "csv"})
 
@@ -116,7 +128,7 @@ def test_export_session_data_csv(client):
     assert "free_energy" in content or "ignitions" in content
 
 
-def test_export_with_variable_filter(client):
+def test_export_with_variable_filter(client: TestClient) -> None:
     """Test exporting with variable filtering."""
     response = client.get(
         "/v1/sessions/test-session-id-123/export",
@@ -132,7 +144,7 @@ def test_export_with_variable_filter(client):
     assert "free_energy" in history
 
 
-def test_export_with_time_filter(client):
+def test_export_with_time_filter(client: TestClient) -> None:
     """Test exporting with time range filtering."""
     response = client.get(
         "/v1/sessions/test-session-id-123/export",
@@ -150,7 +162,7 @@ def test_export_with_time_filter(client):
         assert all(t <= 40.0 for t in times)
 
 
-def test_export_session_not_found(client):
+def test_export_session_not_found(client: TestClient) -> None:
     """Test exporting non-existent session."""
     response = client.get("/v1/sessions/nonexistent-id/export", params={"format": "json"})
 
@@ -158,7 +170,7 @@ def test_export_session_not_found(client):
     assert "not found" in response.json()["detail"].lower()
 
 
-def test_get_summary_statistics(client):
+def test_get_summary_statistics(client: TestClient) -> None:
     """Test retrieving summary statistics."""
     response = client.get("/v1/sessions/test-session-id-123/summary")
 
@@ -179,7 +191,7 @@ def test_get_summary_statistics(client):
     assert "frequency_hz" in ignition_stats
 
 
-def test_get_time_series_data(client):
+def test_get_time_series_data(client: TestClient) -> None:
     """Test retrieving time series data."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
@@ -200,7 +212,7 @@ def test_get_time_series_data(client):
     assert "metabolic_reserves" in data["data"]
 
 
-def test_get_time_series_with_pagination(client):
+def test_get_time_series_with_pagination(client: TestClient) -> None:
     """Test time series with pagination."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
@@ -221,7 +233,7 @@ def test_get_time_series_with_pagination(client):
         assert "next_cursor" in pagination
 
 
-def test_get_time_series_with_downsampling(client):
+def test_get_time_series_with_downsampling(client: TestClient) -> None:
     """Test time series with downsampling."""
     response = client.get(
         "/v1/sessions/test-session-id-123/timeseries",
@@ -235,7 +247,7 @@ def test_get_time_series_with_downsampling(client):
     assert data["num_points"] <= 3  # Original has 6 points, downsample by 2 = 3
 
 
-def test_get_event_analysis(client):
+def test_get_event_analysis(client: TestClient) -> None:
     """Test retrieving event analysis."""
     response = client.get(
         "/v1/sessions/test-session-id-123/events", params={"event_type": "ignition"}
@@ -252,7 +264,7 @@ def test_get_event_analysis(client):
     assert "trigger_patterns" in data
 
 
-def test_get_event_analysis_session_not_found(client):
+def test_get_event_analysis_session_not_found(client: TestClient) -> None:
     """Test event analysis for non-existent session."""
     response = client.get("/v1/sessions/nonexistent-id/events", params={"event_type": "ignition"})
 
@@ -260,7 +272,7 @@ def test_get_event_analysis_session_not_found(client):
     assert "not found" in response.json()["detail"].lower()
 
 
-def test_complete_export_workflow(client):
+def test_complete_export_workflow(client: TestClient) -> None:
     """Test complete data export workflow."""
     session_id = "test-session-id-123"
 

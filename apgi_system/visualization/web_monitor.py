@@ -5,7 +5,6 @@ Provides a modern web interface for real-time monitoring of APGI system dynamics
 using Flask, WebSockets, and interactive JavaScript visualizations.
 """
 
-import json
 import time
 import threading
 from typing import Dict, Any, List, Optional
@@ -19,8 +18,6 @@ import numpy as np
 try:
     from flask import Flask, render_template, jsonify, request
     from flask_socketio import SocketIO, emit
-    import plotly.graph_objs as go
-    import plotly.utils
 
     WEB_DEPENDENCIES_AVAILABLE = True
 except ImportError:
@@ -64,46 +61,51 @@ class WebMonitor:
         self.update_interval = update_interval
 
         # Data buffers
-        self.time_buffer = deque(maxlen=buffer_size)
-        self.ignition_buffer = deque(maxlen=buffer_size)
-        self.free_energy_buffer = deque(maxlen=buffer_size)
-        self.precision_buffer = deque(maxlen=buffer_size)
-        self.energy_reserves_buffer = deque(maxlen=buffer_size)
-        self.coherence_buffer = deque(maxlen=buffer_size)
+        self.time_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.ignition_buffer: deque[int] = deque(maxlen=buffer_size)
+        self.free_energy_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.precision_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.energy_reserves_buffer: deque[float] = deque(maxlen=buffer_size)
+        self.coherence_buffer: deque[float] = deque(maxlen=buffer_size)
 
         # System state
         self.is_monitoring = False
         self.system_status = "Stopped"
-        self.current_metrics = {}
-        self.alerts = []
+        self.current_metrics: Dict[str, Any] = {}
+        self.alerts: List[Dict[str, Any]] = []
 
         # Flask app setup
-        self.app = Flask(
-            __name__,
-            template_folder=str(Path(__file__).parent / "templates"),
-            static_folder=str(Path(__file__).parent / "static"),
-        )
-        self.app.config["SECRET_KEY"] = "apgi_monitor_secret_key"
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
+        self.app: Optional[Flask] = None
+        self.socketio: Optional[SocketIO] = None
+
+        if Flask:
+            self.app = Flask(
+                __name__,
+                template_folder=str(Path(__file__).parent / "templates"),
+                static_folder=str(Path(__file__).parent / "static"),
+            )
+            self.app.config["SECRET_KEY"] = "apgi_monitor_secret_key"
+            self.socketio = SocketIO(self.app, cors_allowed_origins="*")
 
         # Setup routes
-        self._setup_routes()
-        self._setup_socketio_events()
+        if self.app:
+            self._setup_routes()
+            self._setup_socketio_events()
 
         # Background thread for data updates
-        self.update_thread = None
+        self.update_thread: Optional[threading.Thread] = None
         self.stop_event = threading.Event()
 
-    def _setup_routes(self):
+    def _setup_routes(self) -> None:
         """Setup Flask routes."""
 
         @self.app.route("/")
-        def index():
+        def index() -> str:
             """Main dashboard page."""
             return render_template("dashboard.html")
 
         @self.app.route("/api/status")
-        def get_status():
+        def get_status() -> Any:
             """Get current system status."""
             return jsonify(
                 {
@@ -116,7 +118,7 @@ class WebMonitor:
             )
 
         @self.app.route("/api/data")
-        def get_data():
+        def get_data() -> Any:
             """Get current data for plotting."""
             return jsonify(
                 {
@@ -130,7 +132,7 @@ class WebMonitor:
             )
 
         @self.app.route("/api/export")
-        def export_data():
+        def export_data() -> Any:
             """Export current data as JSON."""
             data = {
                 "export_timestamp": datetime.now().isoformat(),
@@ -150,11 +152,11 @@ class WebMonitor:
             }
             return jsonify(data)
 
-    def _setup_socketio_events(self):
+    def _setup_socketio_events(self) -> None:
         """Setup WebSocket event handlers."""
 
         @self.socketio.on("connect")
-        def handle_connect():
+        def handle_connect() -> None:
             """Handle client connection."""
             print(f"Client connected: {request.sid}")
             emit(
@@ -163,12 +165,12 @@ class WebMonitor:
             )
 
         @self.socketio.on("disconnect")
-        def handle_disconnect():
+        def handle_disconnect() -> None:
             """Handle client disconnection."""
             print(f"Client disconnected: {request.sid}")
 
         @self.socketio.on("start_monitoring")
-        def handle_start_monitoring():
+        def handle_start_monitoring() -> None:
             """Handle start monitoring request."""
             self.start_monitoring()
             emit(
@@ -178,7 +180,7 @@ class WebMonitor:
             )
 
         @self.socketio.on("stop_monitoring")
-        def handle_stop_monitoring():
+        def handle_stop_monitoring() -> None:
             """Handle stop monitoring request."""
             self.stop_monitoring()
             emit(
@@ -188,7 +190,7 @@ class WebMonitor:
             )
 
         @self.socketio.on("clear_data")
-        def handle_clear_data():
+        def handle_clear_data() -> None:
             """Handle clear data request."""
             self.clear_buffers()
             emit("data_cleared", broadcast=True)

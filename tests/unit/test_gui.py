@@ -11,11 +11,9 @@ Tests focus on the backend logic that powers the GUI functionality.
 import pytest
 import numpy as np
 import tkinter as tk
-from unittest.mock import Mock, MagicMock, patch
 import tempfile
-import json
 import csv
-from pathlib import Path
+import json
 
 from apgi_system.system import APGISystem
 
@@ -23,7 +21,7 @@ from apgi_system.system import APGISystem
 class TestGUIInitialization:
     """Test GUI initialization and setup."""
 
-    def test_gui_launches_without_errors(self):
+    def test_gui_launches_without_errors(self) -> None:
         """
         Test that GUI can be initialized without errors.
 
@@ -82,7 +80,7 @@ class TestGUIInitialization:
             root.quit()
             root.destroy()
 
-    def test_gui_initializes_with_default_config(self):
+    def test_gui_initializes_with_default_config(self) -> None:
         """
         Test that GUI initializes with default configuration.
         **Validates: Requirements 6.1**
@@ -111,7 +109,7 @@ class TestGUIInitialization:
             root.quit()
             root.destroy()
 
-    def test_gui_creates_all_visualization_panels(self):
+    def test_gui_creates_all_visualization_panels(self) -> None:
         """
         Test that all visualization panels are created.
         **Validates: Requirements 6.1**
@@ -157,7 +155,7 @@ class TestGUIInitialization:
 class TestPlotUpdateMechanisms:
     """Test plot update mechanisms."""
 
-    def test_plot_updates_with_valid_data(self):
+    def test_plot_updates_with_valid_data(self) -> None:
         """
         Test that plots update correctly with valid data.
         **Validates: Requirements 6.4**
@@ -167,7 +165,6 @@ class TestPlotUpdateMechanisms:
         except Exception as e:
             # Skip test if Tkinter is not properly configured
             pytest.skip(f"Tkinter not available: {e}")
-            return
 
         try:
             from apgi_gui import APGIGui
@@ -204,7 +201,7 @@ class TestPlotUpdateMechanisms:
             root.quit()
             root.destroy()
 
-    def test_plot_updates_handle_empty_buffers(self):
+    def test_plot_updates_handle_empty_buffers(self) -> None:
         """
         Test that plot updates handle empty buffers gracefully.
         **Validates: Requirements 6.4**
@@ -231,7 +228,7 @@ class TestPlotUpdateMechanisms:
             root.quit()
             root.destroy()
 
-    def test_status_labels_update_correctly(self):
+    def test_status_labels_update_correctly(self) -> None:
         """
         Test that status labels update with correct values.
         **Validates: Requirements 6.4**
@@ -246,7 +243,7 @@ class TestPlotUpdateMechanisms:
             # Run a few simulation steps
             for i in range(5):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                app.apgi_system.step(obs)
 
             # Update status labels
             app._update_status_labels()
@@ -260,7 +257,7 @@ class TestPlotUpdateMechanisms:
             root.quit()
             root.destroy()
 
-    def test_record_state_captures_all_metrics(self):
+    def test_record_state_captures_all_metrics(self) -> None:
         """
         Test that _record_state captures all required metrics.
         **Validates: Requirements 6.3, 6.4**
@@ -318,7 +315,7 @@ class TestPlotUpdateMechanisms:
 class TestParameterAdjustments:
     """Test slider parameter updates."""
 
-    def test_parameter_adjustment_updates_system(self):
+    def test_parameter_adjustment_updates_system(self) -> None:
         """
         Test that parameter adjustments update the system immediately.
         **Validates: Requirements 6.2**
@@ -350,7 +347,7 @@ class TestParameterAdjustments:
             root.quit()
             root.destroy()
 
-    def test_parameter_adjustment_with_boundary_values(self):
+    def test_parameter_adjustment_with_boundary_values(self) -> None:
         """
         Test parameter adjustments with boundary values.
         **Validates: Requirements 6.2**
@@ -386,7 +383,7 @@ class TestParameterAdjustments:
             root.quit()
             root.destroy()
 
-    def test_parameter_adjustment_handles_errors_gracefully(self):
+    def test_parameter_adjustment_handles_errors_gracefully(self) -> None:
         """
         Test that parameter adjustment handles errors gracefully.
         **Validates: Requirements 6.2**
@@ -415,7 +412,7 @@ class TestParameterAdjustments:
             root.quit()
             root.destroy()
 
-    def test_speed_control_updates(self):
+    def test_speed_control_updates(self) -> None:
         """
         Test that speed control variable updates correctly.
         **Validates: Requirements 6.2**
@@ -442,7 +439,7 @@ class TestParameterAdjustments:
 class TestManualInterventions:
     """Test manual intervention buttons."""
 
-    def test_trigger_ignition_intervention(self):
+    def test_trigger_ignition_intervention(self) -> None:
         """
         Test that manual ignition trigger works correctly.
         **Validates: Requirements 6.5**
@@ -473,7 +470,7 @@ class TestManualInterventions:
             root.quit()
             root.destroy()
 
-    def test_induce_stressor_intervention(self):
+    def test_induce_stressor_intervention(self) -> None:
         """
         Test that stressor induction works correctly.
         **Validates: Requirements 6.5**
@@ -487,15 +484,14 @@ class TestManualInterventions:
 
             # Get initial allostatic load
             obs = np.random.randn(256) * 0.5
-            initial_state = app.apgi_system.step(obs)
-            initial_load = initial_state["allostasis"]["allostatic_load"]
+            app.apgi_system.step(obs)
 
             # Induce stressor
             app._induce_stressor()
 
             # Step the system to see the effect
             obs = np.random.randn(256) * 0.5
-            new_state = app.apgi_system.step(obs)
+            app.apgi_system.step(obs)
 
             # Verify stressor was applied (method should execute without errors)
             # Note: The exact effect on allostatic load depends on system dynamics
@@ -505,7 +501,7 @@ class TestManualInterventions:
             root.quit()
             root.destroy()
 
-    def test_modulate_precision_intervention(self):
+    def test_modulate_precision_intervention(self) -> None:
         """
         Test that precision modulation dialog can be created.
         **Validates: Requirements 6.5**
@@ -518,9 +514,6 @@ class TestManualInterventions:
             app = APGIGui(root)
 
             # Record initial precision values
-            initial_extero = app.param_vars["extero_precision"].get()
-            initial_intero = app.param_vars["intero_precision"].get()
-
             # Note: We can't easily test the dialog interaction without complex mocking,
             # but we can verify the method exists and can be called
             assert hasattr(app, "_modulate_precision")
@@ -530,7 +523,7 @@ class TestManualInterventions:
             root.quit()
             root.destroy()
 
-    def test_reset_simulation_intervention(self):
+    def test_reset_simulation_intervention(self) -> None:
         """
         Test that reset simulation works correctly.
         **Validates: Requirements 6.5**
@@ -571,7 +564,7 @@ class TestManualInterventions:
 class TestDataExport:
     """Test data export functionality."""
 
-    def test_export_data_to_csv(self):
+    def test_export_data_to_csv(self) -> None:
         """
         Test that data can be exported to CSV format.
         **Validates: Requirements 6.3**
@@ -637,7 +630,7 @@ class TestDataExport:
             root.quit()
             root.destroy()
 
-    def test_export_data_to_json(self):
+    def test_export_data_to_json(self) -> None:
         """
         Test that data can be exported to JSON format.
         **Validates: Requirements 6.3**
@@ -691,7 +684,7 @@ class TestDataExport:
 class TestSimulationControl:
     """Test simulation control functionality."""
 
-    def test_start_simulation_changes_state(self):
+    def test_start_simulation_changes_state(self) -> None:
         """
         Test that starting simulation changes GUI state correctly.
         **Validates: Requirements 6.1**
@@ -718,7 +711,7 @@ class TestSimulationControl:
             root.quit()
             root.destroy()
 
-    def test_generate_input_produces_valid_arrays(self):
+    def test_generate_input_produces_valid_arrays(self) -> None:
         """
         Test that input generation produces valid arrays.
         **Validates: Requirements 6.1**
@@ -748,7 +741,7 @@ class TestSimulationControl:
 class TestEventLogging:
     """Test event logging functionality."""
 
-    def test_log_event_adds_to_log(self):
+    def test_log_event_adds_to_log(self) -> None:
         """
         Test that logging events adds entries to the log.
         **Validates: Requirements 6.1**
@@ -777,7 +770,7 @@ class TestEventLogging:
             root.quit()
             root.destroy()
 
-    def test_update_status_changes_status_bar(self):
+    def test_update_status_changes_status_bar(self) -> None:
         """
         Test that updating status changes the status bar.
         **Validates: Requirements 6.1**

@@ -8,7 +8,6 @@ import uuid
 from enum import Enum
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     DateTime,
@@ -16,10 +15,10 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    PickleType,
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -74,7 +73,7 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(ARRAY(Text), nullable=False, default=list, comment="User roles for RBAC")  # type: ignore[var-annotated]
+    roles = Column(PickleType, nullable=False, default=list, comment="User roles for RBAC")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -86,7 +85,7 @@ class User(Base):  # type: ignore[misc, valid-type]
     # Relationships
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User(user_id={self.user_id}, username={self.username})>"
 
 
@@ -108,7 +107,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Owner user ID",
     )
-    config = Column(JSONB, nullable=False, comment="Session configuration as JSON")
+    config = Column(PickleType, nullable=False, comment="Session configuration as JSON")
     state = Column(
         String(20),
         nullable=False,
@@ -130,7 +129,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(ARRAY(Text), nullable=True, default=list, comment="Session tags for organization")  # type: ignore[var-annotated]
+    tags = Column(PickleType, nullable=True, default=list, comment="Session tags for organization")
 
     # Relationships
     user = relationship("User", back_populates="sessions")
@@ -145,7 +144,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         Index("idx_sessions_state", "state"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Session(session_id={self.session_id}, state={self.state})>"
 
 
@@ -168,7 +167,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     task_type = Column(String(50), nullable=False, index=True, comment="Type of experimental task")
-    parameters = Column(JSONB, nullable=False, comment="Task parameters as JSON")
+    parameters = Column(PickleType, nullable=False, comment="Task parameters as JSON")
     status = Column(
         String(20),
         nullable=False,
@@ -177,7 +176,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         comment="Current task status",
     )
     progress = Column(Integer, nullable=True, comment="Progress percentage (0-100)")
-    result_data = Column(JSONB, nullable=True, comment="Task results as JSON")
+    result_data = Column(PickleType, nullable=True, comment="Task results as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -203,7 +202,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         Index("idx_tasks_type", "task_type"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Task(task_id={self.task_id}, type={self.task_type}, status={self.status})>"
 
 
@@ -223,7 +222,7 @@ class SessionData(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     time_ms = Column(Float, nullable=False, comment="Simulation time in milliseconds")
-    data = Column(JSONB, nullable=False, comment="State data as JSON")
+    data = Column(PickleType, nullable=False, comment="State data as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -240,7 +239,7 @@ class SessionData(Base):  # type: ignore[misc, valid-type]
         Index("idx_session_data_time", "time_ms"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<SessionData(id={self.id}, session_id={self.session_id}, time_ms={self.time_ms})>"
 
 
@@ -282,7 +281,7 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
         Index("idx_refresh_tokens_expires", "expires_at"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<RefreshToken(token_id={self.token_id}, user_id={self.user_id})>"
 
 
@@ -305,7 +304,7 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         comment="Associated task ID",
     )
     webhook_url = Column(String(500), nullable=False, comment="Target webhook URL")
-    payload = Column(JSONB, nullable=False, comment="Webhook payload as JSON")
+    payload = Column(PickleType, nullable=False, comment="Webhook payload as JSON")
     status = Column(String(20), nullable=False, default="pending", comment="Delivery status")
     attempts = Column(Integer, nullable=False, default=0, comment="Number of delivery attempts")
     last_attempt_at = Column(
@@ -329,5 +328,5 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         Index("idx_webhook_deliveries_next_retry", "next_retry_at"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<WebhookDelivery(delivery_id={self.delivery_id}, status={self.status})>"

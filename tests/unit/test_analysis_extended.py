@@ -5,9 +5,8 @@ Tests the comprehensive analysis capabilities including system analysis,
 results processing, and reporting functionality.
 """
 
-import pytest
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from apgi_system.analysis import (
     AnalysisResults,
     SystemAnalyzer,

@@ -10,7 +10,7 @@ import numpy as np
 import tempfile
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from apgi_system.data_export import DataExporter, AdvancedAnalytics
 from apgi_system.analysis import AnalysisResults

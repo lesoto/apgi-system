@@ -17,12 +17,17 @@ import csv
 import tempfile
 import os
 import base64
+import sys
 from pathlib import Path
+from numpy.typing import NDArray
 from hypothesis import given, strategies as st, settings, assume
 from hypothesis import HealthCheck
 
-from apgi_system.system import APGISystem
-from tests.strategies import observation_strategy, body_state_strategy, config_strategy
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from apgi_system.system import APGISystem  # noqa
+from tests.strategies import observation_strategy  # noqa
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(
@@ -47,11 +52,11 @@ class DataExporter:
     format consistency.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize data exporter."""
-        self.log_data = []
+        self.log_data: list[dict] = []
 
-    def record_state(self, state):
+    def record_state(self, state: Dict[str, Any]) -> None:
         """
         Record state data from simulation step.
 
@@ -81,7 +86,7 @@ class DataExporter:
 
         self.log_data.append(data_entry)
 
-    def export_to_csv(self, filename):
+    def export_to_csv(self, filename) -> bool:
         """
         Export data to CSV format.
 
@@ -104,7 +109,7 @@ class DataExporter:
             writer.writerows(self.log_data)
         return True
 
-    def export_to_json(self, filename):
+    def export_to_json(self, filename) -> bool:
         """
         Export data to JSON format.
 
@@ -125,7 +130,7 @@ class DataExporter:
             json.dump(self.log_data, f, indent=2)
         return True
 
-    def generate_analysis_report(self):
+    def generate_analysis_report(self) -> dict:
         """
         Generate analysis report with summary statistics.
 
@@ -188,7 +193,9 @@ class DataExporter:
 
 
 @given(num_steps=st.integers(min_value=5, max_value=50), observation=observation_strategy())
-def test_property_export_data_completeness(num_steps, observation):
+def test_property_export_data_completeness(
+    num_steps: int, observation: NDArray[np.float64]
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 34: Export data completeness**
 
@@ -256,7 +263,9 @@ def test_property_export_data_completeness(num_steps, observation):
 
 
 @given(num_steps=st.integers(min_value=10, max_value=50), observation=observation_strategy())
-def test_property_analysis_report_statistics(num_steps, observation):
+def test_property_analysis_report_statistics(
+    num_steps: int, observation: NDArray[np.float64]
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 35: Analysis report statistics**
 
@@ -322,7 +331,7 @@ def test_property_analysis_report_statistics(num_steps, observation):
 
 
 @given(num_steps=st.integers(min_value=5, max_value=30), observation=observation_strategy())
-def test_property_csv_format_consistency(num_steps, observation):
+def test_property_csv_format_consistency(num_steps: int, observation: NDArray[np.float64]) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 36: CSV format consistency**
 
@@ -403,7 +412,9 @@ def test_property_csv_format_consistency(num_steps, observation):
 
 
 @given(num_steps=st.integers(min_value=5, max_value=30), observation=observation_strategy())
-def test_property_json_round_trip_preservation(num_steps, observation):
+def test_property_json_round_trip_preservation(
+    num_steps: int, observation: NDArray[np.float64]
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 37: JSON round-trip preservation**
 
@@ -487,7 +498,9 @@ def test_property_json_round_trip_preservation(num_steps, observation):
     page_size=st.integers(min_value=5, max_value=30),
     observation=observation_strategy(),
 )
-def test_property_pagination_consistency(num_steps, page_size, observation):
+def test_property_pagination_consistency(
+    num_steps: int, page_size: int, observation: NDArray[np.float64]
+) -> None:
     """
     **Feature: api-rest-interface, Property 13: Pagination consistency**
 

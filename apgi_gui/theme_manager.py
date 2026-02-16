@@ -4,14 +4,16 @@ Shared Theme Utility for APGI GUI Applications
 Provides consistent theming support across all GUI applications.
 """
 
+from typing import Any, Dict, Optional, cast
+
 import tkinter as tk
-from typing import Dict, Any
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class ThemeManager:
     """Manages color themes for GUI applications"""
 
-    THEMES = {
+    THEMES: Dict[str, Dict[str, Any]] = {
         "normal": {
             "bg": "white",
             "fg": "black",
@@ -111,7 +113,7 @@ class ThemeManager:
             Color hex code
         """
         theme = self.THEMES[self.current_theme]
-        return theme.get(color_type, "black")
+        return cast(str, theme.get(color_type, "black"))
 
     def set_theme(self, theme_name: str) -> bool:
         """Set the current theme
@@ -128,7 +130,7 @@ class ThemeManager:
         self.current_theme = theme_name
         return True
 
-    def get_available_themes(self) -> list:
+    def get_available_themes(self) -> list[str]:
         """Get list of available theme names
 
         Returns:
@@ -136,7 +138,7 @@ class ThemeManager:
         """
         return list(self.THEMES.keys())
 
-    def apply_theme_to_widget(self, widget: tk.Widget, theme_name: str = None) -> None:
+    def apply_theme_to_widget(self, widget: tk.Misc, theme_name: Optional[str] = None) -> None:
         """Apply current theme to a widget
 
         Args:
@@ -147,22 +149,31 @@ class ThemeManager:
 
         # Apply background and foreground if widget supports it
         try:
-            widget.config(bg=theme["bg"], fg=theme["fg"])
+            widget.configure(bg=theme["bg"], fg=theme["fg"])
         except tk.TclError:
             # Widget doesn't support bg/fg configuration
             pass
 
-    def apply_theme_to_canvas(self, canvas: tk.Canvas, theme_name: str = None) -> None:
+    def apply_theme_to_canvas(
+        self, canvas: tk.Canvas | FigureCanvasTkAgg, theme_name: Optional[str] = None
+    ) -> None:
         """Apply current theme to a canvas
 
         Args:
-            canvas: Tkinter canvas widget
+            canvas: Tkinter canvas widget or matplotlib FigureCanvasTkAgg
             theme_name: Optional theme name, uses current if not specified
         """
         theme = self.THEMES[theme_name or self.current_theme]
 
         try:
-            canvas.config(bg=theme["canvas_bg"])
+            # Check if this is a matplotlib FigureCanvasTkAgg
+            if hasattr(canvas, "figure"):
+                # For matplotlib canvases, set the figure's facecolor
+                canvas.figure.set_facecolor(theme["canvas_bg"])
+                canvas.draw()  # Redraw to apply the change
+            else:
+                # For Tkinter canvases, use config
+                canvas.config(bg=cast(str, theme["canvas_bg"]))
         except tk.TclError:
             pass
 

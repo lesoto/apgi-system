@@ -5,16 +5,17 @@ Integration tests for numerical stability monitoring with core components.
 import pytest
 import numpy as np
 import warnings
+from typing import Dict, Any
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.core.predictive_processing import HierarchicalPredictor
-from apgi_system.stability import NumericalInstabilityError, NumericalStabilityWarning
+from apgi_system.stability import NumericalInstabilityError
 
 
 class TestStabilityIntegrationFreeEnergy:
     """Test stability monitoring integration with FreeEnergyCalculator."""
 
-    def test_free_energy_normal_computation(self):
+    def test_free_energy_normal_computation(self) -> None:
         """Test that normal free energy computation works with stability monitoring."""
         calc = FreeEnergyCalculator()
 
@@ -35,7 +36,7 @@ class TestStabilityIntegrationFreeEnergy:
         assert "accuracy" in components
         assert "complexity" in components
 
-    def test_free_energy_detects_overflow(self):
+    def test_free_energy_detects_overflow(self) -> None:
         """Test that free energy calculator detects overflow conditions."""
         config = {"stability_error_threshold": 1e3}  # Low threshold for testing
         calc = FreeEnergyCalculator(config)
@@ -57,7 +58,7 @@ class TestStabilityIntegrationFreeEnergy:
 
         assert "overflow" in str(exc_info.value).lower()
 
-    def test_free_energy_stability_statistics(self):
+    def test_free_energy_stability_statistics(self) -> None:
         """Test that stability monitor tracks statistics correctly."""
         config = {"stability_warning_threshold": 10.0}  # Low threshold for testing
         calc = FreeEnergyCalculator(config)
@@ -71,7 +72,7 @@ class TestStabilityIntegrationFreeEnergy:
         prior_cov = np.eye(3)
 
         # Should issue warnings but complete
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             fe, components = calc.compute_variational_free_energy(
                 obs, pred, precision, post_mean, post_cov, prior_mean, prior_cov
@@ -90,7 +91,7 @@ class TestStabilityIntegrationFreeEnergy:
 class TestStabilityIntegrationHierarchicalPredictor:
     """Test stability monitoring integration with HierarchicalPredictor."""
 
-    def test_predictor_normal_operation(self, config):
+    def test_predictor_normal_operation(self, config: Dict[str, Any]) -> None:
         """Test that normal prediction works with stability monitoring."""
         predictor = HierarchicalPredictor(config)
 
@@ -104,7 +105,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
         assert "interoceptive" in results
         assert "hierarchical_errors" in results
 
-    def test_predictor_detects_unstable_errors(self, config):
+    def test_predictor_detects_unstable_errors(self, config: Dict[str, Any]) -> None:
         """Test that predictor detects unstable prediction errors."""
         # Configure with low threshold for testing
         config["stability_error_threshold"] = 1e3
@@ -123,7 +124,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
             or "exteroceptive" in str(exc_info.value).lower()
         )
 
-    def test_predictor_detects_unstable_state_updates(self, config):
+    def test_predictor_detects_unstable_state_updates(self, config: Dict[str, Any]) -> None:
         """Test that predictor detects unstable hierarchical state updates."""
         # Configure with low threshold
         config["stability_error_threshold"] = 1e2
@@ -149,7 +150,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
         assert "warning_count" in stats
         assert "error_count" in stats
 
-    def test_predictor_stability_with_warnings(self, config):
+    def test_predictor_stability_with_warnings(self, config: Dict[str, Any]) -> None:
         """Test that predictor issues warnings for large but not critical values."""
         # Configure with moderate thresholds
         config["stability_warning_threshold"] = 10.0
@@ -160,7 +161,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
         extero_input = np.random.randn(256) * 5.0
         intero_input = np.array([70.0, 15.0, 37.0, 5.0, 10.0, 120.0])
 
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             # Run several steps
@@ -174,7 +175,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
         stats = predictor.stability_monitor.get_statistics()
         assert stats["error_count"] == 0  # No errors, just warnings
 
-    def test_predictor_reset_clears_stability_stats(self, config):
+    def test_predictor_reset_clears_stability_stats(self, config: Dict[str, Any]) -> None:
         """Test that resetting predictor also resets stability statistics."""
         predictor = HierarchicalPredictor(config)
 
@@ -197,7 +198,7 @@ class TestStabilityIntegrationHierarchicalPredictor:
 class TestStabilityDisabling:
     """Test that stability checking can be disabled."""
 
-    def test_disabled_stability_allows_invalid_values(self):
+    def test_disabled_stability_allows_invalid_values(self) -> None:
         """Test that disabling stability checks allows invalid computations."""
         config = {"stability_check_enabled": False}
         calc = FreeEnergyCalculator(config)

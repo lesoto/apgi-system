@@ -12,7 +12,6 @@ complementing the property-based tests that verify general properties.
 Requirements tested: 7.1, 7.2, 7.3, 7.4, 7.5
 """
 
-import pytest
 import numpy as np
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask, DeckType, DECK_SCHEDULES
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
@@ -20,7 +19,6 @@ from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
 from apgi_system.experiments.tasks.binocular_rivalry import (
     BinocularRivalryTask,
-    StimulusType as RivalryStimulusType,
 )
 
 
@@ -137,7 +135,7 @@ class TestIowaGamblingTask:
         initial_balance = task.initial_balance
 
         for trial in task.trials:
-            result = task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_system, trial)
 
         # Final balance should equal initial + sum of all net outcomes
         total_net = sum(r.net_outcome for r in task.results)
@@ -317,7 +315,7 @@ class TestMaskingParadigm:
         )
 
         for trial in task.trials:
-            result = task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_system, trial)
 
         # At least some trials should show suppression at short SOAs
         suppressed_count = sum(1 for r in task.results if r.mask_suppression_occurred)
@@ -524,7 +522,7 @@ class TestAttentionalBlink:
         )
 
         for trial in task.trials:
-            result = task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_system, trial)
 
         # At lag 1, we might see some T2 detections (lag-1 sparing)
         # Just verify the mechanism works, not strict performance

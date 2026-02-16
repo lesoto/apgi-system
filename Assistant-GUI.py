@@ -21,28 +21,27 @@ import gc
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Callable, TypeVar, Tuple, Deque
+import importlib
 from functools import wraps
 import numpy as np
 import csv
 
-# Import core APGI Assistant with error handling
+# Import theme manager
 try:
-    from AI_Assistant import APGIAssistant
+    from apgi_gui.theme_manager import ThemeManager
 
-    HAS_ASSISTANT = True
-except ImportError as e:
-    HAS_ASSISTANT = False
-    APGIAssistant = None
-    print(f"Warning: Could not import APGIAssistant: {e}")
-    print("Please ensure AI-Assistant.py is available and all dependencies are installed")
-
-try:
-    import torch
-
-    HAS_TORCH = True
+    THEME_MANAGER_AVAILABLE = True
 except ImportError:
-    HAS_TORCH = False
-    torch = None
+    THEME_MANAGER_AVAILABLE = False
+    print("Warning: Theme manager not available. Theme support disabled.")
+
+# Import core APGI Assistant - will be loaded by load_apgi_module() function
+HAS_ASSISTANT = False  # Will be updated after successful module loading
+APGIAssistant: Optional[Any] = None
+
+# Import torch if available (used by APGI module)
+# Note: torch is used by the APGI module, not directly in this file
+HAS_TORCH = False
 
 # Matplotlib imports (if available)
 try:
@@ -56,9 +55,6 @@ try:
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
-    plt = None
-    Figure = None
-    FigureCanvasTkAgg = None
 
 # PIL imports (if available)
 try:
@@ -67,22 +63,21 @@ try:
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
-    Image = None
-    ImageTk = None
 
 # Check for PDF export dependencies
 try:
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import A4
     from reportlab.platypus import (
         SimpleDocTemplate,
         Paragraph,
         Spacer,
         Table,
         TableStyle,
+        PageBreak,
     )
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib import colors
 
     HAS_REPORTLAB = True
@@ -94,7 +89,7 @@ except ImportError:
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def safe_widget_method(widget_attr: str):
+def safe_widget_method(widget_attr: str) -> Callable[[F], F]:
     """Decorator for safe widget operations with enhanced validation
 
     Args:
@@ -111,7 +106,7 @@ def safe_widget_method(widget_attr: str):
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args: Any, **kwargs: Any) -> Optional[Any]:
             try:
                 # Check if application is shutting down
                 if hasattr(self, "is_shutting_down") and self.is_shutting_down:
@@ -158,7 +153,7 @@ def safe_widget_method(widget_attr: str):
 class ToolTip:
     """Consistent tooltip implementation for tkinter widgets"""
 
-    def __init__(self, widget, text=""):
+    def __init__(self, widget: Any, text: str = "") -> None:
         """Initialize tooltip
 
         Args:
@@ -178,38 +173,41 @@ class ToolTip:
         self.widget.bind("<Leave>", self.on_leave)
         self.widget.bind("<ButtonPress>", self.on_leave)
 
-    def on_enter(self, event=None):
+    def on_enter(self, event: Optional[Any] = None) -> None:
         """Show tooltip when mouse enters widget"""
         self.schedule()
 
-    def on_leave(self, event=None):
+    def on_leave(self, event: Optional[Any] = None) -> None:
         """Hide tooltip when mouse leaves widget"""
         self.unschedule()
         self.hidetip()
 
-    def schedule(self):
+    def schedule(self) -> None:
         """Schedule tooltip display"""
         self.unschedule()
         self.id = self.widget.after(self._delay, self.showtip)
 
-    def unschedule(self):
+    def unschedule(self) -> None:
         """Cancel scheduled tooltip display"""
         id = self.id
         self.id = None
         if id:
             self.widget.after_cancel(id)
 
-    def showtip(self):
+    def showtip(self) -> None:
         """Display the tooltip"""
         if self.tipwindow or not self.text:
             return
 
-        x, y, cx, cy = self.widget.bbox("insert")
+        bbox = self.widget.bbox("insert")
+        if bbox is None:
+            return
+        x, y, cx, cy = bbox
         x = x + self.widget.winfo_rootx() + 25
         y = y + cy + self.widget.winfo_rooty() + 25
 
         self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
+        tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
 
         # Create consistent styling
@@ -220,18 +218,18 @@ class ToolTip:
             background="#ffffe0",
             relief=tk.SOLID,
             borderwidth=1,
-            font=("Arial", "9", "normal"),
+            font=("Arial", 9, "normal"),
         )
         label.pack(padx=1, pady=1)
 
-    def hidetip(self):
+    def hidetip(self) -> None:
         """Hide the tooltip"""
         tw = self.tipwindow
         self.tipwindow = None
         if tw:
             tw.destroy()
 
-    def update_text(self, new_text):
+    def update_text(self, new_text: str) -> None:
         """Update tooltip text"""
         self.text = new_text
 
@@ -265,11 +263,11 @@ class HistoryManager:
         }
 
         # Track memory usage
-        self.memory_usage = {}
+        self.memory_usage: Dict[str, float] = {}
         self.last_prune_time = time.time()
         self.prune_interval = 300  # Prune at most every 5 minutes
 
-    def create_managed_deque(self, history_type: str, maxlen: Optional[int] = None) -> deque:
+    def create_managed_deque(self, history_type: str, maxlen: Optional[int] = None) -> Deque[Any]:
         """Create a managed deque with automatic pruning
 
         Args:
@@ -280,9 +278,9 @@ class HistoryManager:
             Managed deque instance
         """
         strategy = self.pruning_strategies.get(history_type, {"maxlen": 50, "prune_ratio": 0.5})
-        maxlen = maxlen or strategy["maxlen"]
+        maxlen_final: int = maxlen or strategy["maxlen"]
 
-        managed_deque = ManagedDeque(maxlen=maxlen, history_type=history_type, manager=self)
+        managed_deque = ManagedDeque(maxlen=maxlen_final, history_type=history_type, manager=self)
         return managed_deque
 
     def check_memory_usage(self) -> Dict[str, float]:
@@ -320,7 +318,7 @@ class HistoryManager:
 
         return usage
 
-    def _perform_auto_prune(self):
+    def _perform_auto_prune(self) -> None:
         """Perform automatic pruning based on strategies"""
         current_time = time.time()
         if current_time - self.last_prune_time < self.prune_interval:
@@ -384,7 +382,7 @@ class HistoryManager:
         return cleared_count
 
 
-class ManagedDeque(deque):
+class ManagedDeque(deque[Any]):
     """Enhanced deque with automatic pruning and memory tracking"""
 
     def __init__(self, maxlen: int, history_type: str, manager: HistoryManager):
@@ -412,7 +410,7 @@ class ManagedDeque(deque):
         if len(self) % self._prune_threshold == 0:
             self._auto_prune_check()
 
-    def _auto_prune_check(self):
+    def _auto_prune_check(self) -> None:
         """Check if automatic pruning is needed"""
         current_time = time.time()
 
@@ -430,7 +428,7 @@ class ManagedDeque(deque):
                 self.prune(strategy["prune_ratio"])
                 self._last_prune = current_time
 
-    def prune(self, ratio: float = 0.5):
+    def prune(self, ratio: float = 0.5) -> None:
         """Prune the deque by removing oldest entries
 
         Args:
@@ -446,10 +444,9 @@ class ManagedDeque(deque):
         for _ in range(items_to_remove):
             if self:
                 # Clear item reference to help garbage collection
-                item = self.popleft()
-                del item
+                self.popleft()
 
-    def smart_prune(self, target_size: int):
+    def smart_prune(self, target_size: int) -> None:
         """Smart pruning to reach target size"""
         current_size = len(self)
         if current_size <= target_size:
@@ -459,7 +456,7 @@ class ManagedDeque(deque):
         ratio = (current_size - target_size) / current_size
         self.prune(ratio)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear deque with enhanced cleanup"""
         # Clear all items to help garbage collection
         while self:
@@ -468,7 +465,7 @@ class ManagedDeque(deque):
         # Call parent clear method
         super().clear()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure cleanup"""
         try:
             self.clear()
@@ -488,7 +485,7 @@ class DependencyNotifier:
         self.parent_widget = parent_widget
         self.notified_features = set()  # Track which features have been notified
 
-    def check_and_notify_limitations(self):
+    def check_and_notify_limitations(self) -> None:
         """Check for missing dependencies and show user-friendly notifications"""
         limitations = []
 
@@ -552,19 +549,18 @@ class DependencyNotifier:
                 self._show_limitation_notification(limitation)
                 self.notified_features.add(feature)
 
-    def _show_limitation_notification(self, limitation):
+    def _show_limitation_notification(self, limitation: Dict[str, Any]) -> None:
         """Show a single limitation notification"""
         # Use theme-aware severity indicators instead of hard-coded emoji
         severity_symbols = {"high": "!", "medium": "⚡", "low": "i"}
         symbol = severity_symbols.get(limitation["severity"], "i")
 
         # Get theme colors for the notification
-        theme_colors = (
-            self.get_theme_color("notification_colors")
-            if hasattr(self, "get_theme_color")
-            else {"high": "#FF4444", "medium": "#FFA500", "low": "#4444FF"}
-        )
-        color = theme_colors.get(limitation["severity"], "#666666")
+        # theme_colors = (
+        #     self.get_theme_color("notification_colors")
+        #     if hasattr(self, "get_theme_color")
+        #     else {"high": "#FF4444", "medium": "#FFA500", "low": "#4444FF"}
+        # )
 
         message = f"{symbol} {limitation['feature']} Limited\n\n"
         message += f"Impact: {limitation['impact']}\n\n"
@@ -574,11 +570,11 @@ class DependencyNotifier:
         try:
             if self.parent_widget and hasattr(self.parent_widget, "winfo_exists"):
                 messagebox.showinfo("Feature Limitation", message)
-        except Exception as e:
+        except Exception:
             # Fallback to print if GUI not available
             print(f"Feature Limitation: {limitation['feature']} - {limitation['impact']}")
 
-    def reset_notifications(self):
+    def reset_notifications(self) -> None:
         """Reset notification history (for testing)"""
         self.notified_features.clear()
 
@@ -593,9 +589,9 @@ class Debouncer:
             delay_ms: Delay to wait before executing the function
         """
         self.delay_ms = delay_ms
-        self.pending_calls = {}
+        self.pending_calls: Dict[str, Any] = {}
 
-    def debounce(self, key: str, func: Callable, *args, **kwargs):
+    def debounce(self, key: str, func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         """Debounce a function call with a unique key
 
         Args:
@@ -659,7 +655,7 @@ class ErrorContext:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         if exc_type is None:
             return False
 
@@ -682,8 +678,8 @@ class ErrorContext:
                 messagebox.showerror(
                     f"{self.operation} Error", f"Failed to {self.operation.lower()}:\n{error_msg}"
                 )
-            except Exception as msg_error:
-                self.logger.warning(f"Failed to show error message: {msg_error}")
+            except Exception:
+                self.logger.warning("Failed to show error message")
 
         # Only suppress exceptions for user-facing operations that we've handled
         # Re-raise critical exceptions like KeyboardInterrupt, SystemExit, etc.
@@ -1214,7 +1210,7 @@ def load_apgi_module():
     Robustly load APGI Assistant module from various possible locations.
 
     Returns:
-        Module object with APGIAssistant and related classes
+        ModuleType object with APGIAssistant and related classes
     """
     LOGGER.info("Attempting to load APGI Assistant module...")
 
@@ -1230,6 +1226,7 @@ def load_apgi_module():
     # Try from current directory with various possible names
     current_dir = Path(__file__).parent
     possible_files = [
+        "AI-Assistant.py",
         "APGI-Assistant.py",
         "APGI-Assistant-Full.py",
         "APGI-Assistant-Short.py",
@@ -1274,6 +1271,7 @@ try:
     _APGI_MODULE = load_apgi_module()
     APGIAssistant = _APGI_MODULE.APGIAssistant
     APGIVisualizer = _APGI_MODULE.APGIVisualizer
+    HAS_ASSISTANT = True  # Update flag to indicate successful loading
 
     # Merge dependency flags from APGI module with our own checks
     APGI_HAS_MATPLOTLIB = getattr(_APGI_MODULE, "HAS_MATPLOTLIB", False)
@@ -1623,7 +1621,7 @@ class PermissionValidator:
             if not os.access(config_dir, os.R_OK | os.W_OK | os.X_OK):
                 return (
                     False,
-                    f"Insufficient permissions for home directory",
+                    "Insufficient permissions for home directory",
                     f"Fix permissions or run: chmod u+rwx '{config_dir}'",
                 )
 
@@ -1635,7 +1633,7 @@ class PermissionValidator:
             except PermissionError:
                 return (
                     False,
-                    f"Cannot write to home directory",
+                    "Cannot write to home directory",
                     f"Check permissions or run: chmod u+w '{config_dir}'",
                 )
             except Exception as e:
@@ -1772,7 +1770,7 @@ Use the file dialog's browser to navigate to existing files.
             ttk.Button(button_frame, text="Help", command=show_help).pack(side=tk.LEFT, padx=5)
             ttk.Button(button_frame, text="OK", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
-        except Exception as e:
+        except Exception:
             # Fallback to simple message box if dialog creation fails
             messagebox.showerror(title, f"{error_msg}\n\nSuggestion: {suggestion}")
 
@@ -2101,7 +2099,7 @@ class InputValidator:
         if not isinstance(hr, (int, float)):
             errors.append("Heart rate must be a number")
         elif not (40 <= hr <= 200):  # Use hardcoded range as fallback
-            errors.append(f"Heart rate must be between 40-200 bpm")
+            errors.append("Heart rate must be between 40-200 bpm")
 
         # Validate HRV
         if not isinstance(hrv, (int, float)):
@@ -2276,6 +2274,11 @@ class APGIGUI:
         self.root = root
         self.root.title("APGI Assistant - Cognitive AI Interface v2.0")
         self.root.geometry("1400x900")
+
+        # Initialize theme manager
+        self.theme_manager = None
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager = ThemeManager(initial_theme="normal")
 
         # Setup logger
         self.logger = LOGGER
@@ -2530,6 +2533,20 @@ class APGIGUI:
         )
         view_menu.add_separator()
 
+        # Theme menu (only if theme manager is available)
+        if self.theme_manager:
+            theme_menu = Menu(menubar, tearoff=0)
+            menubar.add_cascade(label="Theme", menu=theme_menu)
+
+            # Add theme options
+            for theme_name in self.theme_manager.get_available_themes():
+                theme_menu.add_radiobutton(
+                    label=theme_name.capitalize(),
+                    command=lambda t=theme_name: self._set_theme(t),
+                    variable=tk.StringVar(value=self.theme_manager.current_theme),
+                    value=theme_name,
+                )
+
         # Help menu
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -2537,6 +2554,45 @@ class APGIGUI:
         help_menu.add_command(label="Keyboard Shortcuts", command=self.show_shortcuts)
         help_menu.add_command(label="About", command=self.show_about)
         help_menu.add_command(label="View Logs", command=self.view_logs)
+
+    def _set_theme(self, theme_name: str):
+        """Set the current theme.
+
+        Args:
+            theme_name: Name of the theme to apply
+        """
+        if not self.theme_manager:
+            return
+
+        if self.theme_manager.set_theme(theme_name):
+            self._apply_theme_to_widgets()
+
+    def _apply_theme_to_widgets(self):
+        """Apply current theme to all widgets."""
+        if not self.theme_manager:
+            return
+
+        # Helper function to safely apply theme to text widget
+        def apply_to_text_widget(widget, bg_color, fg_color):
+            if widget and widget.winfo_exists():
+                try:
+                    widget.config(bg=bg_color, fg=fg_color, insertbackground=fg_color)
+                except tk.TclError:
+                    pass
+
+        # Apply theme to text widgets
+        bg_color = self.theme_manager.get_theme_color("bg")
+        fg_color = self.theme_manager.get_theme_color("fg")
+
+        apply_to_text_widget(getattr(self, "query_text", None), bg_color, fg_color)
+        apply_to_text_widget(getattr(self, "response_text", None), bg_color, fg_color)
+
+        # Apply theme to status label
+        if hasattr(self, "status_label") and self.status_label.winfo_exists():
+            try:
+                self.status_label.config(fg=fg_color)
+            except tk.TclError:
+                pass
 
     def update_status(self, message: str, status_type: str = "info") -> None:
         """Update the status label with the given message and status type.
@@ -3570,7 +3626,7 @@ class APGIGUI:
                 try:
                     widget.config(font=font)
                     updated_count += 1
-                except:
+                except tk.TclError:
                     pass  # Widget might not support font changes
 
         # Also update tab-specific widgets by checking each tab
@@ -3580,7 +3636,7 @@ class APGIGUI:
         try:
             # Update TkDefaultFont for new widgets
             self.root.option_add("*Font", f"TkDefaultFont {self.current_font_size}")
-        except:
+        except tk.TclError:
             pass
 
         # Log the update for debugging
@@ -3615,7 +3671,7 @@ class APGIGUI:
         for widget in tab_widgets:
             try:
                 widget.config(font=font)
-            except:
+            except tk.TclError:
                 pass
 
     def next_tab(self, event):
@@ -3935,7 +3991,6 @@ class APGIGUI:
             return
 
         # Update progress message with time remaining
-        remaining = self.init_timeout_seconds - elapsed
         if hasattr(self, "progress") and hasattr(self.progress, "update_message"):
             self.progress.update_message(
                 f"Initializing... {elapsed:.0f}s / {self.init_timeout_seconds}s"
@@ -4519,18 +4574,16 @@ class APGIGUI:
             except Exception as e:
                 self.logger.warning(f"Failed to show reset dialog: {e}")
 
-    def add_to_history(self, query, response):
+    def add_to_history(self, user_query, user_response):
         """Add query to history"""
         timestamp = time.strftime("%H:%M:%S")
-        state = response["cognitive_state"]["primary"]
+        state = user_response["cognitive_state"]["primary"]
         confidence = (
-            response["confidence"].get("level", "unknown")
-            if isinstance(response["confidence"], dict)
-            else str(response["confidence"])
+            user_response["confidence"].get("level", "unknown")
+            if isinstance(user_response["confidence"], dict)
+            else str(user_response["confidence"])
         )
-        surprise = response["cognitive_state"]["surprise_level"]
-        response_time = response["processing_metadata"]["time_elapsed"]
-        query_preview = query[:50] + "..." if len(query) > 50 else query
+        surprise = user_response["cognitive_state"]["surprise_level"]
 
         # Add to history displays (if created)
         if "Cognitive Monitoring" in self.tabs_created:
@@ -4539,11 +4592,15 @@ class APGIGUI:
                 self.debouncer.schedule_update(
                     self.root,
                     "cognitive_history",
-                    lambda: self._update_cognitive_history(timestamp, state, confidence, surprise),
+                    lambda: self._update_cognitive_history(
+                        timestamp, state, confidence, surprise, user_query, user_response
+                    ),
                     "default",
                 )
 
-    def _update_cognitive_history(self, timestamp, state, confidence, surprise):
+    def _update_cognitive_history(
+        self, timestamp, state, confidence, surprise, user_query=None, user_response=None
+    ):
         """Internal method to update cognitive history tree"""
         self.history_tree.insert("", 0, values=(timestamp, state, confidence, surprise))
         # Limit history
@@ -4553,15 +4610,20 @@ class APGIGUI:
 
         if "Performance" in self.tabs_created:
             if hasattr(self, "query_tree") and self.query_tree.winfo_exists():
-                # Debounce performance tree updates to prevent excessive UI redraws
-                self.debouncer.debounce(
+                self.debouncer.schedule_update(
+                    self.root,
                     "performance_history",
-                    lambda: self._update_performance_history(
-                        timestamp, query_preview, state, response_time
+                    lambda q=user_query, r=user_response: self._update_performance_history(
+                        timestamp,
+                        q[:50] + "..." if len(q) > 50 else q,
+                        state,
+                        r["processing_metadata"]["time_elapsed"],
                     ),
                 )
 
-    def _update_performance_history(self, timestamp, query_preview, state, response_time):
+    def _update_performance_history(
+        self, timestamp: str, query_preview: str, state: str, response_time: float
+    ) -> None:
         """Internal method to update performance history tree"""
         self.query_tree.insert(
             "", 0, values=(timestamp, query_preview, state, f"{response_time:.3f}s")
@@ -5109,7 +5171,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                     rec_text += f"Heart Rate: {bio.get('heart_rate', 'N/A')} bpm\n"
                     rec_text += f"vs Baseline: {bio.get('heart_rate_vs_baseline', 1.0):.2f}x\n\n"
 
-                    rec_text += f"Recommendation:\n"
+                    rec_text += "Recommendation:\n"
                     recommendation = bio.get("recommendation", "none").replace("_", " ").title()
                     rec_text += f"  → {recommendation}\n\n"
 
@@ -5365,7 +5427,9 @@ Energy Usage:
             # Check if we're still initializing
             if self.is_initializing:
                 if hasattr(self, "progress") and hasattr(self.progress, "update_message"):
-                    self.progress.update_message(f"Initializing... {int(self.init_progress*100)}%")
+                    self.progress.update_message(
+                        f"Initializing... {int(self.init_progress * 100)}%"
+                    )
                 self.root.after(100, self.update_displays)
                 return
 
@@ -5738,7 +5802,7 @@ Energy Usage:
                     # Enhanced error handling with specific guidance
                     if "Permission denied" in str(e):
                         error_msg = f"Permission denied writing to {filename}"
-                        suggestion = f"Check file permissions or choose different location"
+                        suggestion = "Check file permissions or choose different location"
                     elif "No space left" in str(e):
                         error_msg = f"Insufficient disk space for {filename}"
                         suggestion = "Free up disk space or choose different location"
@@ -6266,7 +6330,7 @@ Energy Usage:
                             writer.writerow(
                                 [
                                     "Average Energy",
-                                    f"{sum(energy_levels)/len(energy_levels):.2f}",
+                                    f"{sum(energy_levels) / len(energy_levels):.2f}",
                                     "normalized",
                                 ]
                             )
@@ -8024,7 +8088,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                                 command=self.enable_memory_profiling,
                             )
                             break
-                    except Exception as e:
+                    except Exception:
                         # Continue if menu entry doesn't exist or can't be accessed
                         continue
 
@@ -8121,13 +8185,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         # Use debouncing with a unique key for each parameter type
         self.debouncer.debounce(f"physio_{param_type}", create_undo_action)
 
-    def undo_action(self):
-        """Undo last action"""
-        if self.action_history.can_undo():
-            self.action_history.undo()
-            self.logger.info("Action undone")
-
-    def redo_action(self):
+    def redo_action2(self):
         """Redo last undone action"""
         if self.action_history.can_redo():
             self.action_history.redo()
@@ -8528,7 +8586,7 @@ def main():
 
     try:
         root = tk.Tk()
-        app = APGIGUI(root)
+        APGIGUI(root)
         root.mainloop()
     except Exception as e:
         LOGGER.critical(f"Fatal error: {e}", exc_info=True)

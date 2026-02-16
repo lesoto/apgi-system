@@ -4,10 +4,18 @@ Quick validation test for Hypothesis strategies.
 This test verifies that all custom strategies generate valid data.
 """
 
-import pytest
-import numpy as np
-from hypothesis import given, settings
-from tests.strategies import (
+import sys
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pytest  # noqa: E402
+import numpy as np  # noqa: E402
+from hypothesis import given, settings, HealthCheck  # noqa: E402
+from typing import Any  # noqa: E402
+
+from tests.strategies import (  # noqa: E402
     body_state_strategy,
     observation_strategy,
     belief_state_strategy,
@@ -22,7 +30,7 @@ from tests.strategies import (
 
 @given(body_state_strategy())
 @settings(max_examples=10)
-def test_body_state_strategy_generates_valid_states(body_state):
+def test_body_state_strategy_generates_valid_states(body_state: dict[str, float]) -> None:
     """Test that body_state_strategy generates valid physiological states."""
     # Check all required keys are present
     required_keys = [
@@ -47,7 +55,9 @@ def test_body_state_strategy_generates_valid_states(body_state):
 
 @given(observation_strategy())
 @settings(max_examples=10)
-def test_observation_strategy_generates_valid_observations(observation):
+def test_observation_strategy_generates_valid_observations(
+    observation: np.ndarray[Any, np.dtype[np.float64]],
+) -> None:
     """Test that observation_strategy generates valid observation vectors."""
     # Check shape
     assert observation.shape == (256,)
@@ -65,8 +75,15 @@ def test_observation_strategy_generates_valid_observations(observation):
 
 
 @given(belief_state_strategy())
-@settings(max_examples=10)
-def test_belief_state_strategy_generates_valid_beliefs(beliefs):
+@settings(
+    max_examples=10,
+    suppress_health_check=[
+        HealthCheck.large_base_example,
+        HealthCheck.data_too_large,
+        HealthCheck.too_slow,
+    ],
+)
+def test_belief_state_strategy_generates_valid_beliefs(beliefs: list[dict[str, Any]]) -> None:
     """Test that belief_state_strategy generates valid belief states."""
     # Check we have 4 levels by default
     assert len(beliefs) == 4
@@ -95,7 +112,7 @@ def test_belief_state_strategy_generates_valid_beliefs(beliefs):
 
 @given(config_strategy())
 @settings(max_examples=10)
-def test_config_strategy_generates_valid_configs(config):
+def test_config_strategy_generates_valid_configs(config: dict[str, Any]) -> None:
     """Test that config_strategy generates valid configuration dictionaries."""
     # Check required top-level keys
     assert "system" in config
@@ -119,7 +136,9 @@ def test_config_strategy_generates_valid_configs(config):
 
 @given(precision_weighted_error_strategy())
 @settings(max_examples=10)
-def test_precision_weighted_error_strategy_generates_valid_errors(error_data):
+def test_precision_weighted_error_strategy_generates_valid_errors(
+    error_data: dict[str, Any],
+) -> None:
     """Test that precision_weighted_error_strategy generates valid data."""
     # Check required keys
     assert "extero_error" in error_data
@@ -144,7 +163,7 @@ def test_precision_weighted_error_strategy_generates_valid_errors(error_data):
 
 @given(error_variance_strategy())
 @settings(max_examples=10)
-def test_error_variance_strategy_generates_valid_variances(variance):
+def test_error_variance_strategy_generates_valid_variances(variance: float) -> None:
     """Test that error_variance_strategy generates valid variance values."""
     assert isinstance(variance, float)
     assert 0.01 <= variance <= 100.0
@@ -152,7 +171,7 @@ def test_error_variance_strategy_generates_valid_variances(variance):
 
 @given(metabolic_reserve_strategy())
 @settings(max_examples=10)
-def test_metabolic_reserve_strategy_generates_valid_reserves(reserve):
+def test_metabolic_reserve_strategy_generates_valid_reserves(reserve: float) -> None:
     """Test that metabolic_reserve_strategy generates valid reserve values."""
     assert isinstance(reserve, float)
     assert 0.0 <= reserve <= 100.0
@@ -160,7 +179,7 @@ def test_metabolic_reserve_strategy_generates_valid_reserves(reserve):
 
 @given(allostatic_load_strategy())
 @settings(max_examples=10)
-def test_allostatic_load_strategy_generates_valid_loads(load):
+def test_allostatic_load_strategy_generates_valid_loads(load: float) -> None:
     """Test that allostatic_load_strategy generates valid load values."""
     assert isinstance(load, float)
     assert 0.0 <= load <= 10.0
@@ -168,7 +187,7 @@ def test_allostatic_load_strategy_generates_valid_loads(load):
 
 @given(somatic_marker_gain_strategy())
 @settings(max_examples=10)
-def test_somatic_marker_gain_strategy_generates_valid_gains(gain):
+def test_somatic_marker_gain_strategy_generates_valid_gains(gain: float) -> None:
     """Test that somatic_marker_gain_strategy generates valid gain values."""
     assert isinstance(gain, float)
     assert 0.5 <= gain <= 2.0

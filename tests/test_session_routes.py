@@ -6,13 +6,12 @@ Integration tests for session management endpoints.
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 import redis.asyncio as redis
 
 from api.main import create_app
 from api.routes import sessions
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
-from api.models.schemas import SessionCreateRequest
 
 
 @pytest.fixture

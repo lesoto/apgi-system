@@ -8,9 +8,7 @@ from pathlib import Path
 from apgi_system.core.active_inference import (
     ActiveInferenceEngine,
     HierarchicalGaussianFilter,
-    BeliefState,
 )
-from apgi_system.types import ConfigDict
 
 
 @pytest.fixture

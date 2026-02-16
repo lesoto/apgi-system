@@ -16,7 +16,7 @@ from apgi_system.stability import (
 class TestNumericalStabilityMonitor:
     """Test suite for NumericalStabilityMonitor."""
 
-    def test_initialization_default(self):
+    def test_initialization_default(self) -> None:
         """Test monitor initialization with default config."""
         monitor = NumericalStabilityMonitor()
 
@@ -27,7 +27,7 @@ class TestNumericalStabilityMonitor:
         assert monitor.warning_count == 0
         assert monitor.error_count == 0
 
-    def test_initialization_custom_config(self):
+    def test_initialization_custom_config(self) -> None:
         """Test monitor initialization with custom config."""
         config = {
             "stability_warning_threshold": 1e8,
@@ -42,7 +42,7 @@ class TestNumericalStabilityMonitor:
         assert monitor.underflow_threshold == 1e-8
         assert monitor.check_enabled is False
 
-    def test_check_stability_valid_scalar(self):
+    def test_check_stability_valid_scalar(self) -> None:
         """Test stability check with valid scalar value."""
         monitor = NumericalStabilityMonitor()
         value = 100.0
@@ -56,7 +56,7 @@ class TestNumericalStabilityMonitor:
         assert status["warning_issued"] is False
         assert status["error_detected"] is False
 
-    def test_check_stability_valid_array(self):
+    def test_check_stability_valid_array(self) -> None:
         """Test stability check with valid array."""
         monitor = NumericalStabilityMonitor()
         values = np.array([1.0, 2.0, 3.0, -4.0])
@@ -70,7 +70,7 @@ class TestNumericalStabilityMonitor:
         assert status["warning_issued"] is False
         assert status["error_detected"] is False
 
-    def test_check_stability_nan_detection(self):
+    def test_check_stability_nan_detection(self) -> None:
         """Test detection of NaN values."""
         monitor = NumericalStabilityMonitor()
         values = np.array([1.0, np.nan, 3.0])
@@ -82,7 +82,7 @@ class TestNumericalStabilityMonitor:
         assert "nan_test" in str(exc_info.value)
         assert monitor.error_count == 1
 
-    def test_check_stability_inf_detection(self):
+    def test_check_stability_inf_detection(self) -> None:
         """Test detection of Inf values."""
         monitor = NumericalStabilityMonitor()
         values = np.array([1.0, np.inf, 3.0])
@@ -94,7 +94,7 @@ class TestNumericalStabilityMonitor:
         assert "inf_test" in str(exc_info.value)
         assert monitor.error_count == 1
 
-    def test_check_stability_negative_inf_detection(self):
+    def test_check_stability_negative_inf_detection(self) -> None:
         """Test detection of negative Inf values."""
         monitor = NumericalStabilityMonitor()
         values = np.array([1.0, -np.inf, 3.0])
@@ -105,7 +105,7 @@ class TestNumericalStabilityMonitor:
         assert "Inf detected" in str(exc_info.value)
         assert monitor.error_count == 1
 
-    def test_check_stability_overflow_detection(self):
+    def test_check_stability_overflow_detection(self) -> None:
         """Test detection of overflow (values exceeding error threshold)."""
         monitor = NumericalStabilityMonitor()
         values = np.array([1e16, 2e16])  # Exceeds default error threshold of 1e15
@@ -117,7 +117,7 @@ class TestNumericalStabilityMonitor:
         assert "overflow_test" in str(exc_info.value)
         assert monitor.error_count == 1
 
-    def test_check_stability_warning_threshold(self):
+    def test_check_stability_warning_threshold(self) -> None:
         """Test warning issued when values exceed warning threshold."""
         monitor = NumericalStabilityMonitor()
         values = np.array([5e10, 6e10])  # Exceeds warning threshold but not error
@@ -136,7 +136,7 @@ class TestNumericalStabilityMonitor:
         assert status["error_detected"] is False
         assert monitor.warning_count == 1
 
-    def test_check_stability_disabled(self):
+    def test_check_stability_disabled(self) -> None:
         """Test that checking can be disabled."""
         config = {"stability_check_enabled": False}
         monitor = NumericalStabilityMonitor(config)
@@ -150,7 +150,7 @@ class TestNumericalStabilityMonitor:
         assert status["has_inf"] is False
         assert monitor.error_count == 0
 
-    def test_check_stability_no_raise_on_error(self):
+    def test_check_stability_no_raise_on_error(self) -> None:
         """Test that errors can be detected without raising exception."""
         monitor = NumericalStabilityMonitor()
         values = np.array([np.nan])
@@ -162,7 +162,7 @@ class TestNumericalStabilityMonitor:
         assert status["error_detected"] is True
         assert monitor.error_count == 1
 
-    def test_check_array_properties_valid(self):
+    def test_check_array_properties_valid(self) -> None:
         """Test array property checking with valid array."""
         monitor = NumericalStabilityMonitor()
         array = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -177,7 +177,7 @@ class TestNumericalStabilityMonitor:
         assert status["actual_shape"] == (2, 2)
         assert status["actual_range"] == (1.0, 4.0)
 
-    def test_check_array_properties_shape_mismatch(self):
+    def test_check_array_properties_shape_mismatch(self) -> None:
         """Test array property checking with shape mismatch."""
         monitor = NumericalStabilityMonitor()
         array = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -189,7 +189,7 @@ class TestNumericalStabilityMonitor:
         assert "expected (3, 2)" in str(exc_info.value)
         assert "got (2, 2)" in str(exc_info.value)
 
-    def test_check_array_properties_range_violation(self):
+    def test_check_array_properties_range_violation(self) -> None:
         """Test array property checking with range violation."""
         monitor = NumericalStabilityMonitor()
         array = np.array([1.0, 2.0, 15.0])  # 15.0 exceeds range
@@ -200,7 +200,7 @@ class TestNumericalStabilityMonitor:
         assert "range violation" in str(exc_info.value)
         assert "expected [0.0, 10.0]" in str(exc_info.value)
 
-    def test_get_statistics(self):
+    def test_get_statistics(self) -> None:
         """Test retrieval of monitoring statistics."""
         monitor = NumericalStabilityMonitor()
 
@@ -219,7 +219,7 @@ class TestNumericalStabilityMonitor:
         assert stats["warning_count"] == 1
         assert stats["error_count"] == 1
 
-    def test_reset_statistics(self):
+    def test_reset_statistics(self) -> None:
         """Test resetting of monitoring statistics."""
         monitor = NumericalStabilityMonitor()
 
@@ -240,7 +240,7 @@ class TestNumericalStabilityMonitor:
         assert stats["warning_count"] == 0
         assert stats["error_count"] == 0
 
-    def test_custom_exception_attributes(self):
+    def test_custom_exception_attributes(self) -> None:
         """Test custom exception attributes."""
         error = NumericalInstabilityError("Test error", context="test_context", value=1e20)
 
@@ -250,7 +250,7 @@ class TestNumericalStabilityMonitor:
         assert "test_context" in str(error)
         assert "Test error" in str(error)
 
-    def test_multiple_checks_accumulate_stats(self):
+    def test_multiple_checks_accumulate_stats(self) -> None:
         """Test that multiple checks accumulate statistics correctly."""
         monitor = NumericalStabilityMonitor()
 
@@ -264,7 +264,7 @@ class TestNumericalStabilityMonitor:
         stats = monitor.get_statistics()
         assert stats["warning_count"] == 3
 
-    def test_edge_case_exactly_at_threshold(self):
+    def test_edge_case_exactly_at_threshold(self) -> None:
         """Test behavior when value is exactly at threshold."""
         config = {"stability_warning_threshold": 100.0}
         monitor = NumericalStabilityMonitor(config)
@@ -277,7 +277,7 @@ class TestNumericalStabilityMonitor:
             assert len(w) == 1
             assert status["warning_issued"] is True
 
-    def test_negative_values_handled_correctly(self):
+    def test_negative_values_handled_correctly(self) -> None:
         """Test that negative values are handled using absolute value."""
         monitor = NumericalStabilityMonitor()
         values = np.array([-5e10, -6e10])  # Large negative values

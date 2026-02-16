@@ -6,7 +6,7 @@ data integrity and catch errors early.
 """
 
 import numpy as np
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 
 class InputValidator:
@@ -26,7 +26,7 @@ class InputValidator:
 
     @staticmethod
     def validate_array(
-        arr: np.ndarray,
+        arr: np.ndarray[Any, np.dtype[Any]],
         name: str,
         expected_shape: Optional[Tuple[int, ...]] = None,
         value_range: Optional[Tuple[float, float]] = None,

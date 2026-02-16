@@ -10,7 +10,7 @@ from unittest.mock import Mock, AsyncMock
 import redis.asyncio as redis
 
 from api.main import create_app
-from api.routes import sessions, state
+from api.routes import sessions
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 
 

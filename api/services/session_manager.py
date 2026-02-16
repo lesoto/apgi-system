@@ -5,25 +5,34 @@ Manages APGI simulation sessions with Redis caching and database persistence.
 """
 
 import asyncio
+import threading
 import json
 import logging
 import re
 import uuid
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from collections import OrderedDict
-from sqlalchemy.orm import sessionmaker
+
+# from sqlalchemy.orm import Session
 
 import redis.asyncio as redis
 from sqlalchemy import select
 
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
-from api.database.connection import get_db_context
+
+# from api.database.connection import get_db_context
 from api.models.schemas import SessionCreateRequest
 from apgi_system.system import APGISystem
+
+# Import circuit breaker utilities
+from utils.circuit_breaker import (
+    circuit_breaker,
+    CircuitBreakerException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -106,11 +115,11 @@ class SimulationSession:
 
         logger.info(f"SimulationSession {session_id} initialized")
 
-    def _apply_custom_config(self, custom_config: Dict[str, Any]):
+    def _apply_custom_config(self, custom_config: Dict[str, Any]) -> None:
         """Apply custom configuration overrides to APGI system."""
 
         # Deep merge custom config into system config
-        def deep_merge(base: dict, override: dict):
+        def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> None:
             for key, value in override.items():
                 if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                     deep_merge(base[key], value)
@@ -120,7 +129,7 @@ class SimulationSession:
         deep_merge(self.apgi_system.config, custom_config)
 
         # Reinitialize subsystems with new config
-        self.apgi_system._initialize_subsystems()
+        self.apgi_system._initialize_subsystems()  # type: ignore
 
     async def start(self) -> Dict[str, Any]:
         """
@@ -209,7 +218,7 @@ class SimulationSession:
         """
         async with self.lock:
             # Reset APGI system
-            self.apgi_system.reset()
+            self.apgi_system.reset()  # type: ignore
 
             # Clear paused state
             self._paused_state = None
@@ -274,7 +283,7 @@ class SimulationSession:
         """Capture complete system state for pause/resume."""
         return self.apgi_system.get_state()
 
-    def _restore_state(self, state: Dict[str, Any]):
+    def _restore_state(self, state: Dict[str, Any]) -> None:
         """Restore system state from snapshot."""
         # This is a simplified restoration - in production, you'd need
         # to carefully restore each subsystem's internal state
@@ -291,7 +300,7 @@ class SessionManager:
     Handles session lifecycle, state caching, and resource cleanup.
     """
 
-    def __init__(self, redis_client: redis.Redis, db_session_factory):
+    def __init__(self, redis_client: redis.Redis, db_session_factory: Any):
         """
         Initialize session manager.
 
@@ -310,7 +319,7 @@ class SessionManager:
         )  # (session, last_access_time)
 
         # Lock for session cache access
-        self.cache_lock = asyncio.Lock()
+        self.cache_lock = threading.Lock()
 
         logger.info("SessionManager initialized")
 
@@ -360,42 +369,61 @@ class SessionManager:
         sim_session = SimulationSession(session_id, config)
 
         # Atomic cache + database operation
-        async with self.cache_lock:
+        with self.cache_lock:
             # Cleanup expired sessions before adding new one
             self._cleanup_expired_sessions()
 
-            # First try to persist to database
-            db_session = self.db_session_factory()
-            try:
-                db_model = SessionModel(
-                    session_id=session_id,
-                    user_id=user_id,
-                    config=config,
-                    state=SessionState.CREATED.value,
-                    description=request.description,
-                    tags=[],
-                )
-                db_session.add(db_model)
-                db_session.commit()
+            # First try to persist to database with circuit breaker
+            await self._persist_session_to_database(
+                session_id, user_id, config, request.description
+            )
 
-                # Only add to cache after successful DB write
-                self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
-                logger.info(f"Session {session_id} created and persisted")
-            except Exception as e:
-                db_session.rollback()
-                logger.error(f"Failed to persist session {session_id}: {e}")
-                # Don't add to cache if DB write failed
-                raise
-            finally:
-                db_session.close()
+            # Only add to cache after successful DB write
+            self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
+            logger.info(f"Session {session_id} created and persisted")
 
             # Enforce cache size limit
             self._evict_oldest_sessions()
 
-        # Cache session metadata in Redis
-        await self._cache_session_metadata(session_id, sim_session)
+        # Cache session metadata in Redis with circuit breaker
+        await self._cache_session_metadata_safe(session_id, sim_session)
 
         return session_id
+
+    @circuit_breaker(name="database_session_persist", failure_threshold=3, recovery_timeout=30.0)  # type: ignore
+    async def _persist_session_to_database(
+        self, session_id: str, user_id: str, config: Dict[str, Any], description: str
+    ) -> None:
+        """Persist session to database with circuit breaker protection."""
+        db_session = self.db_session_factory()
+        try:
+            db_model = SessionModel(
+                session_id=session_id,
+                user_id=user_id,
+                config=config,
+                state=SessionState.CREATED.value,
+                description=description,
+                tags=[],
+            )
+            db_session.add(db_model)
+            db_session.commit()
+        except Exception as e:
+            db_session.rollback()
+            logger.error(f"Database error persisting session {session_id}: {e}")
+            raise CircuitBreakerException(f"Database operation failed: {e}")
+        finally:
+            db_session.close()
+
+    @circuit_breaker(name="redis_session_cache", failure_threshold=5, recovery_timeout=60.0)  # type: ignore
+    async def _cache_session_metadata_safe(
+        self, session_id: str, sim_session: SimulationSession
+    ) -> None:
+        """Cache session metadata in Redis with circuit breaker protection."""
+        try:
+            await self._cache_session_metadata(session_id, sim_session)
+        except Exception as e:
+            logger.error(f"Redis cache error for session {session_id}: {e}")
+            raise CircuitBreakerException(f"Redis operation failed: {e}")
 
     async def get_session(self, session_id: str) -> SimulationSession:
         """
@@ -414,7 +442,7 @@ class SessionManager:
         validate_session_id(session_id)
 
         # Check memory cache first
-        async with self.cache_lock:
+        with self.cache_lock:
             # Cleanup expired sessions
             self._cleanup_expired_sessions()
 
@@ -440,7 +468,7 @@ class SessionManager:
             )
 
             # Add to memory cache
-            async with self.cache_lock:
+            with self.cache_lock:
                 self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
             return sim_session
@@ -473,7 +501,7 @@ class SessionManager:
         finally:
             db_session.close()
 
-    async def delete_session(self, session_id: str):
+    async def delete_session(self, session_id: str) -> None:
         """
         Clean up session resources.
 
@@ -485,8 +513,14 @@ class SessionManager:
         """
         # Validate session ID format
         validate_session_id(session_id)
+
+        # Check if session exists in cache first
+        with self.cache_lock:
+            if session_id not in self.sessions:
+                raise ValueError(f"Session {session_id} not found")
+
         # Remove from memory cache
-        async with self.cache_lock:
+        with self.cache_lock:
             if session_id in self.sessions:
                 del self.sessions[session_id]
 
@@ -500,10 +534,8 @@ class SessionManager:
             result = db_session.execute(stmt)
             db_model = result.scalar_one_or_none()
 
-            if db_model:
-                db_session.delete(db_model)
-                db_session.commit()
-                logger.info(f"Session {session_id} deleted from database")
+            if not db_model:
+                raise ValueError(f"Session {session_id} not found")
         except Exception as e:
             db_session.rollback()
             logger.error(f"Failed to delete session {session_id}: {e}")
@@ -513,7 +545,7 @@ class SessionManager:
 
         logger.info(f"Session {session_id} cleaned up")
 
-    async def update_session_state(self, session_id: str, new_state: SessionLifecycleState):
+    async def update_session_state(self, session_id: str, new_state: SessionLifecycleState) -> None:
         """
         Update session state in database and cache.
 
@@ -548,7 +580,9 @@ class SessionManager:
         sim_session = await self.get_session(session_id)
         await self._cache_session_metadata(session_id, sim_session)
 
-    async def _cache_session_metadata(self, session_id: str, sim_session: SimulationSession):
+    async def _cache_session_metadata(
+        self, session_id: str, sim_session: SimulationSession
+    ) -> None:
         """Cache session metadata in Redis."""
         metadata = {
             "session_id": session_id,
@@ -561,7 +595,7 @@ class SessionManager:
         # Cache for 1 hour
         await self.redis.setex(f"session:{session_id}", 3600, json.dumps(metadata))
 
-    async def list_sessions(self, user_id: Optional[str] = None) -> list:
+    async def list_sessions(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List all sessions, optionally filtered by user.
 

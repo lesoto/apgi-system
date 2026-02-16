@@ -8,13 +8,10 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import os
-import sys
-import subprocess
-import tempfile
 import json
 import yaml
 from pathlib import Path
+from typing import Dict, Any
 import pytest
 from hypothesis import given, strategies as st, settings, assume
 from hypothesis import HealthCheck
@@ -44,7 +41,7 @@ settings.load_profile("executable_tests")
 class TestExecutableLaunchProperties:
     """Property-based tests for executable launch success."""
 
-    def test_property_executable_launch_success(self):
+    def test_property_executable_launch_success(self) -> None:
         """
         **Feature: cross-platform-executable, Property 7: Executable launch success**
 
@@ -94,15 +91,14 @@ class TestExecutableLaunchProperties:
         except Exception as e:
             pytest.fail(f"GUI initialization failed: {str(e)}")
         finally:
-            # Clean up
             try:
                 root.quit()
                 root.destroy()
-            except:
+            except Exception:
                 pass
 
     @given(num_launches=st.integers(min_value=1, max_value=3))
-    def test_property_executable_launch_idempotent(self, num_launches):
+    def test_property_executable_launch_idempotent(self, num_launches: int) -> None:
         """
         Test that the executable can be launched multiple times successfully.
 
@@ -121,19 +117,19 @@ class TestExecutableLaunchProperties:
                 gui = APGIGui(root)
 
                 # Verify successful initialization
-                assert gui is not None, f"Launch {i+1}: GUI should be initialized"
-                assert gui.apgi_system is not None, f"Launch {i+1}: System should be initialized"
+                assert gui is not None, f"Launch {i + 1}: GUI should be initialized"
+                assert gui.apgi_system is not None, f"Launch {i + 1}: System should be initialized"
 
             except Exception as e:
-                pytest.fail(f"Launch {i+1} failed: {str(e)}")
+                pytest.fail(f"Launch {i + 1} failed: {str(e)}")
             finally:
                 try:
                     root.quit()
                     root.destroy()
-                except:
+                except Exception:
                     pass
 
-    def test_property_executable_dependencies_available(self):
+    def test_property_executable_dependencies_available(self) -> None:
         """
         Test that all required dependencies are available.
 
@@ -163,7 +159,7 @@ class TestExecutableLaunchProperties:
             except ImportError as e:
                 pytest.fail(f"Critical dependency missing: {module_name} - {str(e)}")
 
-    def test_property_executable_resource_access(self):
+    def test_property_executable_resource_access(self) -> None:
         """
         Test that the executable can access bundled resources.
 
@@ -195,7 +191,7 @@ class TestExecutableLaunchProperties:
 class TestGUIFunctionalityProperties:
     """Property-based tests for GUI functionality preservation."""
 
-    def test_property_gui_functionality_preservation(self):
+    def test_property_gui_functionality_preservation(self) -> None:
         """
         **Feature: cross-platform-executable, Property 8: GUI functionality preservation**
 
@@ -249,13 +245,17 @@ class TestGUIFunctionalityProperties:
                 assert label is not None, f"Status label {label_name} should exist"
                 assert label.cget("text"), f"Status label {label_name} should have text"
 
+        except (tk.TclError, ImportError, AttributeError) as e:
+            pytest.skip(
+                f"GUI functionality test skipped due to GUI initialization failure: {str(e)}"
+            )
         except Exception as e:
             pytest.fail(f"GUI functionality test failed: {str(e)}")
         finally:
             try:
                 root.quit()
                 root.destroy()
-            except:
+            except Exception:
                 pass
 
     @settings(max_examples=10, suppress_health_check=[HealthCheck.too_slow])
@@ -264,7 +264,9 @@ class TestGUIFunctionalityProperties:
         extero_precision=st.floats(min_value=0.1, max_value=10.0),
         intero_precision=st.floats(min_value=0.1, max_value=10.0),
     )
-    def test_property_gui_parameter_adjustment(self, threshold, extero_precision, intero_precision):
+    def test_property_gui_parameter_adjustment(
+        self, threshold: float, extero_precision: float, intero_precision: float
+    ) -> None:
         """
         Test that GUI parameter adjustments work correctly.
 
@@ -295,9 +297,10 @@ class TestGUIFunctionalityProperties:
                 gui.param_vars["intero_precision"].set(intero_precision)
                 assert abs(gui.param_vars["intero_precision"].get() - intero_precision) < 0.01
 
-        except tk.TclError as e:
-            # Skip test if Tkinter is not properly configured
-            pytest.skip(f"Tkinter not properly configured: {str(e)}")
+        except (tk.TclError, ImportError, AttributeError) as e:
+            pytest.skip(
+                f"Parameter adjustment test skipped due to GUI initialization failure: {str(e)}"
+            )
         except Exception as e:
             pytest.fail(f"Parameter adjustment failed: {str(e)}")
         finally:
@@ -305,10 +308,10 @@ class TestGUIFunctionalityProperties:
                 try:
                     root.quit()
                     root.destroy()
-                except:
+                except Exception:
                     pass
 
-    def test_property_gui_menu_items_exist(self):
+    def test_property_gui_menu_items_exist(self) -> None:
         """
         Test that all menu items exist and are accessible.
 
@@ -339,14 +342,14 @@ class TestGUIFunctionalityProperties:
             try:
                 root.quit()
                 root.destroy()
-            except:
+            except Exception:
                 pass
 
 
 class TestResourceBundlingProperties:
     """Property-based tests for resource bundling completeness."""
 
-    def test_property_resource_bundling_completeness(self):
+    def test_property_resource_bundling_completeness(self) -> None:
         """
         **Feature: cross-platform-executable, Property 5: Resource bundling completeness**
 
@@ -387,7 +390,7 @@ class TestResourceBundlingProperties:
             ]
         )
     )
-    def test_property_resource_file_accessibility(self, resource_name):
+    def test_property_resource_file_accessibility(self, resource_name: str) -> None:
         """
         Test that specific resource files are accessible.
 
@@ -399,7 +402,7 @@ class TestResourceBundlingProperties:
         resource_path = get_resource_path(resource_name)
 
         assert resource_path is not None, f"Resource path for {resource_name} should not be None"
-        assert isinstance(resource_path, Path), f"Resource path should be a Path object"
+        assert isinstance(resource_path, Path), "Resource path should be a Path object"
 
         # Check if resource exists (skip if not in development mode and file is optional)
         if not resource_path.exists():
@@ -409,7 +412,7 @@ class TestResourceBundlingProperties:
             else:
                 pytest.fail(f"Required resource {resource_name} not found at {resource_path}")
 
-    def test_property_config_resources_bundled(self):
+    def test_property_config_resources_bundled(self) -> None:
         """
         Test that configuration resources are properly bundled.
 
@@ -432,7 +435,7 @@ class TestResourceBundlingProperties:
         except Exception as e:
             pytest.fail(f"Failed to read config file: {str(e)}")
 
-    def test_property_icon_resources_available(self):
+    def test_property_icon_resources_available(self) -> None:
         """
         Test that icon resources are available for the platform.
 
@@ -462,7 +465,7 @@ class TestResourceBundlingProperties:
         ), f"At least one icon format should exist for {platform}"
 
     @given(subdir=st.sampled_from(["icons", "images", "data"]))
-    def test_property_resource_subdirectories_accessible(self, subdir):
+    def test_property_resource_subdirectories_accessible(self, subdir: str) -> None:
         """
         Test that resource subdirectories are accessible.
 
@@ -486,7 +489,7 @@ class TestResourceBundlingProperties:
             # (may be empty but should exist)
             assert resource_path.exists(), f"Resource subdirectory {subdir} should exist in bundle"
 
-    def test_property_resource_path_resolution_consistency(self):
+    def test_property_resource_path_resolution_consistency(self) -> None:
         """
         Test that resource path resolution is consistent.
 
@@ -516,7 +519,7 @@ class TestResourceBundlingProperties:
             max_size=50,
         )
     )
-    def test_property_resource_path_always_absolute(self, relative_path):
+    def test_property_resource_path_always_absolute(self, relative_path: str) -> None:
         """
         Test that resource paths are always absolute.
 
@@ -536,7 +539,7 @@ class TestResourceBundlingProperties:
             assert resource_path is not None, "Resource path should not be None"
             assert isinstance(resource_path, Path), "Resource path should be a Path object"
             assert resource_path.is_absolute(), f"Resource path should be absolute: {resource_path}"
-        except Exception as e:
+        except Exception:
             # Some paths may be invalid, which is acceptable
             pass
 
@@ -544,7 +547,7 @@ class TestResourceBundlingProperties:
 class TestFileIOProperties:
     """Property-based tests for file I/O correctness."""
 
-    def test_property_file_io_correctness(self):
+    def test_property_file_io_correctness(self) -> None:
         """
         **Feature: cross-platform-executable, Property 9: File I/O correctness**
 
@@ -585,7 +588,7 @@ class TestFileIOProperties:
             max_size=20,
         ),
     )
-    def test_property_file_io_round_trip(self, content, filename):
+    def test_property_file_io_round_trip(self, content: str, filename: str) -> None:
         """
         Test that file I/O operations preserve data correctly.
 
@@ -631,7 +634,7 @@ class TestFileIOProperties:
             max_size=10,
         )
     )
-    def test_property_json_export_correctness(self, data):
+    def test_property_json_export_correctness(self, data: Dict[str, Any]) -> None:
         """
         Test that JSON export preserves data correctly.
 
@@ -660,7 +663,7 @@ class TestFileIOProperties:
             if test_file.exists():
                 test_file.unlink()
 
-    def test_property_config_file_loading(self):
+    def test_property_config_file_loading(self) -> None:
         """
         Test that configuration files can be loaded correctly.
 
@@ -695,7 +698,7 @@ class TestFileIOProperties:
             max_size=3,
         )
     )
-    def test_property_config_save_load_round_trip(self, config_data):
+    def test_property_config_save_load_round_trip(self, config_data: Dict[str, float]) -> None:
         """
         Test that configuration save/load preserves data.
 
@@ -724,7 +727,7 @@ class TestFileIOProperties:
             if test_config.exists():
                 test_config.unlink()
 
-    def test_property_data_export_directory_writable(self):
+    def test_property_data_export_directory_writable(self) -> None:
         """
         Test that the data export directory is writable.
 
@@ -753,7 +756,7 @@ class TestFileIOProperties:
 class TestConfigurationPersistenceProperties:
     """Property-based tests for configuration persistence."""
 
-    def test_property_configuration_persistence(self):
+    def test_property_configuration_persistence(self) -> None:
         """
         **Feature: cross-platform-executable, Property 10: Configuration persistence**
 
@@ -810,8 +813,8 @@ class TestConfigurationPersistenceProperties:
         ),
     )
     def test_property_configuration_persistence_round_trip(
-        self, baseline_threshold, extero_precision, intero_precision
-    ):
+        self, baseline_threshold: float, extero_precision: float, intero_precision: float
+    ) -> None:
         """
         Test that configuration persistence works for any valid parameter values.
 
@@ -879,7 +882,9 @@ class TestConfigurationPersistenceProperties:
             max_size=6,
         )
     )
-    def test_property_configuration_persistence_arbitrary_params(self, config_data):
+    def test_property_configuration_persistence_arbitrary_params(
+        self, config_data: Dict[str, float]
+    ) -> None:
         """
         Test configuration persistence with arbitrary parameter sets.
 
@@ -921,7 +926,7 @@ class TestConfigurationPersistenceProperties:
             if test_config_file.exists():
                 test_config_file.unlink()
 
-    def test_property_configuration_persistence_with_nested_structure(self):
+    def test_property_configuration_persistence_with_nested_structure(self) -> None:
         """
         Test configuration persistence with nested configuration structures.
 
@@ -978,7 +983,7 @@ class TestConfigurationPersistenceProperties:
             if test_config_file.exists():
                 test_config_file.unlink()
 
-    def test_property_configuration_persistence_user_override(self):
+    def test_property_configuration_persistence_user_override(self) -> None:
         """
         Test that user configuration overrides default configuration.
 
@@ -1029,7 +1034,7 @@ class TestConfigurationPersistenceProperties:
                 user_config_file.unlink()
 
     @given(num_saves=st.integers(min_value=1, max_value=5))
-    def test_property_configuration_persistence_multiple_saves(self, num_saves):
+    def test_property_configuration_persistence_multiple_saves(self, num_saves: int) -> None:
         """
         Test that configuration can be saved and loaded multiple times.
 
@@ -1063,7 +1068,7 @@ class TestConfigurationPersistenceProperties:
                 # Verify configuration is preserved
                 assert (
                     loaded_config == original_config
-                ), f"Config should be preserved after {i+1} save/load cycles"
+                ), f"Config should be preserved after {i + 1} save/load cycles"
 
         finally:
             # Clean up

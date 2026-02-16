@@ -2,7 +2,6 @@
 
 import pytest
 import numpy as np
-from scipy import linalg
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 

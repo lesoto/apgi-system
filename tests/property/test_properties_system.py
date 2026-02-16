@@ -11,15 +11,20 @@ and validates specific requirements from the requirements document.
 import numpy as np
 import pytest
 import yaml
+import sys
 from pathlib import Path
-from hypothesis import given, strategies as st, settings, assume
+from typing import Any, Dict
+from numpy.typing import NDArray
+from hypothesis import given, strategies as st, settings
 from hypothesis import HealthCheck
 
-from apgi_system.system import APGISystem
-from apgi_system.core.active_inference import ActiveInferenceEngine, HierarchicalGaussianFilter
-from apgi_system.core.precision import PrecisionWeighting
-from apgi_system.validation import InputValidator
-from tests.strategies import observation_strategy, error_variance_strategy, config_strategy
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from apgi_system.system import APGISystem  # noqa
+from apgi_system.core.active_inference import HierarchicalGaussianFilter  # noqa
+from apgi_system.validation import InputValidator  # noqa
+from tests.strategies import observation_strategy, config_strategy  # noqa
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(
@@ -35,7 +40,7 @@ settings.register_profile(
 settings.load_profile("property_tests")
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
@@ -46,7 +51,7 @@ class TestErrorHandlingProperties:
     """Property-based tests for error handling and input validation."""
 
     @given(invalid_type=st.one_of(st.text(), st.integers(), st.lists(st.floats()), st.none()))
-    def test_property_input_validation_wrong_type(self, invalid_type):
+    def test_property_input_validation_wrong_type(self, invalid_type: Any) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -85,7 +90,7 @@ class TestErrorHandlingProperties:
         ), f"Error message should mention array type: {error_msg}"
 
     @given(wrong_shape=st.integers(min_value=1, max_value=512).filter(lambda x: x != 256))
-    def test_property_input_validation_wrong_shape(self, wrong_shape):
+    def test_property_input_validation_wrong_shape(self, wrong_shape: int) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -125,7 +130,7 @@ class TestErrorHandlingProperties:
         ), f"Error message should mention expected or actual shape: {error_msg}"
 
     @given(nan_or_inf=st.sampled_from(["nan", "inf", "-inf"]))
-    def test_property_input_validation_nan_inf(self, nan_or_inf):
+    def test_property_input_validation_nan_inf(self, nan_or_inf: str) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -170,7 +175,7 @@ class TestErrorHandlingProperties:
         ), f"Error message should mention NaN or Inf: {error_msg}"
 
     @given(out_of_range=st.floats(min_value=-1.0, max_value=0.0).filter(lambda x: x <= 0))
-    def test_property_input_validation_out_of_range(self, out_of_range):
+    def test_property_input_validation_out_of_range(self, out_of_range: float) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -211,7 +216,9 @@ class TestErrorHandlingProperties:
         ), f"Error message should mention dt, positive, or range: {error_msg}"
 
     @given(observation=observation_strategy())
-    def test_property_input_validation_accepts_valid_input(self, observation):
+    def test_property_input_validation_accepts_valid_input(
+        self, observation: NDArray[np.float64]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -246,7 +253,7 @@ class TestErrorHandlingProperties:
         except (TypeError, ValueError) as e:
             pytest.fail(f"Valid input was rejected: {e}")
 
-    def test_property_input_validation_informative_messages(self):
+    def test_property_input_validation_informative_messages(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 32: Input validation**
 
@@ -259,33 +266,33 @@ class TestErrorHandlingProperties:
 
         # Test array validation with wrong type
         with pytest.raises(TypeError) as exc_info:
-            InputValidator.validate_array("not an array", "test_param")
+            InputValidator.validate_array("not an array", "test_param")  # type: ignore[arg-type]
         error_msg = str(exc_info.value)
         assert "test_param" in error_msg, "Error should mention parameter name"
         assert "numpy array" in error_msg.lower(), "Error should mention expected type"
 
         # Test array validation with wrong shape
         arr = np.array([1, 2, 3])
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info_shape:
             InputValidator.validate_array(arr, "test_param", expected_shape=(5,))
-        error_msg = str(exc_info.value)
+        error_msg = str(exc_info_shape.value)
         assert "test_param" in error_msg, "Error should mention parameter name"
         assert "shape" in error_msg.lower(), "Error should mention shape mismatch"
         assert "(3,)" in error_msg and "(5,)" in error_msg, "Error should show both shapes"
 
         # Test array validation with out of range values
         arr = np.array([1.0, 2.0, 15.0])
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info_range:
             InputValidator.validate_array(arr, "test_param", value_range=(0.0, 10.0))
-        error_msg = str(exc_info.value)
+        error_msg = str(exc_info_range.value)
         assert "test_param" in error_msg, "Error should mention parameter name"
         assert "range" in error_msg.lower(), "Error should mention range"
 
         # Test array validation with NaN
         arr = np.array([1.0, np.nan, 3.0])
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info_nan:
             InputValidator.validate_array(arr, "test_param")
-        error_msg = str(exc_info.value)
+        error_msg = str(exc_info_nan.value)
         assert "test_param" in error_msg, "Error should mention parameter name"
         assert (
             "nan" in error_msg.lower() or "inf" in error_msg.lower()
@@ -293,22 +300,22 @@ class TestErrorHandlingProperties:
 
         # Test scalar validation with wrong type
         with pytest.raises(TypeError) as exc_info:
-            InputValidator.validate_scalar("not a number", "test_scalar")
+            InputValidator.validate_scalar("not a number", "test_scalar")  # type: ignore[arg-type]
         error_msg = str(exc_info.value)
         assert "test_scalar" in error_msg, "Error should mention parameter name"
         assert "numeric" in error_msg.lower(), "Error should mention numeric type"
 
         # Test scalar validation with non-positive when positive required
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info_pos:
             InputValidator.validate_scalar(-1.0, "test_scalar", positive=True)
-        error_msg = str(exc_info.value)
+        error_msg = str(exc_info_pos.value)
         assert "test_scalar" in error_msg, "Error should mention parameter name"
         assert "positive" in error_msg.lower(), "Error should mention positive requirement"
 
         # Test scalar validation with out of range
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info_range_scalar:
             InputValidator.validate_scalar(15.0, "test_scalar", value_range=(0.0, 10.0))
-        error_msg = str(exc_info.value)
+        error_msg = str(exc_info_range_scalar.value)
         assert "test_scalar" in error_msg, "Error should mention parameter name"
         assert "range" in error_msg.lower(), "Error should mention range"
 
@@ -323,8 +330,12 @@ class TestConfigurationProperties:
         timestep_ms=st.floats(min_value=0.1, max_value=10.0),
     )
     def test_property_parameter_validation_and_application(
-        self, learning_rate, precision_init, baseline_threshold, timestep_ms
-    ):
+        self,
+        learning_rate: float,
+        precision_init: float,
+        baseline_threshold: float,
+        timestep_ms: float,
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 33: Parameter validation and application**
 
@@ -394,7 +405,9 @@ class TestConfigurationProperties:
             st.floats(min_value=-1.0, max_value=0.0), st.floats(min_value=1.0, max_value=10.0)
         ),
     )
-    def test_property_parameter_validation_rejects_invalid(self, invalid_learning_rate):
+    def test_property_parameter_validation_rejects_invalid(
+        self, invalid_learning_rate: float
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 33: Parameter validation and application**
 
@@ -444,7 +457,11 @@ class TestConfigurationProperties:
         threshold_range_min=st.floats(min_value=0.5, max_value=2.0),
         threshold_range_max=st.floats(min_value=3.0, max_value=10.0),
     )
-    def test_property_parameter_range_consistency(self, threshold_range_min, threshold_range_max):
+    def test_property_parameter_range_consistency(
+        self,
+        threshold_range_min: float,
+        threshold_range_max: float,
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 33: Parameter validation and application**
 
@@ -495,7 +512,7 @@ class TestConfigurationProperties:
                 os.unlink(temp_config_path)
 
     @given(config_mod=config_strategy())
-    def test_property_full_config_validation(self, config_mod):
+    def test_property_full_config_validation(self, config_mod: Dict[str, Any]) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 33: Parameter validation and application**
 
@@ -560,7 +577,7 @@ class TestConfigurationProperties:
             if os.path.exists(temp_config_path):
                 os.unlink(temp_config_path)
 
-    def test_property_config_parameter_types(self):
+    def test_property_config_parameter_types(self) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 33: Parameter validation and application**
 
@@ -589,7 +606,7 @@ class TestConfigurationProperties:
             system = APGISystem(config_path=temp_config_path)
             # If it doesn't raise an error, it should at least not crash
             extero_input = np.random.randn(256) * 0.5
-            state = system.step(extero_input)
+            state = system.step(extero_input)  # noqa: F841
         except (TypeError, ValueError, AttributeError) as e:
             # Error should be informative
             error_msg = str(e)

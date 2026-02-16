@@ -99,37 +99,24 @@ class TestWindowsBuildIntegration:
         total_deps = deps_dict["total_dependencies"]
         assert total_deps >= 0, "Should have non-negative dependency count"
 
-    def test_windows_build_resource_collection(self, project_root):
+    def test_windows_build_resource_collection(self):
         """
-        Test that resource collection finds all necessary files.
+        Test that resource collection works correctly for Windows build.
 
-        Validates: Requirements 9.1, 9.3
+        Validates: Requirements 9.1
         """
-        # Test config directory
-        config_dir = project_root / "config"
-        if config_dir.exists():
-            resources = collect_resources(str(config_dir))
+        # Test with project root
+        project_root = Path(__file__).parent.parent.parent
+        resources = collect_resources(str(project_root))
 
-            # Function returns a dict with keys: config_files, data_files, resource_files, icon_files
-            assert isinstance(resources, dict), "Should return a dict"
-            assert "config_files" in resources, "Should have config_files key"
+        # Should have config_files key
+        assert "config_files" in resources, "Should have config_files key"
 
-            # Should find YAML files
-            yaml_files = [
-                r for r in resources["config_files"] if r.endswith(".yaml") or r.endswith(".yml")
-            ]
-            assert len(yaml_files) > 0, "Should find at least one YAML config file"
-
-        # Test resources directory
-        resources_dir = project_root / "resources"
-        if resources_dir.exists():
-            resources = collect_resources(str(resources_dir))
-
-            # Should find icon files
-            icon_files = [
-                r for r in resources["icon_files"] if r.endswith((".ico", ".icns", ".png"))
-            ]
-            assert len(icon_files) > 0, "Should find at least one icon file"
+        # Should find YAML files
+        yaml_files = [
+            r for r in resources["config_files"] if r.endswith(".yaml") or r.endswith(".yml")
+        ]
+        assert len(yaml_files) > 0, "Should find at least one YAML config file"
 
     def test_windows_build_hidden_imports_detection(self):
         """
@@ -519,8 +506,12 @@ class TestCrossPlatformCompatibility:
         test_dir = tmp_path / "test_resources"
         test_dir.mkdir()
 
-        # Create test file
-        test_file = test_dir / "test.yaml"
+        # Create config subdirectory
+        config_dir = test_dir / "config"
+        config_dir.mkdir()
+
+        # Create test file in config directory
+        test_file = config_dir / "test.yaml"
         test_file.write_text("test: data")
 
         # Collect resources

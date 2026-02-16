@@ -10,13 +10,13 @@ from api.main import create_app
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create a test client for the API."""
     app = create_app()
     return TestClient(app)
 
 
-def test_app_creation():
+def test_app_creation() -> None:
     """Test that the FastAPI application can be created."""
     app = create_app()
     assert app is not None
@@ -24,7 +24,7 @@ def test_app_creation():
     assert app.version == "1.0.0"
 
 
-def test_root_endpoint(client):
+def test_root_endpoint(client: TestClient) -> None:
     """Test the root endpoint returns basic API information."""
     response = client.get("/")
     assert response.status_code == 200
@@ -35,7 +35,7 @@ def test_root_endpoint(client):
     assert "health" in data
 
 
-def test_health_check_endpoint(client):
+def test_health_check_endpoint(client: TestClient) -> None:
     """Test the health check endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
@@ -45,7 +45,7 @@ def test_health_check_endpoint(client):
     assert data["version"] == "1.0.0"
 
 
-def test_openapi_schema(client):
+def test_openapi_schema(client: TestClient) -> None:
     """Test that OpenAPI schema is generated."""
     response = client.get("/openapi.json")
     assert response.status_code == 200
@@ -55,14 +55,14 @@ def test_openapi_schema(client):
     assert schema["info"]["title"] == "APGI System API"
 
 
-def test_docs_endpoint(client):
+def test_docs_endpoint(client: TestClient) -> None:
     """Test that Swagger UI documentation is accessible."""
     response = client.get("/docs")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
 
-def test_redoc_endpoint(client):
+def test_redoc_endpoint(client: TestClient) -> None:
     """Test that ReDoc documentation is accessible."""
     response = client.get("/redoc")
     assert response.status_code == 200

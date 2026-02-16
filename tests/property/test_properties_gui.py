@@ -10,17 +10,22 @@ and validates specific requirements from the requirements document.
 """
 
 import numpy as np
-import pytest
 import json
 import csv
 import tempfile
 import os
+import sys
 from pathlib import Path
-from hypothesis import given, strategies as st, settings, assume
+from typing import Dict, Any, List
+from numpy.typing import NDArray
+from hypothesis import given, strategies as st, settings
 from hypothesis import HealthCheck
 
-from apgi_system.system import APGISystem
-from tests.strategies import observation_strategy, body_state_strategy, config_strategy
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from apgi_system.system import APGISystem  # noqa: E402
+from tests.strategies import observation_strategy  # noqa: E402
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(
@@ -45,16 +50,16 @@ class MockGUIParameterAdjuster:
     test the backend parameter application logic.
     """
 
-    def __init__(self, apgi_system):
+    def __init__(self, apgi_system: Any) -> None:
         """Initialize with APGI system instance."""
         self.apgi_system = apgi_system
-        self.param_vars = {}
+        self.param_vars: Dict[str, Any] = {}
 
-    def set_parameter(self, param_name, value):
+    def set_parameter(self, param_name: str, value: Any) -> None:
         """Set a parameter value (simulates GUI slider adjustment)."""
         self.param_vars[param_name] = value
 
-    def apply_parameters(self):
+    def apply_parameters(self) -> None:
         """Apply parameter adjustments to system (simulates GUI _apply_parameters)."""
         if not self.apgi_system:
             return
@@ -80,7 +85,7 @@ class MockGUIParameterAdjuster:
                     "baseline_threshold"
                 ]
 
-        except Exception as e:
+        except Exception:
             pass  # Silently ignore parameter application errors (matches GUI behavior)
 
 
@@ -92,11 +97,11 @@ class MockDataExporter:
     requiring file dialogs, allowing us to test the export completeness.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize data exporter."""
-        self.log_data = []
+        self.log_data: List[Dict[str, Any]] = []
 
-    def record_state(self, state):
+    def record_state(self, state: Dict[str, Any]) -> None:
         """Record state data (simulates GUI _record_state)."""
         current_time = state["time"] / 1000.0  # Convert to seconds
 
@@ -119,7 +124,7 @@ class MockDataExporter:
 
         self.log_data.append(data_entry)
 
-    def export_to_csv(self, filename):
+    def export_to_csv(self, filename: str) -> bool:
         """Export data to CSV format (simulates GUI _export_data CSV path)."""
         if not self.log_data:
             return False
@@ -130,7 +135,7 @@ class MockDataExporter:
             writer.writerows(self.log_data)
         return True
 
-    def export_to_json(self, filename):
+    def export_to_json(self, filename: str) -> bool:
         """Export data to JSON format (simulates GUI _export_data JSON path)."""
         if not self.log_data:
             return False
@@ -148,11 +153,11 @@ class MockInterventionApplier:
     without requiring the actual GUI interface.
     """
 
-    def __init__(self, apgi_system):
+    def __init__(self, apgi_system: Any) -> None:
         """Initialize with APGI system instance."""
         self.apgi_system = apgi_system
 
-    def trigger_ignition(self):
+    def trigger_ignition(self) -> bool:
         """Manually trigger ignition event (simulates GUI _trigger_ignition)."""
         if self.apgi_system:
             # Force high arousal to trigger ignition (matches GUI logic)
@@ -161,7 +166,7 @@ class MockInterventionApplier:
             return True
         return False
 
-    def induce_stressor(self, intensity=0.5):
+    def induce_stressor(self, intensity: float = 0.5) -> bool:
         """Induce stressor event (simulates GUI _induce_stressor)."""
         if self.apgi_system:
             self.apgi_system.allostasis.trigger_stressor(intensity=intensity)
@@ -178,8 +183,13 @@ class MockInterventionApplier:
     baseline_threshold=st.floats(min_value=1.0, max_value=5.0),
 )
 def test_property_parameter_adjustment_application(
-    arousal, stress, activity, extero_precision, intero_precision, baseline_threshold
-):
+    arousal: float,
+    stress: float,
+    activity: float,
+    extero_precision: float,
+    intero_precision: float,
+    baseline_threshold: float,
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 21: Parameter adjustment application**
 
@@ -189,11 +199,6 @@ def test_property_parameter_adjustment_application(
     # Initialize system
     system = APGISystem()
     adjuster = MockGUIParameterAdjuster(system)
-
-    # Record initial parameter values
-    initial_arousal = system.body_model.arousal if hasattr(system.body_model, "arousal") else 0.0
-    initial_extero_precision = system.precision.extero_baseline
-    initial_threshold = system.ignition_threshold.baseline_threshold
 
     # Set parameters via mock GUI
     adjuster.set_parameter("arousal", arousal)
@@ -222,7 +227,9 @@ def test_property_parameter_adjustment_application(
 
 
 @given(num_steps=st.integers(min_value=5, max_value=50), observation=observation_strategy())
-def test_property_data_export_completeness(num_steps, observation):
+def test_property_data_export_completeness(
+    num_steps: int, observation: NDArray[np.float64]
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 22: Data export completeness**
 
@@ -319,7 +326,9 @@ def test_property_data_export_completeness(num_steps, observation):
     intervention_type=st.sampled_from(["trigger_ignition", "induce_stressor"]),
     stressor_intensity=st.floats(min_value=0.1, max_value=1.0),
 )
-def test_property_intervention_application(intervention_type, stressor_intensity):
+def test_property_intervention_application(
+    intervention_type: str, stressor_intensity: float
+) -> None:
     """
     **Feature: apgi-enhancement-maintenance, Property 24: Intervention application**
 
@@ -333,11 +342,7 @@ def test_property_intervention_application(intervention_type, stressor_intensity
 
     # Get initial state
     initial_obs = np.random.randn(256) * 0.5
-    initial_state = system.step(initial_obs)
-
-    # Record initial values for comparison
-    initial_arousal = getattr(system.body_model, "arousal", 0.0)
-    initial_allostatic_load = initial_state["allostasis"]["allostatic_load"]
+    system.step(initial_obs)
 
     # Apply intervention
     if intervention_type == "trigger_ignition":
@@ -346,7 +351,7 @@ def test_property_intervention_application(intervention_type, stressor_intensity
 
         # Verify arousal and stress were increased (should affect next state)
         next_obs = np.random.randn(256) * 0.5
-        next_state = system.step(next_obs)
+        system.step(next_obs)
 
         # The intervention should have some effect on the system state
         # (exact effects depend on system dynamics, but we can verify the intervention was applied)
@@ -358,7 +363,7 @@ def test_property_intervention_application(intervention_type, stressor_intensity
 
         # Verify stressor was applied (should affect allostatic load)
         next_obs = np.random.randn(256) * 0.5
-        next_state = system.step(next_obs)
+        system.step(next_obs)
 
         # Allostatic load should be affected by the stressor
         # (may not be immediately visible depending on system dynamics)

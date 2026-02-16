@@ -12,7 +12,6 @@ import shutil
 import os
 import stat
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 
 
 class TestDMGStructureValidation(unittest.TestCase):

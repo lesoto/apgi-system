@@ -12,18 +12,15 @@ with no external browser dependencies, save options, or display capabilities.
 """
 
 import hashlib
-import json
 import logging
 import os
 import shutil
 import signal
 import sys
 import tempfile
-import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -47,10 +44,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# GUI imports with graceful fallbacks
+try:
+    import tkinter as tk
+    from tkinter import messagebox, ttk
+    from traceback import format_exc
+
+    TKINTER_AVAILABLE = True
+except ImportError:
+    TKINTER_AVAILABLE = False
+    logger.warning("Tkinter not available for GUI interface")
+
+
 class ToolTip:
     """Consistent tooltip implementation for tkinter widgets"""
 
-    def __init__(self, widget, text=""):
+    def __init__(self, widget: tk.Widget, text: str = "") -> None:
         """Initialize tooltip
 
         Args:
@@ -59,44 +68,47 @@ class ToolTip:
         """
         self.widget = widget
         self.text = text
-        self.tipwindow = None
-        self.id = None
+        self.tipwindow: Optional[tk.Toplevel] = None
+        self.id: Optional[str] = None
         self._delay = 500
 
         self.widget.bind("<Enter>", self.on_enter)
         self.widget.bind("<Leave>", self.on_leave)
         self.widget.bind("<ButtonPress>", self.on_leave)
 
-    def on_enter(self, event=None):
+    def on_enter(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Show tooltip when mouse enters widget"""
         self.schedule()
 
-    def on_leave(self, event=None):
+    def on_leave(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Hide tooltip when mouse leaves widget"""
         self.unschedule()
         self.hidetip()
 
-    def schedule(self):
+    def schedule(self) -> None:
         """Schedule tooltip display"""
         self.unschedule()
         self.id = self.widget.after(self._delay, self.showtip)
 
-    def unschedule(self):
+    def unschedule(self) -> None:
         """Cancel scheduled tooltip display"""
         id = self.id
         self.id = None
         if id:
             self.widget.after_cancel(id)
 
-    def showtip(self):
+    def showtip(self) -> None:
         """Display the tooltip"""
         if self.tipwindow or not self.text:
             return
-        x, y, cx, cy = self.widget.bbox("insert")
+        bbox = self.widget.bbox("insert")  # type: ignore
+        if bbox is None:
+            return
+        x, y, _, _ = bbox
         x = x + self.widget.winfo_rootx() + 25
         y = y + self.widget.winfo_rooty() + 20
         self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
+        tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         label = tk.Label(
             tw,
@@ -105,25 +117,24 @@ class ToolTip:
             background="#ffffe0",
             relief=tk.SOLID,
             borderwidth=1,
-            font=("tahoma", "8", "normal"),
+            font=("tahoma", 8, "normal"),
         )
         label.pack(padx=1, pady=1)
 
-    def hidetip(self):
+    def hidetip(self) -> None:
         """Hide the tooltip"""
         tw = self.tipwindow
         self.tipwindow = None
         if tw:
             tw.destroy()
 
-    def update_text(self, new_text):
+    def update_text(self, new_text: str) -> None:
         """Update tooltip text"""
         self.text = new_text
 
 
 # Visualization imports with graceful fallbacks
 try:
-    import plotly.express as px
     import plotly.graph_objects as go
     import plotly.io as pio
     from plotly.subplots import make_subplots
@@ -135,12 +146,8 @@ except ImportError:
     logger.warning("Plotly not available. Install with: pip install plotly")
 
 try:
-    import matplotlib.cm as cm
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-    from matplotlib.colors import LinearSegmentedColormap, to_hex
-    from matplotlib.figure import Figure
-    from matplotlib.patches import Circle, Polygon, Wedge
 
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
@@ -154,19 +161,6 @@ try:
 except ImportError:
     PANDAS_AVAILABLE = False
     logger.warning("Pandas not available. Install with: pip install pandas")
-
-# GUI imports with graceful fallbacks
-try:
-    import threading
-    import tkinter as tk
-    from tkinter import messagebox, ttk
-    from tkinter.scrolledtext import ScrolledText
-    from traceback import format_exc
-
-    TKINTER_AVAILABLE = True
-except ImportError:
-    TKINTER_AVAILABLE = False
-    logger.warning("Tkinter not available for GUI interface")
 
 # Try to import tkinterweb for HTML rendering, fallback to built-in approach
 try:
@@ -197,7 +191,7 @@ class APGIParameters:
     z_e: float
     z_i: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate parameters are within physiological bounds"""
         if not (0.1 <= self.Pi_e <= 10.0):
             raise ValueError(f"Pi_e must be in [0.1, 10], got {self.Pi_e}")
@@ -222,7 +216,7 @@ class APGIParameters:
         """
         try:
             computed = self.Pi_e * abs(self.z_e) + self.Pi_i_eff * abs(self.z_i)
-            return np.isclose(self.S_t, computed, rtol=0.01)
+            return np.isclose(self.S_t, computed, rtol=0.01)  # type: ignore
         except (TypeError, AttributeError):
             return False
 
@@ -235,7 +229,7 @@ class APGIParameters:
         try:
             computed = self.Pi_i_baseline * np.exp(self.beta * self.M_ca)
             computed = np.clip(computed, 0.1, 10.0)
-            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)
+            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)  # type: ignore
         except (TypeError, AttributeError):
             return False
 
@@ -1485,7 +1479,7 @@ class APGIVisualizerGUI:
             font=("Arial", 9),
         )
         self.viz_type.set("3D State Network")
-        self.viz_type.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.viz_type.grid(row=1, column=0, sticky="we", pady=(0, 10))
 
         # State Selection
         ttk.Label(control_frame, text="Select State:", font=("Arial", 10, "bold")).grid(
@@ -1498,7 +1492,7 @@ class APGIVisualizerGUI:
             state="readonly",
             font=("Arial", 9),
         )
-        self.state_combo.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.state_combo.grid(row=3, column=0, sticky="we", pady=(0, 10))
 
         # Multiple States for Radar
         ttk.Label(
@@ -1507,12 +1501,12 @@ class APGIVisualizerGUI:
             font=("Arial", 9, "bold"),
         ).grid(row=4, column=0, sticky=tk.W, pady=(5, 2))
         self.states_text = tk.Text(control_frame, height=3, width=25, font=("Courier", 9))
-        self.states_text.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.states_text.grid(row=5, column=0, sticky="we", pady=(0, 10))
         self.states_text.insert("1.0", "flow\nanxiety\ncalm")
 
         # Separator
         ttk.Separator(control_frame, orient="horizontal").grid(
-            row=6, column=0, sticky=(tk.W, tk.E), pady=10
+            row=6, column=0, sticky="we", pady=10
         )
 
         # Parameter Input Section
@@ -1567,18 +1561,17 @@ class APGIVisualizerGUI:
 
         # Separator
         ttk.Separator(control_frame, orient="horizontal").grid(
-            row=17, column=0, sticky=(tk.W, tk.E), pady=10
+            row=17, column=0, sticky="we", pady=10
         )
 
         # Buttons with better styling
-        button_style = {"width": 20}
 
         self.generate_button = ttk.Button(
             control_frame,
             text="Run Simulation",
             command=self.run_simulation_with_validation,
         )
-        self.generate_button.grid(row=18, column=0, sticky=(tk.W, tk.E), pady=5)
+        self.generate_button.grid(row=18, column=0, sticky="we", pady=5)
         ToolTip(self.generate_button, "Run simulation with current parameters")
 
         viz_button = ttk.Button(
@@ -1586,18 +1579,18 @@ class APGIVisualizerGUI:
             text="Generate Visualization",
             command=self.generate_visualization,
         )
-        viz_button.grid(row=19, column=0, sticky=(tk.W, tk.E), pady=5)
+        viz_button.grid(row=19, column=0, sticky="we", pady=5)
         ToolTip(viz_button, "Generate visualization of selected psychological state")
 
         clear_button = ttk.Button(control_frame, text="Clear Display", command=self.clear_display)
-        clear_button.grid(row=20, column=0, sticky=(tk.W, tk.E), pady=5)
+        clear_button.grid(row=20, column=0, sticky="we", pady=5)
         ToolTip(clear_button, "Clear the visualization display")
 
         control_frame.columnconfigure(0, weight=1)
 
         # Visualization Panel (Right) - Enhanced with embedded display
         viz_frame = ttk.LabelFrame(main_frame, text="Visualization Panel", padding="5")
-        viz_frame.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        viz_frame.grid(row=1, column=1, columnspan=2, sticky="nsew")
         viz_frame.columnconfigure(0, weight=1)
         viz_frame.rowconfigure(0, weight=1)
 
@@ -1607,17 +1600,15 @@ class APGIVisualizerGUI:
 
         # Info Panel (Bottom) - Smaller
         info_frame = ttk.LabelFrame(main_frame, text="Information Panel", padding="8")
-        info_frame.grid(
-            row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0)
-        )
+        info_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
         info_frame.columnconfigure(0, weight=1)
         info_frame.rowconfigure(0, weight=1)
 
         self.info_text = tk.Text(info_frame, height=4, width=80, wrap=tk.WORD, font=("Arial", 9))
-        self.info_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.info_text.grid(row=0, column=0, sticky="nsew")
 
         scrollbar = ttk.Scrollbar(info_frame, orient=tk.VERTICAL, command=self.info_text.yview)
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky="ns")
         self.info_text["yscrollcommand"] = scrollbar.set
 
         # Status Bar
@@ -1628,7 +1619,7 @@ class APGIVisualizerGUI:
             relief=tk.SUNKEN,
             font=("Arial", 9),
         )
-        status_bar.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        status_bar.grid(row=3, column=0, columnspan=3, sticky="we", pady=(10, 0))
 
     def populate_state_dropdowns(self) -> None:
         """Populate state selection dropdowns"""
@@ -2327,7 +2318,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         self._cleanup_toolbar()
         self._cleanup_all_figures()
 
-    def _cleanup_matplotlib_canvas(self):
+    def _cleanup_matplotlib_canvas(self) -> None:
         """Clean up the matplotlib canvas widget"""
         if not hasattr(self, "matplotlib_canvas") or not self.matplotlib_canvas:
             return
@@ -2336,10 +2327,8 @@ class EmbeddedDisplayPanel(ttk.Frame):
             # Close the matplotlib figure to free memory
             if hasattr(self.matplotlib_canvas, "figure"):
                 self.matplotlib_canvas.figure.clf()
-                if MATPLOTLIB_AVAILABLE:
-                    import matplotlib.pyplot as plt
 
-                    plt.close(self.matplotlib_canvas.figure)
+                plt.close(self.matplotlib_canvas.figure)
 
             # Destroy the tkinter widget
             widget = self.matplotlib_canvas.get_tk_widget()
@@ -2349,7 +2338,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         except (AttributeError, tk.TclError, RuntimeError):
             self.matplotlib_canvas = None
 
-    def _cleanup_toolbar(self):
+    def _cleanup_toolbar(self) -> None:
         """Clean up the matplotlib toolbar"""
         if not hasattr(self, "toolbar") or not self.toolbar:
             return
@@ -2361,7 +2350,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         except (AttributeError, tk.TclError):
             self.toolbar = None
 
-    def _cleanup_all_figures(self):
+    def _cleanup_all_figures(self) -> None:
         """Clean up any remaining matplotlib figures"""
         if MATPLOTLIB_AVAILABLE:
             try:
@@ -2548,7 +2537,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
     def _render_3d_projection(self, trace, mpl_fig):
         """Render 3D scatter plot as 2D projection"""
         ax = mpl_fig.add_subplot(111)
-        scatter = ax.scatter(
+        ax.scatter(
             trace.x,
             trace.y,
             c=trace.z,
@@ -2563,10 +2552,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
         # Add colorbar
         if mpl_fig.gca().collections:
-            if MATPLOTLIB_AVAILABLE:
-                import matplotlib.pyplot as plt
-
-                plt.colorbar(mpl_fig.gca().collections[0], ax=ax, label="Z value")
+            plt.colorbar(mpl_fig.gca().collections[0], ax=ax, label="Z value")
 
     def _render_info_message(self, fig, mpl_fig):
         """Render generic info message for unsupported plot types"""

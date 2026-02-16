@@ -1,0 +1,14 @@
+{
+  "total_time": 75.0,
+  "time_step": 0.05,
+  "ignition_count": 945,
+  "avg_surprise": 0.6366838140708907,
+  "avg_threshold": 0.8479918461760492,
+  "max_anxiety_index": 0.0,
+  "parameter_ranges_validated": true,
+  "\u03a0_vs_\u03a0\u0302_implemented": true,
+  "measurement_equations_implemented": true,
+  "neuromodulator_mapping_implemented": true,
+  "domain_specific_thresholds_implemented": true,
+  "psychiatric_profiles_implemented": true
+}

@@ -5,24 +5,21 @@ Tests webhook registration, validation, delivery, and retry logic.
 """
 
 import pytest
-import asyncio
-from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, AsyncMock
 import httpx
 
 from api.services.webhook_manager import WebhookManager, WebhookStatus
-from api.database.models import WebhookDelivery, Task as TaskModel
-from api.database.connection import get_db
+from api.database.models import WebhookDelivery
 
 
 @pytest.fixture
-def webhook_manager():
+def webhook_manager() -> WebhookManager:
     """Create webhook manager instance."""
     return WebhookManager()
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> Mock:
     """Create mock database session."""
     db = Mock()
     db.query = Mock()
@@ -36,33 +33,33 @@ class TestWebhookValidation:
     """Test webhook URL validation."""
 
     @pytest.mark.asyncio
-    async def test_validate_valid_https_url(self, webhook_manager):
+    async def test_validate_valid_https_url(self, webhook_manager: WebhookManager) -> None:
         """Test validation of valid HTTPS URL."""
         url = "https://example.com/webhook"
         result = await webhook_manager.validate_webhook_url(url)
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_validate_valid_http_url(self, webhook_manager):
+    async def test_validate_valid_http_url(self, webhook_manager: WebhookManager) -> None:
         """Test validation of valid HTTP URL."""
         url = "http://example.com/webhook"
         result = await webhook_manager.validate_webhook_url(url)
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_validate_empty_url(self, webhook_manager):
+    async def test_validate_empty_url(self, webhook_manager: WebhookManager) -> None:
         """Test validation rejects empty URL."""
         with pytest.raises(ValueError, match="cannot be empty"):
             await webhook_manager.validate_webhook_url("")
 
     @pytest.mark.asyncio
-    async def test_validate_invalid_protocol(self, webhook_manager):
+    async def test_validate_invalid_protocol(self, webhook_manager: WebhookManager) -> None:
         """Test validation rejects invalid protocol."""
         with pytest.raises(ValueError, match="must start with http"):
             await webhook_manager.validate_webhook_url("ftp://example.com/webhook")
 
     @pytest.mark.asyncio
-    async def test_validate_url_too_long(self, webhook_manager):
+    async def test_validate_url_too_long(self, webhook_manager: WebhookManager) -> None:
         """Test validation rejects URLs exceeding max length."""
         long_url = "https://example.com/" + "x" * 500
         with pytest.raises(ValueError, match="exceeds maximum length"):
@@ -73,7 +70,11 @@ class TestWebhookDelivery:
     """Test webhook delivery functionality."""
 
     @pytest.mark.asyncio
-    async def test_successful_delivery(self, webhook_manager, mock_db):
+    async def test_successful_delivery(
+        self,
+        webhook_manager: WebhookManager,
+        mock_db: Mock,
+    ) -> None:
         """Test successful webhook delivery."""
         # Create mock delivery record
         delivery = WebhookDelivery(
@@ -106,7 +107,9 @@ class TestWebhookDelivery:
             assert delivery.response_status == 200
 
     @pytest.mark.asyncio
-    async def test_failed_delivery_schedules_retry(self, webhook_manager, mock_db):
+    async def test_failed_delivery_schedules_retry(
+        self, webhook_manager: WebhookManager, mock_db: Mock
+    ) -> None:
         """Test failed delivery schedules retry with backoff."""
         # Create mock delivery record
         delivery = WebhookDelivery(
@@ -139,7 +142,9 @@ class TestWebhookDelivery:
             assert delivery.next_retry_at is not None
 
     @pytest.mark.asyncio
-    async def test_max_retries_marks_as_failed(self, webhook_manager, mock_db):
+    async def test_max_retries_marks_as_failed(
+        self, webhook_manager: WebhookManager, mock_db: Mock
+    ) -> None:
         """Test that max retries marks delivery as permanently failed."""
         # Create mock delivery record at max retries
         delivery = WebhookDelivery(
@@ -172,7 +177,9 @@ class TestExponentialBackoff:
     """Test exponential backoff calculation."""
 
     @pytest.mark.asyncio
-    async def test_backoff_increases_exponentially(self, webhook_manager, mock_db):
+    async def test_backoff_increases_exponentially(
+        self, webhook_manager: WebhookManager, mock_db: Mock
+    ) -> None:
         """Test that retry delay increases exponentially."""
         delivery = WebhookDelivery(
             delivery_id="test-delivery-4",
@@ -213,22 +220,15 @@ class TestWebhookIntegration:
     """Integration tests for complete webhook flow."""
 
     @pytest.mark.asyncio
-    async def test_create_and_deliver_webhook(self, webhook_manager, mock_db):
+    async def test_create_and_deliver_webhook(
+        self, webhook_manager: WebhookManager, mock_db: Mock
+    ) -> None:
         """Test creating and delivering a webhook."""
         task_id = "test-task-5"
         webhook_url = "https://example.com/webhook"
         payload = {"task_id": task_id, "status": "completed"}
 
         # Mock delivery creation
-        mock_delivery = WebhookDelivery(
-            delivery_id="test-delivery-5",
-            task_id=task_id,
-            webhook_url=webhook_url,
-            payload=payload,
-            status=WebhookStatus.PENDING.value,
-            attempts=0,
-        )
-
         with patch.object(mock_db, "add") as mock_add:
             with patch.object(mock_db, "commit"):
                 with patch.object(mock_db, "refresh") as mock_refresh:

@@ -9,25 +9,27 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import numpy as np
-import pytest
-import yaml
+# Add project root to path
+import sys
 from pathlib import Path
-from hypothesis import given, strategies as st, settings, assume
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+import numpy as np
+import yaml
+from typing import List, Dict, Any
+from numpy.typing import NDArray
+from hypothesis import given, strategies as st, settings
 from hypothesis import HealthCheck
 
 from apgi_system.system import APGISystem
-from apgi_system.core.active_inference import ActiveInferenceEngine
 from apgi_system.core.precision import PrecisionWeighting
-from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.interoception.body_model import BodyModel
 from apgi_system.thermodynamic.metabolism import MetabolicBudget
 from tests.strategies import (
     observation_strategy,
     body_state_strategy,
     error_variance_strategy,
-    metabolic_reserve_strategy,
-    config_strategy,
 )
 
 # Configure Hypothesis for property-based testing
@@ -44,7 +46,7 @@ settings.register_profile(
 settings.load_profile("property_tests")
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
@@ -55,7 +57,9 @@ class TestCoreSystemProperties:
     """Property-based tests for core system invariants."""
 
     @given(observations=st.lists(observation_strategy(), min_size=2, max_size=10))
-    def test_property_free_energy_decreases_with_learning(self, observations):
+    def test_property_free_energy_decreases_with_learning(
+        self, observations: List[NDArray[np.float64]]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 1: Free energy decreases with learning**
 
@@ -99,7 +103,9 @@ class TestCoreSystemProperties:
         error_variance_low=st.floats(min_value=0.1, max_value=5.0),
         error_variance_high=st.floats(min_value=0.1, max_value=5.0),
     )
-    def test_property_precision_inverse_correlation(self, error_variance_low, error_variance_high):
+    def test_property_precision_inverse_correlation(
+        self, error_variance_low: float, error_variance_high: float
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 2: Precision inversely correlates with error variance**
 
@@ -109,6 +115,8 @@ class TestCoreSystemProperties:
         **Validates: Requirements 2.2**
         """
         # Ensure we have different variance levels with meaningful difference
+        from hypothesis import assume
+
         assume(abs(error_variance_high - error_variance_low) > 0.3)
 
         # Make sure high is actually higher
@@ -149,7 +157,9 @@ class TestCoreSystemProperties:
         assert result_high["exteroceptive"] > 0 and np.isfinite(result_high["exteroceptive"])
 
     @given(observations=st.lists(observation_strategy(), min_size=3, max_size=8))
-    def test_property_prediction_errors_decrease_with_learning(self, observations):
+    def test_property_prediction_errors_decrease_with_learning(
+        self, observations: List[NDArray[np.float64]]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 3: Prediction errors decrease with learning**
 
@@ -192,7 +202,7 @@ class TestCoreSystemProperties:
             ), f"Prediction errors should decrease with learning: {error_sequences}"
 
     @given(observation=observation_strategy())
-    def test_property_system_state_consistency(self, observation):
+    def test_property_system_state_consistency(self, observation: NDArray[np.float64]) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 4: System state consistency**
 
@@ -257,7 +267,7 @@ class TestCoreSystemProperties:
                 ), f"{precision_type} precision should be finite: {precision_val}"
 
     @given(body_state=body_state_strategy())
-    def test_property_physiological_bounds_maintained(self, body_state):
+    def test_property_physiological_bounds_maintained(self, body_state: Dict[str, Any]) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 5: Physiological bounds maintained**
 
@@ -305,7 +315,7 @@ class TestCoreSystemProperties:
             ), f"Blood pressure out of bounds: {current_state['blood_pressure']}"
 
     @given(observation=observation_strategy())
-    def test_property_non_negative_free_energy(self, observation):
+    def test_property_non_negative_free_energy(self, observation: NDArray[np.float64]) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 16: Non-negative free energy**
 
@@ -315,8 +325,6 @@ class TestCoreSystemProperties:
         **Validates: Requirements 5.1**
         """
         apgi_system = APGISystem()
-        state = apgi_system.step(observation)
-
         # Extract free energy from various sources
         free_energy_sources = []
 
@@ -328,7 +336,7 @@ class TestCoreSystemProperties:
                 action, ai_info = apgi_system.active_inference.step(observation, [])
                 if "free_energy" in ai_info:
                     free_energy_sources.append(ai_info["free_energy"])
-            except:
+            except Exception:
                 pass
 
         # If no direct free energy available, compute from prediction errors
@@ -343,7 +351,7 @@ class TestCoreSystemProperties:
             assert np.isfinite(fe), f"Free energy should be finite: {fe}"
 
     @given(error_variance=error_variance_strategy())
-    def test_property_finite_positive_precision(self, error_variance):
+    def test_property_finite_positive_precision(self, error_variance: float) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 17: Finite positive precision**
 
@@ -356,7 +364,7 @@ class TestCoreSystemProperties:
         precision_system = PrecisionWeighting(config)
 
         result = precision_system.update(
-            extero_error_variance=error_variance, intero_error_variance=error_variance
+            extero_error_variance=float(error_variance), intero_error_variance=float(error_variance)
         )
 
         # Check exteroceptive precision
@@ -380,7 +388,9 @@ class TestCoreSystemProperties:
     @given(
         ignition_events=st.lists(st.booleans(), min_size=5, max_size=20), task_active=st.booleans()
     )
-    def test_property_metabolic_reserve_bounds(self, ignition_events, task_active):
+    def test_property_metabolic_reserve_bounds(
+        self, ignition_events: List[bool], task_active: bool
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 18: Metabolic reserve bounds**
 
@@ -410,7 +420,7 @@ class TestCoreSystemProperties:
             assert 0 <= reserve_fraction <= 1, f"Reserve fraction out of bounds: {reserve_fraction}"
 
     @given(num_ignitions=st.integers(min_value=1, max_value=10))
-    def test_property_consistent_ignition_cost(self, num_ignitions):
+    def test_property_consistent_ignition_cost(self, num_ignitions: int) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 19: Consistent ignition cost**
 
@@ -448,7 +458,7 @@ class TestCoreSystemProperties:
             ), f"Ignition cost inconsistent: expected {expected_cost}, got {cost}"
 
     @given(steps_before_reset=st.integers(min_value=1, max_value=20))
-    def test_property_reset_restores_initial_state(self, steps_before_reset):
+    def test_property_reset_restores_initial_state(self, steps_before_reset: int) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 20: Reset restores initial state**
 

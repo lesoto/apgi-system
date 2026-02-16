@@ -10,6 +10,11 @@ import numpy as np
 import yaml
 from pathlib import Path
 from hypothesis import settings, HealthCheck
+from typing import Generator, Dict, Any
+from numpy.typing import NDArray
+from apgi_system.system import APGISystem
+from apgi_system.interoception.body_model import BodyModel
+from sqlalchemy.orm import Session
 
 # Configure Hypothesis profiles
 settings.register_profile(
@@ -29,7 +34,7 @@ settings.load_profile("dev")
 
 
 @pytest.fixture
-def config():
+def config() -> Dict[str, Any]:
     """
     Load default configuration from config/default.yaml.
 
@@ -44,7 +49,7 @@ def config():
 
 
 @pytest.fixture
-def apgi_system():
+def apgi_system() -> Generator[APGISystem, None, None]:
     """
     Provide a fresh APGI system instance.
 
@@ -65,7 +70,7 @@ def apgi_system():
 
 
 @pytest.fixture
-def body_model(config):
+def body_model(config: Dict[str, Any]) -> BodyModel:
     """
     Provide a body model instance.
 
@@ -85,7 +90,7 @@ def body_model(config):
 
 
 @pytest.fixture
-def random_observation():
+def random_observation() -> NDArray[np.float64]:
     """
     Generate a random observation vector.
 
@@ -103,7 +108,7 @@ def random_observation():
 
 
 @pytest.fixture
-def random_body_state():
+def random_body_state() -> Dict[str, float]:
     """
     Generate a random but physiologically valid body state.
 
@@ -135,7 +140,7 @@ def random_body_state():
 
 # Database fixtures for API tests
 @pytest.fixture
-def db():
+def db() -> Generator[Session, None, None]:
     """
     Provide a test database session.
 

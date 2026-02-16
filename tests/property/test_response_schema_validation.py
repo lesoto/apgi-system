@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
@@ -40,12 +40,12 @@ class ErrorResponse(BaseModel):
 # ============================================================================
 
 
-def valid_status_string():
+def valid_status_string() -> st.SearchStrategy[str]:
     """Generate valid status strings."""
     return st.sampled_from(["ok", "success", "pending", "completed", "failed"])
 
 
-def valid_response_data():
+def valid_response_data() -> st.SearchStrategy[Optional[Dict[str, Any]]]:
     """Generate valid response data dictionaries."""
     # Generate simple dictionaries with string keys and various value types
     return st.dictionaries(
@@ -61,7 +61,7 @@ def valid_response_data():
     ).map(lambda data: data if data else None)
 
 
-def valid_count():
+def valid_count() -> st.SearchStrategy[int]:
     """Generate valid count values."""
     return st.integers(min_value=0, max_value=10000)
 
@@ -73,7 +73,9 @@ def valid_count():
 
 @given(status=valid_status_string(), data=valid_response_data(), count=valid_count())
 @settings(max_examples=100)
-def test_property_response_schema_validation(status, data, count):
+def test_property_response_schema_validation(
+    status: str, data: Optional[Dict[str, Any]], count: int
+) -> None:
     """
     **Feature: api-rest-interface, Property 27: Response schema validation**
 
@@ -95,7 +97,7 @@ def test_property_response_schema_validation(status, data, count):
 
     # Define endpoint with response model
     @app.get("/test/response", response_model=TestResponse)
-    async def test_endpoint():
+    async def test_endpoint() -> TestResponse:
         """Test endpoint that returns valid response."""
         return TestResponse(status=status, data=data, count=count)
 
@@ -124,7 +126,9 @@ def test_property_response_schema_validation(status, data, count):
 
 @given(status=valid_status_string(), data=valid_response_data())
 @settings(max_examples=100)
-def test_property_response_with_optional_fields(status, data):
+def test_property_response_with_optional_fields(
+    status: str, data: Optional[Dict[str, Any]]
+) -> None:
     """
     Test that responses with optional fields validate correctly.
 
@@ -136,9 +140,10 @@ def test_property_response_with_optional_fields(status, data):
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=True, fail_on_error=False)
 
     @app.get("/test/optional", response_model=TestResponse)
-    async def test_endpoint():
+    async def test_endpoint() -> Dict[str, Any]:
         """Endpoint with optional fields."""
-        response_dict = {"status": status}
+        response_dict: Dict[str, Any] = {}
+        response_dict["status"] = status
         if data is not None:
             response_dict["data"] = data
         return response_dict
@@ -153,7 +158,7 @@ def test_property_response_with_optional_fields(status, data):
 
 @given(error_code=st.text(min_size=1, max_size=50), error_message=st.text(min_size=1, max_size=200))
 @settings(max_examples=100)
-def test_property_error_response_validation(error_code, error_message):
+def test_property_error_response_validation(error_code: str, error_message: str) -> None:
     """
     Test that error responses validate correctly.
 
@@ -169,7 +174,7 @@ def test_property_error_response_validation(error_code, error_message):
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=True, fail_on_error=False)
 
     @app.get("/test/error")
-    async def error_endpoint():
+    async def error_endpoint() -> JSONResponse:
         """Endpoint that returns error."""
         return JSONResponse(
             status_code=400, content={"error": {"code": error_code, "message": error_message}}
@@ -200,7 +205,7 @@ def test_property_error_response_validation(error_code, error_message):
     )
 )
 @settings(max_examples=100)
-def test_property_list_response_validation(items):
+def test_property_list_response_validation(items: List[Dict[str, Any]]) -> None:
     """
     Test that list responses validate correctly.
 
@@ -212,7 +217,7 @@ def test_property_list_response_validation(items):
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=True, fail_on_error=False)
 
     @app.get("/test/list")
-    async def list_endpoint():
+    async def list_endpoint() -> Dict[str, Any]:
         """Endpoint that returns list."""
         return {"items": items, "count": len(items)}
 
@@ -229,7 +234,7 @@ def test_property_list_response_validation(items):
 
 @given(status=valid_status_string())
 @settings(max_examples=100)
-def test_property_nested_response_validation(status):
+def test_property_nested_response_validation(status: str) -> None:
     """
     Test that nested response structures validate correctly.
 
@@ -241,7 +246,7 @@ def test_property_nested_response_validation(status):
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=True, fail_on_error=False)
 
     @app.get("/test/nested")
-    async def nested_endpoint():
+    async def nested_endpoint() -> Dict[str, Any]:
         """Endpoint with nested structure."""
         return {"status": status, "data": {"nested": {"level": 2, "value": "test"}}}
 
@@ -261,7 +266,7 @@ def test_property_nested_response_validation(status):
     )
 )
 @settings(max_examples=100)
-def test_property_path_parameter_response_validation(path_param):
+def test_property_path_parameter_response_validation(path_param: str) -> None:
     """
     Test that responses from endpoints with path parameters validate correctly.
 
@@ -273,7 +278,7 @@ def test_property_path_parameter_response_validation(path_param):
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=True, fail_on_error=False)
 
     @app.get("/test/{item_id}")
-    async def path_param_endpoint(item_id: str):
+    async def path_param_endpoint(item_id: str) -> Dict[str, Any]:
         """Endpoint with path parameter."""
         return {"id": item_id, "status": "ok"}
 

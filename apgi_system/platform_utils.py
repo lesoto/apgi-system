@@ -18,7 +18,7 @@ import sys
 import platform
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 # Configure logging for error handling
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def get_resource_path(relative_path: str) -> Path:
 
         if is_bundled():
             # PyInstaller creates a temp folder and stores path in _MEIPASS
-            base_path = Path(sys._MEIPASS)
+            base_path = Path(getattr(sys, "_MEIPASS", ""))
             logger.debug(f"Running as bundled executable, base path: {base_path}")
         else:
             # Running from source - use project root
@@ -235,7 +235,7 @@ def get_base_path() -> Path:
     """
     try:
         if is_bundled():
-            return Path(sys._MEIPASS)
+            return Path(getattr(sys, "_MEIPASS", ""))
         else:
             return Path(__file__).parent.parent
     except Exception as e:
@@ -333,7 +333,7 @@ def safe_write_file(file_path: Path, content: str, create_backup: bool = True) -
         return False
 
 
-def check_required_libraries() -> dict:
+def check_required_libraries() -> Dict[str, bool]:
     """
     Check if required libraries are available.
 

@@ -10,7 +10,7 @@ import numpy as np
 import yaml
 from pathlib import Path
 
-from apgi_system.core.active_inference import HierarchicalGaussianFilter, ActiveInferenceEngine
+from apgi_system.core.active_inference import HierarchicalGaussianFilter
 from apgi_system.core.predictive_processing import HierarchicalPredictor
 from apgi_system.core.precision import PrecisionWeighting
 from apgi_system.core.free_energy import FreeEnergyCalculator
@@ -26,21 +26,21 @@ with open(config_path, "r") as f:
 class TestActiveInferenceValidation:
     """Test validation in ActiveInferenceEngine and HierarchicalGaussianFilter."""
 
-    def test_filter_update_invalid_observation_type(self):
+    def test_filter_update_invalid_observation_type(self) -> None:
         """Test that update rejects non-array observation."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
 
         with pytest.raises(TypeError, match="observation must be numpy array"):
-            filter.update([1.0, 2.0, 3.0])  # List instead of array
+            filter.update([1.0, 2.0, 3.0])  # type: ignore
 
-    def test_filter_update_invalid_observation_shape(self):
+    def test_filter_update_invalid_observation_shape(self) -> None:
         """Test that update rejects wrong-shaped observation."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
 
         with pytest.raises(ValueError, match="observation shape mismatch"):
             filter.update(np.random.randn(128))  # Wrong size
 
-    def test_filter_update_nan_observation(self):
+    def test_filter_update_nan_observation(self) -> None:
         """Test that update rejects NaN values."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
         obs = np.random.randn(256)
@@ -49,7 +49,7 @@ class TestActiveInferenceValidation:
         with pytest.raises(ValueError, match="observation contains NaN or Inf"):
             filter.update(obs)
 
-    def test_filter_update_inf_observation(self):
+    def test_filter_update_inf_observation(self) -> None:
         """Test that update rejects Inf values."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
         obs = np.random.randn(256)
@@ -58,7 +58,7 @@ class TestActiveInferenceValidation:
         with pytest.raises(ValueError, match="observation contains NaN or Inf"):
             filter.update(obs)
 
-    def test_filter_update_invalid_dt(self):
+    def test_filter_update_invalid_dt(self) -> None:
         """Test that update rejects invalid dt values."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
         obs = np.random.randn(256)
@@ -75,7 +75,7 @@ class TestActiveInferenceValidation:
         with pytest.raises(ValueError, match="dt must be in range"):
             filter.update(obs, dt=2.0)
 
-    def test_filter_update_valid_inputs(self):
+    def test_filter_update_valid_inputs(self) -> None:
         """Test that update accepts valid inputs."""
         filter = HierarchicalGaussianFilter(3, [256, 128, 64], 256)
         obs = np.random.randn(256)
@@ -89,28 +89,28 @@ class TestActiveInferenceValidation:
 class TestPredictiveProcessingValidation:
     """Test validation in HierarchicalPredictor."""
 
-    def test_predict_invalid_extero_type(self):
+    def test_predict_invalid_extero_type(self) -> None:
         """Test that predict rejects non-array extero input."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="extero_input must be numpy array"):
-            predictor.predict(extero_input=[1.0, 2.0])
+            predictor.predict(extero_input=[1.0, 2.0])  # type: ignore
 
-    def test_predict_invalid_extero_shape(self):
+    def test_predict_invalid_extero_shape(self) -> None:
         """Test that predict rejects wrong-shaped extero input."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="extero_input shape mismatch"):
             predictor.predict(extero_input=np.random.randn(128))
 
-    def test_predict_invalid_intero_shape(self):
+    def test_predict_invalid_intero_shape(self) -> None:
         """Test that predict rejects wrong-shaped intero input."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="intero_input shape mismatch"):
             predictor.predict(intero_input=np.random.randn(10))  # Should be 6
 
-    def test_predict_nan_extero(self):
+    def test_predict_nan_extero(self) -> None:
         """Test that predict rejects NaN in extero input."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
         extero = np.random.randn(256)
@@ -119,7 +119,7 @@ class TestPredictiveProcessingValidation:
         with pytest.raises(ValueError, match="extero_input contains NaN or Inf"):
             predictor.predict(extero_input=extero)
 
-    def test_predict_invalid_dt(self):
+    def test_predict_invalid_dt(self) -> None:
         """Test that predict rejects invalid dt values."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
         extero = np.random.randn(256)
@@ -132,7 +132,7 @@ class TestPredictiveProcessingValidation:
         with pytest.raises(ValueError, match="dt_ms must be in range"):
             predictor.predict(extero_input=extero, dt_ms=0.0001)
 
-    def test_predict_valid_inputs(self):
+    def test_predict_valid_inputs(self) -> None:
         """Test that predict accepts valid inputs."""
         predictor = HierarchicalPredictor(DEFAULT_CONFIG)
         extero = np.random.randn(256)
@@ -147,42 +147,42 @@ class TestPredictiveProcessingValidation:
 class TestPrecisionWeightingValidation:
     """Test validation in PrecisionWeighting."""
 
-    def test_update_invalid_variance_type(self):
+    def test_update_invalid_variance_type(self) -> None:
         """Test that update rejects non-numeric variance."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="extero_error_variance must be numeric"):
-            precision.update(extero_error_variance="invalid")
+            precision.update(extero_error_variance="invalid")  # type: ignore[arg-type]
 
-    def test_update_negative_variance(self):
+    def test_update_negative_variance(self) -> None:
         """Test that update rejects negative variance."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="extero_error_variance must be in range"):
             precision.update(extero_error_variance=-1.0)
 
-    def test_update_nan_variance(self):
+    def test_update_nan_variance(self) -> None:
         """Test that update rejects NaN variance."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="extero_error_variance is NaN or Inf"):
             precision.update(extero_error_variance=np.nan)
 
-    def test_update_inf_variance(self):
+    def test_update_inf_variance(self) -> None:
         """Test that update rejects Inf variance."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="intero_error_variance is NaN or Inf"):
             precision.update(intero_error_variance=np.inf)
 
-    def test_update_invalid_attention_target(self):
+    def test_update_invalid_attention_target(self) -> None:
         """Test that update rejects invalid attention target."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="attention_target must be 'extero' or 'intero'"):
             precision.update(attention_target="invalid")
 
-    def test_update_valid_inputs(self):
+    def test_update_valid_inputs(self) -> None:
         """Test that update accepts valid inputs."""
         precision = PrecisionWeighting(DEFAULT_CONFIG)
 
@@ -197,13 +197,13 @@ class TestPrecisionWeightingValidation:
 class TestFreeEnergyCalculatorValidation:
     """Test validation in FreeEnergyCalculator."""
 
-    def test_compute_invalid_observation_type(self):
+    def test_compute_invalid_observation_type(self) -> None:
         """Test that compute rejects non-array observation."""
         calc = FreeEnergyCalculator()
 
         with pytest.raises(TypeError, match="observation must be numpy array"):
             calc.compute_variational_free_energy(
-                observation=[1.0, 2.0],
+                observation=[1.0, 2.0],  # type: ignore[arg-type]
                 prediction=np.array([1.0, 2.0]),
                 precision=1.0,
                 posterior_mean=np.array([1.0, 2.0]),
@@ -212,7 +212,7 @@ class TestFreeEnergyCalculatorValidation:
                 prior_cov=np.eye(2),
             )
 
-    def test_compute_shape_mismatch(self):
+    def test_compute_shape_mismatch(self) -> None:
         """Test that compute rejects mismatched shapes."""
         calc = FreeEnergyCalculator()
 
@@ -227,7 +227,7 @@ class TestFreeEnergyCalculatorValidation:
                 prior_cov=np.eye(2),
             )
 
-    def test_compute_nan_observation(self):
+    def test_compute_nan_observation(self) -> None:
         """Test that compute rejects NaN values."""
         calc = FreeEnergyCalculator()
         obs = np.array([1.0, np.nan, 3.0])
@@ -243,7 +243,7 @@ class TestFreeEnergyCalculatorValidation:
                 prior_cov=np.eye(3),
             )
 
-    def test_compute_negative_precision(self):
+    def test_compute_negative_precision(self) -> None:
         """Test that compute rejects negative precision."""
         calc = FreeEnergyCalculator()
 
@@ -258,7 +258,7 @@ class TestFreeEnergyCalculatorValidation:
                 prior_cov=np.eye(3),
             )
 
-    def test_compute_prior_posterior_shape_mismatch(self):
+    def test_compute_prior_posterior_shape_mismatch(self) -> None:
         """Test that compute rejects mismatched prior/posterior shapes."""
         calc = FreeEnergyCalculator()
 
@@ -273,7 +273,7 @@ class TestFreeEnergyCalculatorValidation:
                 prior_cov=np.eye(2),
             )
 
-    def test_compute_valid_inputs(self):
+    def test_compute_valid_inputs(self) -> None:
         """Test that compute accepts valid inputs."""
         calc = FreeEnergyCalculator()
 
@@ -295,19 +295,19 @@ class TestFreeEnergyCalculatorValidation:
 class TestIgnitionThresholdValidation:
     """Test validation in IgnitionThreshold."""
 
-    def test_compute_ignition_signal_invalid_extero_error_type(self):
+    def test_compute_ignition_signal_invalid_extero_error_type(self) -> None:
         """Test that compute_ignition_signal rejects non-array extero_error."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="extero_error must be numpy array"):
             threshold.compute_ignition_signal(
-                extero_error=[1.0, 2.0],
+                extero_error=[1.0, 2.0],  # type: ignore[arg-type]
                 extero_precision=1.5,
                 intero_error=np.array([0.5]),
                 intero_precision=1.0,
             )
 
-    def test_compute_ignition_signal_negative_extero_precision(self):
+    def test_compute_ignition_signal_negative_extero_precision(self) -> None:
         """Test that compute_ignition_signal rejects negative extero_precision."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
 
@@ -319,7 +319,7 @@ class TestIgnitionThresholdValidation:
                 intero_precision=1.0,
             )
 
-    def test_compute_ignition_signal_negative_intero_precision(self):
+    def test_compute_ignition_signal_negative_intero_precision(self) -> None:
         """Test that compute_ignition_signal rejects negative intero_precision."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
 
@@ -331,7 +331,7 @@ class TestIgnitionThresholdValidation:
                 intero_precision=-1.0,
             )
 
-    def test_compute_ignition_signal_invalid_somatic_marker_gain(self):
+    def test_compute_ignition_signal_invalid_somatic_marker_gain(self) -> None:
         """Test that compute_ignition_signal rejects out-of-range somatic_marker_gain."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
 
@@ -355,7 +355,7 @@ class TestIgnitionThresholdValidation:
                 somatic_marker_gain=3.0,
             )
 
-    def test_compute_ignition_signal_nan_extero_error(self):
+    def test_compute_ignition_signal_nan_extero_error(self) -> None:
         """Test that compute_ignition_signal rejects NaN in extero_error."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
         extero = np.array([1.0, np.nan, 2.0])
@@ -368,7 +368,7 @@ class TestIgnitionThresholdValidation:
                 intero_precision=1.0,
             )
 
-    def test_compute_ignition_signal_inf_intero_error(self):
+    def test_compute_ignition_signal_inf_intero_error(self) -> None:
         """Test that compute_ignition_signal rejects Inf in intero_error."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
         intero = np.array([0.5, np.inf])
@@ -381,7 +381,7 @@ class TestIgnitionThresholdValidation:
                 intero_precision=1.0,
             )
 
-    def test_compute_ignition_signal_valid_inputs(self):
+    def test_compute_ignition_signal_valid_inputs(self) -> None:
         """Test that compute_ignition_signal accepts valid inputs."""
         threshold = IgnitionThreshold(DEFAULT_CONFIG)
 
@@ -402,21 +402,21 @@ class TestIgnitionThresholdValidation:
 class TestGlobalWorkspaceValidation:
     """Test validation in GlobalWorkspace."""
 
-    def test_update_invalid_ignition_occurred_type(self):
+    def test_update_invalid_ignition_occurred_type(self) -> None:
         """Test that update rejects non-bool ignition_occurred."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="ignition_occurred must be bool"):
-            workspace.update(ignition_occurred="true", dt=1.0)
+            workspace.update(ignition_occurred="true", dt=1.0)  # type: ignore[arg-type]
 
-    def test_update_invalid_candidate_content_type(self):
+    def test_update_invalid_candidate_content_type(self) -> None:
         """Test that update rejects non-array candidate_content."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="candidate_content must be numpy array"):
-            workspace.update(ignition_occurred=False, candidate_content=[1.0, 2.0, 3.0], dt=1.0)
+            workspace.update(ignition_occurred=False, candidate_content=[1.0, 2.0, 3.0], dt=1.0)  # type: ignore[arg-type]
 
-    def test_update_nan_candidate_content(self):
+    def test_update_nan_candidate_content(self) -> None:
         """Test that update rejects NaN in candidate_content."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
         content = np.array([1.0, np.nan, 3.0])
@@ -424,35 +424,35 @@ class TestGlobalWorkspaceValidation:
         with pytest.raises(ValueError, match="candidate_content contains NaN or Inf"):
             workspace.update(ignition_occurred=False, candidate_content=content, dt=1.0)
 
-    def test_update_invalid_source_type(self):
+    def test_update_invalid_source_type(self) -> None:
         """Test that update rejects non-string source."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(TypeError, match="source must be str"):
-            workspace.update(ignition_occurred=False, source=123, dt=1.0)
+            workspace.update(ignition_occurred=False, source=123, dt=1.0)  # type: ignore[arg-type]
 
-    def test_update_negative_priority(self):
+    def test_update_negative_priority(self) -> None:
         """Test that update rejects negative priority."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="priority must be positive"):
             workspace.update(ignition_occurred=False, priority=-1.0, dt=1.0)
 
-    def test_update_negative_dt(self):
+    def test_update_negative_dt(self) -> None:
         """Test that update rejects negative dt."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="dt must be positive"):
             workspace.update(ignition_occurred=False, dt=-1.0)
 
-    def test_update_zero_dt(self):
+    def test_update_zero_dt(self) -> None:
         """Test that update rejects zero dt."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 
         with pytest.raises(ValueError, match="dt must be positive"):
             workspace.update(ignition_occurred=False, dt=0.0)
 
-    def test_update_valid_inputs(self):
+    def test_update_valid_inputs(self) -> None:
         """Test that update accepts valid inputs."""
         workspace = GlobalWorkspace(DEFAULT_CONFIG)
 

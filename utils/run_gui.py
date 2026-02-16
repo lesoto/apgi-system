@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-def launch_gui():
+def launch_gui() -> None:
     """Launch the GUI application normally."""
     from apgi_gui import main
 
@@ -35,7 +35,7 @@ def launch_gui():
         input("\nPress Enter to exit...")
 
 
-def test_gui_launch(duration_seconds: int = 3):
+def test_gui_launch(duration_seconds: int = 3) -> bool:
     """
     Test that GUI can be launched.
 
@@ -79,7 +79,7 @@ def test_gui_launch(duration_seconds: int = 3):
         return False
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Launch APGI System GUI",

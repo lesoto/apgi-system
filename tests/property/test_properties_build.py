@@ -8,14 +8,9 @@ These tests verify correctness properties of the build system including:
 """
 
 import sys
-import hashlib
-import subprocess
 from pathlib import Path
-from hypothesis import given, strategies as st, settings, assume
+from hypothesis import given, strategies as st, settings
 import pytest
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from utils.build_common import (
     get_version,
@@ -25,6 +20,9 @@ from utils.build_common import (
     get_excluded_modules,
     get_project_root,
 )
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class TestBuildReproducibility:
@@ -36,7 +34,7 @@ class TestBuildReproducibility:
     script multiple times should produce functionally equivalent executables.
     """
 
-    def test_version_extraction_is_deterministic(self):
+    def test_version_extraction_is_deterministic(self) -> None:
         """
         Version extraction should return the same value on repeated calls.
 
@@ -53,7 +51,7 @@ class TestBuildReproducibility:
 
     @given(st.integers(min_value=0, max_value=10))
     @settings(max_examples=10)
-    def test_version_extraction_stable_across_calls(self, _iteration):
+    def test_version_extraction_stable_across_calls(self, _iteration: int) -> None:
         """
         Property: Version extraction is stable across multiple calls.
 
@@ -65,7 +63,7 @@ class TestBuildReproducibility:
         for _ in range(5):
             assert get_version() == version
 
-    def test_hidden_imports_list_is_deterministic(self):
+    def test_hidden_imports_list_is_deterministic(self) -> None:
         """
         Hidden imports list should be the same on repeated calls.
 
@@ -79,7 +77,7 @@ class TestBuildReproducibility:
         assert isinstance(imports1, list)
         assert all(isinstance(imp, str) for imp in imports1)
 
-    def test_excluded_modules_list_is_deterministic(self):
+    def test_excluded_modules_list_is_deterministic(self) -> None:
         """
         Excluded modules list should be the same on repeated calls.
 
@@ -95,25 +93,32 @@ class TestBuildReproducibility:
 
     @given(st.integers(min_value=0, max_value=5))
     @settings(max_examples=5)
-    def test_resource_collection_is_deterministic(self, _iteration):
+    def test_resource_collection_is_deterministic(self, _iteration: int) -> None:
         """
         Property: Resource collection produces consistent results.
 
         For any project state, collecting resources multiple times should
-        produce the same list of files.
+        produce the same categorized files.
         """
         project_root = get_project_root()
         resource_dirs = ["config"]  # Use only config to keep test fast
 
         # Collect resources multiple times
-        resources1 = collect_resources(project_root, resource_dirs)
-        resources2 = collect_resources(project_root, resource_dirs)
+        resources1 = collect_resources(str(project_root), resource_dirs)
+        resources2 = collect_resources(str(project_root), resource_dirs)
 
         # Should be identical
         assert resources1 == resources2
 
-        # Should be sorted consistently (order matters for reproducibility)
-        assert resources1 == sorted(resources1)
+        # Should be a dict with expected keys
+        assert isinstance(resources1, dict)
+        expected_keys = {"config_files", "data_files", "resource_files", "icon_files"}
+        assert set(resources1.keys()) == expected_keys
+
+        # Each value should be a list
+        for key, value in resources1.items():
+            assert isinstance(value, list)
+            assert all(isinstance(item, str) for item in value)
 
 
 class TestDependencyCompleteness:
@@ -126,7 +131,7 @@ class TestDependencyCompleteness:
     error during build.
     """
 
-    def test_analyze_dependencies_finds_core_imports(self):
+    def test_analyze_dependencies_finds_core_imports(self) -> None:
         """
         Dependency analysis should find all core imports from entry point.
 
@@ -138,20 +143,22 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(entry_point)
+        dependencies = analyze_dependencies(str(entry_point))
 
         # Core dependencies that should be found
         expected_deps = {"numpy", "matplotlib", "yaml"}
 
-        # Check that we found the expected dependencies
-        found_deps = dependencies & expected_deps
-        assert (
-            len(found_deps) > 0
-        ), f"Expected to find {expected_deps}, but only found {dependencies}"
+        # Get all unique dependencies from both sources
+        all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]
 
-    def test_analyze_dependencies_returns_set(self):
+        # Check that we found the expected dependencies
+        found_deps = all_deps & expected_deps
+        msg = f"Expected to find {expected_deps}, but only found {all_deps}"
+        assert len(found_deps) > 0, msg
+
+    def test_analyze_dependencies_returns_set(self) -> None:
         """
-        Dependency analysis should return a set (no duplicates).
+        Dependency analysis should return a dict with set values.
         """
         project_root = get_project_root()
         entry_point = project_root / "apgi_gui.py"
@@ -159,13 +166,17 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(entry_point)
+        dependencies = analyze_dependencies(str(entry_point))
 
-        assert isinstance(dependencies, set)
-        # Converting to list and back should give same size (no duplicates)
-        assert len(dependencies) == len(list(dependencies))
+        assert isinstance(dependencies, dict)
+        assert "requirements_txt" in dependencies
+        assert "pyproject_toml" in dependencies
+        assert "total_dependencies" in dependencies
+        assert isinstance(dependencies["requirements_txt"], set)
+        assert isinstance(dependencies["pyproject_toml"], set)
+        assert isinstance(dependencies["total_dependencies"], int)
 
-    def test_analyze_dependencies_excludes_stdlib(self):
+    def test_analyze_dependencies_excludes_stdlib(self) -> None:
         """
         Dependency analysis should not include standard library modules.
 
@@ -177,16 +188,19 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(entry_point)
+        dependencies = analyze_dependencies(str(entry_point))
+
+        # Get all unique dependencies from both sources
+        all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]
 
         # These are stdlib modules that should NOT be in dependencies
         stdlib_modules = {"os", "sys", "time", "json", "csv", "pathlib", "threading"}
 
         # None of these should be in the dependencies
-        found_stdlib = dependencies & stdlib_modules
+        found_stdlib = all_deps & stdlib_modules
         assert len(found_stdlib) == 0, f"Found stdlib modules in dependencies: {found_stdlib}"
 
-    def test_hidden_imports_are_valid_module_names(self):
+    def test_hidden_imports_are_valid_module_names(self) -> None:
         """
         All hidden imports should be valid Python module names.
 
@@ -208,7 +222,7 @@ class TestDependencyCompleteness:
                     "_"
                 ), f"Invalid module name part: {part} in {module_name}"
 
-    def test_excluded_modules_are_valid_module_names(self):
+    def test_excluded_modules_are_valid_module_names(self) -> None:
         """
         All excluded modules should be valid Python module names.
 
@@ -226,29 +240,31 @@ class TestDependencyCompleteness:
 
     @given(st.sampled_from(["config", "resources", "nonexistent_dir"]))
     @settings(max_examples=3)
-    def test_collect_resources_handles_missing_directories(self, dir_name):
+    def test_collect_resources_handles_missing_directories(self, dir_name: str) -> None:
         """
         Property: Resource collection handles missing directories gracefully.
 
         For any directory name (existing or not), collect_resources should
-        not crash and should return a valid list.
+        not crash and should return a valid dict.
         """
         project_root = get_project_root()
 
         # This should not raise an exception
-        resources = collect_resources(project_root, [dir_name])
+        resources = collect_resources(str(project_root), [dir_name])
 
-        # Should return a list
-        assert isinstance(resources, list)
+        # Should return a dict
+        assert isinstance(resources, dict)
 
-        # Each item should be a tuple of (source, dest)
-        for item in resources:
-            assert isinstance(item, tuple)
-            assert len(item) == 2
-            assert isinstance(item[0], str)
-            assert isinstance(item[1], str)
+        # Should have expected keys
+        expected_keys = {"config_files", "data_files", "resource_files", "icon_files"}
+        assert set(resources.keys()) == expected_keys
 
-    def test_no_overlap_between_hidden_and_excluded(self):
+        # Each value should be a list
+        for key, value in resources.items():
+            assert isinstance(value, list)
+            assert all(isinstance(item, str) for item in value)
+
+    def test_no_overlap_between_hidden_and_excluded(self) -> None:
         """
         Hidden imports and excluded modules should not overlap.
 
@@ -269,34 +285,36 @@ class TestResourceBundling:
     and will be included in the build.
     """
 
-    def test_collect_resources_finds_config_files(self):
+    def test_collect_resources_finds_config_files(self) -> None:
         """
         Resource collection should find configuration files.
         """
         project_root = get_project_root()
-        resources = collect_resources(project_root, ["config"])
+        resources = collect_resources(str(project_root), ["config"])
 
         # Should find at least one config file
-        config_files = [r for r in resources if "config" in r[1]]
+        config_files = resources["config_files"]
         assert len(config_files) > 0, "No config files found"
 
-    def test_collect_resources_preserves_directory_structure(self):
+    def test_collect_resources_preserves_directory_structure(self) -> None:
         """
         Resource collection should preserve directory structure.
 
-        The destination path should match the source directory structure.
+        The file paths should be relative to project root.
         """
         project_root = get_project_root()
-        resources = collect_resources(project_root, ["config"])
+        resources = collect_resources(str(project_root), ["config"])
 
-        for source, dest in resources:
-            source_path = Path(source)
-            # Destination should be a parent directory of the file
-            assert dest in str(source_path.parent) or str(source_path.parent).endswith(dest)
+        # Check that config files are properly relative paths
+        for file_path in resources["config_files"]:
+            assert not file_path.startswith(
+                str(project_root)
+            ), "File paths should be relative to project root"
+            assert file_path.startswith("config/"), "Config files should start with config/"
 
     @given(st.lists(st.sampled_from(["config", "resources"]), min_size=1, max_size=2, unique=True))
     @settings(max_examples=5)
-    def test_collect_resources_with_multiple_dirs(self, dirs):
+    def test_collect_resources_with_multiple_dirs(self, dirs: list[str]) -> None:
         """
         Property: Resource collection works with multiple directories.
 
@@ -304,17 +322,22 @@ class TestResourceBundling:
         resources from all specified directories.
         """
         project_root = get_project_root()
-        resources = collect_resources(project_root, dirs)
+        resources = collect_resources(str(project_root), dirs)
 
-        # Should return a list
-        assert isinstance(resources, list)
+        # Should return a dict
+        assert isinstance(resources, dict)
+
+        # Should have expected keys
+        expected_keys = {"config_files", "data_files", "resource_files", "icon_files"}
+        assert set(resources.keys()) == expected_keys
 
         # If any of the directories exist, we should find some resources
         existing_dirs = [d for d in dirs if (project_root / d).exists()]
         if existing_dirs:
             # We should have found at least some resources
             # (unless the directories are empty, which is unlikely)
-            pass  # Just verify it doesn't crash
+            total_files = sum(len(files) for files in resources.values())
+            assert total_files >= 0  # Just verify it doesn't crash
 
 
 if __name__ == "__main__":

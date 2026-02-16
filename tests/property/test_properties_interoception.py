@@ -10,21 +10,23 @@ and validates specific requirements from the requirements document.
 """
 
 import numpy as np
-import pytest
 import yaml
+import sys
 from pathlib import Path
+from typing import Dict, Any
+
 from hypothesis import given, strategies as st, settings, assume
 from hypothesis import HealthCheck
 
-from apgi_system.interoception.body_model import BodyModel
-from apgi_system.interoception.allostasis import AllostaticRegulator
-from apgi_system.interoception.somatic_markers import SomaticMarkerSystem
-from tests.strategies import (
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from apgi_system.interoception.body_model import BodyModel  # noqa: E402
+from apgi_system.interoception.allostasis import AllostaticRegulator  # noqa: E402
+from apgi_system.interoception.somatic_markers import SomaticMarkerSystem  # noqa: E402
+from tests.strategies import (  # noqa: E402
     body_state_strategy,
     observation_strategy,
-    allostatic_load_strategy,
-    somatic_marker_gain_strategy,
-    config_strategy,
 )
 
 # Configure Hypothesis for property-based testing
@@ -41,7 +43,7 @@ settings.register_profile(
 settings.load_profile("property_tests")
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
@@ -64,8 +66,12 @@ class TestInteroceptionProperties:
         ),
     )
     def test_property_homeostatic_bounds_invariant(
-        self, simulation_steps, arousal_sequence, activity_sequence, stress_sequence
-    ):
+        self,
+        simulation_steps: int,
+        arousal_sequence: list[float],
+        activity_sequence: list[float],
+        stress_sequence: list[float],
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 11: Homeostatic bounds invariant**
 
@@ -124,7 +130,7 @@ class TestInteroceptionProperties:
             ), f"Blood pressure out of homeostatic bounds: {current_state['blood_pressure']} at step {i}"
 
     @given(body_states=st.lists(body_state_strategy(), min_size=5, max_size=20))
-    def test_property_allostatic_load_accumulation(self, body_states):
+    def test_property_allostatic_load_accumulation(self, body_states: list) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 12: Allostatic load accumulation**
 
@@ -179,7 +185,9 @@ class TestInteroceptionProperties:
         ),
         current_time=st.floats(min_value=0.0, max_value=10000.0),
     )
-    def test_property_somatic_marker_storage_completeness(self, context_action_pairs, current_time):
+    def test_property_somatic_marker_storage_completeness(
+        self, context_action_pairs: list, current_time: float
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 13: Somatic marker storage completeness**
 
@@ -199,7 +207,6 @@ class TestInteroceptionProperties:
 
         # Check that markers were stored
         final_count = len(sm_system.markers)
-        expected_increase = min(len(context_action_pairs), sm_system.capacity - initial_count)
 
         assert (
             final_count >= initial_count
@@ -250,8 +257,13 @@ class TestInteroceptionProperties:
         ),
     )
     def test_property_somatic_marker_retrieval_accuracy(
-        self, context, action, body_outcome, retrieval_context, retrieval_action
-    ):
+        self,
+        context: list[float],
+        action: list[float],
+        body_outcome: float,
+        retrieval_context: list[float],
+        retrieval_action: list[float],
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 14: Somatic marker retrieval accuracy**
 
@@ -318,7 +330,9 @@ class TestInteroceptionProperties:
             assert gain_different == 1.0, f"No match should return neutral gain: {gain_different}"
 
     @given(body_state=body_state_strategy(), predicted_state=body_state_strategy())
-    def test_property_interoceptive_prediction_error_computation(self, body_state, predicted_state):
+    def test_property_interoceptive_prediction_error_computation(
+        self, body_state: dict, predicted_state: dict
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 15: Interoceptive prediction error computation**
 

@@ -10,17 +10,15 @@ from sqlalchemy.orm import Session
 
 from api.services.auth_manager import AuthManager, TokenPayload
 from api.services.authorization import (
-    Role,
     Permission,
     get_permissions_for_roles,
     has_permission,
     check_permission,
 )
-from api.database.models import User, RefreshToken
+from api.database.models import User
 from api.exceptions import (
     AuthenticationError,
     InvalidTokenError,
-    ExpiredTokenError,
     AuthorizationError,
 )
 
@@ -106,7 +104,7 @@ class TestAuthManager:
 class TestAuthorization:
     """Test authorization functionality."""
 
-    def test_role_permissions(self):
+    def test_role_permissions(self) -> None:
         """Test that roles have correct permissions."""
         # Admin should have all permissions
         admin_perms = get_permissions_for_roles(["admin"])
@@ -126,7 +124,7 @@ class TestAuthorization:
         assert Permission.SESSION_CREATE not in viewer_perms
         assert Permission.TASK_CREATE not in viewer_perms
 
-    def test_has_permission(self):
+    def test_has_permission(self) -> None:
         """Test permission checking."""
         # Admin has all permissions
         assert has_permission(["admin"], Permission.SESSION_CREATE)
@@ -140,7 +138,7 @@ class TestAuthorization:
         assert has_permission(["viewer"], Permission.SESSION_READ)
         assert not has_permission(["viewer"], Permission.SESSION_CREATE)
 
-    def test_check_permission_raises(self):
+    def test_check_permission_raises(self) -> None:
         """Test that check_permission raises AuthorizationError when lacking permission."""
         # Viewer trying to create session should fail
         with pytest.raises(AuthorizationError) as exc_info:
@@ -158,7 +156,7 @@ class TestAuthorization:
 class TestTokenPayload:
     """Test TokenPayload class."""
 
-    def test_to_dict_and_from_dict(self):
+    def test_to_dict_and_from_dict(self) -> None:
         """Test serialization and deserialization."""
         exp_time = datetime.utcnow() + timedelta(hours=1)
 
@@ -186,7 +184,7 @@ class TestTokenPayload:
         assert restored.token_type == payload.token_type
 
 
-def test_authentication_integration(db: Session):
+def test_authentication_integration(db: Session) -> None:
     """Integration test for authentication flow."""
     auth_manager = AuthManager(db)
 

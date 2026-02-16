@@ -104,6 +104,10 @@ class OscillationEngine:
         """
         self.config = config
         osc_config = config.get("oscillations", {})
+        if not isinstance(osc_config, dict):
+            # Handle case where oscillations config is not a dict (e.g., a float)
+            osc_config = {}
+
         bands_config = osc_config.get("bands", {})
 
         # Initialize bands

@@ -1,0 +1,202 @@
+version: 2
+updates:
+  # Python dependencies via pip
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "lesoto"  # Replace with actual maintainer usernames
+    assignees:
+      - "lesoto"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      - "automated"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "numpy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "scipy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "matplotlib"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tensorflow"
+        update-types: ["version-update:semver-major"]
+      # Ignore specific problematic versions
+      - dependency-name: "pyqt5"
+        versions: ["5.15.10"]  # Known compatibility issues
+      - dependency-name: "tkinter"
+        update-types: ["all"]  # System dependency, don't update
+
+  # Python project dependencies (pyproject.toml)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "lesoto"
+    assignees:
+      - "lesoto"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      - "pyproject"
+      - "automated"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+      # Development dependencies
+      - dependency-name: "pytest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "black"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "flake8"
+        update-types: ["version-update:semver-major"]
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "lesoto"
+    assignees:
+      - "lesoto"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "infrastructure"
+      - "automated"
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ubuntu"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "lesoto"
+    assignees:
+      - "lesoto"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci/cd"
+      - "automated"
+
+  # Kubernetes manifests (if applicable)
+  - package-ecosystem: "kubernetes"
+    directory: "/k8s"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "lesoto"
+    assignees:
+      - "lesoto"
+    commit-message:
+      prefix: "k8s"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "kubernetes"
+      - "infrastructure"
+      - "automated"
+    ignore:
+      - dependency-name: "kubernetes"
+        update-types: ["version-update:semver-major"]
+
+# Global settings
+registries:
+  # Custom registries can be defined here if needed
+  # For private package registries
+
+groups:
+  # Group related dependencies for cleaner PRs
+  python-core:
+    patterns:
+      - "numpy"
+      - "scipy"
+      - "matplotlib"
+      - "pandas"
+    update-types:
+      - "minor"
+      - "patch"
+
+  python-ml:
+    patterns:
+      - "torch"
+      - "tensorflow"
+      - "scikit-learn"
+      - "xgboost"
+    update-types:
+      - "minor"
+      - "patch"
+
+  testing-tools:
+    patterns:
+      - "pytest"
+      - "pytest-*"
+      - "coverage"
+      - "hypothesis"
+    update-types:
+      - "minor"
+      - "patch"
+
+  code-quality:
+    patterns:
+      - "black"
+      - "flake8"
+      - "mypy"
+      - "isort"
+    update-types:
+      - "minor"
+      - "patch"

@@ -14,7 +14,7 @@ import tkinter as tk
 from collections import deque
 from pathlib import Path
 from tkinter import scrolledtext, ttk
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import theme manager
 try:
@@ -29,7 +29,7 @@ except ImportError:
 class ToolTip:
     """Consistent tooltip implementation for tkinter widgets"""
 
-    def __init__(self, widget, text=""):
+    def __init__(self, widget: tk.Widget, text: str = "") -> None:
         """Initialize tooltip
 
         Args:
@@ -38,44 +38,47 @@ class ToolTip:
         """
         self.widget = widget
         self.text = text
-        self.tipwindow = None
-        self.id = None
+        self.tipwindow: Optional[tk.Toplevel] = None
+        self.id: Optional[str] = None
         self._delay = 500
 
         self.widget.bind("<Enter>", self.on_enter)
         self.widget.bind("<Leave>", self.on_leave)
         self.widget.bind("<ButtonPress>", self.on_leave)
 
-    def on_enter(self, event=None):
+    def on_enter(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Show tooltip when mouse enters widget"""
         self.schedule()
 
-    def on_leave(self, event=None):
+    def on_leave(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Hide tooltip when mouse leaves widget"""
         self.unschedule()
         self.hidetip()
 
-    def schedule(self):
+    def schedule(self) -> None:
         """Schedule tooltip display"""
         self.unschedule()
         self.id = self.widget.after(self._delay, self.showtip)
 
-    def unschedule(self):
+    def unschedule(self) -> None:
         """Cancel scheduled tooltip display"""
         id = self.id
         self.id = None
-        if id:
+        if id is not None:
             self.widget.after_cancel(id)
 
-    def showtip(self):
+    def showtip(self) -> None:
         """Display the tooltip"""
         if self.tipwindow or not self.text:
             return
-        x, y, cx, cy = self.widget.bbox("insert")
+        bbox = self.widget.bbox("insert")  # type: ignore
+        if bbox is None:
+            return
+        x, y, _, _ = bbox
         x = x + self.widget.winfo_rootx() + 25
         y = y + self.widget.winfo_rooty() + 20
         self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
+        tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         label = tk.Label(
             tw,
@@ -84,18 +87,18 @@ class ToolTip:
             background="#ffffe0",
             relief=tk.SOLID,
             borderwidth=1,
-            font=("tahoma", "8", "normal"),
+            font=("tahoma", 8, "normal"),
         )
         label.pack(padx=1, pady=1)
 
-    def hidetip(self):
+    def hidetip(self) -> None:
         """Hide the tooltip"""
         tw = self.tipwindow
         self.tipwindow = None
-        if tw:
+        if tw is not None:
             tw.destroy()
 
-    def update_text(self, new_text):
+    def update_text(self, new_text: str) -> None:
         """Update tooltip text"""
         self.text = new_text
 
@@ -122,7 +125,7 @@ class UtilsRunnerGUI:
         self.scripts = self.get_script_list()
 
         # Store running processes
-        self.running_processes: Dict[str, subprocess.Popen] = {}
+        self.running_processes: Dict[str, subprocess.Popen[str]] = {}
 
         # Output tag constants
         self.TAG_INFO = "info"
@@ -132,7 +135,7 @@ class UtilsRunnerGUI:
 
         # Bounded output buffer to prevent memory leaks
         self.output_buffer_size = 10000  # Maximum number of output lines to keep
-        self.output_buffer = deque(maxlen=self.output_buffer_size)
+        self.output_buffer: deque[Tuple[str, str]] = deque(maxlen=self.output_buffer_size)
 
         self.setup_ui()
 
@@ -156,7 +159,7 @@ class UtilsRunnerGUI:
                     scripts.append(file_path)
         return sorted(scripts)
 
-    def _create_menu_bar(self):
+    def _create_menu_bar(self) -> None:
         """Create menu bar with theme options."""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
@@ -175,12 +178,12 @@ class UtilsRunnerGUI:
             for theme_name in self.theme_manager.get_available_themes():
                 theme_menu.add_radiobutton(
                     label=theme_name.capitalize(),
-                    command=lambda t=theme_name: self._set_theme(t),
+                    command=lambda t=theme_name: self._set_theme(t),  # type: ignore
                     variable=tk.StringVar(value=self.theme_manager.current_theme),
                     value=theme_name,
                 )
 
-    def _set_theme(self, theme_name: str):
+    def _set_theme(self, theme_name: str) -> None:
         """Set the current theme.
 
         Args:
@@ -192,7 +195,7 @@ class UtilsRunnerGUI:
         if self.theme_manager.set_theme(theme_name):
             self._apply_theme_to_widgets()
 
-    def _apply_theme_to_widgets(self):
+    def _apply_theme_to_widgets(self) -> None:
         """Apply current theme to all widgets."""
         if not self.theme_manager:
             return
@@ -210,11 +213,11 @@ class UtilsRunnerGUI:
         if hasattr(self, "status_label"):
             fg_color = self.theme_manager.get_theme_color("fg")
             try:
-                self.status_label.config(fg=fg_color)
+                self.status_label.config(fg=fg_color)  # type: ignore
             except tk.TclError:
                 pass
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Setup the user interface.
 
         Creates the main layout with script list, control buttons,
@@ -225,7 +228,7 @@ class UtilsRunnerGUI:
 
         # Main container
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.grid(row=0, column=0, sticky="nsew")
 
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
@@ -241,7 +244,7 @@ class UtilsRunnerGUI:
 
         # Scripts list frame
         list_frame = ttk.LabelFrame(main_frame, text="Available Scripts", padding="5")
-        list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        list_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
 
         # Scripts listbox with scrollbar
         list_scrollbar = ttk.Scrollbar(list_frame)
@@ -259,7 +262,7 @@ class UtilsRunnerGUI:
 
         # Control buttons frame
         control_frame = ttk.Frame(main_frame)
-        control_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N), padx=(0, 10))
+        control_frame.grid(row=1, column=1, sticky="nsew", padx=(0, 10))
 
         # Buttons
         self.run_button = ttk.Button(
@@ -306,9 +309,7 @@ class UtilsRunnerGUI:
 
         # Output frame
         output_frame = ttk.LabelFrame(main_frame, text="Output", padding="5")
-        output_frame.grid(
-            row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0)
-        )
+        output_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
 
         # Output text area
         self.output_text = scrolledtext.ScrolledText(
@@ -322,7 +323,7 @@ class UtilsRunnerGUI:
         self.output_text.tag_config(self.TAG_SUCCESS, foreground="green")
         self.output_text.tag_config(self.TAG_WARNING, foreground="orange")
 
-    def log_output(self, message: str, tag: str = None):
+    def log_output(self, message: str, tag: Optional[str] = None) -> None:
         """Add message to output text area.
 
         Args:
@@ -335,7 +336,7 @@ class UtilsRunnerGUI:
         self.output_buffer.append((message, tag))
         self.root.after_idle(lambda: self._safe_log_output(message, tag))
 
-    def _safe_log_output(self, message: str, tag: str):
+    def _safe_log_output(self, message: str, tag: str) -> None:
         """Thread-safe output logging with bounded buffer management."""
         # Clear and rebuild output if buffer is getting large
         if len(self.output_buffer) > 5000:
@@ -347,7 +348,7 @@ class UtilsRunnerGUI:
             self.output_text.insert(tk.END, message + "\n", tag)
         self.output_text.see(tk.END)
 
-    def update_status(self, message: str):
+    def update_status(self, message: str) -> None:
         """Update status label.
 
         Args:
@@ -355,7 +356,7 @@ class UtilsRunnerGUI:
         """
         self.root.after_idle(lambda: self._safe_update_status(message))
 
-    def _safe_update_status(self, message: str):
+    def _safe_update_status(self, message: str) -> None:
         """Thread-safe status update."""
         self.status_label.config(text=message)
 
@@ -365,13 +366,13 @@ class UtilsRunnerGUI:
         Returns:
             Path to selected script or None if no selection.
         """
-        selection = self.scripts_listbox.curselection()
+        selection = tuple(self.scripts_listbox.curselection())  # type: ignore
         if selection:
             index = selection[0]
             return self.scripts[index]
         return None
 
-    def run_selected_script(self):
+    def run_selected_script(self) -> None:
         """Run the selected script in a separate thread."""
         script = self.get_selected_script()
         if not script:
@@ -380,16 +381,16 @@ class UtilsRunnerGUI:
 
         self.run_script(script)
 
-    def run_all_scripts(self):
+    def run_all_scripts(self) -> None:
         """Run all scripts sequentially."""
         if not self.scripts:
             self.log_output("No scripts found", self.TAG_ERROR)
             return
 
-        def run_all():
+        def run_all() -> None:
             for i, script in enumerate(self.scripts):
                 self.log_output(
-                    f"Running script {i+1}/{len(self.scripts)}: {script.name}", self.TAG_INFO
+                    f"Running script {i + 1}/{len(self.scripts)}: {script.name}", self.TAG_INFO
                 )
                 self.scripts_listbox.selection_clear(0, tk.END)
                 self.scripts_listbox.selection_set(i)
@@ -443,8 +444,9 @@ class UtilsRunnerGUI:
 
             self.running_processes[script.name] = process
 
-            # Read output in real-time
-            def read_output():
+            def read_output() -> None:
+                if process.stdout is None:
+                    return
                 while True:
                     output = process.stdout.readline()
                     if output == "" and process.poll() is not None:
@@ -492,14 +494,14 @@ class UtilsRunnerGUI:
             self.root.after_idle(self._update_stop_button_state)
             return False
 
-    def _update_stop_button_state(self):
+    def _update_stop_button_state(self) -> None:
         """Update stop button state based on running processes."""
         if self.running_processes:
             self.stop_button.config(state=tk.NORMAL)
         else:
             self.stop_button.config(state=tk.DISABLED)
 
-    def stop_selected_script(self):
+    def stop_selected_script(self) -> None:
         """Stop the selected script if it's running."""
         script = self.get_selected_script()
         if not script:
@@ -521,12 +523,12 @@ class UtilsRunnerGUI:
         else:
             self.log_output(f"Script {script.name} is not running", self.TAG_WARNING)
 
-    def clear_output(self):
+    def clear_output(self) -> None:
         """Clear the output text area."""
         self.output_text.delete(1.0, tk.END)
         self.log_output("Output cleared", self.TAG_INFO)
 
-    def quit_application(self):
+    def quit_application(self) -> None:
         """Quit the application safely.
 
         Stops all running processes and closes the application.
@@ -554,12 +556,12 @@ class UtilsRunnerGUI:
         self.root.destroy()
 
 
-def main():
+def main() -> None:
     """Launch the utils runner GUI."""
     try:
         # Create and run the GUI
         root = tk.Tk()
-        app = UtilsRunnerGUI(root)
+        UtilsRunnerGUI(root)
 
         # Center window on screen
         root.update_idletasks()

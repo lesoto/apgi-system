@@ -10,21 +10,22 @@ and validates specific requirements from the requirements document.
 """
 
 import numpy as np
-import pytest
 import yaml
+import sys
 from pathlib import Path
+from typing import Dict, Any
+from numpy.typing import NDArray
 from hypothesis import given, strategies as st, settings, assume
 from hypothesis import HealthCheck
 
-from apgi_system.ignition.threshold import IgnitionThreshold
-from apgi_system.ignition.global_workspace import GlobalWorkspace
-from apgi_system.ignition.temporal_dynamics import IgnitionTimeline
-from tests.strategies import (
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from apgi_system.ignition.threshold import IgnitionThreshold  # noqa: E402
+from apgi_system.ignition.global_workspace import GlobalWorkspace  # noqa: E402
+from tests.strategies import (  # noqa: E402
     precision_weighted_error_strategy,
-    metabolic_reserve_strategy,
-    allostatic_load_strategy,
     somatic_marker_gain_strategy,
-    config_strategy,
     observation_strategy,
 )
 
@@ -42,7 +43,7 @@ settings.register_profile(
 settings.load_profile("property_tests")
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
@@ -57,7 +58,9 @@ class TestIgnitionDynamicsProperties:
         somatic_gain=somatic_marker_gain_strategy(),
         current_time=st.floats(min_value=0.0, max_value=10000.0),
     )
-    def test_property_ignition_threshold_crossing(self, error_data, somatic_gain, current_time):
+    def test_property_ignition_threshold_crossing(
+        self, error_data: Dict[str, Any], somatic_gain: float, current_time: float
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 6: Ignition occurs when signal exceeds threshold**
 
@@ -118,8 +121,11 @@ class TestIgnitionDynamicsProperties:
         num_updates=st.integers(min_value=10, max_value=50),
     )
     def test_property_workspace_broadcast_duration(
-        self, candidate_content, amplification_duration, num_updates
-    ):
+        self,
+        candidate_content: NDArray[np.float64],
+        amplification_duration: float,
+        num_updates: int,
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 7: Workspace broadcast duration**
 
@@ -180,8 +186,8 @@ class TestIgnitionDynamicsProperties:
         error_data=precision_weighted_error_strategy(),
     )
     def test_property_threshold_increase_with_depleted_reserves(
-        self, reserves_low, reserves_high, error_data
-    ):
+        self, reserves_low: float, reserves_high: float, error_data: Dict[str, Any]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 8: Threshold increases with depleted reserves**
 
@@ -236,8 +242,8 @@ class TestIgnitionDynamicsProperties:
         error_data=precision_weighted_error_strategy(),
     )
     def test_property_threshold_modulation_by_allostatic_load(
-        self, load_low, load_high, error_data
-    ):
+        self, load_low: float, load_high: float, error_data: Dict[str, Any]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 9: Threshold modulation by allostatic load**
 
@@ -291,7 +297,9 @@ class TestIgnitionDynamicsProperties:
         gain_high=st.floats(min_value=1.2, max_value=2.0),
         error_data=precision_weighted_error_strategy(),
     )
-    def test_property_somatic_marker_gain_incorporation(self, gain_low, gain_high, error_data):
+    def test_property_somatic_marker_gain_incorporation(
+        self, gain_low: float, gain_high: float, error_data: Dict[str, Any]
+    ) -> None:
         """
         **Feature: apgi-enhancement-maintenance, Property 10: Somatic marker gain incorporation**
 

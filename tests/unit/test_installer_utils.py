@@ -6,7 +6,6 @@ Requirements: 13.1, 13.2
 """
 
 import pytest
-import tempfile
 from pathlib import Path
 from utils.installer_utils import (
     extract_version_from_pyproject,
@@ -22,14 +21,12 @@ class TestVersionExtraction:
     def test_extract_version_from_valid_pyproject(self, tmp_path):
         """Test extracting version from a valid pyproject.toml file."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            """
+        pyproject.write_text("""
 [project]
 name = "test-app"
 version = "1.2.3"
 description = "Test application"
-"""
-        )
+""")
 
         version = extract_version_from_pyproject(pyproject)
         assert version == "1.2.3"
@@ -37,13 +34,11 @@ description = "Test application"
     def test_extract_version_with_single_quotes(self, tmp_path):
         """Test extracting version with single quotes."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            """
+        pyproject.write_text("""
 [project]
 name = "test-app"
 version = '0.5.10'
-"""
-        )
+""")
 
         version = extract_version_from_pyproject(pyproject)
         assert version == "0.5.10"
@@ -51,13 +46,11 @@ version = '0.5.10'
     def test_extract_version_with_extra_whitespace(self, tmp_path):
         """Test extracting version with extra whitespace."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            """
+        pyproject.write_text("""
 [project]
 name = "test-app"
 version   =   "2.0.0"
-"""
-        )
+""")
 
         version = extract_version_from_pyproject(pyproject)
         assert version == "2.0.0"
@@ -72,13 +65,11 @@ version   =   "2.0.0"
     def test_extract_version_missing_version_field(self, tmp_path):
         """Test error when version field is missing."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            """
+        pyproject.write_text("""
 [project]
 name = "test-app"
 description = "No version here"
-"""
-        )
+""")
 
         with pytest.raises(ValueError, match="Version not found"):
             extract_version_from_pyproject(pyproject)
@@ -86,12 +77,10 @@ description = "No version here"
     def test_extract_version_invalid_format(self, tmp_path):
         """Test error when version format is invalid."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            """
+        pyproject.write_text("""
 [project]
 version = "invalid"
-"""
-        )
+""")
 
         with pytest.raises(ValueError, match="Invalid version format"):
             extract_version_from_pyproject(pyproject)

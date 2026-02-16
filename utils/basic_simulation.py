@@ -9,8 +9,7 @@ visualizations of ignition events, free energy, precision, and metabolic reserve
 import argparse
 import os
 import sys
-from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any, Tuple
 
 import numpy as np
 import matplotlib
@@ -25,7 +24,7 @@ from utils.datetime_utils import (
 )
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Run basic APGI system simulation",
@@ -82,7 +81,7 @@ def parse_arguments():
 
 def sensory_input_factory(
     input_size: int = 256, noise_level: float = 0.2
-) -> Callable[[float], np.ndarray]:
+) -> Callable[[float], np.ndarray[Any, np.dtype[Any]]]:
     """
     Create sensory input function with sinusoidal pattern and noise.
 
@@ -94,7 +93,7 @@ def sensory_input_factory(
         Function that generates sensory input for given time
     """
 
-    def sensory_input(t: float) -> np.ndarray:
+    def sensory_input(t: float) -> np.ndarray[Any, np.dtype[Any]]:
         """
         Generate sensory input at time t.
 
@@ -117,7 +116,7 @@ def run_simulation(
     input_size: int = 256,
     noise_level: float = 0.2,
     config_path: Optional[str] = None,
-) -> tuple:
+) -> Tuple[Dict[str, Any], APGISystem, float]:
     """
     Run APGI system simulation.
 
@@ -158,7 +157,7 @@ def run_simulation(
 
     # Get final state summary
     summary = system.get_state_summary()
-    print(f"\nFinal State:")
+    print("\nFinal State:")
     print(f"  Allostatic load: {summary['allostatic_load']:.3f}")
     print(f"  Metabolic reserves: {summary['metabolic_reserves']:.1f}")
     print(f"  Somatic markers: {summary['somatic_markers']['num_markers']}")
@@ -167,8 +166,8 @@ def run_simulation(
 
 
 def plot_results(
-    history: dict, output_file: str = "apgi_simulation_results.png", show: bool = False
-):
+    history: Dict[str, Any], output_file: str = "apgi_simulation_results.png", show: bool = False
+) -> None:
     """
     Plot simulation results.
 
@@ -216,7 +215,7 @@ def plot_results(
         print("Continuing without plot generation...")
 
 
-def main():
+def main() -> None:
     """Run basic simulation with command-line arguments."""
     args = parse_arguments()
 

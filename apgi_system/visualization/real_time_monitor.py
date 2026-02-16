@@ -2,8 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from typing import Dict, Any, List
+from typing import Dict, Any
 from collections import deque
 
 
@@ -47,15 +46,15 @@ class RealTimeMonitor:
     ----------
     window_size : int
         Maximum number of timepoints displayed
-    time_buffer : deque
+    time_buffer: deque[float]
         Circular buffer storing timestamps
-    ignition_buffer : deque
+    ignition_buffer : deque[int]
         Buffer storing ignition event indicators (0/1)
-    fe_buffer : deque
+    fe_buffer : deque[float]
         Buffer storing free energy / prediction error values
-    precision_buffer : deque
+    precision_buffer : deque[float]
         Buffer storing precision weight values
-    energy_buffer : deque
+    energy_buffer : deque[float]
         Buffer storing energy reserve levels
     fig : matplotlib.figure.Figure
         Main figure object
@@ -87,11 +86,11 @@ class RealTimeMonitor:
         self.window_size = window_size
 
         # Data buffers
-        self.time_buffer = deque(maxlen=window_size)
-        self.ignition_buffer = deque(maxlen=window_size)
-        self.fe_buffer = deque(maxlen=window_size)
-        self.precision_buffer = deque(maxlen=window_size)
-        self.energy_buffer = deque(maxlen=window_size)
+        self.time_buffer: deque[float] = deque(maxlen=window_size)
+        self.ignition_buffer: deque[int] = deque(maxlen=window_size)
+        self.fe_buffer: deque[float] = deque(maxlen=window_size)
+        self.precision_buffer: deque[float] = deque(maxlen=window_size)
+        self.energy_buffer: deque[float] = deque(maxlen=window_size)
 
         # Setup figure
         self.fig, self.axes = plt.subplots(4, 1, figsize=(12, 10))
@@ -113,7 +112,7 @@ class RealTimeMonitor:
         # Ignition events as scatter
         self.ignition_scatter = self.axes[0].scatter([], [], c="red", s=50, alpha=0.6)
 
-    def update(self, state: Dict[str, Any]):
+    def update(self, state: Dict[str, Any]) -> None:
         """
         Update monitor buffers with new system state.
 
@@ -142,7 +141,7 @@ class RealTimeMonitor:
         self.precision_buffer.append(state["precision"]["exteroceptive"])
         self.energy_buffer.append(state["metabolism"]["reserves"])
 
-    def render(self):
+    def render(self) -> None:
         """
         Render current visualization state.
 
@@ -196,11 +195,11 @@ class RealTimeMonitor:
         plt.draw()
         plt.pause(0.001)
 
-    def show(self):
+    def show(self) -> None:
         """Display monitor window."""
         plt.show()
 
-    def save(self, filename: str = "apgi_monitor.png"):
+    def save(self, filename: str = "apgi_monitor.png") -> None:
         """
         Save current visualization to file.
 

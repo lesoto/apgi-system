@@ -7,7 +7,7 @@ including execution time, memory usage, and computational efficiency.
 import time
 import gc
 import psutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 import numpy as np
 
@@ -256,7 +256,7 @@ class PerformanceMonitor:
 
         stats = self.get_statistics()
 
-        print(f"\n=== Performance Statistics ===")
+        print("\n=== Performance Statistics ===")
         print(f"Total samples: {stats['total_samples']}")
         print(
             f"Step time: {stats['mean_step_time_ms']:.3f} ms "
@@ -274,7 +274,7 @@ class PerformanceMonitor:
 
         if verbose and len(self.history) > 0:
             recent = self.get_recent_metrics(5)
-            print(f"\nRecent metrics (last 5):")
+            print("\nRecent metrics (last 5):")
             for i, m in enumerate(recent, 1):
                 print(
                     f"  {i}. Time: {m.timestamp:.1f}ms, "
@@ -286,12 +286,12 @@ class PerformanceMonitor:
 class SystemProfiler:
     """Profile system resources and performance characteristics."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize system profiler."""
         self.start_time = time.time()
-        self.profile_data = {}
+        self.profile_data: Dict[str, Any] = {}
 
-    def profile_system_resources(self) -> dict:
+    def profile_system_resources(self) -> Dict[str, Any]:
         """Profile current system resource usage.
 
         Returns
@@ -310,7 +310,7 @@ class SystemProfiler:
             "uptime_seconds": time.time() - self.start_time,
         }
 
-    def profile_python_memory(self) -> dict:
+    def profile_python_memory(self) -> Dict[str, Any]:
         """Profile Python memory usage.
 
         Returns
@@ -330,12 +330,12 @@ class SystemProfiler:
 class MetricsCollector:
     """Collect and aggregate metrics from multiple sources."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize metrics collector."""
-        self.metrics_sources = []
-        self.collected_metrics = []
+        self.metrics_sources: List[Any] = []
+        self.collected_metrics: List[Any] = []
 
-    def add_metrics_source(self, source):
+    def add_metrics_source(self, source: Any) -> None:
         """Add a metrics source to collect from.
 
         Parameters
@@ -345,7 +345,7 @@ class MetricsCollector:
         """
         self.metrics_sources.append(source)
 
-    def collect_all_metrics(self) -> dict:
+    def collect_all_metrics(self) -> Dict[str, Any]:
         """Collect metrics from all sources.
 
         Returns
@@ -368,7 +368,7 @@ class MetricsCollector:
 
         return all_metrics
 
-    def get_metrics_summary(self) -> dict:
+    def get_metrics_summary(self) -> Dict[str, Any]:
         """Get summary of collected metrics.
 
         Returns
