@@ -111,126 +111,95 @@ def check_build_environment() -> Dict[str, bool]:
     return checks
 
 
-def analyze_dependencies(entry_point: Optional[str] = None) -> Dependencies:
-    """Analyze project dependencies from requirements.txt and pyproject.toml.
+def analyze_dependencies(file_path: str, exclude_modules: Optional[Set[str]] = None) -> Set[str]:
+    """Analyze dependencies from a Python file.
 
     Parameters
     ----------
-    entry_point : str, optional
-        Path to Python entry point file to analyze, by default None (apgi_gui.py)
+    file_path : str
+        Path to Python file to analyze
+    exclude_modules : Set[str], optional
+        Modules to exclude from analysis
 
     Returns
     -------
-    dict
-        Dictionary with keys: requirements_txt, pyproject_toml, total_dependencies
+    Set[str]
+        Set of top-level module dependencies
     """
-    project_root = get_project_root()
+    if exclude_modules is None:
+        exclude_modules = set()
 
-    dependencies: Dependencies = {
-        "requirements_txt": set(),
-        "pyproject_toml": set(),
-        "total_dependencies": 0,
-    }
+    dependencies = set()
 
-    # Analyze requirements.txt
-    requirements_file = project_root / "requirements.txt"
-    if requirements_file.exists():
-        try:
-            content = requirements_file.read_text()
-            for line in content.splitlines():
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    # Extract package name (before ==, >=, etc.)
-                    package = (
-                        line.split()[0].split("==")[0].split(">=")[0].split("<=")[0].split("!=")[0]
-                    )
-                    if package:
-                        dependencies["requirements_txt"].add(package)
-        except Exception:
-            pass
+    try:
+        import ast
 
-    # Analyze pyproject.toml
-    pyproject_file = project_root / "pyproject.toml"
-    if pyproject_file.exists():
-        try:
-            import toml  # type: ignore[import-untyped]
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
-            config = toml.load(pyproject_file)
-            deps = config.get("project", {}).get("dependencies", [])
-            for dep in deps:
-                # Extract package name
-                package = dep.split()[0].split("==")[0].split(">=")[0].split("<=")[0].split("!=")[0]
-                if package:
-                    dependencies["pyproject_toml"].add(package)
-        except Exception:
-            pass
+        tree = ast.parse(content, filename=file_path)
 
-    # Calculate total unique dependencies
-    all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]
-    dependencies["total_dependencies"] = len(all_deps)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    # Get top-level module
+                    module = alias.name.split(".")[0]
+                    if module and module not in exclude_modules:
+                        dependencies.add(module)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    # Get top-level module
+                    module = node.module.split(".")[0]
+                    if module and module not in exclude_modules:
+                        dependencies.add(module)
+
+    except (SyntaxError, FileNotFoundError, UnicodeDecodeError):
+        # Return empty set on any parsing error
+        pass
 
     return dependencies
 
 
 def collect_resources(
-    project_path: Optional[str] = None, resource_dirs: Optional[List[str]] = None
-) -> Dict[str, List[str]]:
-    """Collect project resources from specified directories.
+    project_path: str, patterns: Optional[List[str]] = None
+) -> List[tuple[str, str]]:
+    """Collect resources from a directory.
 
     Parameters
     ----------
-    project_path : str, optional
-        Path to project, by default None (current directory)
-    resource_dirs : List[str], optional
-        List of directory names to collect from, by default None (all)
+    project_path : str
+        Path to directory to collect from
+    patterns : List[str], optional
+        File patterns to include, e.g. ["*.yaml", "*.yml"]
 
     Returns
     -------
-    dict
-        Dictionary with keys: config_files, data_files, resource_files, icon_files
+    List[tuple[str, str]]
+        List of (source_path, dest_path) tuples
     """
-    if project_path is None:
-        project_path_obj = get_project_root()
-    else:
-        project_path_obj = Path(project_path)
+    from fnmatch import fnmatch
 
-    resources: Dict[str, List[str]] = {
-        "config_files": [],
-        "data_files": [],
-        "resource_files": [],
-        "icon_files": [],
-    }
+    project_path_obj = Path(project_path)
+    resources: List[tuple[str, str]] = []
 
-    # If no specific directories provided, use defaults
-    if resource_dirs is None:
-        resource_dirs = ["config", "resources"]
+    if not project_path_obj.exists() or not project_path_obj.is_dir():
+        return resources
 
-    # Collect from each specified directory
-    for dir_name in resource_dirs:
-        dir_path = project_path_obj / dir_name
-        if dir_path.exists() and dir_path.is_dir():
-            # Collect all files in this directory recursively
-            for file_path in dir_path.rglob("*"):
-                if file_path.is_file():
-                    # Create relative destination path
-                    try:
-                        rel_path = file_path.relative_to(project_path_obj)
-                        file_str = str(rel_path)
+    # Default patterns if none provided
+    if patterns is None:
+        patterns = ["*.yaml", "*.yml", "*.json", "*.png", "*.ico", "*.csv", "*.txt"]
 
-                        # Categorize files
-                        if dir_name == "config":
-                            resources["config_files"].append(file_str)
-                        elif dir_name == "resources":
-                            if file_path.suffix in [".ico", ".icns", ".png"]:
-                                resources["icon_files"].append(file_str)
-                            else:
-                                resources["resource_files"].append(file_str)
-                        else:
-                            resources["data_files"].append(file_str)
-
-                    except ValueError:
-                        # File not under project root, skip
-                        continue
+    for pattern in patterns:
+        for file_path in project_path_obj.rglob("*"):
+            if file_path.is_file() and fnmatch(file_path.name, pattern):
+                try:
+                    # Make destination relative to project root
+                    rel_path = file_path.relative_to(project_path_obj)
+                    dest_path = str(rel_path)
+                    source_path = str(file_path)
+                    resources.append((source_path, dest_path))
+                except ValueError:
+                    continue
 
     return resources
 
@@ -262,7 +231,7 @@ def get_version(project_path: Optional[str] = None) -> str:
     pyproject_file = project_path_obj / "pyproject.toml"
     if pyproject_file.exists():
         try:
-            import toml
+            import toml  # type: ignore
 
             config = toml.load(pyproject_file)
             return config.get("project", {}).get("version", "0.1.0")
@@ -272,110 +241,120 @@ def get_version(project_path: Optional[str] = None) -> str:
     return "0.1.0"
 
 
-def detect_hidden_imports(project_path: Optional[str] = None) -> List[str]:
-    """Detect hidden imports in the project.
+def detect_hidden_imports(package: str) -> List[str]:
+    """Detect hidden imports for a specific package.
 
     Parameters
     ----------
-    project_path : str, optional
-        Path to project, by default None (current directory)
+    package : str
+        Package name to get hidden imports for
 
     Returns
     -------
     List[str]
-        List of hidden imports
+        List of hidden imports for the package
     """
-    if project_path is None:
-        project_path_obj = get_project_root()
-    else:
-        project_path_obj = Path(project_path)
+    # Known hidden imports for common packages
+    hidden_imports_map = {
+        "scipy": [
+            "scipy._lib.messagestream",
+            "scipy.special._ufuncs_cxx",
+            "scipy.linalg.cython_lapack",
+            "scipy.linalg.cython_blas",
+        ],
+        "matplotlib": [
+            "matplotlib.backends._backend_agg",
+            "matplotlib.backends._backend_tk",
+            "matplotlib.backends.backend_qt5agg",
+            "matplotlib.backends.backend_qt4agg",
+        ],
+        "tkinter": [
+            "tkinter.ttk",
+            "tkinter.filedialog",
+            "tkinter.messagebox",
+            "tkinter.simpledialog",
+        ],
+        "numpy": [
+            "numpy.linalg.lapack_lite",
+            "numpy.linalg._umath_lapack",
+            "numpy.core._multiarray_umath",
+        ],
+        "sklearn": [
+            "sklearn.utils._cython_blas",
+            "sklearn.utils._openmp_helpers",
+        ],
+        "torch": [
+            "torch._C",
+            "torch._C._dynamo",
+        ],
+        "jax": [
+            "jaxlib.xla_extension",
+        ],
+    }
 
-    hidden_imports = []
-
-    # Common hidden imports for scientific packages
-    common_hidden = [
-        "numpy.linalg.lapack_lite",
-        "numpy.linalg.umath_lapack",
-        "scipy.special._ufuncs_cxx",
-        "scipy.linalg.cython_lapack",
-        "scipy.linalg.cython_blas",
-        "sklearn.utils._cython_blas",
-        "sklearn.utils._openmp_helpers",
-        "torch._C",
-        "torch._C._dynamo",
-        "jaxlib.xla_extension",
-    ]
-
-    # Check if these packages are used
-    python_files = list(project_path_obj.rglob("*.py"))
-
-    for py_file in python_files:
-        try:
-            content = py_file.read_text()
-            for hidden in common_hidden:
-                package = hidden.split(".")[0]
-                if package in content and hidden not in hidden_imports:
-                    hidden_imports.append(hidden)
-        except Exception:
-            continue
-
-    return hidden_imports
+    return hidden_imports_map.get(package, [])
 
 
 # Alias for backward compatibility
 get_hidden_imports = detect_hidden_imports
 
 
-def should_exclude_module(module_name: str) -> bool:
+def should_exclude_module(module_name: str, custom_exclusions: Optional[Set[str]] = None) -> bool:
     """Check if a module should be excluded from packaging.
 
     Parameters
     ----------
     module_name : str
         Module name to check
+    custom_exclusions : Set[str], optional
+        Custom modules to exclude (if provided, only these are used)
 
     Returns
     -------
     bool
         True if module should be excluded
     """
-    # Common exclusions
-    exclusions = [
-        "test",
-        "tests",
-        "pytest",
-        "_pytest",
-        "setuptools",
-        "pip",
-        "wheel",
-        "debug",
-        "pdb",
-        "ipdb",
-        "jupyter",
-        "ipython",
-        "sphinx",
-        "docs",
-        "examples",
-        "samples",
-        "mypy",
-        "flake8",
-        "black",
-        "coverage",
-        "coveralls",
-    ]
+    if custom_exclusions is not None:
+        exclusions = custom_exclusions
+    else:
+        # Common exclusions
+        exclusions = {
+            "test",
+            "tests",
+            "pytest",
+            "_pytest",
+            "setuptools",
+            "pip",
+            "wheel",
+            "debug",
+            "pdb",
+            "ipdb",
+            "jupyter",
+            "ipython",
+            "sphinx",
+            "docs",
+            "examples",
+            "samples",
+            "mypy",
+            "flake8",
+            "black",
+            "coverage",
+            "coveralls",
+            "hypothesis",
+        }
 
     return any(excl in module_name.lower() for excl in exclusions)
 
 
-def get_excluded_modules() -> List[str]:
+def get_excluded_modules() -> Set[str]:
     """Get list of commonly excluded modules.
 
     Returns
     -------
-    List[str]
-        List of excluded modules
+    Set[str]
+        Set of excluded modules
     """
-    return [
+    return {
         "test",
         "tests",
         "pytest",
@@ -397,6 +376,7 @@ def get_excluded_modules() -> List[str]:
         "black",
         "coverage",
         "coveralls",
+        "hypothesis",
         "tkinter.test",
         "unittest",
         "doctest",
@@ -407,4 +387,4 @@ def get_excluded_modules() -> List[str]:
         "urllib",
         "xml",
         "xmlrpc",
-    ]
+    }

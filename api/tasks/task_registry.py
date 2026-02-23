@@ -4,7 +4,7 @@ Task Registry Module
 Registry for mapping task types to their corresponding Celery task functions.
 """
 
-from typing import Dict, Type
+from typing import Dict
 from enum import Enum
 
 from api.tasks.experimental_tasks import (

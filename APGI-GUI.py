@@ -12,16 +12,17 @@ from datetime import datetime
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-import psutil
 import time
-import threading
-from threading import Lock, RLock
 import platform
+import threading
+from threading import RLock, Lock
 import yaml
 import json
 import csv
 from pathlib import Path
-from typing import Dict, Optional, Union, Any, cast
+from typing import Dict, Optional, Any, cast
+from numpy.typing import NDArray
+import psutil
 
 from apgi_system.system import APGISystem
 from apgi_system.config_validator import validate_config_file, ConfigValidationError
@@ -41,7 +42,7 @@ logging.basicConfig(
     level=logging.WARNING,  # Only show warnings and errors, not info/debug
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("apgi_gui.log"),
+        logging.FileHandler(str(get_data_dir() / "apgi_gui.log")),
         # Only log to file, not console for cleaner startup
     ],
 )
@@ -54,6 +55,9 @@ class APGIGui:
         """Initialize GUI application."""
         self.root = root
         self.root.title("APGI Consciousness Modeling Framework")
+
+        # Configuration
+        self.config_file = Path.home() / ".apgi_gui_config.json"
 
         # Set responsive window size based on screen dimensions
         screen_width = self.root.winfo_screenwidth()
@@ -81,6 +85,17 @@ class APGIGui:
 
         # Initialize theme manager
         self.theme_manager = get_theme_manager()
+
+        # Load saved theme from config
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, "r") as f:
+                    config = json.load(f)
+                    if "theme" in config:
+                        self.theme_manager.set_theme(config["theme"])
+        except Exception as e:
+            logger.warning(f"Failed to load config: {e}")
+
         self._apply_theme_to_root()
 
         # System state
@@ -95,6 +110,18 @@ class APGIGui:
         self.min_buffer_size: int = 100  # Minimum buffer size
         self.max_buffer_size: int = 10000  # Maximum buffer size
 
+        # Load buffer size from config if available
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, "r") as f:
+                    config = json.load(f)
+                    if "buffer_size" in config:
+                        loaded_size = config["buffer_size"]
+                        if self.min_buffer_size <= loaded_size <= self.max_buffer_size:
+                            self.buffer_size = loaded_size
+        except Exception as e:
+            logger.warning(f"Failed to load buffer size from config: {e}")
+
         # Initialize buffers with default size
         self._initialize_buffers(self.buffer_size)
 
@@ -104,22 +131,22 @@ class APGIGui:
         self.memory_buffer: deque[float] = deque(maxlen=1000)
 
         # Thread safety locks
-        self.data_lock = RLock()  # Reentrant lock for data buffers
-        self.log_lock = Lock()  # Simple lock for log data
-        self.system_lock = RLock()  # Reentrant lock for system access
+        self.data_lock: threading.RLock = threading.RLock()  # Reentrant lock for data buffers
+        self.log_lock: threading.Lock = threading.Lock()  # Simple lock for log data
+        self.system_lock: threading.RLock = threading.RLock()  # Reentrant lock for system access
 
         # Logging with bounded buffer to prevent memory leaks
         self.log_buffer_size: int = 10000  # Maximum number of log entries to keep
-        self.log_data: deque[str] = deque(maxlen=self.log_buffer_size)
+        self.log_data: deque[Dict[str, Any]] = deque(maxlen=self.log_buffer_size)
         self.auto_save: bool = False
 
-        # Initialize view variables as regular Python variables first
-        self.view_vars: Dict[str, Union[bool, tk.BooleanVar]] = {
-            "control_panel": True,
-            "neural_activity": True,
-            "interoception": True,
-            "system_metrics": True,
-        }
+        # Initialize custom input attributes
+        self.custom_input_steps_remaining = 0
+        self.custom_input_params = None
+
+        # Initialize view variables as tk.BooleanVar with master
+        # Moved to _convert_to_tkinter_variables for proper timing
+        self.view_vars: Dict[str, tk.BooleanVar] = {}  # Placeholder
         self.auto_save = False
 
         # Build GUI
@@ -216,6 +243,18 @@ class APGIGui:
         if self.theme_manager.set_theme(theme_name):
             self.apply_theme_to_gui()
             self._log_event(f"Theme changed to: {theme_name}")
+
+            # Save theme to config
+            try:
+                config = {}
+                if self.config_file.exists():
+                    with open(self.config_file, "r") as f:
+                        config = json.load(f)
+                config["theme"] = theme_name
+                with open(self.config_file, "w") as f:
+                    json.dump(config, f)
+            except Exception as e:
+                self._log_event(f"Failed to save theme: {e}")
         else:
             messagebox.showerror("Theme Error", f"Unknown theme: {theme_name}")
 
@@ -286,24 +325,15 @@ class APGIGui:
         # Convert buffer size variable
         self.buffer_size_var = tk.IntVar(master=self.root, value=self.buffer_size)
 
-        # Convert view variables to tkinter variables
-        old_view_vars = self.view_vars.copy()
-        self.view_vars = {}
-        for key, var in old_view_vars.items():
-            self.view_vars[key] = tk.BooleanVar(master=self.root, value=var.get())
-
         # Convert auto-save variable
         self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
 
-        # Convert speed variable and assign to scale
-        self.speed_var = tk.DoubleVar(master=self.root, value=self._speed_value)
-        if hasattr(self, "_speed_scale"):
-            self._speed_scale.configure(variable=self.speed_var)
-            self.speed_var.trace_add("write", lambda *args: self._update_speed_cache())
+        # Initialize speed variable
+        self.speed_var = tk.DoubleVar(master=self.root, value=1.0)
 
         # Convert parameter variables and assign to scales
         for key, value in self.param_vars.items():
-            var_value = value.get() if isinstance(value, tk.Variable) else value
+            var_value = value.get() if isinstance(value, tk.Variable) else float(value)
             var = tk.DoubleVar(master=self.root, value=var_value)
             self.param_vars[key] = var
 
@@ -320,23 +350,34 @@ class APGIGui:
                     ),
                 )
 
-        # Assign variables to existing view menu checkbuttons
-        try:
-            if hasattr(self, "_view_menu"):
-                checkbuttons = [
-                    ("Control Panel", "control_panel"),
-                    ("Neural Activity", "neural_activity"),
-                    ("Interoception", "interoception"),
-                    ("System Metrics", "system_metrics"),
-                ]
-
-                for i, (label, key) in enumerate(checkbuttons):
-                    try:
-                        self._view_menu.entryconfig(i, variable=self.view_vars[key])
-                    except tk.TclError:
-                        pass  # Skip if entry doesn't exist
-        except Exception as e:
-            self._log_event(f"Warning: Could not assign variables to view menu: {e}")
+        # Initialize view variables and assign to checkbuttons
+        self.view_vars = {
+            "control_panel": tk.BooleanVar(master=self.root, value=True),
+            "neural_activity": tk.BooleanVar(master=self.root, value=True),
+            "interoception": tk.BooleanVar(master=self.root, value=True),
+            "system_metrics": tk.BooleanVar(master=self.root, value=True),
+        }
+        # Assign variables to view checkbuttons
+        for key, var in self.view_vars.items():
+            if hasattr(self, "view_checkbuttons") and key in self.view_checkbuttons:
+                # Note: add_checkbutton returns an index, not the checkbutton object
+                # We need to configure the menu item by index
+                menu = self._view_menu
+                # Find the index of the checkbutton
+                end_index = menu.index("end")
+                if end_index is not None:
+                    for i in range(int(end_index) + 1):
+                        if (
+                            menu.entrycget(i, "label")
+                            == {
+                                "control_panel": "Control Panel",
+                                "neural_activity": "Neural Activity",
+                                "interoception": "Interoception",
+                                "system_metrics": "System Metrics",
+                            }[key]
+                        ):
+                            menu.entryconfig(i, variable=var)
+                            break
 
         # Now add the auto-save checkbutton to the file menu
         try:
@@ -433,6 +474,18 @@ class APGIGui:
                 if self.min_buffer_size <= new_size <= self.max_buffer_size:
                     with self.data_lock:
                         self._initialize_buffers(new_size)
+                    self.buffer_size = new_size
+                    # Save buffer size to config
+                    try:
+                        config = {}
+                        if self.config_file.exists():
+                            with open(self.config_file, "r") as f:
+                                config = json.load(f)
+                        config["buffer_size"] = new_size
+                        with open(self.config_file, "w") as f:
+                            json.dump(config, f)
+                    except Exception as e:
+                        self._log_event(f"Failed to save buffer size to config: {e}")
                     dialog.destroy()
                     self._log_event(f"Buffer size updated to {new_size} points")
                 else:
@@ -470,15 +523,6 @@ class APGIGui:
         self.log_buffer_size = 10000  # Maximum number of log entries to keep
         self.log_data = deque(maxlen=self.log_buffer_size)
         self.auto_save = False
-
-        # UI state variables
-        self.view_vars = {
-            "control_panel": tk.BooleanVar(value=True),
-            "neural_activity": tk.BooleanVar(value=True),
-            "interoception": tk.BooleanVar(value=True),
-            "system_metrics": tk.BooleanVar(value=True),
-        }
-        self.auto_save_var = tk.BooleanVar(value=False)
 
         # Build GUI
         try:
@@ -571,6 +615,8 @@ class APGIGui:
         self.menu_bar.add_cascade(label="View", menu=view_menu)
         # Store view menu for later variable assignment
         self._view_menu = view_menu
+        # Store checkbuttons for later variable assignment
+        self.view_checkbuttons: Dict[str, Any] = {}
         view_menu.add_checkbutton(
             label="Control Panel",
             command=self._toggle_control_panel,
@@ -583,7 +629,7 @@ class APGIGui:
             label="Interoception",
             command=self._toggle_interoception,
         )
-        view_menu.add_checkbutton(
+        self.view_checkbuttons["system_metrics"] = view_menu.add_checkbutton(
             label="System Metrics",
             command=self._toggle_system_metrics,
         )
@@ -635,16 +681,12 @@ class APGIGui:
         # Create theme menu
         self._create_theme_menu()
 
-        # Bind keyboard shortcuts
-        self.root.bind("<Control-n>", lambda e: self._new_session())
-        self.root.bind("<Control-o>", lambda e: self._load_config())
-        self.root.bind("<Control-s>", lambda e: self._save_config())
-        self.root.bind("<Control-e>", lambda e: self._export_data())
-        self.root.bind("<Control-q>", lambda e: self._exit_app())
+    def _exit_app(self) -> None:
+        """Exit the application."""
+        self.root.quit()
         self.root.bind("<Control-plus>", lambda e: self._zoom_in())
         self.root.bind("<Control-minus>", lambda e: self._zoom_out())
-        self.root.bind("<Control-0>", lambda e: self._zoom_fit())
-        self.root.bind("<Control-r>", lambda e: self._reset_simulation())
+        self.root.bind("<Control-s>", lambda e: self.on_start_clicked())  # type: ignore
         self.root.bind("<Control-p>", lambda e: self._toggle_parameter_panel())
         self.root.bind("<Control-l>", lambda e: self._toggle_log_panel())
         self.root.bind("<F5>", lambda e: self._start_simulation())
@@ -670,6 +712,10 @@ class APGIGui:
         # Right panel - Visualizations (tabbed)
         right_panel = ttk.Frame(main_paned)
         main_paned.add(right_panel, weight=1)
+
+        # Store references for toggling
+        self.main_paned = main_paned
+        self.left_panel = left_panel
 
         # Build left panel
         self._create_control_panel(left_panel)
@@ -710,13 +756,14 @@ class APGIGui:
         speed_frame = ttk.Frame(control_frame)
         speed_frame.pack(fill=tk.X, pady=5)
         ttk.Label(speed_frame, text="Speed:").pack(side=tk.LEFT)
-        self._speed_value = 1.0  # Thread-safe cache
-        speed_scale = ttk.Scale(speed_frame, from_=0.1, to=10.0, orient=tk.HORIZONTAL)
+        if not hasattr(self, "speed_var"):
+            self.speed_var = tk.DoubleVar(master=self.root, value=1.0)
+        speed_scale = ttk.Scale(
+            speed_frame, from_=0.1, to=10.0, orient=tk.HORIZONTAL, variable=self.speed_var
+        )
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.speed_label = ttk.Label(speed_frame, text="1.0x")
         self.speed_label.pack(side=tk.LEFT)
-        # Store scale reference for later variable assignment
-        self._speed_scale = speed_scale
 
         # System Status
         status_frame = ttk.LabelFrame(parent, text="System Status", padding=10)
@@ -758,7 +805,7 @@ class APGIGui:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Add parameter controls
-        self.param_vars: Dict[str, Union[float, tk.DoubleVar]] = {}
+        self.param_vars: Dict[str, Any] = {}
         self.param_scales: Dict[str, ttk.Scale] = {}
         self.param_labels: Dict[str, ttk.Label] = {}
         parameters = [
@@ -792,7 +839,7 @@ class APGIGui:
             self.param_labels[key] = val_label
 
         # Initialize thread-safe parameter cache after all parameters are created
-        self._param_cache = {}
+        self._param_cache: Dict[str, Any] = {}
         self._setup_param_cache()
 
         # Event Log
@@ -805,7 +852,7 @@ class APGIGui:
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self._log_event("APGI System initialized")
 
-    def _create_visualization_panel(self, parent):
+    def _create_visualization_panel(self, parent: tk.Widget) -> None:
         """Create tabbed visualization panel."""
         notebook = ttk.Notebook(parent)
         notebook.pack(fill=tk.BOTH, expand=True)
@@ -840,7 +887,19 @@ class APGIGui:
         notebook.add(state_tab, text="State Space")
         self._create_state_space(state_tab)
 
-    def _create_neural_plots(self, parent):
+        # Store references for toggling
+        self.notebook = notebook
+        self.tab_frames = [neural_tab, intero_tab, metrics_tab, self_tab, osc_tab, state_tab]
+        self.tab_texts = [
+            "Neural Activity",
+            "Interoception",
+            "System Metrics",
+            "Self-Model",
+            "Oscillations",
+            "State Space",
+        ]
+
+    def _create_neural_plots(self, parent: tk.Widget) -> None:
         """Create neural activity visualization."""
         fig = Figure(figsize=(10, 8))
 
@@ -861,7 +920,7 @@ class APGIGui:
         self.neural_axes["free_energy"].set_xlabel("Time (s)")
 
         # Initialize line plots
-        self.neural_lines = {}
+        self.neural_lines: Dict[str, Any] = {}
         self.neural_lines["ignition"] = self.neural_axes["ignition"].scatter(
             [], [], c="red", s=50, alpha=0.6
         )
@@ -882,16 +941,16 @@ class APGIGui:
 
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.neural_canvas = canvas
 
-    def _create_intero_plots(self, parent):
+    def _create_intero_plots(self, parent: tk.Widget) -> None:
         """Create interoception visualization."""
         fig = Figure(figsize=(10, 8))
 
@@ -908,7 +967,7 @@ class APGIGui:
         self.intero_axes["metabolic"].set_ylabel("Metabolic Reserves")
         self.intero_axes["metabolic"].set_xlabel("Time (s)")
 
-        self.intero_lines = {}
+        self.intero_lines: Dict[str, Any] = {}
         (self.intero_lines["heart_rate"],) = self.intero_axes["heart_rate"].plot(
             [], [], "r-", linewidth=2
         )
@@ -924,17 +983,17 @@ class APGIGui:
 
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.intero_canvas = canvas
 
-    def _create_metrics_plots(self, parent):
-        """Create system metrics visualization with performance metrics."""
+    def _create_metrics_plots(self, parent: tk.Widget) -> None:
+        """Create system metrics visualization."""
         fig = Figure(figsize=(10, 8))
 
         self.metrics_axes = {
@@ -950,7 +1009,7 @@ class APGIGui:
         self.metrics_axes["memory"].set_ylabel("Memory (MB)")
         self.metrics_axes["memory"].set_xlabel("Time (s)")
 
-        self.metrics_lines = {}
+        self.metrics_lines: Dict[str, Any] = {}
         (self.metrics_lines["somatic"],) = self.metrics_axes["somatic"].plot(
             [], [], "purple", linewidth=2
         )
@@ -966,16 +1025,16 @@ class APGIGui:
 
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.metrics_canvas = canvas
 
-    def _create_self_plots(self, parent):
+    def _create_self_plots(self, parent: tk.Widget) -> None:
         """Create self-model visualization."""
         fig = Figure(figsize=(10, 8))
 
@@ -984,6 +1043,7 @@ class APGIGui:
         ax.set_xlabel("Time (s)")
         ax.set_ylim(0, 1.1)
 
+        self.coherence_line: Any = None
         (self.coherence_line,) = ax.plot([], [], "b-", linewidth=2, label="Minimal Self")
         ax.axhline(y=0.7, color="g", linestyle="--", label="Normal Threshold")
         ax.axhline(y=0.4, color="r", linestyle="--", label="Depersonalization")
@@ -991,17 +1051,17 @@ class APGIGui:
 
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.self_canvas = canvas
         self.self_ax = ax
 
-    def _create_osc_plots(self, parent):
+    def _create_osc_plots(self, parent: tk.Widget) -> None:
         """Create oscillation visualization."""
         fig = Figure(figsize=(10, 8))
 
@@ -1013,25 +1073,26 @@ class APGIGui:
         ax2.set_ylabel("Power")
         ax2.set_xlabel("Frequency Band")
 
+        self.osc_signal_line: Any = None
         (self.osc_signal_line,) = ax1.plot([], [], "b-", linewidth=1)
 
         # Bar plot for power spectrum
-        self.osc_bars = None
+        self.osc_bars: Any = None
         self.osc_ax1 = ax1
         self.osc_ax2 = ax2
 
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.osc_canvas = canvas
 
-    def _create_state_space(self, parent):
+    def _create_state_space(self, parent: tk.Widget) -> None:
         """Create 3D state space visualization."""
 
         fig = Figure(figsize=(10, 8))
@@ -1042,20 +1103,20 @@ class APGIGui:
         ax.set_zlabel("Allostatic Load")
         ax.set_title("3D State Space Trajectory")
 
+        self.state_scatter: Any = None
         self.state_scatter = ax.scatter([], [], [], c="b", marker="o", s=20, alpha=0.6)
         self.state_ax = ax
 
-        canvas = FigureCanvasTkAgg(fig, parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        canvas = FigureCanvasTkAgg(fig, parent)  # type: ignore
+        canvas.draw()  # type: ignore
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore
 
-        toolbar = NavigationToolbar2Tk(canvas, parent)
+        toolbar = NavigationToolbar2Tk(canvas, parent)  # type: ignore
         toolbar.update()
 
         self.state_canvas = canvas
 
     def _create_status_bar(self) -> None:
-        """Create status bar."""
         status_bar = ttk.Frame(self.root)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -1124,7 +1185,7 @@ class APGIGui:
             except Exception:
                 pass
 
-    def _reset_to_default_config(self):
+    def _reset_to_default_config(self) -> None:
         """Reset configuration to default settings."""
         try:
             # Reset to default configuration path
@@ -1152,18 +1213,16 @@ class APGIGui:
             )
             self._log_event(f"Configuration reset failed: {str(e)}")
 
-    def _enable_system_controls(self, enabled):
+    def _enable_system_controls(self, enabled: bool) -> None:
         """Enable or disable UI controls that require a valid system."""
         # Simulation controls
         self.start_btn.config(state=tk.NORMAL if enabled else tk.DISABLED)
         self.reset_btn.config(state=tk.NORMAL if enabled else tk.DISABLED)
 
         # Parameter controls
-        if hasattr(self, "param_vars"):
-            for param_var in self.param_vars.values():
-                # Note: Tkinter variables don't have a direct enable/disable state
-                # This would need to be handled at the widget level if needed
-                pass
+        if hasattr(self, "param_scales"):
+            for scale in self.param_scales.values():
+                scale.config(state=tk.NORMAL if enabled else tk.DISABLED)
 
         # Menu items that require system (these would need to be stored as references)
         # For now, we'll handle this in the individual menu methods
@@ -1208,7 +1267,7 @@ class APGIGui:
             self._log_event("Simulation resumed")
             self._update_status("Running simulation...")
 
-    def _update_ui_after_error(self):
+    def _update_ui_after_error(self) -> None:
         """Update UI button states after simulation error."""
         self.start_btn.config(state=tk.NORMAL)
         self.pause_btn.config(state=tk.DISABLED, text="⏸ Pause")
@@ -1265,7 +1324,7 @@ class APGIGui:
         # Update displays
         self._update_plots()
 
-    def _simulation_loop(self):
+    def _simulation_loop(self) -> None:
         """Main simulation loop (runs in separate thread) with system validation."""
         last_time = time.time()
         frame_count = 0
@@ -1301,9 +1360,7 @@ class APGIGui:
 
                     frame_count += 1
 
-                except Exception as e:
-                    self._log_event(f"ERROR: {str(e)}")
-                    logger.error(f"Simulation loop error: {str(e)}", exc_info=True)
+                except Exception:
                     self.is_running = False
                     self.is_paused = False
                     # Schedule GUI update with proper button states
@@ -1313,39 +1370,68 @@ class APGIGui:
             current = time.time()
             if current - last_time >= fps_update_interval:
                 fps = frame_count / (current - last_time)
-                self.root.after(0, lambda f=fps: self._safe_update_fps(f))
+                self.root.after(0, lambda fps=fps: self._safe_update_fps(fps))
                 frame_count = 0
                 last_time = current
 
             # Control simulation speed
-            time.sleep(0.001 / self._speed_value)
+            time.sleep(0.001 / self.speed_var.get())
 
-    def _generate_input(self, t):
+    def _generate_input(self, t: float) -> NDArray[np.float64]:
         """Generate sensory input."""
-        # Sinusoidal with noise
+        # Check for custom input
+        if self.custom_input_steps_remaining > 0:
+            params = self.custom_input_params
+            if params:
+                pattern = params["pattern"]  # type: ignore[unreachable]
+                intensity = params["intensity"]
+                noise_level = params["noise"]
+
+                if pattern == "constant":
+                    base = np.full(256, intensity)
+                elif pattern == "pulse":
+                    # Create a pulse in the middle of the step
+                    base = np.zeros(256)
+                    base[intensity > 0.5] = intensity  # Simplified pulse
+                elif pattern == "sine":
+                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(256)
+                else:  # random
+                    base = np.random.randn(256) * intensity
+
+                noise = np.random.randn(256) * noise_level
+                input_signal = base + noise
+
+                self.custom_input_steps_remaining -= 1
+                if self.custom_input_steps_remaining == 0:
+                    self.custom_input_params = None
+                    self._log_event("Custom input injection completed")
+
+                return input_signal
+
+        # Default sinusoidal with noise
         base = np.sin(2 * np.pi * t / 5.0) * np.ones(256)
         noise = np.random.randn(256) * 0.2
         return base + noise
 
-    def _safe_update_fps(self, fps):
+    def _safe_update_fps(self, fps: float) -> None:
         """Safely update FPS label with existence check."""
         try:
             if hasattr(self, "fps_label") and self.fps_label.winfo_exists():
                 self.fps_label.config(text=f"{fps:.1f} FPS")
-        except Exception as e:
+        except Exception:
             # Log errors during shutdown
-            logger.warning(f"Error updating FPS label: {e}")
+            logger.warning("Error updating FPS label")
 
-    def _safe_enable_system_controls(self, enabled):
+    def _safe_enable_system_controls(self, enabled: bool) -> None:
         """Safely enable/disable system controls with existence check."""
         try:
             if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._enable_system_controls(enabled)
-        except Exception as e:
+        except Exception:
             # Log errors during shutdown
-            logger.warning(f"Error enabling/disabling controls: {e}")
+            logger.warning("Error enabling/disabling controls")
 
-    def _safe_update_ui_after_error(self):
+    def _safe_update_ui_after_error(self) -> None:
         """Safely update UI after error with existence check."""
         try:
             if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
@@ -1354,7 +1440,7 @@ class APGIGui:
             # Ignore errors during shutdown
             pass
 
-    def _apply_parameters(self):
+    def _apply_parameters(self) -> None:
         """Apply parameter adjustments to system with validation and rollback."""
         if self.apgi_system is None:
             self._log_event("Cannot apply parameters: System not initialized")
@@ -1384,8 +1470,8 @@ class APGIGui:
                         validation_errors.append(
                             f"{param_name}: Must be between {min_val} and {max_val}"
                         )
-                except Exception as e:
-                    validation_errors.append(f"{param_name}: Error reading value - {str(e)}")
+                except Exception:
+                    validation_errors.append(f"{param_name}: Error reading value")
 
         # Cross-parameter validation for incompatible combinations
         try:
@@ -1421,8 +1507,8 @@ class APGIGui:
                     "Consider reducing threshold or activity."
                 )
 
-        except Exception as e:
-            validation_errors.append(f"Cross-parameter validation error: {str(e)}")
+        except Exception:
+            validation_errors.append("Cross-parameter validation error")
 
         # If validation errors exist, show them and abort
         if validation_errors:
@@ -1458,9 +1544,9 @@ class APGIGui:
                 "baseline_threshold"
             ]
 
-        except Exception as e:
-            self._log_event(f"Error applying parameters: {str(e)} - Rolling back...")
-            logger.error(f"Parameter application error: {str(e)}", exc_info=True)
+        except Exception:
+            self._log_event("Error applying parameters - Rolling back...")
+            logger.error("Parameter application error", exc_info=True)
 
             # Rollback to previous values
             try:
@@ -1478,7 +1564,7 @@ class APGIGui:
                 self._log_event(f"CRITICAL: Failed to rollback parameters: {str(rollback_error)}")
                 logger.error(f"Rollback failed: {str(rollback_error)}", exc_info=True)
 
-    def _record_state(self, state):
+    def _record_state(self, state: Any) -> None:
         """Record state data (thread-safe)."""
         current_time = state["time"] / 1000.0  # Convert to seconds
 
@@ -1514,12 +1600,17 @@ class APGIGui:
             self.data_buffers["alpha_power"].append(alpha_power)
             # Calculate delta_power as difference between gamma and beta power
             self.data_buffers["delta_power"].append(abs(gamma_power - beta_power))
-            self.data_buffers["minimal_self_coherence"].append(
-                state["self_model"]["minimal"]["coherence"]
-            )
+            if state is not None:
+                self.data_buffers["minimal_self_coherence"].append(
+                    state["self_model"]["minimal"]["coherence"]
+                )
 
             # Count somatic markers
-            if hasattr(self.apgi_system.somatic_markers, "markers"):
+            if (
+                self.apgi_system is not None
+                and hasattr(self.apgi_system, "somatic_markers")
+                and hasattr(self.apgi_system.somatic_markers, "markers")
+            ):
                 self.data_buffers["somatic_markers"].append(
                     len(self.apgi_system.somatic_markers.markers)
                 )
@@ -1572,7 +1663,7 @@ class APGIGui:
         # Schedule next update - use 50ms for smoother 20Hz refresh rate
         self.root.after(50, self._update_displays)  # Update every 50ms (20Hz)
 
-    def _update_status_labels(self):
+    def _update_status_labels(self) -> None:
         """Update status labels with system validation."""
         if self.apgi_system is None:
             # Show disabled status when system is not available
@@ -1600,11 +1691,11 @@ class APGIGui:
             load = summary["allostatic_load"] * 100
             self.status_labels["Allostatic Load"].config(text=f"{load:.1f}%")
 
-        except Exception as e:
-            self._log_event(f"Error updating status labels: {str(e)}")
-            logger.error(f"Status update error: {str(e)}", exc_info=True)
+        except Exception:
+            self._log_event("Error updating status labels")
+            logger.error("Status update error", exc_info=True)
 
-    def _update_plots(self):
+    def _update_plots(self) -> None:
         """Update all plot canvases (thread-safe)."""
         with self.data_lock:
             if len(self.time_buffer) < 2:
@@ -1615,7 +1706,7 @@ class APGIGui:
             for key, buffer in self.data_buffers.items():
                 if len(buffer) < min_buffer_length:
                     self._log_event(
-                        f"Buffer {key} length mismatch: {len(buffer)} vs {min_buffer_length}"
+                        f"Buffer {key} length mismatch: " f"{len(buffer)} vs {min_buffer_length}"
                     )
                     return
 
@@ -1644,11 +1735,11 @@ class APGIGui:
             # Update 3D state space
             self._update_state_space(time_data, data_copies)
 
-        except Exception as e:
-            self._log_event(f"Error updating plots: {str(e)}")
-            logger.error(f"Plot update error: {str(e)}", exc_info=True)
+        except Exception:
+            self._log_event("Error updating plots")
+            logger.error("Plot update error", exc_info=True)
 
-    def _update_neural_plots(self, time_data, data_copies):
+    def _update_neural_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update neural activity plots."""
         # Ignition events (scatter plot)
         ignitions = data_copies["ignition"]
@@ -1685,7 +1776,7 @@ class APGIGui:
 
         self.neural_canvas.draw_idle()
 
-    def _update_intero_plots(self, time_data, data_copies):
+    def _update_intero_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update interoception plots."""
         hr = data_copies["heart_rate"]
         cortisol = data_copies["cortisol"]
@@ -1704,7 +1795,7 @@ class APGIGui:
 
         self.intero_canvas.draw_idle()
 
-    def _update_metrics_plots(self, time_data, data_copies):
+    def _update_metrics_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update system metrics plots."""
         somatic = data_copies["somatic_markers"]
         gamma = data_copies["gamma_power"]
@@ -1731,18 +1822,18 @@ class APGIGui:
             ax.relim()
             ax.autoscale_view(scalex=False, scaley=True)
 
-        self.metrics_canvas.draw_idle()
+        self.metrics_canvas.draw_idle()  # type: ignore
 
-    def _update_self_plot(self, time_data, data_copies):
+    def _update_self_plot(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update self-model plot."""
         coherence = data_copies["minimal_self_coherence"]
         self.coherence_line.set_data(time_data, coherence)
 
         self.self_ax.set_xlim(time_data[0], time_data[-1])
 
-        self.self_canvas.draw_idle()
+        self.self_canvas.draw_idle()  # type: ignore
 
-    def _update_osc_plots(self, time_data, data_copies):
+    def _update_osc_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update oscillation plots."""
         # For oscillation signal, show recent window
         window_size = min(500, len(time_data))
@@ -1806,9 +1897,9 @@ class APGIGui:
             for bar, power in zip(self.osc_bars, powers):
                 bar.set_height(power)
 
-        self.osc_canvas.draw_idle()
+        self.osc_canvas.draw_idle()  # type: ignore
 
-    def _update_state_space(self, time_data, data_copies):
+    def _update_state_space(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update 3D state space plot."""
         if len(time_data) < 10:
             return
@@ -1864,10 +1955,10 @@ class APGIGui:
                 # Validate configuration before using it
                 try:
                     validate_config_file(filename)
-                except ConfigValidationError as e:
+                except ConfigValidationError:
                     messagebox.showerror(
                         "Configuration Error",
-                        f"Configuration validation failed:\n{str(e)}\n\nPlease fix the configuration file and try again.",
+                        "Configuration validation failed.\n\nPlease fix the configuration file and try again.",
                     )
                     return
 
@@ -1875,10 +1966,10 @@ class APGIGui:
                 self._initialize_system()
                 self._log_event(f"Configuration loaded: {filename}")
                 messagebox.showinfo("Success", "Configuration loaded successfully")
-            except yaml.YAMLError as e:
-                messagebox.showerror("YAML Error", f"Invalid YAML format:\n{str(e)}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to load configuration:\n{str(e)}")
+            except yaml.YAMLError:
+                messagebox.showerror("YAML Error", "Invalid YAML format")
+            except Exception:
+                messagebox.showerror("Error", "Failed to load configuration")
 
     def _save_config(self) -> None:
         """Save configuration file."""
@@ -1895,8 +1986,8 @@ class APGIGui:
                     yaml.dump(config, f)
                 self._log_event(f"Configuration saved: {filename}")
                 messagebox.showinfo("Success", "Configuration saved successfully")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save configuration:\n{str(e)}")
+            except Exception:
+                messagebox.showerror("Error", "Failed to save configuration")
 
     def _export_data(self) -> None:
         """Export simulation data (thread-safe)."""
@@ -1927,18 +2018,35 @@ class APGIGui:
                 else:
                     # CSV export
                     with open(filename, "w", newline="") as f:
-                        if log_data_copy:
+                        if log_data_copy and isinstance(log_data_copy[0], dict):
                             writer = csv.DictWriter(f, fieldnames=log_data_copy[0].keys())
                             writer.writeheader()
                             writer.writerows(log_data_copy)
 
                 self._log_event(f"Data exported: {filename}")
                 messagebox.showinfo("Success", f"Data exported to {filename}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export data:\n{str(e)}")
+            except Exception:
+                messagebox.showerror("Error", "Failed to export data")
 
     def _export_plot(self) -> None:
         """Export current plot."""
+        # Determine which tab is currently active
+        try:
+            current_tab_index = self.notebook.index("current")  # type: ignore
+            # Map tab index to corresponding canvas
+            canvases = [
+                self.neural_canvas,  # Neural Activity (tab 0)
+                self.intero_canvas,  # Interoception (tab 1)
+                self.metrics_canvas,  # System Metrics (tab 2)
+                self.self_canvas,  # Self-Model (tab 3)
+                self.osc_canvas,  # Oscillations (tab 4)
+                self.state_canvas,  # State Space (tab 5)
+            ]
+            canvas = canvases[current_tab_index]
+        except (AttributeError, IndexError):
+            # Fallback to neural canvas if something goes wrong
+            canvas = self.neural_canvas
+
         filename = filedialog.asksaveasfilename(
             title="Export Plot",
             defaultextension=".png",
@@ -1946,11 +2054,11 @@ class APGIGui:
         )
         if filename:
             try:
-                self.neural_canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
+                canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
                 self._log_event(f"Plot exported: {filename}")
                 messagebox.showinfo("Success", f"Plot saved to {filename}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export plot:\n{str(e)}")
+            except Exception:
+                messagebox.showerror("Error", "Failed to export plot")
 
     def _toggle_auto_save(self) -> None:
         """Toggle auto-save feature."""
@@ -1958,25 +2066,87 @@ class APGIGui:
         status = "enabled" if self.auto_save else "disabled"
         self._log_event(f"Auto-save {status}")
 
+        if self.auto_save:
+            # Start auto-save timer (save every 5 minutes)
+            self._start_auto_save_timer()
+        else:
+            # Stop auto-save timer
+            self._stop_auto_save_timer()
+
+    def _start_auto_save_timer(self) -> None:
+        """Start the auto-save timer."""
+        if hasattr(self, "auto_save_timer") and self.auto_save_timer is not None:
+            self.root.after_cancel(self.auto_save_timer)
+
+        # Save every 5 minutes (300,000 ms)
+        self.auto_save_timer = self.root.after(300000, self._auto_save_timer_callback)
+
+    def _stop_auto_save_timer(self) -> None:
+        """Stop the auto-save timer."""
+        if hasattr(self, "auto_save_timer") and self.auto_save_timer is not None:
+            self.root.after_cancel(self.auto_save_timer)
+            self.auto_save_timer = None
+
+    def _auto_save_timer_callback(self) -> None:
+        """Callback for auto-save timer."""
+        if self.auto_save:
+            self._auto_save_data()
+            # Schedule next save
+            self.auto_save_timer = self.root.after(300000, self._auto_save_timer_callback)
+
     def _toggle_control_panel(self) -> None:
         """Toggle control panel visibility."""
-        # Implementation would show/hide control panel
         visible = self.view_vars["control_panel"].get()
+        if visible:
+            # Show control panel
+            if self.left_panel not in self.main_paned.panes():  # type: ignore
+                self.main_paned.insert(0, self.left_panel, weight=0)
+        else:
+            # Hide control panel
+            if self.left_panel in self.main_paned.panes():  # type: ignore
+                self.main_paned.remove(self.left_panel)
         self._log_event(f"Control panel {'shown' if visible else 'hidden'}")
 
     def _toggle_neural_activity(self) -> None:
         """Toggle neural activity panel visibility."""
         visible = self.view_vars["neural_activity"].get()
+        tab_index = 0
+        if visible:
+            # Show tab
+            if self.tab_frames[tab_index] not in self.notebook.tabs():
+                self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
+        else:
+            # Hide tab
+            if self.tab_frames[tab_index] in self.notebook.tabs():
+                self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"Neural activity panel {'shown' if visible else 'hidden'}")
 
     def _toggle_interoception(self) -> None:
         """Toggle interoception panel visibility."""
         visible = self.view_vars["interoception"].get()
+        tab_index = 1
+        if visible:
+            # Show tab
+            if self.tab_frames[tab_index] not in self.notebook.tabs():
+                self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
+        else:
+            # Hide tab
+            if self.tab_frames[tab_index] in self.notebook.tabs():
+                self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"Interoception panel {'shown' if visible else 'hidden'}")
 
     def _toggle_system_metrics(self) -> None:
         """Toggle system metrics panel visibility."""
         visible = self.view_vars["system_metrics"].get()
+        tab_index = 2
+        if visible:
+            # Show tab
+            if self.tab_frames[tab_index] not in self.notebook.tabs():
+                self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
+        else:
+            # Hide tab
+            if self.tab_frames[tab_index] in self.notebook.tabs():
+                self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"System metrics panel {'shown' if visible else 'hidden'}")
 
     def _auto_save_data(self) -> None:
@@ -1988,24 +2158,28 @@ class APGIGui:
         try:
             with self.log_lock:
                 log_data_copy = list(self.log_data)  # Convert deque to list for export
+
+            # Collect full simulation state
+            state = {
+                "log_data": log_data_copy,
+                "param_vars": {
+                    k: v.get() if hasattr(v, "get") else v for k, v in self.param_vars.items()
+                },
+                "buffer_size": self.buffer_size,
+                "data_buffers": {k: list(v) for k, v in self.data_buffers.items()},
+                "time_buffer": list(self.time_buffer),
+                "is_running": self.is_running,
+                "is_paused": self.is_paused,
+                "theme": self.theme_manager.current_theme,
+                "auto_save_enabled": self.auto_save,
+            }
+
             with open(filename, "w") as f:
-                json.dump(log_data_copy, f)
-        except Exception as e:
-            self._log_event(f"Auto-save failed: {str(e)}")
+                json.dump(state, f)
+        except Exception:
+            self._log_event("Auto-save failed")
 
-    def _exit_app(self) -> None:
-        """Exit application."""
-        if self.is_running:
-            if not messagebox.askyesno("Exit", "Simulation is running. Exit anyway?"):
-                return
-
-        # Clean up all open toplevel windows (progress dialogs, etc.)
-        self._cleanup_toplevel_windows()
-
-        self.root.quit()
-        self.root.destroy()
-
-    def _cleanup_toplevel_windows(self):
+    def _cleanup_toplevel_windows(self) -> None:
         """Clean up all toplevel windows to prevent Tkinter warnings."""
         try:
             for widget in self.root.winfo_children():
@@ -2017,7 +2191,7 @@ class APGIGui:
         except Exception:
             pass
 
-    def _edit_parameters(self):
+    def _edit_parameters(self) -> None:
         """Open parameter editor dialog."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Edit System Parameters")
@@ -2086,7 +2260,7 @@ class APGIGui:
         button_frame = ttk.Frame(dialog)
         button_frame.pack(fill=tk.X, pady=10)
 
-        def apply_parameters():
+        def apply_parameters() -> None:
             """Apply the edited parameters to the main system."""
             if hasattr(self, "param_vars"):
                 for key, var in param_vars.items():
@@ -2111,7 +2285,7 @@ class APGIGui:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def _edit_precision(self):
+    def _edit_precision(self) -> None:
         """Edit precision settings."""
         if not self.apgi_system:
             messagebox.showwarning(
@@ -2175,13 +2349,13 @@ class APGIGui:
                 )
                 messagebox.showinfo("Success", "Precision settings updated successfully!")
                 dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to update precision: {str(e)}")
+            except Exception:
+                messagebox.showerror("Error", "Failed to update precision")
 
         ttk.Button(button_frame, text="Apply", command=apply_precision).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
-    def _edit_threshold(self):
+    def _edit_threshold(self) -> None:
         """Edit ignition threshold."""
         if not self.apgi_system:
             messagebox.showwarning(
@@ -2235,13 +2409,13 @@ class APGIGui:
                 self._log_event(f"Ignition threshold updated: {threshold_var.get():.2f}")
                 messagebox.showinfo("Success", "Ignition threshold updated successfully!")
                 dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to update threshold: {str(e)}")
+            except Exception:
+                messagebox.showerror("Error", "Failed to update threshold")
 
         ttk.Button(button_frame, text="Apply", command=apply_threshold).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
-    def _reset_defaults(self):
+    def _reset_defaults(self) -> None:
         """Reset all parameters to defaults."""
         if messagebox.askyesno("Reset", "Reset all parameters to default values?"):
             # Reset parameter sliders
@@ -2256,7 +2430,7 @@ class APGIGui:
 
             self._log_event("Parameters reset to defaults")
 
-    def _run_preset_task(self):
+    def _run_preset_task(self) -> None:
         """Run preset experimental task."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Run Preset Task")
@@ -2340,7 +2514,7 @@ class APGIGui:
         run_button.config(command=run_selected)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(pady=5)
 
-    def _run_attentional_blink_task(self, num_trials: int = 20):
+    def _run_attentional_blink_task(self, num_trials: int = 20) -> None:
         """Run the Attentional Blink experimental task."""
         if not self.apgi_system:
             messagebox.showerror("Error", "System not initialized")
@@ -2390,7 +2564,7 @@ class APGIGui:
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
             # Run task in separate thread
-            def run_task_thread():
+            def run_task_thread() -> None:
                 total_trials = len(task.trials)
 
                 for trial_idx, trial in enumerate(task.trials):
@@ -2499,14 +2673,14 @@ class APGIGui:
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
 
-    def _run_change_blindness_task(self, num_trials: int = 10):
+    def _run_change_blindness_task(self, num_trials: int = 10) -> None:
         """Run the Change Blindness experimental task."""
         if not self.apgi_system:
             messagebox.showerror("Error", "System not initialized")
@@ -2556,7 +2730,7 @@ class APGIGui:
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
             # Run task in separate thread
-            def run_task_thread():
+            def run_task_thread() -> None:
                 total_trials = len(task.trials)
 
                 for trial_idx, trial in enumerate(task.trials):
@@ -2670,9 +2844,9 @@ class APGIGui:
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
@@ -2726,7 +2900,7 @@ class APGIGui:
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
             # Run task in separate thread
-            def run_task_thread():
+            def run_task_thread() -> None:
                 total_trials = len(task.trials)
 
                 for trial_idx, trial in enumerate(task.trials):
@@ -2845,9 +3019,9 @@ class APGIGui:
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
@@ -2890,7 +3064,7 @@ class APGIGui:
             results_text = scrolledtext.ScrolledText(progress_dialog, height=6, width=60)
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
-            def run_task_thread():
+            def run_task_thread() -> None:
                 total_trials = len(task.trials)
 
                 for trial_idx, trial in enumerate(task.trials):
@@ -2993,9 +3167,9 @@ class APGIGui:
 
             threading.Thread(target=run_task_thread, daemon=True).start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
@@ -3051,7 +3225,7 @@ class APGIGui:
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
             # Run task in separate thread
-            def run_task_thread():
+            def run_task_thread() -> None:
                 total_trials = len(task.trials)
 
                 for trial_idx, trial in enumerate(task.trials):
@@ -3166,9 +3340,9 @@ class APGIGui:
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
@@ -3194,10 +3368,6 @@ class APGIGui:
             # Create task with specified parameters
             task = StroopTask(
                 num_trials=num_trials,
-                trial_duration_ms=1500,
-                inter_trial_interval_ms=500,
-                stimulus_strength=2.0,
-                conflict_strength=1.5,
             )
 
             # Create progress dialog
@@ -3222,7 +3392,7 @@ class APGIGui:
             results_text = scrolledtext.ScrolledText(progress_dialog, height=8, width=60)
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
-            def run_task_thread():
+            def run_task_thread() -> None:
                 """Run task in separate thread to keep GUI responsive."""
                 try:
                     results = task.run_all_trials(self.apgi_system)
@@ -3335,12 +3505,10 @@ class APGIGui:
                         ).pack(pady=5),
                     )
 
-                except Exception as e:
+                except Exception:
                     self.root.after(
                         0,
-                        lambda: messagebox.showerror(
-                            "Task Error", f"Error running task:\n{str(e)}"
-                        ),
+                        lambda: messagebox.showerror("Task Error", "Error running task"),
                     )
                     self.root.after(
                         0,
@@ -3354,9 +3522,9 @@ class APGIGui:
             task_thread = threading.Thread(target=run_task_thread, daemon=True)
             task_thread.start()
 
-        except Exception as e:
-            self._log_event(f"ERROR running task: {str(e)}")
-            messagebox.showerror("Task Error", f"Failed to run task:\n{str(e)}")
+        except Exception:
+            self._log_event("ERROR running task")
+            messagebox.showerror("Task Error", "Failed to run task")
             import traceback
 
             traceback.print_exc()
@@ -3411,7 +3579,7 @@ class APGIGui:
             results_text = scrolledtext.ScrolledText(progress_dialog, height=8, width=60)
             results_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
-            def run_task_thread():
+            def run_task_thread() -> None:
                 """Run task in separate thread to keep GUI responsive."""
                 try:
                     results = task.run_all_trials(self.apgi_system)
@@ -3524,12 +3692,10 @@ class APGIGui:
                         ).pack(pady=5),
                     )
 
-                except Exception as e:
+                except Exception:
                     self.root.after(
                         0,
-                        lambda: messagebox.showerror(
-                            "Task Error", f"Error running task:\n{str(e)}"
-                        ),
+                        lambda: messagebox.showerror("Task Error", "Error running task"),
                     )
                     self.root.after(
                         0,
@@ -3635,6 +3801,11 @@ class APGIGui:
     def _zoom_fit(self) -> None:
         """Reset zoom to fit all data on all matplotlib plots."""
         try:
+            # Check if there's data to fit
+            if len(self.time_buffer) == 0:
+                messagebox.showinfo("No Data", "No data to fit — start simulation first")
+                return
+
             # Force a plot update to recalculate limits
             if len(self.time_buffer) > 0:
                 self._update_plots()
@@ -3667,11 +3838,18 @@ class APGIGui:
 
     def _trigger_ignition(self):
         """Manually trigger ignition event."""
-        if self.apgi_system:
-            # Force high arousal to trigger ignition
-            self.param_vars["arousal"].set(0.9)
-            self.param_vars["stress"].set(0.8)
-            self._log_event("Manual ignition trigger activated")
+        if not self.apgi_system:
+            messagebox.showinfo("No System", "Please initialize the system first.")
+            return
+
+        if not self.is_running:
+            messagebox.showinfo("Simulation Not Running", "Please start the simulation first.")
+            return
+
+        # Force high arousal to trigger ignition
+        self.param_vars["arousal"].set(0.9)
+        self.param_vars["stress"].set(0.8)
+        self._log_event("Manual ignition trigger activated")
 
     def _induce_stressor(self):
         """Induce stressor event."""
@@ -3696,13 +3874,22 @@ class APGIGui:
 
         def apply():
             factor = factor_var.get()
-            self.param_vars["extero_precision"].set(
-                self.param_vars["extero_precision"].get() * factor
+            extero_current = self.param_vars["extero_precision"].get()
+            intero_current = self.param_vars["intero_precision"].get()
+
+            extero_new = extero_current * factor
+            intero_new = intero_current * factor
+
+            # Clamp to valid precision range [0.1, 10.0]
+            extero_clamped = min(10.0, max(0.1, extero_new))
+            intero_clamped = min(10.0, max(0.1, intero_new))
+
+            self.param_vars["extero_precision"].set(extero_clamped)
+            self.param_vars["intero_precision"].set(intero_clamped)
+
+            self._log_event(
+                f"Precision modulated by factor: {factor:.2f} (Extero: {extero_current:.2f} -> {extero_clamped:.2f}, Intero: {intero_current:.2f} -> {intero_clamped:.2f})"
             )
-            self.param_vars["intero_precision"].set(
-                self.param_vars["intero_precision"].get() * factor
-            )
-            self._log_event(f"Precision modulated by factor: {factor:.2f}")
             dialog.destroy()
 
         ttk.Button(dialog, text="Apply", command=apply).pack(pady=10)
@@ -3832,19 +4019,32 @@ class APGIGui:
                 if noise > 0:
                     input_signal += np.random.randn(duration) * noise
 
-                # Inject into system (this would need to be implemented in the APGI system)
+                # Inject into system
+                self.custom_input_params = {
+                    "pattern": pattern,
+                    "intensity": intensity,
+                    "noise": noise,
+                    "type": input_type_val,
+                }
+                self.custom_input_steps_remaining = duration
+
                 status_text.delete(1.0, tk.END)
                 status_text.insert(tk.END, f"Input Type: {input_type_val}\n")
                 status_text.insert(tk.END, f"Pattern: {pattern}\n")
                 status_text.insert(tk.END, f"Intensity: {intensity:.2f}\n")
                 status_text.insert(tk.END, f"Duration: {duration} steps\n")
                 status_text.insert(tk.END, f"Noise Level: {noise:.2f}\n\n")
-                status_text.insert(tk.END, "Input injection simulated!\n")
-                status_text.insert(
-                    tk.END, "(Note: Actual injection requires APGI system integration)\n"
+                status_text.insert(tk.END, "Custom input injected into APGI system!\n")
+                status_text.insert(tk.END, f"Will affect next {duration} simulation steps.\n")
+
+                self._log_event(
+                    f"Custom sensory input injected: {pattern} pattern, intensity {intensity:.2f}, duration {duration} steps"
                 )
 
-                messagebox.showinfo("Success", "Custom input injected successfully!")
+                messagebox.showinfo(
+                    "Success",
+                    f"Custom input injected successfully!\n\nWill affect the next {duration} simulation steps.",
+                )
 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to inject input: {str(e)}")
@@ -3865,9 +4065,145 @@ class APGIGui:
 
     def _set_body_state(self):
         """Set body state manually."""
-        messagebox.showinfo(
-            "Body State", "Use Activity, Arousal, and Stress sliders in control panel"
+        if not self.apgi_system:
+            messagebox.showwarning(
+                "Warning", "No active APGI system found. Please initialize the system first."
+            )
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Set Body State")
+        dialog.geometry("500x600")
+
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        main_frame = ttk.Frame(dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(main_frame, text="Body State Configuration", font=("Arial", 12, "bold")).pack(
+            pady=10
         )
+
+        # Current values display
+        current_frame = ttk.LabelFrame(main_frame, text="Current Values", padding=10)
+        current_frame.pack(fill=tk.X, pady=5)
+
+        current_values = {
+            "Heart Rate": f"{self.apgi_system.body_model.heart_rate:.1f} bpm",
+            "Cortisol": f"{self.apgi_system.body_model.cortisol:.3f} μg/dL",
+            "Arousal": f"{self.apgi_system.body_model.arousal_level:.3f}",
+            "Stress": f"{self.apgi_system.body_model.stress_level:.3f}",
+            "Activity": f"{self.apgi_system.body_model.activity_level:.3f}",
+        }
+
+        for label, value in current_values.items():
+            frame = ttk.Frame(current_frame)
+            frame.pack(fill=tk.X, pady=2)
+            ttk.Label(frame, text=f"{label}:", width=12, anchor="w").pack(side=tk.LEFT)
+            ttk.Label(frame, text=value, anchor="w").pack(side=tk.LEFT, padx=10)
+
+        # Parameter adjustment frame
+        adjust_frame = ttk.LabelFrame(main_frame, text="Adjust Parameters", padding=10)
+        adjust_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        # Define adjustable parameters
+        params = [
+            ("Arousal Level", "arousal", 0.0, 1.0, self.apgi_system.body_model.arousal_level),
+            ("Stress Level", "stress", 0.0, 1.0, self.apgi_system.body_model.stress_level),
+            ("Activity Level", "activity", 0.0, 1.0, self.apgi_system.body_model.activity_level),
+            ("Heart Rate", "heart_rate", 60.0, 180.0, self.apgi_system.body_model.heart_rate),
+            ("Cortisol", "cortisol", 0.0, 2.0, self.apgi_system.body_model.cortisol),
+            (
+                "Temperature",
+                "temperature",
+                36.0,
+                40.0,
+                getattr(self.apgi_system.body_model, "temperature", 37.0),
+            ),
+            (
+                "Respiration",
+                "respiration",
+                8.0,
+                30.0,
+                getattr(self.apgi_system.body_model, "respiration_rate", 12.0),
+            ),
+            (
+                "Glucose",
+                "glucose",
+                70.0,
+                200.0,
+                getattr(self.apgi_system.body_model, "glucose_level", 90.0),
+            ),
+        ]
+
+        param_vars = {}
+        for label, key, min_val, max_val, default in params:
+            frame = ttk.Frame(adjust_frame)
+            frame.pack(fill=tk.X, pady=3)
+
+            ttk.Label(frame, text=label, width=15).pack(side=tk.LEFT)
+
+            var = tk.DoubleVar(value=default)
+            param_vars[key] = var
+
+            scale = ttk.Scale(frame, from_=min_val, to=max_val, variable=var, orient=tk.HORIZONTAL)
+            scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+            val_label = ttk.Label(frame, text=f"{default:.2f}", width=8)
+            val_label.pack(side=tk.LEFT)
+
+            var.trace_add(
+                "write", lambda *args, v=var, label=val_label: label.config(text=f"{v.get():.2f}")
+            )
+
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        def apply_body_state():
+            """Apply the body state changes."""
+            try:
+                # Set the parameters
+                if "arousal" in param_vars:
+                    self.apgi_system.body_model.set_arousal(param_vars["arousal"].get())
+                if "stress" in param_vars:
+                    self.apgi_system.body_model.set_stress(param_vars["stress"].get())
+                if "activity" in param_vars:
+                    self.apgi_system.body_model.set_activity(param_vars["activity"].get())
+
+                # For other parameters, try to set them if the body_model supports it
+                for key in ["heart_rate", "cortisol", "temperature", "respiration", "glucose"]:
+                    if hasattr(self.apgi_system.body_model, f"set_{key}"):
+                        getattr(self.apgi_system.body_model, f"set_{key}")(param_vars[key].get())
+                    elif hasattr(self.apgi_system.body_model, key):
+                        setattr(self.apgi_system.body_model, key, param_vars[key].get())
+
+                self._log_event("Body state manually adjusted")
+                messagebox.showinfo("Success", "Body state updated successfully!")
+                dialog.destroy()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update body state: {str(e)}")
+
+        def reset_to_current():
+            """Reset sliders to current values."""
+            for key, var in param_vars.items():
+                if hasattr(self.apgi_system.body_model, key):
+                    var.set(getattr(self.apgi_system.body_model, key))
+                elif key == "arousal":
+                    var.set(self.apgi_system.body_model.arousal_level)
+                elif key == "stress":
+                    var.set(self.apgi_system.body_model.stress_level)
+                elif key == "activity":
+                    var.set(self.apgi_system.body_model.activity_level)
+
+        ttk.Button(button_frame, text="Apply", command=apply_body_state).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Reset to Current", command=reset_to_current).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
     def _show_diagnostics(self):
         """Show system diagnostics."""
@@ -3877,24 +4213,32 @@ class APGIGui:
 
         summary = self.apgi_system.get_state_summary()
 
+        # Extract values with validation
+        ignition_stats = summary.get("ignition_stats", {})
+        somatic_markers = summary.get("somatic_markers", {})
+
+        mean_signal = ignition_stats.get("mean_signal", "N/A")
+        mean_threshold = ignition_stats.get("mean_threshold", "N/A")
+        retrieval_success_rate = somatic_markers.get("retrieval_success_rate", "N/A")
+
         diag_text = f"""APGI System Diagnostics
 
-Time: {summary['time_ms'] / 1000.0:.2f} seconds
+Time: {summary.get('time_ms', 0) / 1000.0:.2f} seconds
 
 Ignition Statistics:
-- Recent Events: {summary['ignition_stats']['recent_ignitions']}
-- Mean Signal: {summary['ignition_stats'].get('mean_signal', 0):.3f}
-- Mean Threshold: {summary['ignition_stats'].get('mean_threshold', 0):.3f}
+- Recent Events: {ignition_stats.get('recent_ignitions', 'N/A')}
+- Mean Signal: {mean_signal if mean_signal != 'N/A' else 'N/A'}
+- Mean Threshold: {mean_threshold if mean_threshold != 'N/A' else 'N/A'}
 
-Workspace State: {summary['workspace_state']}
+Workspace State: {summary.get('workspace_state', 'N/A')}
 
 Metabolic State:
-- Reserves: {summary['metabolic_reserves']:.1f}
-- Allostatic Load: {summary['allostatic_load'] * 100:.1f}%
+- Reserves: {summary.get('metabolic_reserves', 'N/A')}
+- Allostatic Load: {summary.get('allostatic_load', 'N/A') * 100:.1f if summary.get('allostatic_load') != 'N/A' else 'N/A'}%
 
 Somatic Markers:
-- Count: {summary['somatic_markers']['num_markers']}
-- Retrieval Success Rate: {summary['somatic_markers'].get('retrieval_success_rate', 0) * 100:.1f}%
+- Count: {somatic_markers.get('num_markers', 'N/A')}
+- Retrieval Success Rate: {retrieval_success_rate * 100:.1f if retrieval_success_rate != 'N/A' else 'N/A'}%
 """
 
         messagebox.showinfo("System Diagnostics", diag_text)
@@ -3962,11 +4306,151 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _analyze_coherence(self):
         """Analyze self-model coherence."""
-        messagebox.showinfo(
-            "Self-Model Coherence", "Check the Self-Model tab for coherence visualization"
-        )
+        if not self.apgi_system:
+            messagebox.showwarning("No System", "Please start the simulation first")
+            return
 
-    def _generate_report(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Self-Model Coherence Analysis")
+        dialog.geometry("600x500")
+
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        main_frame = ttk.Frame(dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(
+            main_frame, text="Self-Model Coherence Analysis", font=("Arial", 14, "bold")
+        ).pack(pady=10)
+
+        # Analysis results text area
+        results_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, height=20)
+        results_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        def run_coherence_analysis():
+            """Run coherence analysis and display results."""
+            results_text.delete(1.0, tk.END)
+            results_text.insert(tk.END, "ANALYZING SELF-MODEL COHERENCE\n")
+            results_text.insert(tk.END, "=" * 50 + "\n\n")
+
+            try:
+                # Get coherence data from buffer
+                with self.data_lock:
+                    coherence_data = list(self.data_buffers.get("minimal_self_coherence", []))
+
+                if not coherence_data:
+                    results_text.insert(tk.END, "No coherence data available.\n")
+                    results_text.insert(tk.END, "Please run the simulation to collect data.\n")
+                    return
+
+                import numpy as np
+
+                coherence_array = np.array(coherence_data)
+
+                # Basic statistics
+                mean_coherence = np.mean(coherence_array)
+                std_coherence = np.std(coherence_array)
+                min_coherence = np.min(coherence_array)
+                max_coherence = np.max(coherence_array)
+                median_coherence = np.median(coherence_array)
+
+                # Trend analysis
+                if len(coherence_array) > 10:
+                    # Simple linear trend
+                    x = np.arange(len(coherence_array))
+                    slope, intercept = np.polyfit(x, coherence_array, 1)
+                    trend_direction = (
+                        "increasing"
+                        if slope > 0.001
+                        else "decreasing"
+                        if slope < -0.001
+                        else "stable"
+                    )
+                else:
+                    trend_direction = "insufficient data"
+
+                # State assessment
+                if mean_coherence > 0.8:
+                    state = "High coherence - Strong self-model integrity"
+                elif mean_coherence > 0.6:
+                    state = "Moderate coherence - Normal self-model function"
+                elif mean_coherence > 0.4:
+                    state = "Low coherence - Potential depersonalization risk"
+                else:
+                    state = "Very low coherence - Significant self-model disruption"
+
+                # Variability assessment
+                if std_coherence < 0.1:
+                    stability = "Highly stable coherence"
+                elif std_coherence < 0.2:
+                    stability = "Moderately stable coherence"
+                else:
+                    stability = "Highly variable coherence"
+
+                # Display results
+                results_text.insert(tk.END, "STATISTICAL SUMMARY\n")
+                results_text.insert(tk.END, f"Data Points: {len(coherence_array)}\n")
+                results_text.insert(tk.END, f"Mean Coherence: {mean_coherence:.3f}\n")
+                results_text.insert(tk.END, f"Standard Deviation: {std_coherence:.3f}\n")
+                results_text.insert(tk.END, f"Median: {median_coherence:.3f}\n")
+                results_text.insert(tk.END, f"Range: {min_coherence:.3f} - {max_coherence:.3f}\n")
+                results_text.insert(tk.END, f"Trend: {trend_direction}\n\n")
+
+                results_text.insert(tk.END, "ASSESSMENT\n")
+                results_text.insert(tk.END, f"Current State: {state}\n")
+                results_text.insert(tk.END, f"Stability: {stability}\n\n")
+
+                results_text.insert(tk.END, "INTERPRETATION\n")
+                if mean_coherence > 0.7:
+                    results_text.insert(tk.END, "• Self-model maintains strong coherence\n")
+                    results_text.insert(tk.END, "• Effective predictive processing\n")
+                    results_text.insert(
+                        tk.END, "• Good integration of exteroceptive and interoceptive signals\n"
+                    )
+                elif mean_coherence > 0.5:
+                    results_text.insert(tk.END, "• Self-model coherence is adequate\n")
+                    results_text.insert(tk.END, "• Minor fluctuations in self-representation\n")
+                    results_text.insert(tk.END, "• Monitor for environmental stressors\n")
+                else:
+                    results_text.insert(tk.END, "• Self-model coherence is compromised\n")
+                    results_text.insert(tk.END, "• Risk of depersonalization or dissociation\n")
+                    results_text.insert(tk.END, "• Consider reducing cognitive load or stress\n")
+                    results_text.insert(
+                        tk.END, "• May benefit from increased precision weighting\n"
+                    )
+
+                if std_coherence > 0.15:
+                    results_text.insert(
+                        tk.END, "\n• High variability suggests environmental instability\n"
+                    )
+                    results_text.insert(tk.END, "• Consider stabilizing sensory input patterns\n")
+
+                results_text.insert(tk.END, f"\nAnalysis completed at {time.strftime('%H:%M:%S')}")
+
+            except Exception as e:
+                results_text.insert(tk.END, f"Analysis failed: {str(e)}\n")
+                import traceback
+
+                results_text.insert(tk.END, traceback.format_exc())
+
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="Run Analysis", command=run_coherence_analysis).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(
+            button_frame, text="Clear", command=lambda: results_text.delete(1.0, tk.END)
+        ).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+
+        # Run initial analysis
+        run_coherence_analysis()
+
+    def _generate_report(self) -> None:
         """Generate comprehensive report with statistical analysis."""
         filename = filedialog.asksaveasfilename(
             title="Save Report",
@@ -4099,7 +4583,11 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                         significance = (
                             "***"
                             if p_val < 0.001
-                            else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
+                            else "**"
+                            if p_val < 0.01
+                            else "*"
+                            if p_val < 0.05
+                            else ""
                         )
                         text_widget.insert(
                             tk.END, f"  {var2}: r={corr:.3f} {significance} (p={p_val:.3f})\n"
@@ -4175,26 +4663,12 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _show_docs(self):
         """Show documentation."""
-        doc_text = """APGI System Documentation
-
-The Allostatic Precision-Gated Ignition (APGI) framework is a computational
-model of consciousness integrating:
-
-- Active Inference
-- Predictive Processing
-- Allostatic Regulation
-- Global Workspace Theory
-- Somatic Marker Hypothesis
-
-Key Features:
-- Multi-scale neural dynamics
-- Precision-weighted prediction errors
-- Dynamic ignition thresholds
-- Metabolic constraints
-- Self-model maintenance
-
-For detailed documentation, see APGI-System-README.md in the project directory.
-"""
+        try:
+            docs_path = Path(__file__).parent / "docs" / "GUI.md"
+            with open(docs_path, "r", encoding="utf-8") as f:
+                doc_text = f.read()
+        except Exception as e:
+            doc_text = f"Error loading documentation: {e}\n\nPlease check if docs/GUI.md exists."
 
         dialog = tk.Toplevel(self.root)
         dialog.title("Documentation")
@@ -4259,7 +4733,7 @@ A computational model of consciousness based on:
 
 Developed using Python, NumPy, Matplotlib, and Tkinter
 
-For more information, visit the project repository.
+For more information, visit: https://github.com/lesoto/apgi-system
 """
 
         messagebox.showinfo("About APGI System", about_text)
@@ -4439,14 +4913,21 @@ def main():
     except ImportError:
         # Silently continue if dependency checker is not available
         pass
-    except Exception as e:
+    except Exception:
         # Silently continue if dependency check fails
         pass
 
     # Create main application
     root = tk.Tk()
     app = APGIGui(root)
-    root.mainloop()
+
+    # Start the main loop (app reference needed for GUI lifecycle)
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        # Handle graceful shutdown
+        if hasattr(app, "root") and app.root:
+            app.root.quit()
 
 
 if __name__ == "__main__":

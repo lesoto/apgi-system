@@ -4,13 +4,13 @@ Integration test to verify CORS headers are present in API responses.
 
 import pytest
 from fastapi.testclient import TestClient
-from api.main import app
+from api.main import create_app
 
 
 @pytest.fixture
 def client():
     """Create a test client for the API."""
-    return TestClient(app)
+    return TestClient(create_app(test_mode=True))
 
 
 def test_cors_headers_present_on_root(client):

@@ -21,11 +21,11 @@ import json
 from datetime import datetime
 
 try:
-    import pyautogui
-    import pygetwindow as gw
-    from PIL import Image
-    import cv2
-    import numpy as np
+    import pyautogui  # type: ignore
+    import pygetwindow as gw  # type: ignore
+    from PIL import Image  # type: ignore
+    import cv2  # type: ignore
+    import numpy as np  # type: ignore
 
     SCREENSHOT_AVAILABLE = True
 except ImportError as e:
@@ -38,17 +38,17 @@ except ImportError as e:
         def __getattr__(self, name):
             raise ImportError(f"Screenshot functionality not available: {name}")
 
-    pyautogui = Dummy()
-    gw = Dummy()
-    Image = Dummy()
-    cv2 = Dummy()
-    np = Dummy()
+    pyautogui = Dummy()  # type: ignore
+    gw = Dummy()  # type: ignore
+    Image = Dummy()  # type: ignore
+    cv2 = Dummy()  # type: ignore
+    np = Dummy()  # type: ignore
 
 
 class APGIScreenshotDocumentation:
     """Screenshot system for Python desktop application."""
 
-    def __init__(self, base_dir: Path = None):
+    def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = base_dir or Path(__file__).parent.parent
         self.screenshots_dir = self.base_dir / "docs" / "screenshots"
         self.reports_dir = self.base_dir / "docs" / "screenshots" / "reports"
@@ -66,8 +66,8 @@ class APGIScreenshotDocumentation:
         }
 
         # GUI process reference
-        self.gui_process = None
-        self.gui_window = None
+        self.gui_process: Optional[subprocess.Popen[str]] = None
+        self.gui_window: Optional[Any] = None
 
         # Performance and reliability settings
         self.max_retry_attempts = 3
@@ -80,19 +80,19 @@ class APGIScreenshotDocumentation:
         self.compression_quality = 85
 
         # GUI element locations (will be discovered)
-        self.button_locations = {}
-        self.tab_locations = {}
-        self.slider_locations = {}
-        self.menu_items = {}
-        self.dialog_locations = {}
-        self.view_toggles = {}
-        self.zoom_controls = {}
-        self.tools_actions = {}
-        self.analysis_actions = {}
-        self.help_actions = {}
-        self.speed_slider = None
-        self.status_bar = None
-        self.event_log = None
+        self.button_locations: Dict[str, Any] = {}
+        self.tab_locations: Dict[str, Any] = {}
+        self.slider_locations: Dict[str, Any] = {}
+        self.menu_items: Dict[str, Any] = {}
+        self.dialog_locations: Dict[str, Any] = {}
+        self.view_toggles: Dict[str, Any] = {}
+        self.zoom_controls: Dict[str, Any] = {}
+        self.tools_actions: Dict[str, Any] = {}
+        self.analysis_actions: Dict[str, Any] = {}
+        self.help_actions: Dict[str, Any] = {}
+        self.speed_slider: Optional[Any] = None
+        self.status_bar: Optional[Any] = None
+        self.event_log: Optional[Any] = None
 
     def _get_system_info(self) -> Dict[str, Any]:
         """Get system information for documentation."""
@@ -108,7 +108,7 @@ class APGIScreenshotDocumentation:
             "screen_size": pyautogui.size() if SCREENSHOT_AVAILABLE else "Unknown",
         }
 
-    def generate_comprehensive_documentation(self):
+    def generate_comprehensive_documentation(self) -> None:
         """Generate complete screenshot documentation."""
         print("🚀 Starting APGI System Desktop App Documentation")
         print("=" * 60)
@@ -157,7 +157,7 @@ class APGIScreenshotDocumentation:
         finally:
             self._cleanup_processes()
 
-    def _start_gui_app(self):
+    def _start_gui_app(self) -> bool:
         """Start the GUI application."""
         print("\n📱 Starting GUI Application...")
 
@@ -179,7 +179,7 @@ class APGIScreenshotDocumentation:
             print(f"❌ Error starting GUI: {e}")
             return False
 
-    def _discover_gui_elements(self):
+    def _discover_gui_elements(self) -> bool:
         """Discover and locate GUI elements with robust fallback."""
         print("\n🔍 Discovering GUI elements...")
 
@@ -284,7 +284,7 @@ class APGIScreenshotDocumentation:
         )
         return True
 
-    def _use_fallback_discovery(self):
+    def _use_fallback_discovery(self) -> None:
         """Use keyboard shortcuts and estimated positions when window cannot be located."""
         print("  🔄 Using fallback discovery mode...")
 
@@ -386,12 +386,12 @@ class APGIScreenshotDocumentation:
             # Method 1: Try macOS native window detection
             macos_available = False
             try:
-                from Quartz import (
+                from Quartz import (  # type: ignore
                     CGWindowListCopyWindowInfo,
                     kCGWindowListOptionOnScreenOnly,
                     kCGNullWindowID,
                 )
-                from AppKit import NSWorkspace
+                from AppKit import NSWorkspace  # type: ignore
 
                 macos_available = True
             except ImportError:
@@ -415,7 +415,6 @@ class APGIScreenshotDocumentation:
                             or "consciousness" in window_title.lower()
                             or "consciousness" in owner_name.lower()
                         ):
-
                             # Get window bounds
                             bounds = window_info.get("kCGWindowBounds", {})
                             if bounds:
@@ -443,7 +442,7 @@ class APGIScreenshotDocumentation:
                                         except Exception:
                                             return False
 
-                                return SimpleWindow(window_title, bounds)
+                                return SimpleWindow(window_title, bounds)  # type: ignore
 
                 except Exception as e:
                     print(f"⚠️ macOS native method failed: {e}")
@@ -482,7 +481,7 @@ class APGIScreenshotDocumentation:
                                     except Exception:
                                         return False
 
-                            return EstimatedWindow(title)
+                            return EstimatedWindow(title)  # type: ignore
                         except Exception as e:
                             print(f"   Could not create window object: {e}")
                             continue
@@ -499,7 +498,7 @@ class APGIScreenshotDocumentation:
         print("❌ Could not find APGI GUI window")
         return None
 
-    def _discover_buttons(self, screenshot: Image.Image):
+    def _discover_buttons(self, screenshot: Image.Image) -> None:
         """Discover button locations using improved image processing with memory optimization."""
         print("  🔘 Discovering buttons...")
 
@@ -665,7 +664,7 @@ class APGIScreenshotDocumentation:
         else:
             return "stop"
 
-    def _discover_tabs(self, screenshot: Image.Image):
+    def _discover_tabs(self, screenshot: Image.Image) -> None:
         """Discover tab locations using improved detection."""
         print("  📑 Discovering tabs...")
 
@@ -747,7 +746,7 @@ class APGIScreenshotDocumentation:
         except Exception as e:
             print(f"    ❌ Error in tab discovery: {e}")
 
-    def _discover_sliders(self, screenshot: Image.Image):
+    def _discover_sliders(self, screenshot: Image.Image) -> None:
         """Discover slider locations using improved detection."""
         print("  🎚️ Discovering sliders...")
 
@@ -841,7 +840,7 @@ class APGIScreenshotDocumentation:
         except Exception as e:
             print(f"    ❌ Error in slider discovery: {e}")
 
-    def _discover_menu_items(self):
+    def _discover_menu_items(self) -> None:
         """Discover all menu items and their submenus."""
         print("  📋 Discovering menu items...")
 
@@ -926,7 +925,7 @@ class APGIScreenshotDocumentation:
             f"    Found {len(self.menu_items)} menu categories with {total_menu_items} total items"
         )
 
-    def _document_all_screens(self):
+    def _document_all_screens(self) -> None:
         """Document all screens and interactions with enhanced error handling."""
         print("\n📸 Documenting all screens and interactions...")
 
@@ -999,7 +998,7 @@ class APGIScreenshotDocumentation:
 
             traceback.print_exc()
 
-    def _document_all_tabs(self):
+    def _document_all_tabs(self) -> None:
         """Document all tabs by clicking through them with enhanced error handling."""
         print("  📑 Documenting tabs...")
 
@@ -1033,7 +1032,7 @@ class APGIScreenshotDocumentation:
                         )
                         continue
 
-    def _document_all_buttons(self):
+    def _document_all_buttons(self) -> None:
         """Document all buttons by clicking them with enhanced error handling."""
         print("  🔘 Documenting buttons...")
 
@@ -1076,7 +1075,7 @@ class APGIScreenshotDocumentation:
                         )
                         continue
 
-    def _document_all_sliders(self):
+    def _document_all_sliders(self) -> None:
         """Document all sliders by adjusting them."""
         print("  🎚️ Documenting sliders...")
 
@@ -1111,7 +1110,7 @@ class APGIScreenshotDocumentation:
                 print(f"    ❌ Error documenting slider {slider_name}: {e}")
                 continue
 
-    def _document_all_menus(self):
+    def _document_all_menus(self) -> None:
         """Document all menu items and their submenus."""
         print("  📋 Documenting menus...")
 
@@ -1155,7 +1154,7 @@ class APGIScreenshotDocumentation:
                 time.sleep(0.5)
                 continue
 
-    def _document_simulation_states(self):
+    def _document_simulation_states(self) -> None:
         """Document different simulation states."""
         print("  ▶️ Documenting simulation states...")
 
@@ -1210,7 +1209,7 @@ class APGIScreenshotDocumentation:
         except Exception as e:
             print(f"    ❌ Error documenting simulation states: {e}")
 
-    def _document_dialog_windows(self):
+    def _document_dialog_windows(self) -> None:
         """Document all dialog windows triggered by menu actions."""
         print("  🪟 Documenting dialog windows...")
 
@@ -1293,7 +1292,7 @@ class APGIScreenshotDocumentation:
                 time.sleep(0.5)
                 continue
 
-    def _document_view_toggles(self):
+    def _document_view_toggles(self) -> None:
         """Document View menu toggles and zoom controls."""
         print("  👁️ Documenting view toggles and zoom controls...")
 
@@ -1372,7 +1371,7 @@ class APGIScreenshotDocumentation:
         except Exception as e:
             print(f"    ❌ Error documenting view toggles: {e}")
 
-    def _document_speed_control(self):
+    def _document_speed_control(self) -> None:
         """Document speed control slider."""
         print("  ⚡ Documenting speed control...")
 
@@ -1409,7 +1408,7 @@ class APGIScreenshotDocumentation:
         except Exception as e:
             print(f"    ⚠️ Could not document speed control: {e}")
 
-    def _document_status_bar_and_log(self):
+    def _document_status_bar_and_log(self) -> None:
         """Document status bar and event log."""
         print("  📊 Documenting status bar and event log...")
 
@@ -1467,7 +1466,6 @@ class APGIScreenshotDocumentation:
                         and self.gui_window.width > 0
                         and self.gui_window.height > 0
                     ):
-
                         # Activate window one more time right before screenshot
                         self.gui_window.activate()
                         time.sleep(0.3)
@@ -1695,7 +1693,6 @@ class APGIScreenshotDocumentation:
                         and hasattr(window, "width")
                         and hasattr(window, "height")
                     ):
-
                         title = window.title
                         title_lower = title.lower()
 
@@ -1748,7 +1745,7 @@ class APGIScreenshotDocumentation:
             print(f"❌ Error in manual selection: {e}")
             return None
 
-    def _generate_documentation_report(self):
+    def _generate_documentation_report(self) -> None:
         """Generate comprehensive HTML documentation report."""
         print("\n📄 Generating documentation report...")
 
@@ -2139,7 +2136,7 @@ class APGIScreenshotDocumentation:
 """
         return html
 
-    def _cleanup_processes(self):
+    def _cleanup_processes(self) -> None:
         """Clean up running processes with enhanced error handling."""
         if self.gui_process:
             try:
@@ -2200,7 +2197,7 @@ def main():
         sys.exit(1)
 
     # Check if GUI script exists
-    gui_script = base_dir / "apgi_gui.py"
+    gui_script = base_dir / "APGI-GUI.py"
     if not gui_script.exists():
         print(f"⚠️ GUI script not found: {gui_script}")
         print("The script will still run but may not be able to start the GUI automatically.")

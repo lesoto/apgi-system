@@ -13,9 +13,11 @@ References:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, cast
+from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
+from random import shuffle
 
 
 class ChangeType(Enum):
@@ -34,8 +36,8 @@ class Trial:
     trial_number: int
     change_type: ChangeType
     change_magnitude: float  # Strength of the change (0.0-1.0)
-    original_image: np.ndarray  # Original scene
-    modified_image: np.ndarray  # Scene with change
+    original_image: NDArray[np.float64]  # Original scene
+    modified_image: NDArray[np.float64]  # Scene with change
     max_alternations: int  # Maximum number of flicker cycles
 
 
@@ -94,8 +96,8 @@ class ChangeBlindnessTask:
         self.results: List[TrialResult] = []
 
         # Step execution state
-        self._step_state = None
-        self._current_trial_result = None
+        self._step_state: Optional[Dict[str, Any]] = None
+        self._current_trial_result: Optional[TrialResult] = None
 
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
@@ -123,13 +125,13 @@ class ChangeBlindnessTask:
                     trial_num += 1
 
         # Shuffle trials
-        np.random.shuffle(trials)
+        shuffle(trials)
 
         return trials
 
     def _generate_image_pair(
         self, change_type: ChangeType, magnitude: float
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
         Generate original and modified image pair.
 
@@ -185,7 +187,7 @@ class ChangeBlindnessTask:
 
         return original, modified
 
-    def _generate_base_scene(self) -> np.ndarray:
+    def _generate_base_scene(self) -> NDArray[np.float64]:
         """
         Generate a base visual scene.
 
@@ -211,7 +213,7 @@ class ChangeBlindnessTask:
 
         return scene
 
-    def _generate_blank(self) -> np.ndarray:
+    def _generate_blank(self) -> NDArray[np.float64]:
         """Generate blank screen (low noise)."""
         return 0.1 * np.random.randn(self.stim_dim)
 
@@ -223,7 +225,7 @@ class ChangeBlindnessTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
+    def run_trial(self, apgi_system: Any, trial: Trial) -> TrialResult:
         """
         Run a single trial on the APGI system.
 
@@ -251,9 +253,7 @@ class ChangeBlindnessTask:
 
         # Run alternation cycles
         for alternation in range(trial.max_alternations):
-
             # === Present ORIGINAL image ===
-            start_time = apgi_system.time
             presentation_steps = int(self.presentation_duration_ms)
 
             for _ in range(presentation_steps):
@@ -270,7 +270,6 @@ class ChangeBlindnessTask:
                 state = apgi_system.step(blank_screen)
 
             # === Present MODIFIED image ===
-            modified_start_time = apgi_system.time
             presentation_steps = int(self.presentation_duration_ms)
 
             for step in range(presentation_steps):
@@ -312,7 +311,7 @@ class ChangeBlindnessTask:
 
         return result
 
-    def run_all_trials(self, apgi_system) -> Dict[str, Any]:
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Run all trials and return summary statistics.
 
@@ -331,7 +330,7 @@ class ChangeBlindnessTask:
             if trial_idx % 10 == 0:
                 print(f"Progress: {trial_idx}/{len(self.trials)} trials...")
 
-            result = self.run_trial(apgi_system, trial)
+            self.run_trial(apgi_system, trial)
 
         # Analyze results
         return self.analyze_results()
@@ -351,9 +350,13 @@ class ChangeBlindnessTask:
             return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize by change type and magnitude
-        results_by_type = {ct: [] for ct in ChangeType}
-        results_by_magnitude = {mag: [] for mag in self.change_magnitudes}
-        results_by_type_mag = {ct: {mag: [] for mag in self.change_magnitudes} for ct in ChangeType}
+        results_by_type: Dict[ChangeType, List[TrialResult]] = {ct: [] for ct in ChangeType}
+        results_by_magnitude: Dict[float, List[TrialResult]] = {
+            mag: [] for mag in self.change_magnitudes
+        }
+        results_by_type_mag: Dict[ChangeType, Dict[float, List[TrialResult]]] = {
+            ct: {mag: [] for mag in self.change_magnitudes} for ct in ChangeType
+        }
 
         for result in self.results:
             results_by_type[result.change_type].append(result)
@@ -422,7 +425,7 @@ class ChangeBlindnessTask:
             }
 
         # Compute metrics by type AND magnitude
-        type_mag_analysis = {}
+        type_mag_analysis: Dict[str, Dict[float, Dict[str, Any]]] = {}
         for change_type in ChangeType:
             type_mag_analysis[change_type.value] = {}
             for magnitude in self.change_magnitudes:
@@ -484,7 +487,7 @@ class ChangeBlindnessTask:
 
         return summary
 
-    def print_results(self, analysis: Optional[Dict[str, Any]] = None):
+    def print_results(self, analysis: Optional[Dict[str, Any]] = None) -> None:
         """Print formatted results."""
         if analysis is None:
             analysis = self.analyze_results()
@@ -569,10 +572,9 @@ class ChangeBlindnessTask:
         print("  - Longer detection times indicate change blindness")
         print()
 
-    def save_results(self, filename: str):
+    def save_results(self, filename: str) -> None:
         """Save results to JSON file."""
         import json
-        from pathlib import Path
 
         analysis = self.analyze_results()
 
@@ -598,7 +600,7 @@ class ChangeBlindnessTask:
 
         print(f"Results saved to: {filename}")
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset task for new run."""
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
@@ -606,7 +608,7 @@ class ChangeBlindnessTask:
         self._step_state = None
         self._current_trial_result = None
 
-    def step(self, apgi_system) -> Dict[str, Any]:
+    def step(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Execute one step of the current trial.
 
@@ -657,17 +659,17 @@ class ChangeBlindnessTask:
             self._current_trial_result = None
 
         state = self._step_state
-        trial = state["trial"]
+        trial = cast(Trial, state["trial"])
 
         # Determine stimulus based on phase
         if state["phase"] == "original":
-            stimulus = trial.original_image
+            stimulus = trial.original_image  # type: ignore[union-attr]
             phase_duration = self.presentation_duration_ms
         elif state["phase"] == "blank":
             stimulus = state["blank_screen"]
             phase_duration = self.blank_duration_ms
         else:  # modified
-            stimulus = trial.modified_image
+            stimulus = trial.modified_image  # type: ignore[union-attr]
             phase_duration = self.presentation_duration_ms
 
         # Step the system
@@ -701,12 +703,12 @@ class ChangeBlindnessTask:
                 state["alternation"] += 1
 
                 # Check if should stop (detected or max alternations)
-                if state["change_detected"] or state["alternation"] >= trial.max_alternations:
+                if state["change_detected"] or state["alternation"] >= trial.max_alternations:  # type: ignore[union-attr]
                     # Trial complete
                     result = TrialResult(
-                        trial_number=trial.trial_number,
-                        change_type=trial.change_type,
-                        change_magnitude=trial.change_magnitude,
+                        trial_number=trial.trial_number,  # type: ignore[union-attr]
+                        change_type=trial.change_type,  # type: ignore[union-attr]
+                        change_magnitude=trial.change_magnitude,  # type: ignore[union-attr]
                         change_detected=state["change_detected"],
                         alternations_to_detection=state["alternations_to_detection"],
                         time_to_detection=state["time_to_detection"],
@@ -720,7 +722,7 @@ class ChangeBlindnessTask:
                     return {
                         "done": self.get_next_trial() is None,
                         "trial_complete": True,
-                        "trial_number": trial.trial_number,
+                        "trial_number": trial.trial_number,  # type: ignore[union-attr]
                         "phase": None,
                         "alternation": state["alternation"],
                         "stimulus": None,
@@ -731,7 +733,7 @@ class ChangeBlindnessTask:
         return {
             "done": False,
             "trial_complete": False,
-            "trial_number": trial.trial_number,
+            "trial_number": trial.trial_number,  # type: ignore[union-attr]
             "phase": state["phase"],
             "alternation": state["alternation"],
             "stimulus": stimulus,

@@ -241,7 +241,7 @@ class StroopTask:
             accuracy = sum(1 for t in trials if t.is_correct) / len(trials)
 
             mean_rt = np.mean(rts) if rts else 0.0
-            return mean_rt, accuracy
+            return float(mean_rt), accuracy
 
         # Calculate metrics for each condition
         congruent_rt, congruent_acc = calculate_metrics(congruent_trials)

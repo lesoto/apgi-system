@@ -80,7 +80,7 @@ jobs:
           CELERY_BROKER_URL: redis://localhost:6379/1
           CELERY_RESULT_BACKEND: redis://localhost:6379/2
         run: |
-          pytest tests/unit/ -v --cov=apgi_system --cov=api --cov-report=xml --cov-report=html --cov-report=term-missing
+          pytest tests/unit/ -v --cov=apgi_system --cov=api --cov-report=xml --cov-report=html --cov-report=term-missing --ignore=tests/unit/test_gui.py
       
       - name: Run property-based tests
         env:

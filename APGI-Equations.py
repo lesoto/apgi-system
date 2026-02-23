@@ -24,13 +24,14 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
+from numpy.typing import NDArray
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Check for optional visualization packages
 try:
-    import plotly.io as pio
+    import plotly.io as pio  # type: ignore
 
     PLOTLY_AVAILABLE = True
     pio.templates.default = "plotly_white+plotly_dark"
@@ -456,7 +457,7 @@ class DynamicalSystemEquations:
                 if len(eps_i_history) >= int(tau_int)
                 else np.mean(eps_i_history)
             )
-            interoceptive = min(1.0, 0.3 * recent_eps_i)
+            interoceptive = min(1.0, float(0.3 * recent_eps_i))
         else:
             interoceptive = 0.0
 
@@ -528,7 +529,7 @@ class RunningStatistics:
         self.mu = 0.0
         self.variance = 1.0
 
-    def update(self, error: float, dt: float = 1.0) -> tuple:
+    def update(self, error: float, dt: float = 1.0) -> tuple[float, float]:
         """
         Update running statistics with new error value
 
@@ -617,7 +618,7 @@ class DerivedQuantities:
 
     @staticmethod
     def metabolic_cost(
-        S_history: np.ndarray,
+        S_history: NDArray[np.float64],
         dt: float,
         T_ignition: Optional[float] = None,
     ) -> float:
@@ -654,7 +655,7 @@ class DerivedQuantities:
         tau: float,
         beta_cross: float,
         B_higher: float,
-    ) -> tuple:
+    ) -> tuple[float, float, float]:
         """
         Compute hierarchical level dynamics:
 
@@ -797,7 +798,7 @@ class APGIParameters:
 
     def validate(self) -> List[str]:
         """Validate parameters against CORRECTED A.2 constraints"""
-        violations = []
+        violations: List[str] = []
 
         # Validate different parameter groups
         self._validate_time_ranges(violations)
@@ -887,9 +888,9 @@ class PsychologicalState:
     Pi_i_expected: Optional[float] = None  # Expected/needed interoceptive precision
 
     # ========== DERIVED PARAMETERS ==========
-    Pi_i_eff_actual: Optional[float] = None  # Actual effective interoceptive precision
-    Pi_i_eff_expected: Optional[float] = None  # Expected effective interoceptive precision
-    S_t: Optional[float] = None  # Accumulated surprise
+    Pi_i_eff_actual: float = 0.0  # Actual effective interoceptive precision
+    Pi_i_eff_expected: float = 0.0  # Expected effective interoceptive precision
+    S_t: float = 0.0  # Accumulated surprise
 
     # ========== ADDITIONAL METADATA ==========
     arousal_level: float = 0.5
@@ -954,7 +955,7 @@ class PsychologicalState:
 
     def to_dynamical_inputs(
         self, time: float = 0.0, include_expectation: bool = False
-    ) -> Dict[str, float]:
+    ) -> Dict[str, float | str]:
         """Convert state to dynamical system inputs"""
 
         if include_expectation:
@@ -2329,7 +2330,7 @@ class NeuromodulatorSystem:
 
     def __init__(self) -> None:
         self.levels = self.BASELINES.copy()
-        self.history = defaultdict(list)
+        self.history: Dict[str, List[float]] = defaultdict(list)
 
     def set_levels(self, **kwargs) -> None:
         """Set neuromodulator levels"""
@@ -2344,7 +2345,7 @@ class NeuromodulatorSystem:
 
     def compute_parameter_modifications(self) -> Dict[str, float]:
         """Compute APGI parameter modifications from current neuromodulator levels"""
-        modifications = defaultdict(float)
+        modifications: Dict[str, float] = defaultdict(float)
 
         for mod, level in self.levels.items():
             if mod in self.PARAMETER_MAPPINGS:
@@ -3584,7 +3585,6 @@ def _check_derived_quantities():
 
 
 def verify_all_equations():
-
     print("=" * 80)
     print("EQUATION VERIFICATION")
     print("=" * 80)
@@ -3628,7 +3628,6 @@ def verify_all_equations():
 # =============================================================================
 
 if __name__ == "__main__":
-
     print("\n" + "=" * 80)
     print("COMPLETE APGI SYSTEM - 100% EQUATION IMPLEMENTATION")
     print("=" * 80)

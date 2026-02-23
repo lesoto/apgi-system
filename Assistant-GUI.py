@@ -18,6 +18,15 @@ from pathlib import Path
 import sys
 import importlib.util
 import gc
+
+# Import APGI Assistant components
+try:
+    from AI_Assistant import APGIAssistant  # type: ignore
+
+    HAS_APGI_ASSISTANT = True
+except ImportError:
+    HAS_APGI_ASSISTANT = False
+    logging.warning("APGI Assistant not available")
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Callable, TypeVar, Tuple, Deque
@@ -35,9 +44,14 @@ except ImportError:
     THEME_MANAGER_AVAILABLE = False
     print("Warning: Theme manager not available. Theme support disabled.")
 
+# Import ToolTip from components
+try:
+    from apgi_gui.components.core import ToolTip
+except ImportError:
+    print("Warning: ToolTip component not available.")
+
 # Import core APGI Assistant - will be loaded by load_apgi_module() function
 HAS_ASSISTANT = False  # Will be updated after successful module loading
-APGIAssistant: Optional[Any] = None
 
 # Import torch if available (used by APGI module)
 # Note: torch is used by the APGI module, not directly in this file
@@ -66,8 +80,8 @@ except ImportError:
 
 # Check for PDF export dependencies
 try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import (
+    from reportlab.lib.pagesizes import A4  # type: ignore
+    from reportlab.platypus import (  # type: ignore
         SimpleDocTemplate,
         Paragraph,
         Spacer,
@@ -75,10 +89,10 @@ try:
         TableStyle,
         PageBreak,
     )
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
+    from reportlab.lib.units import inch  # type: ignore
+    from reportlab.lib.enums import TA_CENTER  # type: ignore
+    from reportlab.lib import colors  # type: ignore
 
     HAS_REPORTLAB = True
 except ImportError:
@@ -150,90 +164,6 @@ def safe_widget_method(widget_attr: str) -> Callable[[F], F]:
     return decorator
 
 
-class ToolTip:
-    """Consistent tooltip implementation for tkinter widgets"""
-
-    def __init__(self, widget: Any, text: str = "") -> None:
-        """Initialize tooltip
-
-        Args:
-            widget: The widget to attach tooltip to
-            text: Tooltip text to display
-        """
-        self.widget = widget
-        self.text = text
-        self.tipwindow = None
-        self.id = None
-        self.x = self.y = 0
-        self._delay = 500  # milliseconds
-        self._follow_mouse = False
-
-        # Bind events
-        self.widget.bind("<Enter>", self.on_enter)
-        self.widget.bind("<Leave>", self.on_leave)
-        self.widget.bind("<ButtonPress>", self.on_leave)
-
-    def on_enter(self, event: Optional[Any] = None) -> None:
-        """Show tooltip when mouse enters widget"""
-        self.schedule()
-
-    def on_leave(self, event: Optional[Any] = None) -> None:
-        """Hide tooltip when mouse leaves widget"""
-        self.unschedule()
-        self.hidetip()
-
-    def schedule(self) -> None:
-        """Schedule tooltip display"""
-        self.unschedule()
-        self.id = self.widget.after(self._delay, self.showtip)
-
-    def unschedule(self) -> None:
-        """Cancel scheduled tooltip display"""
-        id = self.id
-        self.id = None
-        if id:
-            self.widget.after_cancel(id)
-
-    def showtip(self) -> None:
-        """Display the tooltip"""
-        if self.tipwindow or not self.text:
-            return
-
-        bbox = self.widget.bbox("insert")
-        if bbox is None:
-            return
-        x, y, cx, cy = bbox
-        x = x + self.widget.winfo_rootx() + 25
-        y = y + cy + self.widget.winfo_rooty() + 25
-
-        self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-
-        # Create consistent styling
-        label = tk.Label(
-            tw,
-            text=self.text,
-            justify=tk.LEFT,
-            background="#ffffe0",
-            relief=tk.SOLID,
-            borderwidth=1,
-            font=("Arial", 9, "normal"),
-        )
-        label.pack(padx=1, pady=1)
-
-    def hidetip(self) -> None:
-        """Hide the tooltip"""
-        tw = self.tipwindow
-        self.tipwindow = None
-        if tw:
-            tw.destroy()
-
-    def update_text(self, new_text: str) -> None:
-        """Update tooltip text"""
-        self.text = new_text
-
-
 try:
     import psutil
 
@@ -278,7 +208,7 @@ class HistoryManager:
             Managed deque instance
         """
         strategy = self.pruning_strategies.get(history_type, {"maxlen": 50, "prune_ratio": 0.5})
-        maxlen_final: int = maxlen or strategy["maxlen"]
+        maxlen_final: int = int(maxlen or strategy["maxlen"])
 
         managed_deque = ManagedDeque(maxlen=maxlen_final, history_type=history_type, manager=self)
         return managed_deque
@@ -295,7 +225,7 @@ class HistoryManager:
         if current_time - self.last_prune_time < 30:  # Check every 30 seconds
             return self.memory_usage
 
-        total_memory = 0
+        total_memory: float = 0
         usage = {}
 
         # Calculate memory usage for each history type
@@ -307,7 +237,7 @@ class HistoryManager:
                     # Rough estimate: each item ~1KB average
                     estimated_mb = len(deque_obj) * 0.001
                     usage[history_type] = estimated_mb
-                    total_memory += estimated_mb
+                    total_memory: int = int(total_memory + estimated_mb)
 
         usage["total"] = total_memory
         self.memory_usage = usage
@@ -729,7 +659,7 @@ class StatusManager:
         self.status_history: Deque[Dict[str, Any]] = deque(maxlen=100)
 
         # Timing management to prevent overlap
-        self.last_update_time = 0
+        self.last_update_time: float = 0
         self.min_update_interval = 0.5  # Minimum 500ms between updates
         self.pending_update = None
         self.update_timer = None
@@ -939,7 +869,7 @@ class GUIConfig:
     HR_RANGE = (40, 200)
     HRV_RANGE = (10, 200)
     RESP_RANGE = (8, 40)
-    EDA_RANGE = (0.5, 20)
+    EDA_RANGE = (0.5, 20.0)
 
     # Battery thresholds
     LOW_BATTERY_THRESHOLD = 0.2
@@ -1099,7 +1029,7 @@ class GUIConfig:
         return padding
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Setup comprehensive logging system"""
     logger = logging.getLogger("APGIGUI")
     logger.setLevel(logging.DEBUG)
@@ -1269,7 +1199,7 @@ def load_apgi_module():
 # Load APGI module
 try:
     _APGI_MODULE = load_apgi_module()
-    APGIAssistant = _APGI_MODULE.APGIAssistant
+    #    APGIAssistant = _APGI_MODULE.APGIAssistant  # type: ignore[no-redef]
     APGIVisualizer = _APGI_MODULE.APGIVisualizer
     HAS_ASSISTANT = True  # Update flag to indicate successful loading
 
@@ -2262,14 +2192,13 @@ class APGIGUI:
     def __init__(self, root):
         # Validate dependencies first
         if not HAS_ASSISTANT:
-            messagebox.showerror(
-                "Missing Dependency",
+            messagebox.showwarning(
+                "Degraded Mode",
                 "APGI Assistant core module is not available.\n\n"
+                "Running in degraded mode with limited features.\n"
                 "Please ensure AI-Assistant.py is in the same directory\n"
                 "and all required dependencies are installed.",
             )
-            root.destroy()
-            return
 
         self.root = root
         self.root.title("APGI Assistant - Cognitive AI Interface v2.0")
@@ -2281,6 +2210,11 @@ class APGIGUI:
             self.theme_manager = ThemeManager(initial_theme="normal")
 
         # Setup logger
+        # Log event method
+        def _log_event(self, message: str) -> None:
+            """Log an event message."""
+            self.logger.info(message)
+
         self.logger = LOGGER
         self.logger.info("Initializing APGI GUI")
 
@@ -2308,7 +2242,19 @@ class APGIGUI:
         self.update_count = 0
 
         # Theme management
-        self.current_theme = "normal"
+        self.current_theme = self._load_theme_preference()
+
+        # Initialize APGI Assistant for conversation
+        if HAS_APGI_ASSISTANT:
+            try:
+                self.assistant = APGIAssistant({"llm_model": "gpt2"})
+                self._log_event("APGI Assistant initialized with LLM integration")
+            except Exception as e:
+                self.assistant = None
+                self._log_event(f"Failed to initialize APGI Assistant: {e}")
+        else:
+            self.assistant = None
+            self._log_event("APGI Assistant not available - LLM features disabled")
         self.high_contrast_var = tk.BooleanVar(value=False)
 
         # Configuration variables (needed before settings tab creation)
@@ -2417,6 +2363,24 @@ class APGIGUI:
         self.start_auto_save_timer()
 
         self.logger.info("GUI initialization complete")
+
+    def _log_event(self, message: str) -> None:
+        """Log event to event log (thread-safe)."""
+        if hasattr(self, "log_text") and self.log_text is not None:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            log_message = f"[{timestamp}] {message}\n"
+            # Schedule GUI update on main thread
+            self.root.after(0, lambda msg=log_message: self._safe_log_to_gui(msg))
+
+    def _safe_log_to_gui(self, message: str) -> None:
+        """Safely log message to GUI with existence check."""
+        try:
+            if hasattr(self, "log_text") and self.log_text.winfo_exists():
+                self.log_text.insert(tk.END, message)
+                self.log_text.see(tk.END)
+        except Exception:
+            # Ignore errors during shutdown
+            pass
 
     def create_menu(self):
         """Create menu bar"""
@@ -4174,6 +4138,8 @@ class APGIGUI:
         The GUI thread monitors the queue and updates the UI.
         """
         try:
+            from AI_Assistant import APGIAssistant
+
             self.logger.info("Background initialization started")
 
             # Update state
@@ -4903,7 +4869,9 @@ class APGIGUI:
             color = (
                 battery_colors["high"]
                 if battery_level > 0.5
-                else battery_colors["medium"] if battery_level > 0.2 else battery_colors["low"]
+                else battery_colors["medium"]
+                if battery_level > 0.2
+                else battery_colors["low"]
             )
 
             self.battery_canvas.create_rectangle(
@@ -5209,7 +5177,9 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 60 <= val <= 80
-                                else "orange" if 50 <= val <= 90 else "red"
+                                else "orange"
+                                if 50 <= val <= 90
+                                else "red"
                             )
                         elif label == "HRV":
                             color = "green" if val > 50 else "orange" if val > 30 else "red"
@@ -5217,7 +5187,9 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 12 <= val <= 20
-                                else "orange" if 10 <= val <= 24 else "red"
+                                else "orange"
+                                if 10 <= val <= 24
+                                else "red"
                             )
                         else:  # EDA
                             color = "green" if val < 6 else "orange" if val < 8 else "red"
@@ -6341,7 +6313,9 @@ Energy Usage:
                                 trend_direction = (
                                     "Increasing"
                                     if trend > 0
-                                    else "Decreasing" if trend < 0 else "Stable"
+                                    else "Decreasing"
+                                    if trend < 0
+                                    else "Stable"
                                 )
                                 writer.writerow(["Energy Trend", trend_direction, "qualitative"])
 
@@ -8164,26 +8138,21 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         elif param_type == "eda":
             self.eda_label.config(text=f"{value:.1f} µS")
 
-        # Debounce undo action creation to prevent performance issues
-        def create_undo_action():
-            # Create undo action
-            old_state = {
-                "hr": self.hr_var.get(),
-                "hrv": self.hrv_var.get(),
-                "resp": self.resp_var.get(),
-                "eda": self.eda_var.get(),
-            }
+        # Create undo action immediately for consistent redo
+        old_state = {
+            "hr": self.hr_var.get(),
+            "hrv": self.hrv_var.get(),
+            "resp": self.resp_var.get(),
+            "eda": self.eda_var.get(),
+        }
 
-            # Create new state with updated value
-            new_state = old_state.copy()
-            new_state[param_type] = value
+        # Create new state with updated value
+        new_state = old_state.copy()
+        new_state[param_type] = value
 
-            # Execute action through history
-            action = SetPhysiologyAction(self, old_state, new_state)
-            self.action_history.execute(action)
-
-        # Use debouncing with a unique key for each parameter type
-        self.debouncer.debounce(f"physio_{param_type}", create_undo_action)
+        # Execute action through history immediately
+        action = SetPhysiologyAction(self, old_state, new_state)
+        self.action_history.execute(action)
 
     def redo_action2(self):
         """Redo last undone action"""
@@ -8444,6 +8413,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             return
 
         self.current_theme = theme_name
+        self._save_theme_preference()
         theme = GUIConfig.THEMES[theme_name]
 
         # Update main window
@@ -8568,22 +8538,122 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         # Update query input if it exists
         if hasattr(self, "query_input"):
             self.query_input.configure(bg=theme["bg"], fg=theme["fg"], insertbackground=theme["fg"])
+            # Bind Enter key to send query
+            self.query_input.bind("<Return>", self.send_query)
 
-    def _update_status_colors(self):
+    def _update_status_colors(self) -> None:
         """Update status color mappings"""
         # The update_status method will automatically use theme colors
         pass
+
+    def _save_theme_preference(self) -> None:
+        """Save current theme preference and buffer size to config file."""
+        try:
+            config_dir = Path.home() / ".apgi_assistant"
+            config_dir.mkdir(exist_ok=True)
+            config_file = config_dir / "theme_config.json"
+
+            config = {
+                "current_theme": self.current_theme,
+                "buffer_size": getattr(self, "memory_length_var", tk.IntVar(value=100)).get(),
+            }
+            with open(config_file, "w") as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            self._log_event(f"Failed to save preferences: {e}")
+
+    def _load_theme_preference(self) -> str:
+        """Load theme preference and buffer size from config file."""
+        try:
+            config_dir = Path.home() / ".apgi_assistant"
+            config_file = config_dir / "theme_config.json"
+
+            if config_file.exists():
+                with open(config_file, "r") as f:
+                    config = json.load(f)
+                # Load buffer size if available
+                if "buffer_size" in config and hasattr(self, "memory_length_var"):
+                    self.memory_length_var.set(config["buffer_size"])
+        except Exception:
+            pass
+        return "normal"  # Default theme
+
+    def send_query(self, event: Optional[Any] = None) -> None:
+        """Send user query to the APGI Assistant and display response."""
+        if not hasattr(self, "query_input") or not hasattr(self, "response_display"):
+            return
+
+        # Get user input
+        user_input = self.query_input.get().strip()
+        if not user_input:
+            return
+
+        # Clear input
+        self.query_input.delete(0, tk.END)
+
+        # Check if assistant is available
+        if not HAS_APGI_ASSISTANT or not hasattr(self, "assistant") or self.assistant is None:
+            self.response_display.insert(
+                tk.END, "APGI Assistant not available. Please check dependencies.\n"
+            )
+            self.response_display.see(tk.END)
+            return
+
+        # Start conversation if not active
+        if not self.assistant.conversation_active:
+            self.assistant.start_conversation()
+
+        # Process query in thread to avoid blocking GUI
+        def process_query_thread() -> None:
+            try:
+                result = self.assistant.process_query(user_input)
+
+                # Display response on main thread
+                self.root.after(0, lambda: self._display_response(user_input, result))
+
+            except Exception as e:
+                self.root.after(0, lambda exc=e: self._display_error(str(exc)))
+
+        # Start processing thread
+        import threading
+
+        thread = threading.Thread(target=process_query_thread, daemon=True)
+        thread.start()
+
+    def _display_response(self, user_input: str, result: Dict[str, Any]) -> None:
+        """Display the assistant response in the GUI."""
+        if not hasattr(self, "response_display"):
+            return
+
+        # Display user input
+        self.response_display.insert(tk.END, f"You: {user_input}\n", "user")
+        self.response_display.insert(tk.END, f"Assistant: {result['response']}\n\n", "assistant")
+
+        # Display cognitive analysis if available
+        cognitive = result.get("cognitive_analysis", {})
+        if cognitive and "error" not in cognitive:
+            analysis_text = "Cognitive Analysis:\n"
+            analysis_text += (
+                f"- Processing Confidence: {cognitive.get('processing_confidence', 0):.2f}\n"
+            )
+            analysis_text += f"- Cognitive Load: {cognitive.get('cognitive_load', 0):.2f}\n"
+            analysis_text += (
+                f"- Response Coherence: {cognitive.get('response_coherence', 0):.2f}\n\n"
+            )
+            self.response_display.insert(tk.END, analysis_text, "analysis")
+
+        self.response_display.see(tk.END)
+
+    def _display_error(self, error_msg: str) -> None:
+        """Display error message in the GUI."""
+        if hasattr(self, "response_display"):
+            self.response_display.insert(tk.END, f"Error: {error_msg}\n\n", "error")
+            self.response_display.see(tk.END)
 
 
 def main():
     """Main function to run the GUI"""
     # Validate dependencies before creating GUI
-    if not HAS_ASSISTANT:
-        print("ERROR: APGI Assistant core module is not available.")
-        print("Please ensure AI-Assistant.py is in the same directory")
-        print("and all required dependencies are installed.")
-        sys.exit(1)
-
     try:
         root = tk.Tk()
         APGIGUI(root)

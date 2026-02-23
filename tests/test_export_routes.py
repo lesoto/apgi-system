@@ -90,7 +90,6 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> Generator[TestC
     mock_user.roles = ["researcher"]
 
     with (patch("api.services.auth_manager.AuthManager.verify_token", return_value=mock_user),):
-
         yield TestClient(app)
 
 

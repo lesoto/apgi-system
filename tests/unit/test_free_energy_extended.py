@@ -7,7 +7,6 @@ expected free energy, and their constituent components.
 
 import pytest
 import numpy as np
-from unittest.mock import patch, MagicMock
 from apgi_system.core.free_energy import (
     FreeEnergyCalculator,
     compute_variational_free_energy,
@@ -459,15 +458,12 @@ class TestFreeEnergyIntegration:
         # Simulate a simple active inference scenario
         n_states = 3
         n_observations = 2
-        n_actions = 2
         n_timesteps = 5
 
         # Initialize beliefs and models
         state_beliefs = np.ones(n_states) / n_states
         observation_model = np.random.rand(n_states, n_observations)
         observation_model = observation_model / observation_model.sum(axis=1, keepdims=True)
-
-        preferences = np.array([1.0, -1.0])  # Prefer first observation
 
         free_energy_history = []
 

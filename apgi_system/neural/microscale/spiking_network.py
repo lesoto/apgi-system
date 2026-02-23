@@ -8,7 +8,7 @@ Implements leaky integrate-and-fire neurons with:
 """
 
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 

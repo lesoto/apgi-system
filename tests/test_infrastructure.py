@@ -13,15 +13,15 @@ import numpy as np
 from typing import Any, Dict
 from hypothesis import given, settings
 
-# Add project root to path first
+# Add project root to path for local imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tests.strategies import (
+from tests.strategies import (  # noqa: E402
     body_state_strategy,
     observation_strategy,
     belief_state_strategy,
     error_variance_strategy,
-)  # noqa: E402
+)
 
 
 def test_config_fixture(config: Any) -> None:

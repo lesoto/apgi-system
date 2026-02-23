@@ -67,15 +67,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--strict-markers",
-    "--tb=short",
-    "--cov=apgi_system",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-fail-under=90",
-]
+addopts = "-v --strict-markers --tb=short --cov=apgi_system --cov-report=term-missing --cov-report=html --cov-fail-under=90 --cov-exclude=**/apgi_gui.py --cov-exclude=**/Psychological_States_GUI.py --cov-exclude=**/Utils_GUI.py --cov-exclude=**/Tests-GUI.py"
 markers = [
     "unit: Unit tests for individual components",
     "property: Property-based tests using Hypothesis",

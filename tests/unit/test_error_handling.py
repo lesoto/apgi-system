@@ -103,10 +103,12 @@ class TestInvalidConfigurationHandling:
     def test_config_with_missing_required_fields(self, tmp_path):
         """Test handling of config files missing required fields."""
         incomplete_config = tmp_path / "incomplete.yaml"
-        incomplete_config.write_text("""
+        incomplete_config.write_text(
+            """
 # Missing required fields
 some_field: value
-""")
+"""
+        )
 
         with open(incomplete_config, "r") as f:
             config = yaml.safe_load(f)
@@ -118,10 +120,12 @@ some_field: value
     def test_config_with_invalid_types(self, tmp_path):
         """Test handling of config with wrong data types."""
         invalid_types_config = tmp_path / "invalid_types.yaml"
-        invalid_types_config.write_text("""
+        invalid_types_config.write_text(
+            """
 numeric_field: "not_a_number"
 boolean_field: "not_a_boolean"
-""")
+"""
+        )
 
         with open(invalid_types_config, "r") as f:
             config = yaml.safe_load(f)
@@ -133,10 +137,12 @@ boolean_field: "not_a_boolean"
     def test_config_with_invalid_values(self, tmp_path):
         """Test handling of config with out-of-range values."""
         invalid_values_config = tmp_path / "invalid_values.yaml"
-        invalid_values_config.write_text("""
+        invalid_values_config.write_text(
+            """
 threshold: -999  # Invalid negative threshold
 precision: 0     # Invalid zero precision
-""")
+"""
+        )
 
         with open(invalid_values_config, "r") as f:
             config = yaml.safe_load(f)
@@ -227,13 +233,13 @@ class TestMissingLibraryDetection:
         """Test handling of missing optional dependencies."""
         # Try to import a module that doesn't exist
         with pytest.raises(ImportError):
-            import nonexistent_module
+            __import__("nonexistent_module")
 
     def test_missing_required_import(self):
         """Test detection of missing required dependencies."""
         # Test that required modules can be imported
         try:
-            import yaml
+            __import__("json")
 
             assert True
         except ImportError as e:
@@ -327,10 +333,12 @@ class TestConfigurationLoading:
     def test_load_valid_config(self, tmp_path):
         """Test loading a valid configuration file."""
         valid_config = tmp_path / "valid.yaml"
-        valid_config.write_text("""
+        valid_config.write_text(
+            """
 threshold: 2.0
 precision: 1.0
-""")
+"""
+        )
 
         with open(valid_config, "r") as f:
             config = yaml.safe_load(f)
@@ -341,12 +349,14 @@ precision: 1.0
     def test_load_config_with_comments(self, tmp_path):
         """Test loading config with comments."""
         config_with_comments = tmp_path / "commented.yaml"
-        config_with_comments.write_text("""
+        config_with_comments.write_text(
+            """
 # This is a comment
 threshold: 2.0  # Inline comment
 # Another comment
 precision: 1.0
-""")
+"""
+        )
 
         with open(config_with_comments, "r") as f:
             config = yaml.safe_load(f)
@@ -357,13 +367,15 @@ precision: 1.0
     def test_load_config_with_nested_structure(self, tmp_path):
         """Test loading config with nested structure."""
         nested_config = tmp_path / "nested.yaml"
-        nested_config.write_text("""
+        nested_config.write_text(
+            """
 system:
   threshold: 2.0
   precision:
     extero: 1.0
     intero: 0.8
-""")
+"""
+        )
 
         with open(nested_config, "r") as f:
             config = yaml.safe_load(f)
@@ -374,13 +386,15 @@ system:
     def test_load_config_with_lists(self, tmp_path):
         """Test loading config with list values."""
         list_config = tmp_path / "lists.yaml"
-        list_config.write_text("""
+        list_config.write_text(
+            """
 values: [1, 2, 3, 4, 5]
 names:
   - alice
   - bob
   - charlie
-""")
+"""
+        )
 
         with open(list_config, "r") as f:
             config = yaml.safe_load(f)
@@ -500,10 +514,12 @@ class TestGracefulDegradation:
     def test_partial_config_loading(self, tmp_path):
         """Test loading config with some missing fields."""
         partial_config = tmp_path / "partial.yaml"
-        partial_config.write_text("""
+        partial_config.write_text(
+            """
 threshold: 2.5
 # precision field is missing
-""")
+"""
+        )
 
         with open(partial_config, "r") as f:
             config = yaml.safe_load(f)

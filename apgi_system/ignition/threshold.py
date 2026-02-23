@@ -9,7 +9,7 @@ Implements dynamic threshold for global ignition based on:
 """
 
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Tuple
 from collections import deque
 from ..validation import InputValidator
 from ..types import FloatArray, ConfigDict
@@ -138,7 +138,7 @@ class IgnitionThreshold:
 
         # Recent ignition history
         self.refractory_period_ms = ignition_config.get("refractory_period_ms", 200)
-        self.recent_ignitions = deque(maxlen=100)
+        self.recent_ignitions: deque[Dict[str, float]] = deque(maxlen=100)
         self.last_ignition_time = -np.inf
 
         # Metabolic tracking
@@ -146,8 +146,8 @@ class IgnitionThreshold:
         self.allostatic_load = 0.0  # 0-1, starts at zero
 
         # Signal history for analysis
-        self.signal_history = deque(maxlen=1000)
-        self.threshold_history = deque(maxlen=1000)
+        self.signal_history: deque[float] = deque(maxlen=1000)
+        self.threshold_history: deque[float] = deque(maxlen=1000)
 
     def compute_ignition_signal(
         self,
@@ -260,10 +260,12 @@ class IgnitionThreshold:
         )
 
         # Exteroceptive component
-        self.extero_signal = extero_precision * np.linalg.norm(extero_error)
+        self.extero_signal = float(extero_precision * np.linalg.norm(extero_error))
 
         # Interoceptive component with somatic marker modulation
-        self.intero_signal = intero_precision * somatic_marker_gain * np.linalg.norm(intero_error)
+        self.intero_signal = float(
+            intero_precision * somatic_marker_gain * np.linalg.norm(intero_error)
+        )
 
         # Total accumulated signal
         self.current_signal = self.extero_signal + self.intero_signal

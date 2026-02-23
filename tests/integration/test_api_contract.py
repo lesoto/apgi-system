@@ -177,7 +177,6 @@ def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task
     from api.main import create_app
     from fastapi.testclient import TestClient
     from api.services.authorization import get_current_user, require_permission
-    from api.middleware.authentication import is_authenticated
     from api.services.auth_manager import TokenPayload
     from datetime import datetime, timedelta
 
@@ -317,7 +316,6 @@ class TestSessionEndpointContracts:
         assert response.status_code == 201
 
         data = response.json()
-        components = openapi_schema.get("components", {})
 
         # Verify required fields from SessionCreateResponse
         assert "session_id" in data

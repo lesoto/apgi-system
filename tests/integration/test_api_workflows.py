@@ -18,15 +18,13 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch
 import redis.asyncio as redis
-import time
 
 from api.main import create_app
-from api.routes import sessions, state, export, tasks, auth
+from api.routes import sessions, state, export, tasks
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 from api.services.task_executor import TaskExecutor
 from api.services.data_export import DataExportService
 from api.database.models import User
-from api.services.auth_manager import AuthManager
 
 
 @pytest.fixture
@@ -515,7 +513,7 @@ class TestCompleteSimulationWorkflow:
         for i in range(3):
             response = client.post(
                 "/v1/sessions",
-                json={"config_path": "config/default.yaml", "description": f"Session {i+1}"},
+                json={"config_path": "config/default.yaml", "description": f"Session {i + 1}"},
             )
             assert response.status_code == 201
             session_ids.append(response.json()["session_id"])

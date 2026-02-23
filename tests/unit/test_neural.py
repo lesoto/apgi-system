@@ -9,15 +9,13 @@ neural dynamics simulation.
 
 import pytest
 import numpy as np
-from unittest.mock import Mock, patch
-import tempfile
 
 # Import neural modules with error handling
 try:
     from apgi_system.neural.oscillations import OscillationEngine, OscillationBand
 
     HAS_OSCILLATIONS = True
-except ImportError as e:
+except ImportError:
     HAS_OSCILLATIONS = False
     OscillationEngine = None
     OscillationBand = None
@@ -27,16 +25,16 @@ try:
     from apgi_system.neural.macroscale.large_scale_networks import LargeScaleNetworkManager
 
     HAS_MACROSCALE = True
-except ImportError as e:
+except ImportError:
     HAS_MACROSCALE = False
     LargeScaleNetworkManager = None
-    print(f"Warning: Could not import macroscale modules: {e}")
+    print("Warning: Could not import macroscale modules")
 
 try:
     from apgi_system.neural.mesoscale.neural_columns import NeuralColumn
 
     HAS_MESOSCALE = True
-except ImportError as e:
+except ImportError:
     HAS_MESOSCALE = False
     NeuralColumn = None
     print("Warning: Could not import mesoscale modules")
@@ -240,7 +238,7 @@ class TestOscillationEngine:
         engine = OscillationEngine(sample_config)
 
         # Generate signal
-        result = engine.generate()
+        engine.generate()
 
         # Test burst detection
         burst_detected = engine.detect_gamma_burst(threshold=0.1)
@@ -285,10 +283,6 @@ class TestOscillationEngine:
             engine.generate()
 
         # Store state before reset
-        time_before = engine.time
-        powers_before = engine.get_spectral_power()
-
-        # Reset
         engine.reset()
 
         # Check reset worked
@@ -336,7 +330,7 @@ class TestLargeScaleNetwork:
     @pytest.mark.skipif(not HAS_MACROSCALE, reason="Macroscale modules not available")
     def test_large_scale_network_initialization(self, network_config):
         """Test large-scale network initialization."""
-        network = LargeScaleNetwork(network_config)
+        network = LargeScaleNetworkManager(network_config)
 
         assert network.config == network_config
         assert hasattr(network, "regions")
@@ -346,7 +340,7 @@ class TestLargeScaleNetwork:
     @pytest.mark.skipif(not HAS_MACROSCALE, reason="Macroscale modules not available")
     def test_network_simulation_step(self, network_config):
         """Test network simulation step."""
-        network = LargeScaleNetwork(network_config)
+        network = LargeScaleNetworkManager(network_config)
 
         # Perform simulation step
         result = network.step()
@@ -359,7 +353,7 @@ class TestLargeScaleNetwork:
     @pytest.mark.skipif(not HAS_MACROSCALE, reason="Macroscale modules not available")
     def test_region_activity_calculation(self, network_config):
         """Test region activity calculation."""
-        network = LargeScaleNetwork(network_config)
+        network = LargeScaleNetworkManager(network_config)
 
         activities = network._calculate_region_activities()
 

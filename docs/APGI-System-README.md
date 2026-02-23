@@ -150,26 +150,31 @@ pip install -e .
 
 ## Quick Start
 
-### GUI Application (Recommended)
+### GUI Applications (Recommended)
+
+#### Main APGI System GUI
 
 ```bash
-# Launch the comprehensive GUI
-python run_gui.py
-
-# Or directly
-python apgi_gui.py
+python APGI-GUI.py
 ```
 
-**Features:**
+**Features**: Complete real-time visualization, parameter control, and data export
 
-- Real-time visualization of all subsystems
-- Interactive parameter adjustment
-- Multi-panel displays (6 tabs)
-- Complete menu system with all controls
-- Data export (CSV/JSON)
-- Preset experimental tasks
+#### Specialized GUIs
 
-See [docs/gui/GUI_README.md](docs/gui/GUI_README.md) for complete GUI documentation.
+```bash
+# Psychological states parameter exploration
+python Psychological-States-GUI.py
+
+# Run and monitor test scripts
+python Tests-GUI.py
+
+# Execute utility scripts with GUI interface
+python Utils-GUI.py
+
+# Interactive AI assistant for APGI system
+python Assistant-GUI.py
+```
 
 ### Programmatic Usage
 
@@ -190,8 +195,14 @@ print(f"Final state: {results['final_state']}")
 ### Command Line Examples
 
 ```bash
-# Run basic simulation example
-python examples/basic_simulation.py
+# Run basic simulation with visualization
+python utils/basic_simulation.py --duration 1000 --input-size 256
+
+# Check system dependencies
+python utils/dependency_checker.py
+
+# Generate documentation screenshots
+python utils/take_screenshots.py
 
 # Run experimental tasks
 python apgi_system/experiments/test_iowa_gambling.py
@@ -276,13 +287,11 @@ The system is organized into several key modules:
 
 ### **1. GUI Application** (Primary Interface)
 
-**File**: [apgi_gui.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/apgi_gui.py:0:0-0:0) (83,840 bytes)
+**File**: [apgi_gui.py]
 **Launch**:
 
 ```bash
-python apgi_gui.py
-# or
-python utils/run_gui.py
+python APGI-GUI.py
 ```
 
 **Features**:
@@ -300,7 +309,73 @@ python utils/run_gui.py
 - **Experimental task execution** with progress tracking
 - **Keyboard shortcuts** (Ctrl+N/O/S/E/Q, F5-F8)
 
-### **2. REST API** (Web Interface)
+### **2. Psychological States GUI**
+
+**File**: [Psychological-States-GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/Psychological-States-GUI.py:0:0-0:0) (3,137 bytes)
+**Launch**:
+
+```bash
+python Psychological-States-GUI.py
+```
+
+**Features**:
+
+- **Parameter Library**: Complete parameter mappings for 51 psychological states
+- **Advanced Visualizations**: Interactive visualizations rendered directly in the GUI
+- **State Management**: Comprehensive psychological state parameter exploration
+- **No External Dependencies**: All visualizations displayed within the application
+
+### **3. Tests GUI**
+
+**File**: [Tests-GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/Tests-GUI.py:0:0-0:0) (167 bytes)
+**Launch**:
+
+```bash
+python Tests-GUI.py
+```
+
+**Features**:
+
+- **Test Script Runner**: GUI interface to run all test scripts from the tests folder
+- **Real-time Output Display**: Live output display with error handling
+- **Test Results Summary**: Statistics panel showing test results and pass/fail counts
+- **Process Management**: Individual test execution and full test suite running
+- **Script Selection**: Browse and select individual test scripts to run
+
+### **4. Utils GUI**
+
+**File**: [Utils-GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/Utils-GUI.py:0:0-0:0) (68 bytes)
+**Launch**:
+
+```bash
+python Utils-GUI.py
+```
+
+**Features**:
+
+- **Utility Script Runner**: GUI interface to run all utility scripts from the utils folder
+- **Real-time Output Display**: Live output display with error handling
+- **Process Management**: Individual script execution and batch running
+- **Script Selection**: Browse and select individual utility scripts to run
+
+### **5. Assistant GUI**
+
+**File**: [Assistant-GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/Assistant-GUI.py:0:0-0:0) (8,647 bytes)
+**Launch**:
+
+```bash
+python Assistant-GUI.py
+```
+
+**Features**:
+
+- **AI Assistant Interface**: Interactive AI assistant for APGI system guidance
+- **Multi-threaded Architecture**: Responsive UI with background processing
+- **Queue-based Communication**: Asynchronous message handling
+- **Comprehensive Logging**: Rotating file handler and structured logging
+- **Dynamic Module Loading**: Runtime loading of APGI components
+
+### **6. REST API** (Web Interface)
 
 **File**: [api/main.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/api/main.py:0:0-0:0)
 **Framework**: FastAPI with comprehensive middleware
@@ -313,7 +388,7 @@ python utils/run_gui.py
 - Redis for session management
 - CORS support for web clients
 
-### **3. Programmatic Interface**
+### **7. Programmatic Interface**
 
 **File**: [apgi_system/system.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-system/apgi_system/system.py:0:0-0:0)
 **Usage**:
@@ -325,7 +400,7 @@ system = APGISystem(config_path="config/default.yaml")
 results = system.run(duration_ms=10000.0)
 ```
 
-### **4. Experimental Tasks**
+### **8. Experimental Tasks**
 
 **Location**: `apgi_system/experiments/tasks/`
 **Available Tasks**:
@@ -335,6 +410,85 @@ results = system.run(duration_ms=10000.0)
 - **Change Blindness Task**: Visual perception failures
 - **Binocular Rivalry Task**: Competitive perception
 - **Masking Paradigm Task**: Subliminal processing
+
+### **9. Utility Scripts**
+
+**Location**: `utils/`
+**Available Scripts**:
+
+#### **basic_simulation.py** - APGI System Simulation
+
+```bash
+python utils/basic_simulation.py --duration 1000 --input-size 256
+```
+
+- Runs configurable APGI system simulations
+- Generates visualizations of ignition events, free energy, and metabolic reserves
+- Supports sinusoidal sensory input with adjustable parameters
+
+#### **build_common.py** - Build Utilities
+
+- Common build and development utilities for the APGI system
+- Project root detection and command execution helpers
+
+#### **circuit_breaker.py** - System Resilience
+
+- Implements circuit breaker pattern for system fault tolerance
+- Prevents cascading failures in distributed components
+
+#### **datetime_utils.py** - Date/Time Utilities
+
+- UTC time handling and elapsed time calculations
+- Timestamp formatting for logging and data export
+
+#### **dependency_checker.py** - System Validation
+
+```bash
+python utils/dependency_checker.py
+```
+
+- Checks for required Python packages and system dependencies
+- Provides installation guidance for missing components
+- Validates Python version compatibility
+
+#### **demo_analysis.py** - Analysis Tools
+
+- Demonstration analysis utilities for simulation results
+
+#### **installer_utils.py** - Installation Helpers
+
+- Automated installation utilities and setup scripts
+
+#### **release.py** - Release Management
+
+- Release management and deployment utilities
+
+#### **script_runner_gui.py** - GUI Framework
+
+- Shared GUI base class for running scripts from directories
+- Used by Tests-GUI.py and Utils-GUI.py applications
+
+#### **take_screenshots.py** - Documentation Tools
+
+```bash
+python utils/take_screenshots.py
+```
+
+- Automated screenshot capture for Python desktop applications
+- Generates documentation screenshots with GUI interaction
+- Requires pyautogui, pygetwindow, pillow, opencv-python
+
+#### **test_platform_utils.py** - Platform Testing
+
+- Platform utility testing and validation
+
+#### **test_rate_limiter_debug.py** - Debug Tools
+
+- Rate limiter debugging utilities
+
+#### **validate_app.py** - Application Validation
+
+- Comprehensive application validation and health checks
 
 ## Key Functionality
 
@@ -418,8 +572,17 @@ The APGI framework provides a comprehensive platform for studying consciousness 
 
 To explore the system further:
 
-1. **Start the GUI**: Run `python apgi_gui.py` to launch the interactive interface
-2. **Review the API**: Check `docs/api/REST-API.md` for web service endpoints
-3. **Examine the core**: Look at `apgi_system/system.py` for the main simulation logic
-4. **Check experiments**: Explore `apgi_system/experiments/` for task implementations
-5. **Review configuration**: Study `config/default.yaml` for system parameters
+1. **Start the Main GUI**: Run `python APGI-GUI.py` to launch the comprehensive interactive interface
+2. **Explore Specialized GUIs**:
+   - `python Psychological-States-GUI.py` - Parameter library for 51 psychological states
+   - `python Tests-GUI.py` - Run and monitor test scripts
+   - `python Utils-GUI.py` - Execute utility scripts with GUI interface
+   - `python Assistant-GUI.py` - Interactive AI assistant for guidance
+3. **Use Utility Scripts**:
+   - `python utils/basic_simulation.py` - Run configurable simulations
+   - `python utils/dependency_checker.py` - Check system requirements
+   - `python utils/take_screenshots.py` - Generate documentation screenshots
+4. **Review the API**: Check `docs/api/REST-API.md` for web service endpoints
+5. **Examine the core**: Look at `apgi_system/system.py` for the main simulation logic
+6. **Check experiments**: Explore `apgi_system/experiments/` for task implementations
+7. **Review configuration**: Study `config/default.yaml` for system parameters

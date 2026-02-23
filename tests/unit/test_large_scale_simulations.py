@@ -14,11 +14,8 @@ import numpy as np
 import time
 import psutil
 import gc
-from unittest.mock import Mock, patch
 import tempfile
-import json
 import csv
-from pathlib import Path
 
 from apgi_system.system import APGISystem
 

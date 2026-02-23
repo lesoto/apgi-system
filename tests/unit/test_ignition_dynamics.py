@@ -7,8 +7,8 @@ for IgnitionThreshold, GlobalWorkspace, and IgnitionTimeline components.
 
 import pytest
 import numpy as np
-from unittest.mock import Mock, patch
-from collections import deque
+from typing import Dict, Any
+from unittest.mock import Mock
 
 from apgi_system.ignition.threshold import IgnitionThreshold
 from apgi_system.ignition.global_workspace import GlobalWorkspace, WorkspaceState, BroadcastContent
@@ -19,7 +19,7 @@ class TestIgnitionThreshold:
     """Unit tests for IgnitionThreshold component."""
 
     @pytest.fixture
-    def threshold_config(self):
+    def threshold_config(self) -> Dict[str, Any]:
         """Configuration for threshold tests."""
         return {
             "ignition": {
@@ -31,11 +31,11 @@ class TestIgnitionThreshold:
         }
 
     @pytest.fixture
-    def threshold(self, threshold_config):
+    def threshold(self, threshold_config: Dict[str, Any]) -> IgnitionThreshold:
         """Create IgnitionThreshold instance."""
         return IgnitionThreshold(threshold_config)
 
-    def test_initialization(self, threshold):
+    def test_initialization(self, threshold) -> None:
         """Test proper initialization of IgnitionThreshold."""
         assert threshold.baseline_threshold == 2.0
         assert threshold.threshold_range == [1.0, 5.0]
@@ -47,7 +47,7 @@ class TestIgnitionThreshold:
         assert threshold.allostatic_load == 0.0
         assert len(threshold.recent_ignitions) == 0
 
-    def test_basic_signal_computation(self, threshold):
+    def test_basic_signal_computation(self, threshold) -> None:
         """Test basic ignition signal computation."""
         extero_error = np.array([1.0, 2.0, 1.5])
         intero_error = np.array([0.5, 0.3])
@@ -74,7 +74,7 @@ class TestIgnitionThreshold:
         assert components["somatic_marker_gain"] == 1.2
         assert isinstance(ignited, bool)
 
-    def test_threshold_exceeding_ignition(self, threshold):
+    def test_threshold_exceeding_ignition(self, threshold) -> None:
         """Test ignition when signal exceeds threshold."""
         # Create large error to exceed threshold
         extero_error = np.array([3.0, 4.0, 2.0])  # Large error
@@ -97,7 +97,7 @@ class TestIgnitionThreshold:
         # With such large signals, ignition should occur eventually
         assert ignition_occurred, "Large signal should eventually trigger ignition"
 
-    def test_refractory_period_enforcement(self, threshold):
+    def test_refractory_period_enforcement(self, threshold) -> None:
         """Test that refractory period prevents immediate re-ignition."""
         # Create large error that should trigger ignition
         extero_error = np.array([5.0, 5.0])
@@ -146,10 +146,9 @@ class TestIgnitionThreshold:
         )
 
         # May ignite again (stochastic, but not blocked by refractory period)
-        # We just check it's not automatically blocked
         assert isinstance(ignited3, bool)
 
-    def test_metabolic_state_modulation(self, threshold):
+    def test_metabolic_state_modulation(self, threshold) -> None:
         """Test threshold modulation by metabolic state."""
         # Test with full reserves
         threshold.update_metabolic_state(reserves=1.0, allostatic_load=0.0)
@@ -201,7 +200,7 @@ class TestIgnitionThreshold:
         assert components_high["intero_signal"] > components_low["intero_signal"]
         assert components_high["total_signal"] > components_low["total_signal"]
 
-    def test_input_validation(self, threshold):
+    def test_input_validation(self, threshold) -> None:
         """Test input validation for compute_ignition_signal."""
         valid_extero = np.array([1.0, 2.0])
         valid_intero = np.array([0.5])
@@ -234,7 +233,7 @@ class TestIgnitionThreshold:
                 somatic_marker_gain=3.0,  # Out of range [0.5, 2.0]
             )
 
-    def test_statistics_computation(self, threshold):
+    def test_statistics_computation(self, threshold) -> None:
         """Test statistics computation."""
         # Initially empty
         stats = threshold.get_statistics()
@@ -260,7 +259,7 @@ class TestIgnitionThreshold:
         assert "mean_threshold" in stats
         assert "ignition_rate" in stats
 
-    def test_reset_functionality(self, threshold):
+    def test_reset_functionality(self, threshold) -> None:
         """Test reset restores initial state."""
         # Modify state
         threshold.metabolic_reserves = 0.5
@@ -284,16 +283,16 @@ class TestGlobalWorkspace:
     """Unit tests for GlobalWorkspace component."""
 
     @pytest.fixture
-    def workspace_config(self):
+    def workspace_config(self) -> Dict[str, Any]:
         """Configuration for workspace tests."""
         return {"ignition": {"amplification_duration_ms": 300}}
 
     @pytest.fixture
-    def workspace(self, workspace_config):
+    def workspace(self, workspace_config) -> GlobalWorkspace:
         """Create GlobalWorkspace instance."""
         return GlobalWorkspace(workspace_config)
 
-    def test_initialization(self, workspace):
+    def test_initialization(self, workspace) -> None:
         """Test proper initialization of GlobalWorkspace."""
         assert workspace.amplification_duration_ms == 300
         assert workspace.state == WorkspaceState.IDLE
@@ -302,7 +301,7 @@ class TestGlobalWorkspace:
         assert len(workspace.competing_contents) == 0
         assert len(workspace.subscribers) == 0
 
-    def test_idle_to_igniting_transition(self, workspace):
+    def test_idle_to_igniting_transition(self, workspace) -> None:
         """Test transition from IDLE to IGNITING state."""
         # Add candidate content
         candidate = np.random.randn(256)
@@ -322,7 +321,7 @@ class TestGlobalWorkspace:
         assert state["state"] == "igniting"
         assert state["state_time"] == 0.0
 
-    def test_competition_resolution(self, workspace):
+    def test_competition_resolution(self, workspace) -> None:
         """Test winner selection from competing contents."""
         # Add multiple candidates with different priorities
         candidates = [
@@ -348,7 +347,7 @@ class TestGlobalWorkspace:
         assert "broadcast_content" in state
         # Higher priority should have better chance of winning (though stochastic)
 
-    def test_broadcasting_phase(self, workspace):
+    def test_broadcasting_phase(self, workspace) -> None:
         """Test broadcasting phase mechanics."""
         # Set up and trigger ignition
         candidate = np.random.randn(256)
@@ -365,7 +364,7 @@ class TestGlobalWorkspace:
         assert state["is_broadcasting"]
         assert state["is_reportable"]
 
-    def test_subscriber_notification(self, workspace):
+    def test_subscriber_notification(self, workspace) -> None:
         """Test subscriber notification during broadcasting."""
         # Set up subscriber
         received_content = []
@@ -388,7 +387,7 @@ class TestGlobalWorkspace:
         assert len(received_content) > 0
         assert isinstance(received_content[0], BroadcastContent)
 
-    def test_state_machine_progression(self, workspace):
+    def test_state_machine_progression(self, workspace: GlobalWorkspace) -> None:
         """Test complete state machine progression."""
         # Start in IDLE
         assert workspace.state == WorkspaceState.IDLE
@@ -399,11 +398,13 @@ class TestGlobalWorkspace:
         workspace.update(ignition_occurred=True)
 
         # Should be IGNITING
-        assert workspace.state == WorkspaceState.IGNITING
+        assert workspace.state == WorkspaceState.IGNITING  # type: ignore[comparison-overlap]
 
         # Progress through IGNITING (50ms)
         for _ in range(60):
             workspace.update(ignition_occurred=False, dt=1.0)
+            if workspace.state != WorkspaceState.IGNITING:
+                break  # type: ignore
 
         # Should be BROADCASTING
         assert workspace.state == WorkspaceState.BROADCASTING
@@ -641,21 +642,21 @@ class TestIgnitionTimeline:
         for _ in range(199):
             timeline.update(ignition_signal=False, dt=1.0)
 
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 200ms
+        _ = timeline.update(ignition_signal=False, dt=1.0)  # 200ms
         assert timeline.motor_planned
 
         # Progress to 400ms - memory encoding
         for _ in range(199):
             timeline.update(ignition_signal=False, dt=1.0)
 
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 400ms
+        timeline.update(ignition_signal=False, dt=1.0)  # 400ms
         assert timeline.memory_encoded
 
         # Progress to 700ms - marker updating
         for _ in range(299):
             timeline.update(ignition_signal=False, dt=1.0)
 
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 700ms
+        _ = timeline.update(ignition_signal=False, dt=1.0)  # 700ms
         assert timeline.markers_updated
 
     def test_complete_cycle(self, timeline):

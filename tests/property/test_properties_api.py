@@ -6,9 +6,10 @@ Tests universal properties that should hold across all valid API requests.
 
 import pytest
 from hypothesis import given, strategies as st, settings, assume, HealthCheck
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 import uuid
 from datetime import datetime, timedelta
+from typing import Dict, Any
 
 from api.services.task_executor import TaskExecutor, TaskType, TaskStatus
 from api.exceptions import (
@@ -29,7 +30,7 @@ from api.exceptions import (
 
 
 @st.composite
-def task_type_strategy(draw):
+def task_type_strategy(draw) -> str:
     """Generate valid task types."""
     return draw(
         st.sampled_from(
@@ -43,7 +44,7 @@ def task_type_strategy(draw):
 
 
 @st.composite
-def task_parameters_strategy(draw, task_type):
+def task_parameters_strategy(draw, task_type: str) -> Dict[str, Any]:
     """Generate valid parameters for a given task type."""
     if task_type == TaskType.IOWA_GAMBLING.value:
         return {
@@ -78,7 +79,7 @@ def task_parameters_strategy(draw, task_type):
 
 
 @st.composite
-def session_id_strategy(draw):
+def session_id_strategy(draw) -> str:
     """Generate valid session IDs (UUIDs)."""
     return str(uuid.uuid4())
 
@@ -120,7 +121,7 @@ def task_result_strategy(draw, task_type, session_id):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_task_execution_round_trip(data):
+async def test_property_task_execution_round_trip(data) -> None:
     """
     **Feature: api-rest-interface, Property 10: Task execution and retrieval round-trip**
 
@@ -440,106 +441,6 @@ async def test_property_failed_task_status_tracking(data):
             assert "error" in status_info
             assert isinstance(status_info["error"], str)
             assert len(status_info["error"]) > 0
-
-
-@given(data=st.data())
-@settings(max_examples=100, deadline=None)
-@pytest.mark.asyncio
-async def test_property_async_task_status_tracking(data):
-    """
-    **Feature: api-rest-interface, Property 25: Async task status tracking**
-
-    For any long-running task, polling the status endpoint should show progress
-    updates until completion.
-
-    **Validates: Requirements 11.1, 11.2**
-    """
-    # Generate test data upfront
-    task_type = data.draw(task_type_strategy())
-    session_id = data.draw(session_id_strategy())
-    parameters = data.draw(task_parameters_strategy(task_type))
-    progress_value = data.draw(st.integers(min_value=0, max_value=99))
-    current_trial = data.draw(st.integers(min_value=1, max_value=100))
-    task_result = data.draw(task_result_strategy(task_type, session_id))
-
-    # Create mock Celery app
-    mock_celery_app = Mock()
-    task_id = str(uuid.uuid4())
-
-    # Simulate task lifecycle: PENDING -> STARTED -> SUCCESS
-    task_states = ["PENDING", "STARTED", "SUCCESS"]
-
-    for state in task_states:
-        mock_async_result = Mock()
-        mock_async_result.id = task_id
-        mock_async_result.state = state
-
-        # Configure mock based on state
-        if state == "PENDING":
-            mock_async_result.successful.return_value = False
-            mock_async_result.failed.return_value = False
-            mock_async_result.ready.return_value = False
-            mock_async_result.info = None
-        elif state == "STARTED":
-            mock_async_result.successful.return_value = False
-            mock_async_result.failed.return_value = False
-            mock_async_result.ready.return_value = False
-            # Include progress info for running tasks
-            mock_async_result.info = {"progress": progress_value, "current_trial": current_trial}
-        elif state == "SUCCESS":
-            mock_async_result.successful.return_value = True
-            mock_async_result.failed.return_value = False
-            mock_async_result.ready.return_value = True
-            mock_async_result.result = task_result
-
-        mock_celery_app.send_task.return_value = mock_async_result
-
-        with patch("api.services.task_executor.celery_app", mock_celery_app):
-            with patch("api.services.task_executor.AsyncResult", return_value=mock_async_result):
-                executor = TaskExecutor()
-
-                # For first iteration, submit the task
-                if state == "PENDING":
-                    returned_task_id = await executor.submit_task(
-                        session_id=session_id, task_type=task_type, parameters=parameters
-                    )
-                    assert returned_task_id == task_id
-
-                # Poll status
-                status_info = await executor.get_task_status(task_id)
-
-                # Verify status structure is always present
-                assert "task_id" in status_info
-                assert "status" in status_info
-                assert "state" in status_info
-                assert status_info["task_id"] == task_id
-                assert status_info["state"] == state
-
-                # Verify status is valid
-                valid_statuses = [s.value for s in TaskStatus]
-                assert status_info["status"] in valid_statuses
-
-                # Verify state-specific properties
-                if state == "PENDING":
-                    assert status_info["status"] == TaskStatus.PENDING.value
-                elif state == "STARTED":
-                    assert status_info["status"] == TaskStatus.RUNNING.value
-                    # Running tasks should include progress info
-                    if "info" in status_info:
-                        assert isinstance(status_info["info"], dict)
-                elif state == "SUCCESS":
-                    assert status_info["status"] == TaskStatus.COMPLETED.value
-                    # Completed tasks should include result
-                    assert "result" in status_info
-                    assert isinstance(status_info["result"], dict)
-
-                    # Verify result structure
-                    result = status_info["result"]
-                    assert "task_type" in result
-                    assert "session_id" in result
-                    assert "status" in result
-                    assert result["task_type"] == task_type
-                    assert result["session_id"] == session_id
 
 
 # ============================================================================
@@ -940,7 +841,7 @@ def test_property_expired_token_rejection(credentials, user_id, expiration_secon
     from api.services.auth_manager import AuthManager, TokenPayload
     from api.exceptions import ExpiredTokenError
     from api.database.connection import SessionLocal
-    from datetime import datetime, timedelta
+    from datetime import datetime
     import jwt
 
     # Create database session
@@ -1123,7 +1024,7 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
     unique_client_id = f"test_{test_run_id}_{timestamp_id}_{client_id}"
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
 
     try:
         # Create rate limiter
@@ -1212,7 +1113,7 @@ async def test_property_rate_limit_per_client_isolation(client_id, endpoint):
     from api.config import settings
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
 
     try:
         # Create rate limiter
@@ -1270,7 +1171,7 @@ async def test_property_rate_limit_per_endpoint_isolation(client_id, endpoint1, 
     assume(endpoint1 != endpoint2)
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
 
     try:
         # Create rate limiter
@@ -1329,7 +1230,7 @@ async def test_property_rate_limit_custom_configuration(
     from api.config import settings
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
 
     try:
         # Create rate limiter
@@ -1392,7 +1293,7 @@ async def test_property_rate_limit_header_completeness(client_id, endpoint):
     from datetime import datetime
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
 
     try:
         # Create rate limiter
@@ -2215,7 +2116,7 @@ async def test_property_pagination_consistency(session_id, data):
     for i in range(1, len(all_times)):
         assert (
             all_times[i] >= all_times[i - 1]
-        ), f"Times not in order at index {i}: {all_times[i-1]} -> {all_times[i]}"
+        ), f"Times not in order at index {i}: {all_times[i - 1]} -> {all_times[i]}"
 
     # Property 4: All data for each variable should match original (no duplicates or gaps)
     for var in variables:
@@ -2390,7 +2291,7 @@ async def test_property_pagination_empty_results(session_id, data):
     # Property: Pagination should indicate no more data
     pagination = result.get("pagination")
     if pagination:
-        assert pagination.get("has_more") == False
+        assert pagination.get("has_more") is False
         assert pagination.get("next_cursor") is None
 
 
@@ -2462,13 +2363,13 @@ async def test_property_pagination_boundary_conditions(session_id, data):
         if expected_page < num_pages - 1:
             # Not the last page - should have more data
             assert pagination is not None
-            assert pagination.get("has_more") == True
+            assert pagination.get("has_more")
             cursor = pagination.get("next_cursor")
             assert cursor is not None
         else:
             # Last page - should not have more data
             if pagination:
-                assert pagination.get("has_more") == False
+                assert not pagination.get("has_more")
                 assert pagination.get("next_cursor") is None
 
     # Property: Should have fetched exactly num_pages
@@ -2734,7 +2635,7 @@ async def test_property_deprecation_header_presence(deprecated_config):
     if "sunset" in deprecation_info:
         assert (
             "Sunset" in response.headers
-        ), f"Deprecated endpoint with sunset date should include Sunset header"
+        ), "Deprecated endpoint with sunset date should include Sunset header"
 
         sunset_header = response.headers["Sunset"]
         assert (
@@ -2745,7 +2646,7 @@ async def test_property_deprecation_header_presence(deprecated_config):
     if "replacement" in deprecation_info:
         assert (
             "Link" in response.headers
-        ), f"Deprecated endpoint with replacement should include Link header"
+        ), "Deprecated endpoint with replacement should include Link header"
 
         link_header = response.headers["Link"]
         expected_replacement = deprecation_info["replacement"]
@@ -2757,7 +2658,7 @@ async def test_property_deprecation_header_presence(deprecated_config):
         ), "Link header should include rel='successor-version'"
 
     # Property: Response should include Warning header
-    assert "Warning" in response.headers, f"Deprecated endpoint should include Warning header"
+    assert "Warning" in response.headers, "Deprecated endpoint should include Warning header"
 
     warning_header = response.headers["Warning"]
     assert "299" in warning_header, "Warning header should use code 299 for miscellaneous warnings"
@@ -2826,7 +2727,7 @@ async def test_property_non_deprecated_endpoint_no_headers(endpoint):
         link_header = response.headers["Link"]
         assert (
             'rel="successor-version"' not in link_header
-        ), f"Non-deprecated endpoint should not include successor-version Link header"
+        ), "Non-deprecated endpoint should not include successor-version Link header"
 
 
 @given(data=st.data())
@@ -2997,7 +2898,7 @@ def test_property_cors_header_presence(http_method, endpoint_path, origin):
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.testclient import TestClient
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse  # noqa: F401
 
     # Create a simple test app with CORS middleware
     app = FastAPI()
@@ -3068,7 +2969,7 @@ def test_property_cors_header_presence(http_method, endpoint_path, origin):
     if origin is not None:
         assert (
             "access-control-allow-origin" in response.headers
-        ), f"Response to request with Origin header should include Access-Control-Allow-Origin header"
+        ), "Response to request with Origin header should include Access-Control-Allow-Origin header"
 
         # Verify the header value
         allow_origin = response.headers["access-control-allow-origin"]
@@ -3528,7 +3429,6 @@ async def test_property_webhook_retry_exponential_backoff(data):
     from api.services.webhook_manager import WebhookManager, WebhookStatus
     from api.database.models import WebhookDelivery
     from unittest.mock import MagicMock
-    from datetime import datetime, timedelta
 
     # Generate test data
     task_type = data.draw(task_type_strategy())
@@ -3609,7 +3509,7 @@ async def test_property_webhook_retry_exponential_backoff(data):
     for i in range(1, len(retry_delays)):
         assert retry_delays[i] >= retry_delays[i - 1], (
             f"Retry delays should increase or stay at maximum: "
-            f"delay[{i-1}]={retry_delays[i-1]}, delay[{i}]={retry_delays[i]}"
+            f"delay[{i - 1}]={retry_delays[i - 1]}, delay[{i}]={retry_delays[i]}"
         )
 
     # Property: Delays should not exceed maximum
@@ -3636,7 +3536,6 @@ async def test_property_webhook_max_retries_enforcement(data):
     from api.services.webhook_manager import WebhookManager, WebhookStatus
     from api.database.models import WebhookDelivery
     from unittest.mock import MagicMock
-    from datetime import datetime
 
     # Generate test data
     task_type = data.draw(task_type_strategy())

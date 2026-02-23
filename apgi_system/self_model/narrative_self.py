@@ -1,7 +1,7 @@
 """Narrative Self - long-term identity and autobiographical memory."""
 
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any
 from collections import deque
 
 
@@ -48,7 +48,7 @@ class NarrativeSelf:
         Circular buffer storing significant experiences
     identity_vector : np.ndarray
         64-dimensional identity representation
-    goal_hierarchy : List
+    goal_hierarchy : list
         Hierarchical goal structure (currently unused)
     memory_capacity : int
         Maximum number of stored episodes
@@ -70,9 +70,9 @@ class NarrativeSelf:
         self.memory_capacity = self.config.get("episodic_memory_capacity", 1000)
         self.consolidation_rate = self.config.get("consolidation_rate", 0.01)
 
-        self.episodic_memory = deque(maxlen=self.memory_capacity)
+        self.episodic_memory: deque[Dict[str, Any]] = deque(maxlen=self.memory_capacity)
         self.identity_vector = np.random.randn(64) * 0.1
-        self.goal_hierarchy = []
+        self.goal_hierarchy: list[Any] = []
 
     def update(self, experience: Dict[str, Any], dt: float = 1.0) -> Dict[str, Any]:
         """
@@ -125,6 +125,6 @@ class NarrativeSelf:
             "identity_vector": self.identity_vector.copy(),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self.episodic_memory.clear()
         self.identity_vector = np.random.randn(64) * 0.1

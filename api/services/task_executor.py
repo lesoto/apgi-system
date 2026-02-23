@@ -8,10 +8,7 @@ import logging
 from enum import Enum
 import asyncio
 from typing import Dict, Any, Optional
-
-from celery.result import AsyncResult
-from fastapi import HTTPException, status
-
+from celery.result import AsyncResult  # type: ignore
 from api.celery_app import celery_app
 from api.tasks.task_registry import TASK_REGISTRY, TaskType
 
@@ -34,7 +31,7 @@ class TaskExecutor:
     Manages task submission, status tracking, and result retrieval.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize task executor."""
         self.celery = celery_app
         logger.info("TaskExecutor initialized")
@@ -77,7 +74,7 @@ class TaskExecutor:
         params = parameters or {}
 
         # Submit task in thread pool to avoid blocking
-        def _submit_task():
+        def _submit_task() -> str:
             logger.info(f"Submitting {task_type} task for session {session_id}")
             result = self.celery.send_task(
                 task_name, args=[session_id, params], task_id=None  # Let Celery generate ID
@@ -107,7 +104,7 @@ class TaskExecutor:
                 - error: Error message if failed
         """
 
-        def _get_status():
+        def _get_status() -> Dict[str, Any]:
             result = AsyncResult(task_id, app=self.celery)
 
             # Map Celery states to our TaskStatus
@@ -119,11 +116,9 @@ class TaskExecutor:
                 "FAILURE": TaskStatus.FAILED,
             }
 
-            status = state_mapping.get(result.state, TaskStatus.PENDING)
-
             response = {
                 "task_id": task_id,
-                "status": status.value,
+                "status": state_mapping.get(result.state, TaskStatus.PENDING),
                 "state": result.state,
             }
 
@@ -154,7 +149,7 @@ class TaskExecutor:
             ValueError: If task is not completed or failed
         """
 
-        def _get_result():
+        def _get_result() -> Any:
             result = AsyncResult(task_id, app=self.celery)
 
             if not result.ready():
@@ -180,7 +175,7 @@ class TaskExecutor:
             Dict with cancellation status
         """
 
-        def _cancel_task():
+        def _cancel_task() -> Dict[str, Any]:
             result = AsyncResult(task_id, app=self.celery)
 
             if result.state in ["PENDING", "STARTED", "RETRY"]:

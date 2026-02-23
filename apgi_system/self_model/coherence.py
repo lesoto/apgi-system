@@ -1,6 +1,5 @@
 """Coherence maintenance between minimal and narrative self."""
 
-import numpy as np
 from typing import Dict, Any
 
 
@@ -96,5 +95,5 @@ class CoherenceMaintenance:
             "phenomenal_unity": self.coherence_score > 0.7,
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self.coherence_score = 1.0

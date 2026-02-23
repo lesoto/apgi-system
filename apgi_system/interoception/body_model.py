@@ -5,10 +5,9 @@ Simulates physiological states and generates interoceptive predictions.
 """
 
 import numpy as np
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from dataclasses import dataclass
 from apgi_system.validation import InputValidator
-from apgi_system.types import FloatArray, ConfigDict, BodyState
 
 
 @dataclass

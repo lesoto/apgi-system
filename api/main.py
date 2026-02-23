@@ -161,7 +161,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
-        lifespan=lifespan,
+        lifespan=lifespan if not test_mode else None,
     )
 
     # Add request size limiting middleware (first, to catch large requests early)

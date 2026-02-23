@@ -23,9 +23,11 @@ References:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Optional, cast
+from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
+from random import shuffle
 
 
 class MaskType(Enum):
@@ -41,8 +43,8 @@ class Trial:
     """Configuration for a single masking trial."""
 
     trial_number: int
-    target_stimulus: np.ndarray
-    mask_stimulus: np.ndarray
+    target_stimulus: NDArray[np.float64]
+    mask_stimulus: NDArray[np.float64]
     soa_ms: float  # Stimulus Onset Asynchrony
     mask_type: MaskType
     target_duration_ms: float
@@ -61,6 +63,11 @@ class TrialResult:
     ignition_strength: float
     ignition_count: int
     mask_suppression_occurred: bool
+    mask_detected: bool
+    target_ignition_time: Optional[float]
+    mask_ignition_time: Optional[float]
+    target_signal_strength: float
+    mask_signal_strength: float
 
 
 class MaskingParadigmTask:
@@ -113,10 +120,10 @@ class MaskingParadigmTask:
         self.results: List[TrialResult] = []
 
         # Step execution state
-        self._step_state = None
-        self._current_trial_result = None
+        self._step_state: Optional[Dict[str, Any]] = None
+        self._current_trial_result: Optional[TrialResult] = None
 
-        print(f"Masking Paradigm Task initialized:")
+        print("Masking Paradigm Task initialized:")
         print(f"  - SOAs: {self.soas} ms")
         print(f"  - Target duration: {self.target_duration_ms} ms")
         print(f"  - Mask duration: {self.mask_duration_ms} ms")
@@ -147,10 +154,10 @@ class MaskingParadigmTask:
                 trial_num += 1
 
         # Randomize trial order
-        np.random.shuffle(trials)
+        shuffle(trials)
         return trials
 
-    def _generate_target(self) -> np.ndarray:
+    def _generate_target(self) -> NDArray[np.float64]:
         """
         Generate target stimulus.
 
@@ -177,7 +184,7 @@ class MaskingParadigmTask:
 
         return target
 
-    def _generate_mask(self) -> np.ndarray:
+    def _generate_mask(self) -> NDArray[np.float64]:
         """
         Generate mask stimulus.
 
@@ -194,7 +201,13 @@ class MaskingParadigmTask:
 
         return mask
 
-    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
+    def get_next_trial(self) -> Optional[Trial]:
+        """Get the next trial in sequence."""
+        if self.current_trial_idx >= len(self.trials):
+            return None
+        return self.trials[self.current_trial_idx]
+
+    def run_trial(self, apgi_system: Any, trial: Trial) -> TrialResult:
         """
         Run a single masking trial.
 
@@ -268,7 +281,6 @@ class MaskingParadigmTask:
 
         # Phase 3: Present mask stimulus
         # The mask may suppress ongoing target processing or prevent late ignition
-        target_detected_before_mask = target_detected
         mask_steps = int(trial.mask_duration_ms)
 
         # Calculate masking probability based on SOA
@@ -317,13 +329,18 @@ class MaskingParadigmTask:
             ignition_strength=max_ignition_strength,
             ignition_count=ignition_count,
             mask_suppression_occurred=mask_suppression_occurred,
+            mask_detected=False,  # Not tracked in run_trial
+            target_ignition_time=detection_time if target_detected else None,
+            mask_ignition_time=None,
+            target_signal_strength=max_ignition_strength if target_detected else 0.0,
+            mask_signal_strength=0.0,
         )
 
         self.results.append(result)
         self.current_trial_idx += 1
         return result
 
-    def run_all_trials(self, apgi_system) -> Dict[str, Any]:
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Run all trials and return comprehensive results.
 
@@ -340,9 +357,9 @@ class MaskingParadigmTask:
         self.results = []
         self.current_trial_idx = 0
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Running Masking Paradigm Task: {len(self.trials)} trials")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         for trial_idx, trial in enumerate(self.trials):
             if trial_idx % 10 == 0:
@@ -373,7 +390,7 @@ class MaskingParadigmTask:
             return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize results by SOA
-        results_by_soa = {soa: [] for soa in self.soas}
+        results_by_soa: Dict[float, List[TrialResult]] = {soa: [] for soa in self.soas}
         for result in self.results:
             results_by_soa[result.soa_ms].append(result)
 
@@ -445,7 +462,7 @@ class MaskingParadigmTask:
             },
         }
 
-    def print_results(self, analysis: Optional[Dict[str, Any]] = None):
+    def print_results(self, analysis: Optional[Dict[str, Any]] = None) -> None:
         """
         Print formatted results to console.
 
@@ -506,7 +523,7 @@ class MaskingParadigmTask:
         print(f"  • Mask strength: {params['mask_strength']}")
         print("=" * 80 + "\n")
 
-    def save_results(self, filename: str):
+    def save_results(self, filename: str) -> None:
         """
         Save results to JSON file.
 
@@ -550,7 +567,7 @@ class MaskingParadigmTask:
 
         print(f"Results saved to: {filename}")
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset task for a new run."""
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
@@ -559,7 +576,7 @@ class MaskingParadigmTask:
         self._current_trial_result = None
         print("Task reset. Ready for new run.")
 
-    def step(self, apgi_system) -> Dict[str, Any]:
+    def step(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Execute one step of the current trial.
 
@@ -607,14 +624,14 @@ class MaskingParadigmTask:
             self._current_trial_result = None
 
         state = self._step_state
-        trial = state["trial"]
+        trial = cast(Trial, state["trial"])
 
         # Determine stimulus based on phase
         if state["phase"] == "target":
-            stimulus = trial.target
+            stimulus = trial.target_stimulus
             phase_duration = self.target_duration_ms
         else:  # mask
-            stimulus = trial.mask
+            stimulus = trial.mask_stimulus
             phase_duration = self.mask_duration_ms
 
         # Step the system
@@ -649,8 +666,13 @@ class MaskingParadigmTask:
                 # Trial complete
                 result = TrialResult(
                     trial_number=trial.trial_number,
-                    soa=trial.soa,
+                    soa_ms=trial.soa_ms,
+                    mask_type=trial.mask_type,
                     target_detected=state["target_detected"],
+                    detection_time=state["target_ignition_time"],
+                    ignition_strength=state["target_signal_strength"],
+                    ignition_count=1 if state["target_detected"] or state["mask_detected"] else 0,
+                    mask_suppression_occurred=False,
                     mask_detected=state["mask_detected"],
                     target_ignition_time=state["target_ignition_time"],
                     mask_ignition_time=state["mask_ignition_time"],

@@ -9,24 +9,23 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-# Add project root to path
 import sys
 from pathlib import Path
 
+# Add project root to path for local imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import numpy as np
-import yaml
-from typing import List, Dict, Any
-from numpy.typing import NDArray
-from hypothesis import given, strategies as st, settings
-from hypothesis import HealthCheck
-
-from apgi_system.system import APGISystem
-from apgi_system.core.precision import PrecisionWeighting
-from apgi_system.interoception.body_model import BodyModel
-from apgi_system.thermodynamic.metabolism import MetabolicBudget
-from tests.strategies import (
+import numpy as np  # noqa: E402
+import yaml  # noqa: E402
+from typing import List, Dict, Any  # noqa: E402
+from numpy.typing import NDArray  # noqa: E402
+from hypothesis import given, strategies as st, settings  # noqa: E402
+from hypothesis import HealthCheck  # noqa: E402
+from apgi_system.system import APGISystem  # noqa: E402
+from apgi_system.core.precision import PrecisionWeighting  # noqa: E402
+from apgi_system.interoception.body_model import BodyModel  # noqa: E402
+from apgi_system.thermodynamic.metabolism import MetabolicBudget  # noqa: E402
+from tests.strategies import (  # noqa: E402
     observation_strategy,
     body_state_strategy,
     error_variance_strategy,

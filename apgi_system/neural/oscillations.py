@@ -4,14 +4,12 @@ Neural Oscillation Engine
 Generates multi-band oscillations and phase-amplitude coupling.
 """
 
-import logging
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 
 import numpy as np
 
 from apgi_system.constants import (
     DEFAULT_TIMESTEP_MS,
-    DEFAULT_FREQS,
     TWO_PI,
     MILLISECONDS_TO_SECONDS,
 )
@@ -115,9 +113,6 @@ class OscillationEngine:
         for band_name, band_cfg in bands_config.items():
             freq_range = tuple(band_cfg["range"])
             amplitude = band_cfg["amplitude"]
-
-            # Start with random frequency in range
-            center_freq = (freq_range[0] + freq_range[1]) / 2
 
             self.bands[band_name] = OscillationBand(
                 name=band_name,

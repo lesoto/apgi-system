@@ -4,8 +4,7 @@ Allostatic Regulation
 Maintains homeostatic set points and manages allostatic load.
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
 from apgi_system.validation import InputValidator
 
@@ -282,7 +281,7 @@ class AllostaticRegulator:
         """
         return self.total_load
 
-    def trigger_stressor(self, intensity: float = 0.5):
+    def trigger_stressor(self, intensity: float = 0.5) -> None:
         """
         Simulate an acute stressor event.
 
@@ -298,7 +297,7 @@ class AllostaticRegulator:
         self.total_load += intensity * 0.2
         self.total_load = min(1.0, self.total_load)
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset to baseline state.
 

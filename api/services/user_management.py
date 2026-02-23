@@ -10,7 +10,7 @@ Provides comprehensive user management functionality including:
 
 import secrets
 import string
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from api.database.models import User
 from api.services.auth_manager import AuthManager
-from api.exceptions import AuthenticationError, UserNotFoundError
+from api.exceptions import UserNotFoundError
 
 
 class UserManagementService:
@@ -285,7 +285,9 @@ class UserManagementService:
         """
         stmt = select(User)
         if active_only:
-            stmt = stmt.where(User.is_active == True)
+            stmt = stmt.where(User.is_active.is_(True))
+        else:
+            stmt = stmt.where(User.is_active.is_(True))
 
         stmt = stmt.order_by(User.created_at.desc())
         result = self.db.execute(stmt)

@@ -11,6 +11,7 @@ from .core import (
     VisualizationPanel,
     StatusBar,
     MenuBar,
+    ToolTip,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "VisualizationPanel",
     "StatusBar",
     "MenuBar",
+    "ToolTip",
 ]

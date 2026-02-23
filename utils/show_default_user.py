@@ -9,13 +9,13 @@ Useful for development and testing when you need to know the login credentials.
 import sys
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
-
 from api.database.connection import SessionLocal
 from api.database.models import User
 from sqlalchemy import select
+
+# Add project root to path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
 
 def display_default_user():

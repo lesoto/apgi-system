@@ -6,7 +6,6 @@ Handles JWT token creation/verification and password hashing for user authentica
 
 import hmac
 import logging
-import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 

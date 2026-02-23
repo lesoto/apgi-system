@@ -22,8 +22,8 @@ try:
     WEB_DEPENDENCIES_AVAILABLE = True
 except ImportError:
     WEB_DEPENDENCIES_AVAILABLE = False
-    Flask = None
-    SocketIO = None
+    Flask = None  # type: ignore
+    SocketIO = None  # type: ignore
 
 
 class WebMonitor:
@@ -78,7 +78,7 @@ class WebMonitor:
         self.app: Optional[Flask] = None
         self.socketio: Optional[SocketIO] = None
 
-        if Flask:
+        if WEB_DEPENDENCIES_AVAILABLE:
             self.app = Flask(
                 __name__,
                 template_folder=str(Path(__file__).parent / "templates"),
@@ -98,14 +98,15 @@ class WebMonitor:
 
     def _setup_routes(self) -> None:
         """Setup Flask routes."""
+        assert self.app is not None
 
-        @self.app.route("/")
-        def index() -> str:
+        @self.app.route("/")  # type: ignore
+        def index() -> str:  # type: ignore
             """Main dashboard page."""
             return render_template("dashboard.html")
 
-        @self.app.route("/api/status")
-        def get_status() -> Any:
+        @self.app.route("/api/status")  # type: ignore
+        def get_status() -> Any:  # type: ignore
             """Get current system status."""
             return jsonify(
                 {
@@ -117,8 +118,8 @@ class WebMonitor:
                 }
             )
 
-        @self.app.route("/api/data")
-        def get_data() -> Any:
+        @self.app.route("/api/data")  # type: ignore
+        def get_data() -> Any:  # type: ignore
             """Get current data for plotting."""
             return jsonify(
                 {
@@ -131,8 +132,8 @@ class WebMonitor:
                 }
             )
 
-        @self.app.route("/api/export")
-        def export_data() -> Any:
+        @self.app.route("/api/export")  # type: ignore
+        def export_data() -> Any:  # type: ignore
             """Export current data as JSON."""
             data = {
                 "export_timestamp": datetime.now().isoformat(),
@@ -154,23 +155,24 @@ class WebMonitor:
 
     def _setup_socketio_events(self) -> None:
         """Setup WebSocket event handlers."""
+        assert self.socketio is not None
 
-        @self.socketio.on("connect")
-        def handle_connect() -> None:
+        @self.socketio.on("connect")  # type: ignore
+        def handle_connect() -> None:  # type: ignore
             """Handle client connection."""
-            print(f"Client connected: {request.sid}")
+            print(f"Client connected: {request.sid}")  # type: ignore
             emit(
                 "status_update",
                 {"is_monitoring": self.is_monitoring, "system_status": self.system_status},
             )
 
-        @self.socketio.on("disconnect")
-        def handle_disconnect() -> None:
+        @self.socketio.on("disconnect")  # type: ignore
+        def handle_disconnect() -> None:  # type: ignore
             """Handle client disconnection."""
-            print(f"Client disconnected: {request.sid}")
+            print(f"Client disconnected: {request.sid}")  # type: ignore
 
-        @self.socketio.on("start_monitoring")
-        def handle_start_monitoring() -> None:
+        @self.socketio.on("start_monitoring")  # type: ignore
+        def handle_start_monitoring() -> None:  # type: ignore
             """Handle start monitoring request."""
             self.start_monitoring()
             emit(
@@ -179,8 +181,8 @@ class WebMonitor:
                 broadcast=True,
             )
 
-        @self.socketio.on("stop_monitoring")
-        def handle_stop_monitoring() -> None:
+        @self.socketio.on("stop_monitoring")  # type: ignore
+        def handle_stop_monitoring() -> None:  # type: ignore
             """Handle stop monitoring request."""
             self.stop_monitoring()
             emit(
@@ -189,13 +191,13 @@ class WebMonitor:
                 broadcast=True,
             )
 
-        @self.socketio.on("clear_data")
-        def handle_clear_data() -> None:
+        @self.socketio.on("clear_data")  # type: ignore
+        def handle_clear_data() -> None:  # type: ignore
             """Handle clear data request."""
             self.clear_buffers()
             emit("data_cleared", broadcast=True)
 
-    def start_monitoring(self):
+    def start_monitoring(self) -> None:
         """Start real-time monitoring."""
         if not self.is_monitoring:
             self.is_monitoring = True
@@ -209,7 +211,7 @@ class WebMonitor:
 
             print("Real-time monitoring started")
 
-    def stop_monitoring(self):
+    def stop_monitoring(self) -> None:
         """Stop real-time monitoring."""
         if self.is_monitoring:
             self.is_monitoring = False
@@ -221,7 +223,7 @@ class WebMonitor:
 
             print("Real-time monitoring stopped")
 
-    def clear_buffers(self):
+    def clear_buffers(self) -> None:
         """Clear all data buffers."""
         self.time_buffer.clear()
         self.ignition_buffer.clear()
@@ -232,13 +234,14 @@ class WebMonitor:
         self.alerts.clear()
         print("Data buffers cleared")
 
-    def update_data(self, system_state: Dict[str, Any]):
+    def update_data(self, system_state: Dict[str, Any]) -> None:
         """
         Update monitoring data with new system state.
 
         Args:
             system_state: Current APGI system state dictionary
         """
+        assert self.socketio is not None
         current_time = system_state.get("time", time.time() * 1000)
 
         # Extract key metrics
@@ -271,7 +274,7 @@ class WebMonitor:
 
         # Emit data update via WebSocket
         if self.is_monitoring:
-            self.socketio.emit(
+            self.socketio.emit(  # type: ignore
                 "data_update",
                 {
                     "time": current_time,
@@ -280,7 +283,7 @@ class WebMonitor:
                 },
             )
 
-    def _check_alerts(self, system_state: Dict[str, Any]):
+    def _check_alerts(self, system_state: Dict[str, Any]) -> None:
         """Check for system alerts and warnings."""
         current_time = datetime.now().isoformat()
 
@@ -324,12 +327,13 @@ class WebMonitor:
         if len(self.alerts) > 100:
             self.alerts = self.alerts[-50:]
 
-    def _update_loop(self):
+    def _update_loop(self) -> None:
         """Background thread for periodic updates."""
+        assert self.socketio is not None
         while not self.stop_event.is_set():
             try:
                 # Emit periodic status updates
-                self.socketio.emit(
+                self.socketio.emit(  # type: ignore
                     "heartbeat",
                     {
                         "timestamp": datetime.now().isoformat(),
@@ -344,7 +348,7 @@ class WebMonitor:
                 print(f"Error in update loop: {e}")
                 break
 
-    def create_dashboard_template(self):
+    def create_dashboard_template(self) -> None:
         """Create the HTML dashboard template."""
         template_dir = Path(__file__).parent / "templates"
         template_dir.mkdir(exist_ok=True)
@@ -378,7 +382,7 @@ class WebMonitor:
                 </h1>
             </div>
         </div>
-        
+
         <div class="row">
             <div class="col-md-8">
                 <!-- Control Panel -->
@@ -392,7 +396,7 @@ class WebMonitor:
                         <span id="statusText" class="ms-3 fw-bold">Stopped</span>
                     </div>
                 </div>
-                
+
                 <!-- Plots -->
                 <div class="row">
                     <div class="col-md-6">
@@ -412,7 +416,7 @@ class WebMonitor:
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card">
@@ -432,7 +436,7 @@ class WebMonitor:
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-4">
                 <!-- Current Metrics -->
                 <div class="card metric-card">
@@ -460,7 +464,7 @@ class WebMonitor:
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Alerts -->
                 <div class="card">
                     <div class="card-header">System Alerts</div>
@@ -475,53 +479,53 @@ class WebMonitor:
     <script>
         // Initialize Socket.IO connection
         const socket = io();
-        
+
         // Initialize plots
         const plotConfig = {responsive: true, displayModeBar: false};
-        
+
         // Initialize empty plots
         Plotly.newPlot('ignitionPlot', [{x: [], y: [], type: 'scatter', mode: 'lines', name: 'Ignition Signal'}], {}, plotConfig);
         Plotly.newPlot('freeEnergyPlot', [{x: [], y: [], type: 'scatter', mode: 'lines', name: 'Free Energy'}], {}, plotConfig);
         Plotly.newPlot('precisionPlot', [{x: [], y: [], type: 'scatter', mode: 'lines', name: 'Precision'}], {}, plotConfig);
         Plotly.newPlot('energyPlot', [{x: [], y: [], type: 'scatter', mode: 'lines', name: 'Energy Reserves'}], {}, plotConfig);
-        
+
         // Control buttons
         document.getElementById('startBtn').addEventListener('click', () => {
             socket.emit('start_monitoring');
         });
-        
+
         document.getElementById('stopBtn').addEventListener('click', () => {
             socket.emit('stop_monitoring');
         });
-        
+
         document.getElementById('clearBtn').addEventListener('click', () => {
             socket.emit('clear_data');
         });
-        
+
         document.getElementById('exportBtn').addEventListener('click', () => {
             window.open('/api/export', '_blank');
         });
-        
+
         // Socket event handlers
         socket.on('status_update', (data) => {
             updateStatus(data.is_monitoring, data.system_status);
         });
-        
+
         socket.on('data_update', (data) => {
             updateMetrics(data.metrics);
             updatePlots(data.time, data.metrics);
             updateAlerts(data.alerts);
         });
-        
+
         socket.on('data_cleared', () => {
             clearPlots();
         });
-        
+
         // Update functions
         function updateStatus(isMonitoring, status) {
             const indicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
-            
+
             if (isMonitoring) {
                 indicator.className = 'status-indicator status-running';
                 statusText.textContent = 'Running';
@@ -530,7 +534,7 @@ class WebMonitor:
                 statusText.textContent = 'Stopped';
             }
         }
-        
+
         function updateMetrics(metrics) {
             document.getElementById('currentIgnition').textContent = metrics.ignition_signal.toFixed(2);
             document.getElementById('currentFreeEnergy').textContent = metrics.free_energy.toFixed(2);
@@ -538,41 +542,41 @@ class WebMonitor:
             document.getElementById('currentEnergy').textContent = (metrics.energy_reserves * 100).toFixed(1) + '%';
             document.getElementById('currentCoherence').textContent = metrics.coherence.toFixed(2);
         }
-        
+
         function updatePlots(time, metrics) {
             const update = {
                 x: [[time]],
                 y: [[metrics.ignition_signal]]
             };
             Plotly.extendTraces('ignitionPlot', update, [0]);
-            
+
             Plotly.extendTraces('freeEnergyPlot', {x: [[time]], y: [[metrics.free_energy]]}, [0]);
             Plotly.extendTraces('precisionPlot', {x: [[time]], y: [[metrics.precision]]}, [0]);
             Plotly.extendTraces('energyPlot', {x: [[time]], y: [[metrics.energy_reserves]]}, [0]);
         }
-        
+
         function updateAlerts(alerts) {
             const alertsPanel = document.getElementById('alertsPanel');
             if (alerts.length === 0) {
                 alertsPanel.innerHTML = '<p class="text-muted">No alerts</p>';
                 return;
             }
-            
+
             let html = '';
             alerts.forEach(alert => {
-                const alertClass = alert.level === 'critical' ? 'alert-danger' : 
+                const alertClass = alert.level === 'critical' ? 'alert-danger' :
                                  alert.level === 'warning' ? 'alert-warning' : 'alert-info';
                 html += `<div class="alert ${alertClass} alert-sm">${alert.message}</div>`;
             });
             alertsPanel.innerHTML = html;
         }
-        
+
         function clearPlots() {
             Plotly.deleteTraces('ignitionPlot', 0);
             Plotly.deleteTraces('freeEnergyPlot', 0);
             Plotly.deleteTraces('precisionPlot', 0);
             Plotly.deleteTraces('energyPlot', 0);
-            
+
             Plotly.addTraces('ignitionPlot', {x: [], y: [], type: 'scatter', mode: 'lines', name: 'Ignition Signal'});
             Plotly.addTraces('freeEnergyPlot', {x: [], y: [], type: 'scatter', mode: 'lines', name: 'Free Energy'});
             Plotly.addTraces('precisionPlot', {x: [], y: [], type: 'scatter', mode: 'lines', name: 'Precision'});
@@ -586,7 +590,7 @@ class WebMonitor:
         with open(template_dir / "dashboard.html", "w", encoding="utf-8") as f:
             f.write(dashboard_html)
 
-    def run(self, debug: bool = False):
+    def run(self, debug: bool = False) -> None:
         """
         Start the web monitoring server.
 
@@ -600,7 +604,7 @@ class WebMonitor:
         print("Press Ctrl+C to stop the server")
 
         try:
-            self.socketio.run(
+            self.socketio.run(  # type: ignore
                 self.app, host=self.host, port=self.port, debug=debug, allow_unsafe_werkzeug=True
             )
         except KeyboardInterrupt:
@@ -629,7 +633,7 @@ class MonitoringIntegration:
         self.monitor = monitor
         self.is_connected = False
 
-    def connect_system(self, apgi_system):
+    def connect_system(self, apgi_system) -> None:
         """
         Connect APGI system to web monitor.
 
@@ -644,7 +648,7 @@ class MonitoringIntegration:
         else:
             print("Warning: APGI system does not support monitoring callbacks")
 
-    def disconnect_system(self, apgi_system):
+    def disconnect_system(self, apgi_system) -> None:
         """
         Disconnect APGI system from web monitor.
 
@@ -656,7 +660,7 @@ class MonitoringIntegration:
             self.is_connected = False
             print("APGI system disconnected from web monitor")
 
-    def simulate_data(self, duration: float = 60.0, interval: float = 0.1):
+    def simulate_data(self, duration: float = 60.0, interval: float = 0.1) -> None:
         """
         Simulate APGI system data for testing the monitor.
 
@@ -712,7 +716,6 @@ if __name__ == "__main__":
     integration = MonitoringIntegration(monitor)
 
     # Start simulation in a separate thread
-    import threading
 
     sim_thread = threading.Thread(target=integration.simulate_data, args=(300.0, 0.1))
     sim_thread.daemon = True

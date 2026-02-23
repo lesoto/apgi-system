@@ -8,7 +8,7 @@ and neuromodulator effects.
 import numpy as np
 import threading
 from collections import deque
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from enum import Enum
 
 from apgi_system.validation import InputValidator

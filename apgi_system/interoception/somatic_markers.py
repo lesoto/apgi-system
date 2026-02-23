@@ -8,8 +8,7 @@ then uses these to bias decision-making.
 
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict
+from dataclasses import dataclass
 from apgi_system.validation import InputValidator
 
 
@@ -21,8 +20,8 @@ class SomaticMarker:
     Stores: (context_pattern, action_pattern) -> body_outcome
     """
 
-    context_pattern: np.ndarray
-    action_pattern: np.ndarray
+    context_pattern: np.ndarray[Any, np.dtype[Any]]
+    action_pattern: np.ndarray[Any, np.dtype[Any]]
     body_outcome: float  # Valence: positive = good, negative = bad
     strength: float = 1.0  # Association strength
     access_count: int = 0
@@ -129,11 +128,11 @@ class SomaticMarkerSystem:
 
     def learn(
         self,
-        context: np.ndarray,
-        action: np.ndarray,
+        context: np.ndarray[Any, np.dtype[Any]],
+        action: np.ndarray[Any, np.dtype[Any]],
         body_outcome: float,
         current_time: float = 0.0,
-    ):
+    ) -> None:
         """
         Learn or update a somatic marker.
 
@@ -207,7 +206,9 @@ class SomaticMarkerSystem:
                     last_update_time=current_time,
                 )
 
-    def retrieve(self, context: np.ndarray, action: np.ndarray) -> Tuple[float, bool]:
+    def retrieve(
+        self, context: np.ndarray[Any, np.dtype[Any]], action: np.ndarray[Any, np.dtype[Any]]
+    ) -> Tuple[float, bool]:
         """
         Retrieve somatic marker for a context-action pair.
 
@@ -281,7 +282,10 @@ class SomaticMarkerSystem:
             return 1.0, False
 
     def _find_similar_marker(
-        self, context: np.ndarray, action: np.ndarray, similarity_threshold: float = 0.8
+        self,
+        context: np.ndarray[Any, np.dtype[Any]],
+        action: np.ndarray[Any, np.dtype[Any]],
+        similarity_threshold: float = 0.8,
     ) -> Optional[SomaticMarker]:
         """
         Find marker similar to given context-action pair.
@@ -324,7 +328,9 @@ class SomaticMarkerSystem:
 
         return best_marker
 
-    def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
+    def _cosine_similarity(
+        self, a: np.ndarray[Any, np.dtype[Any]], b: np.ndarray[Any, np.dtype[Any]]
+    ) -> float:
         """
         Compute cosine similarity between two vectors.
 
@@ -359,7 +365,7 @@ class SomaticMarkerSystem:
 
         return float(np.dot(a_trunc, b_trunc) / (norm_a * norm_b))
 
-    def decay_markers(self, dt: float):
+    def decay_markers(self, dt: float) -> None:
         """
         Apply decay to unused markers.
 
@@ -409,7 +415,7 @@ class SomaticMarkerSystem:
             "avg_outcome": float(np.mean([m.body_outcome for m in self.markers])),
         }
 
-    def consolidate(self):
+    def consolidate(self) -> None:
         """
         Consolidate markers (simulate sleep/offline processing).
 
@@ -433,7 +439,7 @@ class SomaticMarkerSystem:
             # Reset access count
             marker.access_count = 0
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Clear all markers and reset statistics.
 

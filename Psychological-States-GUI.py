@@ -33,6 +33,12 @@ except ImportError:
     THEME_MANAGER_AVAILABLE = False
     print("Warning: Theme manager not available. Theme support disabled.")
 
+# Import ToolTip from components
+try:
+    from apgi_gui.components.core import ToolTip
+except ImportError:
+    print("Warning: ToolTip component not available.")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -56,88 +62,10 @@ except ImportError:
     logger.warning("Tkinter not available for GUI interface")
 
 
-class ToolTip:
-    """Consistent tooltip implementation for tkinter widgets"""
-
-    def __init__(self, widget: tk.Widget, text: str = "") -> None:
-        """Initialize tooltip
-
-        Args:
-            widget: The widget to attach tooltip to
-            text: Tooltip text to display
-        """
-        self.widget = widget
-        self.text = text
-        self.tipwindow: Optional[tk.Toplevel] = None
-        self.id: Optional[str] = None
-        self._delay = 500
-
-        self.widget.bind("<Enter>", self.on_enter)
-        self.widget.bind("<Leave>", self.on_leave)
-        self.widget.bind("<ButtonPress>", self.on_leave)
-
-    def on_enter(self, event: Optional[tk.Event[Any]] = None) -> None:
-        """Show tooltip when mouse enters widget"""
-        self.schedule()
-
-    def on_leave(self, event: Optional[tk.Event[Any]] = None) -> None:
-        """Hide tooltip when mouse leaves widget"""
-        self.unschedule()
-        self.hidetip()
-
-    def schedule(self) -> None:
-        """Schedule tooltip display"""
-        self.unschedule()
-        self.id = self.widget.after(self._delay, self.showtip)
-
-    def unschedule(self) -> None:
-        """Cancel scheduled tooltip display"""
-        id = self.id
-        self.id = None
-        if id:
-            self.widget.after_cancel(id)
-
-    def showtip(self) -> None:
-        """Display the tooltip"""
-        if self.tipwindow or not self.text:
-            return
-        bbox = self.widget.bbox("insert")  # type: ignore
-        if bbox is None:
-            return
-        x, y, _, _ = bbox
-        x = x + self.widget.winfo_rootx() + 25
-        y = y + self.widget.winfo_rooty() + 20
-        self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(
-            tw,
-            text=self.text,
-            justify=tk.LEFT,
-            background="#ffffe0",
-            relief=tk.SOLID,
-            borderwidth=1,
-            font=("tahoma", 8, "normal"),
-        )
-        label.pack(padx=1, pady=1)
-
-    def hidetip(self) -> None:
-        """Hide the tooltip"""
-        tw = self.tipwindow
-        self.tipwindow = None
-        if tw:
-            tw.destroy()
-
-    def update_text(self, new_text: str) -> None:
-        """Update tooltip text"""
-        self.text = new_text
-
-
-# Visualization imports with graceful fallbacks
 try:
-    import plotly.graph_objects as go
-    import plotly.io as pio
-    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go  # type: ignore
+    import plotly.io as pio  # type: ignore
+    from plotly.subplots import make_subplots  # type: ignore
 
     PLOTLY_AVAILABLE = True
     pio.templates.default = "plotly_white"
@@ -165,7 +93,7 @@ except ImportError:
 # Try to import tkinterweb for HTML rendering, fallback to built-in approach
 try:
     try:
-        from tkinterweb import HTMLFrame
+        from tkinterweb import HTMLFrame  # type: ignore
 
         TKINTERWEB_AVAILABLE = True
     except ImportError:
@@ -229,7 +157,7 @@ class APGIParameters:
         try:
             computed = self.Pi_i_baseline * np.exp(self.beta * self.M_ca)
             computed = np.clip(computed, 0.1, 10.0)
-            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)  # type: ignore
+            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)
         except (TypeError, AttributeError):
             return False
 
@@ -300,7 +228,7 @@ class EmbeddedVisualizationRenderer:
     def __init__(self, temp_dir: Optional[str] = None):
         """Initialize renderer with optional temp directory"""
         self.temp_dir = temp_dir
-        self.current_file = None
+        self.current_file: Optional[str] = None
         self._cleanup_on_exit = True
         self._temp_dir_initialized = False
 
@@ -311,7 +239,7 @@ class EmbeddedVisualizationRenderer:
             self._temp_dir_initialized = True
         return self.temp_dir
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup temporary files on object destruction"""
         # Note: __del__ is not guaranteed to be called
         # Use force_cleanup() for explicit cleanup
@@ -321,12 +249,12 @@ class EmbeddedVisualizationRenderer:
             # Silently ignore cleanup errors during destruction
             pass
 
-    def force_cleanup(self):
+    def force_cleanup(self) -> None:
         """Force cleanup of temporary resources"""
         self._cleanup_on_exit = True
         self.cleanup_temp_files()
 
-    def cleanup_temp_files(self):
+    def cleanup_temp_files(self) -> None:
         """Manually cleanup temporary files"""
         if hasattr(self, "temp_dir") and self.temp_dir and os.path.exists(self.temp_dir):
             try:
@@ -506,7 +434,7 @@ class VisualizationCache:
         self.cache: Dict[str, go.Figure] = {}
         self.max_size = max_size
 
-    def _get_cache_key(self, viz_type: str, **kwargs) -> str:
+    def _get_cache_key(self, viz_type: str, **kwargs: Any) -> str:
         """Generate cache key from visualization parameters"""
         try:
             # Sort and convert to string for hash
@@ -523,12 +451,12 @@ class VisualizationCache:
             key_data = f"{viz_type}_{str(kwargs)}"
             return hashlib.md5(key_data.encode()).hexdigest()
 
-    def get(self, viz_type: str, **kwargs) -> Optional[go.Figure]:
+    def get(self, viz_type: str, **kwargs: Any) -> Optional[go.Figure]:
         """Get cached visualization if available"""
         key = self._get_cache_key(viz_type, **kwargs)
         return self.cache.get(key)
 
-    def put(self, viz_type: str, fig: go.Figure, **kwargs) -> None:
+    def put(self, viz_type: str, fig: go.Figure, **kwargs: Any) -> None:
         """Cache visualization with size management"""
         key = self._get_cache_key(viz_type, **kwargs)
 
@@ -592,6 +520,8 @@ class APGIVisualizer:
         self.renderer = EmbeddedVisualizationRenderer()
         self.cache = VisualizationCache()
 
+        self.df: Optional[pd.DataFrame] = None
+
         if PANDAS_AVAILABLE:
             self.df = self._create_dataframe()
         else:
@@ -613,7 +543,7 @@ class APGIVisualizer:
         else:
             return value / col_max
 
-    def _create_3d_marker(self, size: float, color: str) -> dict:
+    def _create_3d_marker(self, size: float, color: str) -> Dict[str, Any]:
         """Create standardized 3D marker configuration"""
         return dict(
             size=size,
@@ -962,6 +892,200 @@ class APGIVisualizer:
             return fig
         except Exception as e:
             logger.error(f"Error creating radar chart: {e}")
+            return None
+
+    def plot_state_transition(self, start_state: str, end_state: str) -> Optional[go.Figure]:
+        """Create a visualization of the transition between two psychological states.
+
+        Args:
+            start_state: Name of the starting state
+            end_state: Name of the ending state
+
+        Returns:
+            Plotly Figure showing the transition path or None if unavailable
+        """
+        if not PLOTLY_AVAILABLE:
+            logger.warning("Plotly not available")
+            return None
+
+        if start_state not in self.states or end_state not in self.states:
+            logger.warning("Invalid states for transition")
+            return None
+
+        try:
+            # Get state parameters
+            start_params = self.states[start_state]
+            end_params = self.states[end_state]
+
+            # Create transition path by interpolating parameters
+            n_steps = 20
+            transition_states = []
+            for i in range(n_steps + 1):
+                t = i / n_steps
+                # Interpolate each parameter
+                interpolated = APGIParameters(
+                    Pi_e=start_params.Pi_e + t * (end_params.Pi_e - start_params.Pi_e),
+                    Pi_i_baseline=start_params.Pi_i_baseline
+                    + t * (end_params.Pi_i_baseline - start_params.Pi_i_baseline),
+                    Pi_i_eff=start_params.Pi_i_eff
+                    + t * (end_params.Pi_i_eff - start_params.Pi_i_eff),
+                    theta_t=start_params.theta_t + t * (end_params.theta_t - start_params.theta_t),
+                    S_t=start_params.S_t + t * (end_params.S_t - start_params.S_t),
+                    M_ca=start_params.M_ca + t * (end_params.M_ca - start_params.M_ca),
+                    beta=start_params.beta + t * (end_params.beta - start_params.beta),
+                    z_e=start_params.z_e + t * (end_params.z_e - start_params.z_e),
+                    z_i=start_params.z_i + t * (end_params.z_i - start_params.z_i),
+                )
+                transition_states.append(interpolated)
+
+            # Create 3D trajectory visualization
+            x_vals = [p.Pi_e for p in transition_states]
+            y_vals = [p.Pi_i_eff for p in transition_states]
+            z_vals = [p.theta_t for p in transition_states]
+
+            fig = go.Figure()
+
+            # Add trajectory line
+            fig.add_trace(
+                go.Scatter3d(
+                    x=x_vals,
+                    y=y_vals,
+                    z=z_vals,
+                    mode="lines+markers",
+                    line=dict(color="blue", width=4),
+                    marker=dict(size=6, color="red"),
+                    name="Transition Path",
+                )
+            )
+
+            # Add start and end points
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[x_vals[0]],
+                    y=[y_vals[0]],
+                    z=[z_vals[0]],
+                    mode="markers+text",
+                    marker=dict(size=10, color="green"),
+                    text=[start_state],
+                    textposition="top center",
+                    name="Start State",
+                )
+            )
+
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[x_vals[-1]],
+                    y=[y_vals[-1]],
+                    z=[z_vals[-1]],
+                    mode="markers+text",
+                    marker=dict(size=10, color="orange"),
+                    text=[end_state],
+                    textposition="top center",
+                    name="End State",
+                )
+            )
+
+            fig.update_layout(
+                title=f"State Transition: {start_state} → {end_state}",
+                scene=dict(
+                    xaxis_title="Pi_e",
+                    yaxis_title="Pi_i_eff",
+                    zaxis_title="theta_t",
+                ),
+                showlegend=True,
+            )
+
+            return fig
+        except Exception as e:
+            logger.error(f"Error creating transition visualization: {e}")
+            return None
+
+    def plot_comparative_analysis(self, state_names: List[str]) -> Optional[go.Figure]:
+        """Create a comparative analysis table of multiple psychological states.
+
+        Args:
+            state_names: List of state names to compare
+
+        Returns:
+            Plotly Figure with comparison table or None if unavailable
+        """
+        if not PLOTLY_AVAILABLE or not PANDAS_AVAILABLE:
+            logger.warning("Plotly or Pandas not available")
+            return None
+
+        # Filter valid states
+        valid_states = [name for name in state_names if name in self.states]
+        if len(valid_states) < 2:
+            logger.warning("Need at least 2 valid states for comparison")
+            return None
+
+        try:
+            # Get parameter data for each state
+            param_data = {}
+            parameters = [
+                "Pi_e",
+                "Pi_i_baseline",
+                "Pi_i_eff",
+                "theta_t",
+                "S_t",
+                "M_ca",
+                "beta",
+                "z_e",
+                "z_i",
+                "ignition_probability",
+            ]
+
+            for param in parameters:
+                param_data[param] = [getattr(self.states[state], param) for state in valid_states]
+
+            # Create table data
+            header = ["Parameter"] + valid_states + ["Mean", "Std", "Range"]
+            rows = []
+
+            for param in parameters:
+                values = param_data[param]
+                mean_val = np.mean(values)
+                std_val = np.std(values)
+                range_val = max(values) - min(values)
+
+                row = (
+                    [param]
+                    + [f"{v:.3f}" for v in values]
+                    + [f"{mean_val:.3f}", f"{std_val:.3f}", f"{range_val:.3f}"]
+                )
+                rows.append(row)
+
+            # Create table figure
+            fig = go.Figure(
+                data=[
+                    go.Table(
+                        columnwidth=[150] + [100] * (len(valid_states) + 3),
+                        header=dict(
+                            values=header,
+                            fill_color="lightblue",
+                            align="center",
+                            font=dict(size=12, color="black"),
+                            height=40,
+                        ),
+                        cells=dict(
+                            values=list(zip(*rows)),
+                            fill_color="white",
+                            align=["left"] + ["center"] * (len(valid_states) + 3),
+                            font=dict(size=11, color="black"),
+                            height=30,
+                        ),
+                    )
+                ]
+            )
+
+            fig.update_layout(
+                title=f"Comparative Analysis of {len(valid_states)} Psychological States",
+                margin=dict(l=20, r=20, t=60, b=20),
+            )
+
+            return fig
+        except Exception as e:
+            logger.error(f"Error creating comparative analysis: {e}")
             return None
 
     def plot_parameter_correlation_heatmap(
@@ -1386,7 +1510,7 @@ class APGIVisualizerGUI:
             self.root.destroy()
             raise
 
-    def _create_menu_bar(self):
+    def _create_menu_bar(self) -> None:
         """Create menu bar with theme options."""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
@@ -1410,7 +1534,7 @@ class APGIVisualizerGUI:
                     value=theme_name,
                 )
 
-    def _set_theme(self, theme_name: str):
+    def _set_theme(self, theme_name: str) -> None:
         """Set the current theme.
 
         Args:
@@ -1422,7 +1546,7 @@ class APGIVisualizerGUI:
         if self.theme_manager.set_theme(theme_name):
             self._apply_theme_to_widgets()
 
-    def _apply_theme_to_widgets(self):
+    def _apply_theme_to_widgets(self) -> None:
         """Apply current theme to all widgets."""
         if not self.theme_manager:
             return
@@ -1435,6 +1559,10 @@ class APGIVisualizerGUI:
                 self.states_text.config(bg=bg_color, fg=fg_color, insertbackground=fg_color)
             except tk.TclError:
                 pass
+
+    def quit_application(self) -> None:
+        """Quit the application."""
+        self.root.quit()
 
     def setup_gui(self) -> None:
         """Setup the enhanced GUI layout with embedded visualization panel"""
@@ -1474,6 +1602,8 @@ class APGIVisualizerGUI:
                 "State Radar Comparison",
                 "Parameter Correlation Heatmap",
                 "State Dashboard",
+                "State Transition Simulation",
+                "Comparative Analysis",
             ],
             state="readonly",
             font=("Arial", 9),
@@ -1503,6 +1633,31 @@ class APGIVisualizerGUI:
         self.states_text = tk.Text(control_frame, height=3, width=25, font=("Courier", 9))
         self.states_text.grid(row=5, column=0, sticky="we", pady=(0, 10))
         self.states_text.insert("1.0", "flow\nanxiety\ncalm")
+
+        # Transition States
+        ttk.Label(
+            control_frame, text="Start State for Transition:", font=("Arial", 10, "bold")
+        ).grid(row=6, column=0, sticky=tk.W, pady=(5, 2))
+        self.start_state_var = tk.StringVar()
+        self.start_state_combo = ttk.Combobox(
+            control_frame,
+            textvariable=self.start_state_var,
+            state="readonly",
+            font=("Arial", 9),
+        )
+        self.start_state_combo.grid(row=7, column=0, sticky="we", pady=(0, 5))
+
+        ttk.Label(control_frame, text="End State for Transition:", font=("Arial", 10, "bold")).grid(
+            row=8, column=0, sticky=tk.W, pady=(5, 2)
+        )
+        self.end_state_var = tk.StringVar()
+        self.end_state_combo = ttk.Combobox(
+            control_frame,
+            textvariable=self.end_state_var,
+            state="readonly",
+            font=("Arial", 9),
+        )
+        self.end_state_combo.grid(row=9, column=0, sticky="we", pady=(0, 10))
 
         # Separator
         ttk.Separator(control_frame, orient="horizontal").grid(
@@ -1629,9 +1784,13 @@ class APGIVisualizerGUI:
 
         state_names: List[str] = sorted(PSYCHOLOGICAL_STATES.keys())
         self.state_combo["values"] = state_names
+        self.start_state_combo["values"] = state_names
+        self.end_state_combo["values"] = state_names
 
         if state_names:
             self.state_combo.set(state_names[0])
+            self.start_state_combo.set(state_names[0])
+            self.end_state_combo.set(state_names[1] if len(state_names) > 1 else state_names[0])
 
         self.status_var.set("Ready - Select visualization type and click Generate")
 
@@ -1646,7 +1805,7 @@ class APGIVisualizerGUI:
         self.info_text.insert("1.0", text)
         self.info_text.config(state=tk.DISABLED)
 
-    def generate_visualization(self):
+    def generate_visualization(self) -> None:
         """Generate the selected visualization with embedded display and progress feedback"""
         viz_type = self.viz_type.get()
         self.status_var.set(f"Generating {viz_type}...")
@@ -1743,6 +1902,52 @@ class APGIVisualizerGUI:
                     fig = self.visualizer.create_state_summary_dashboard(state)
                     self.visualizer.cache.put("dashboard", fig, **cache_key_params)
                 title = f"State Dashboard: {state}"
+
+            elif viz_type == "State Transition Simulation":
+                start_state = self.start_state_var.get()
+                end_state = self.end_state_var.get()
+                if not start_state or not end_state:
+                    messagebox.showerror(
+                        "Error", "Please select start and end states for transition"
+                    )
+                    return
+
+                cache_key_params = {"type": "transition", "start": start_state, "end": end_state}
+                cached_fig = self.visualizer.cache.get("transition", **cache_key_params)
+                from_cache = cached_fig is not None
+
+                if from_cache:
+                    fig = cached_fig
+                else:
+                    self.status_var.set(
+                        f"Simulating transition from {start_state} to {end_state}..."
+                    )
+                    self.root.update()
+                    fig = self.visualizer.plot_state_transition(start_state, end_state)
+                    self.visualizer.cache.put("transition", fig, **cache_key_params)
+                title = f"State Transition: {start_state} → {end_state}"
+
+            elif viz_type == "Comparative Analysis":
+                states_text = self.states_text.get("1.0", tk.END).strip()
+                states = [s.strip() for s in states_text.split("\n") if s.strip()]
+                if not states or len(states) < 2:
+                    messagebox.showerror("Error", "Please enter at least 2 states to compare")
+                    return
+
+                cache_key_params = {"type": "comparative", "states": tuple(sorted(states))}
+                cached_fig = self.visualizer.cache.get("comparative", **cache_key_params)
+                from_cache = cached_fig is not None
+
+                if from_cache:
+                    fig = cached_fig
+                else:
+                    self.status_var.set(
+                        f"Computing comparative analysis for {len(states)} states..."
+                    )
+                    self.root.update()
+                    fig = self.visualizer.plot_comparative_analysis(states)
+                    self.visualizer.cache.put("comparative", fig, **cache_key_params)
+                title = f"Comparative Analysis: {', '.join(states)}"
 
             else:
                 messagebox.showerror("Error", "Unknown visualization type")

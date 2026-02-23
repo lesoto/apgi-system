@@ -367,7 +367,7 @@ class SimpleMonitor:
 
         if "temporal" in stats:
             print(f"\nUpdate Rate: {stats['temporal']['update_rate_hz']:.2f} Hz")
-            print(f"Duration: {stats['temporal']['duration_ms']/1000:.1f} seconds")
+            print(f"Duration: {stats['temporal']['duration_ms'] / 1000:.1f} seconds")
 
         if status["recent_alerts"]:
             print("\nRecent Alerts:")

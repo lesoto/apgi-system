@@ -95,7 +95,7 @@ class TestPerformanceMonitor:
         # Record several ignition events
         for i in range(5):
             monitor.start_step()
-            metrics = monitor.end_step(
+            monitor.end_step(
                 system_time_ms=float(i * 100),  # 100ms apart
                 ignition_occurred=True,
                 free_energy=10.0,
@@ -116,7 +116,7 @@ class TestPerformanceMonitor:
 
         # Add recent ignition event
         monitor.start_step()
-        metrics = monitor.end_step(
+        monitor.end_step(
             system_time_ms=2000.0,  # 2 seconds later
             ignition_occurred=True,
             free_energy=10.0,

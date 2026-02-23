@@ -153,10 +153,7 @@ class TestInstallerUtilsIntegration:
     def test_can_import_installer_utils(self):
         """Test that installer utilities module can be imported."""
         try:
-            from build.installer_utils import (
-                extract_version_from_pyproject,
-                generate_inno_setup_script,
-            )
+            from build.installer_utils import extract_version_from_pyproject as _  # noqa: F401
 
             assert True
         except ImportError as e:

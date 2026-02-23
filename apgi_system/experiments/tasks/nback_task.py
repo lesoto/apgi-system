@@ -25,12 +25,13 @@ References:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 import random
 import time
 import string
+from scipy.special import erfcinv  # type: ignore
 
 
 class StimulusType(Enum):
@@ -124,6 +125,7 @@ class NBackTask:
         self.trials: List[NBackTrial] = []
         self.task_start_time: Optional[float] = None
         self.stimulus_history: List[str] = []
+        self.results: List[Dict[str, Any]] = []
 
         # Generate trials
         self._generate_trials()
@@ -145,7 +147,7 @@ class NBackTask:
         """Generate the sequence of trials for the task."""
         stimulus_set = self._get_stimulus_set()
         trials = []
-        stimulus_history = []
+        stimulus_history: List[str] = []
 
         for trial_num in range(self.num_trials):
             # Determine if this should be a target trial
@@ -248,8 +250,8 @@ class NBackTask:
         hit_rate_corr = min(max(hit_rate, 0.01), 0.99)
         false_alarm_rate_corr = min(max(false_alarm_rate, 0.01), 0.99)
 
-        z_hit = np.sqrt(2) * np.erfcinv(2 * (1 - hit_rate_corr))
-        z_fa = np.sqrt(2) * np.erfcinv(2 * (1 - false_alarm_rate_corr))
+        z_hit = np.sqrt(2) * erfcinv(2 * (1 - hit_rate_corr))
+        z_fa = np.sqrt(2) * erfcinv(2 * (1 - false_alarm_rate_corr))
         d_prime = z_hit - z_fa
         criterion = -0.5 * (z_hit + z_fa)
 
@@ -265,8 +267,8 @@ class NBackTask:
             if not t.is_target and t.response is False and t.response_time is not None
         ]
 
-        mean_rt_hits = np.mean(hit_rts) if hit_rts else 0.0
-        mean_rt_correct_rejections = np.mean(cr_rts) if cr_rts else 0.0
+        mean_rt_hits = float(np.mean(hit_rts) if hit_rts else 0.0)
+        mean_rt_correct_rejections = float(np.mean(cr_rts) if cr_rts else 0.0)
 
         return NBackResults(
             n_level=self.n_level,
@@ -325,3 +327,82 @@ class NBackTask:
             random.seed(self.random_seed)
             np.random.seed(self.random_seed)
             self._generate_trials()
+
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
+        """
+        Run all trials and return comprehensive results.
+
+        Parameters
+        ----------
+        apgi_system : APGISystem
+            The APGI system instance to run trials on
+
+        Returns
+        -------
+        Dict[str, Any]
+            Comprehensive analysis of all results
+        """
+        self.results = []
+        self.current_trial = 0
+
+        print(f"\n{'=' * 70}")
+        print(f"Running N-Back Task: {len(self.trials)} trials")
+        print(f"{'=' * 70}\n")
+
+        for trial_idx, trial in enumerate(self.trials):
+            if trial_idx % 10 == 0:
+                progress = (trial_idx / len(self.trials)) * 100
+                print(f"Progress: {trial_idx}/{len(self.trials)} trials ({progress:.1f}%)...")
+
+            # For N-back task, we need to simulate participant responses
+            # In a real experiment, this would come from user input
+            # For now, simulate with some accuracy
+            response_time = 0.5 + np.random.exponential(0.3)  # Simulate RT distribution
+
+            # Simulate participant accuracy (imperfect but above chance)
+            if trial.is_target:
+                response = np.random.random() < 0.8  # 80% hit rate
+            else:
+                response = np.random.random() < 0.2  # 20% false alarm rate
+
+            self.record_response(response, response_time)
+
+        print(f"Progress: {len(self.trials)}/{len(self.trials)} trials (100.0%)")
+        print("\nAll trials completed. Analyzing results...\n")
+
+        return self.analyze_results()
+
+    def analyze_results(self) -> Dict[str, Any]:
+        """
+        Analyze results and compute comprehensive metrics.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - Overall statistics
+            - Results by condition
+            - Task parameters
+        """
+        if not self.is_complete():
+            return {"error": "Task not complete", "total_trials": len(self.trials)}
+
+        results = self.get_results()
+
+        return {
+            "total_trials": results.total_trials,
+            "overall_accuracy": results.accuracy,
+            "hit_rate": results.hit_rate,
+            "false_alarm_rate": results.false_alarm_rate,
+            "d_prime": results.d_prime,
+            "criterion": results.criterion,
+            "mean_rt_hits": results.mean_rt_hits,
+            "mean_rt_correct_rejections": results.mean_rt_correct_rejections,
+            "by_condition": {},  # N-back doesn't have multiple conditions like other tasks
+            "task_parameters": {
+                "n_level": self.n_level,
+                "stimulus_type": self.stimulus_type.value,
+                "num_trials": self.num_trials,
+                "target_probability": self.target_probability,
+            },
+        }

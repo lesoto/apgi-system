@@ -1,6 +1,5 @@
 """Metabolic energy budget tracking."""
 
-import numpy as np
 from typing import Dict, Any
 
 

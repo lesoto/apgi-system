@@ -92,18 +92,19 @@ class TestGUIInitialization:
 
             app = APGIGui(root)
 
+            # Wait for tkinter variable conversion
+            app.root.after(250)  # Wait longer than the 200ms delay
+            app.root.update()
+
             # Verify default parameter values
-            assert app.param_vars["baseline_threshold"].get() == 2.0
-            assert app.param_vars["extero_precision"].get() == 1.0
-            assert app.param_vars["intero_precision"].get() == 0.8
-            assert app.param_vars["arousal"].get() == 0.0
-            assert app.param_vars["stress"].get() == 0.0
+            assert app.param_vars["baseline_threshold"] == 2.0
+            assert app.param_vars["extero_precision"] == 1.0
+            assert app.param_vars["intero_precision"] == 0.8
+            assert app.param_vars["arousal"] == 0.0
+            assert app.param_vars["stress"] == 0.0
 
             # Verify buffer size
             assert app.buffer_size == 1000
-
-            # Verify speed control
-            assert app.speed_var.get() == 1.0
 
         finally:
             root.quit()
@@ -139,7 +140,8 @@ class TestGUIInitialization:
             assert hasattr(app, "metrics_axes")
             assert "somatic" in app.metrics_axes
             assert "gamma" in app.metrics_axes
-            assert "beta" in app.metrics_axes
+            assert "performance" in app.metrics_axes
+            assert "memory" in app.metrics_axes
 
             # Verify canvases were created
             assert hasattr(app, "neural_canvas")

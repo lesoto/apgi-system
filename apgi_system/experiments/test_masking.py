@@ -3,9 +3,10 @@
 
 from apgi_system.system import APGISystem
 from apgi_system.experiments import MaskingParadigmTask
+from typing import Dict, Any
 
 
-def test_masking_paradigm():
+def test_masking_paradigm() -> Dict[str, Any]:
     """Test the masking paradigm task."""
     print("=" * 80)
     print("Testing Masking Paradigm Task")

@@ -8,9 +8,10 @@ Iowa Gambling Task to verify the implementation works correctly.
 
 from apgi_system.system import APGISystem
 from apgi_system.experiments.tasks import IowaGamblingTask
+from typing import Dict, Any
 
 
-def main():
+def main() -> Dict[str, Any]:
     """Run Iowa Gambling Task test."""
     print("=" * 80)
     print("Iowa Gambling Task - Test Run")
@@ -46,6 +47,8 @@ def main():
     print("\n" + "=" * 80)
     print("Test completed successfully!")
     print("=" * 80)
+
+    return results
 
 
 if __name__ == "__main__":

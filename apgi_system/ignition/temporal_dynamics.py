@@ -7,7 +7,6 @@ Orchestrates the complete ignition timeline:
 - Post-ignition (+500 ms onwards)
 """
 
-import numpy as np
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from dataclasses import dataclass

@@ -13,9 +13,11 @@ References:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Optional, cast
+from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
+from random import shuffle
 
 
 class StimulusType(Enum):
@@ -34,7 +36,7 @@ class Trial:
     t1_position: int  # Position in stream (0-indexed)
     t2_position: int  # Position in stream
     lag: int  # Number of items between T1 and T2
-    stream: List[np.ndarray]  # Full stimulus stream
+    stream: List[NDArray[np.float64]]  # Full stimulus stream
     stream_types: List[StimulusType]  # Type of each stimulus
 
 
@@ -91,8 +93,8 @@ class AttentionalBlinkTask:
         self.results: List[TrialResult] = []
 
         # Step execution state
-        self._step_state = None
-        self._current_trial_result = None
+        self._step_state: Optional[Dict[str, Any]] = None
+        self._current_trial_result: Optional[TrialResult] = None
 
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
@@ -135,11 +137,11 @@ class AttentionalBlinkTask:
                 trial_num += 1
 
         # Shuffle trials
-        np.random.shuffle(trials)
+        shuffle(trials)
 
         return trials
 
-    def _generate_target(self, target_num: int) -> np.ndarray:
+    def _generate_target(self, target_num: int) -> NDArray[np.float64]:
         """
         Generate a target stimulus (high salience).
 
@@ -160,7 +162,7 @@ class AttentionalBlinkTask:
 
         return target
 
-    def _generate_distractor(self) -> np.ndarray:
+    def _generate_distractor(self) -> NDArray[np.float64]:
         """Generate a distractor stimulus (low salience)."""
         # Weak random noise
         distractor = 0.5 * np.random.randn(self.stim_dim)
@@ -174,7 +176,7 @@ class AttentionalBlinkTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
+    def run_trial(self, apgi_system: Any, trial: Trial) -> TrialResult:
         """
         Run a single trial on the APGI system.
 
@@ -197,7 +199,6 @@ class AttentionalBlinkTask:
         t2_signal_strength = 0.0
 
         # Track what position we're at and what we've seen
-        current_position = 0
         seen_t1 = False
         seen_t2 = False
         t1_presentation_time = None
@@ -243,8 +244,6 @@ class AttentionalBlinkTask:
                                 t2_ignition_time = ignition_time
                                 t2_signal_strength = state["ignition"]["total_signal"]
 
-            current_position = position
-
         # Determine if blink occurred: T1 detected but T2 missed
         blink_occurred = t1_detected and not t2_detected
 
@@ -265,7 +264,7 @@ class AttentionalBlinkTask:
 
         return result
 
-    def run_all_trials(self, apgi_system) -> Dict[str, Any]:
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Run all trials and return summary statistics.
 
@@ -283,8 +282,6 @@ class AttentionalBlinkTask:
         for trial_idx, trial in enumerate(self.trials):
             if trial_idx % 10 == 0:
                 print(f"Progress: {trial_idx}/{len(self.trials)} trials...")
-
-            result = self.run_trial(apgi_system, trial)
 
         # Analyze results
         return self.analyze_results()
@@ -304,7 +301,7 @@ class AttentionalBlinkTask:
             return {"error": "No results to analyze", "total_trials": 0}
 
         # Organize by lag
-        results_by_lag = {lag: [] for lag in self.lags}
+        results_by_lag: Dict[int, List[TrialResult]] = {lag: [] for lag in self.lags}
         for result in self.results:
             results_by_lag[result.lag].append(result)
 
@@ -360,7 +357,7 @@ class AttentionalBlinkTask:
 
         return summary
 
-    def print_results(self, analysis: Optional[Dict[str, Any]] = None):
+    def print_results(self, analysis: Optional[Dict[str, Any]] = None) -> None:
         """Print formatted results."""
         if analysis is None:
             analysis = self.analyze_results()
@@ -414,10 +411,9 @@ class AttentionalBlinkTask:
         print("  - T2 accuracy recovery at lag 8+ (sparing)")
         print()
 
-    def save_results(self, filename: str):
+    def save_results(self, filename: str) -> None:
         """Save results to JSON file."""
         import json
-        from pathlib import Path
 
         analysis = self.analyze_results()
 
@@ -445,7 +441,7 @@ class AttentionalBlinkTask:
 
         print(f"Results saved to: {filename}")
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset task for new run."""
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
@@ -453,7 +449,7 @@ class AttentionalBlinkTask:
         self._step_state = None
         self._current_trial_result = None
 
-    def step(self, apgi_system) -> Dict[str, Any]:
+    def step(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Execute one step of the current trial.
 
@@ -512,7 +508,7 @@ class AttentionalBlinkTask:
             self._current_trial_result = None
 
         state = self._step_state
-        trial = state["trial"]
+        trial = cast(Trial, state["trial"])
 
         # Get current stimulus
         if state["position"] >= len(trial.stream):

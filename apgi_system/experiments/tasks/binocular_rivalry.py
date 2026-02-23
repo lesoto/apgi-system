@@ -15,9 +15,11 @@ References:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, cast
+from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
+from random import shuffle
 
 
 class StimulusType(Enum):
@@ -55,8 +57,8 @@ class Trial:
     """Single rivalry trial configuration."""
 
     trial_number: int
-    pattern_a: np.ndarray  # First competing pattern
-    pattern_b: np.ndarray  # Second competing pattern
+    pattern_a: NDArray[np.float64]  # First competing pattern
+    pattern_b: NDArray[np.float64]  # Second competing pattern
     pattern_a_strength: float  # Relative strength of pattern A
     pattern_b_strength: float  # Relative strength of pattern B
     duration_ms: float  # Total trial duration
@@ -120,8 +122,8 @@ class BinocularRivalryTask:
         self.results: List[TrialResult] = []
 
         # Step execution state
-        self._step_state = None
-        self._current_trial_result = None
+        self._step_state: Optional[Dict[str, Any]] = None
+        self._current_trial_result: Optional[TrialResult] = None
 
     def _generate_trials(self) -> List[Trial]:
         """Generate all trial configurations."""
@@ -146,11 +148,11 @@ class BinocularRivalryTask:
                 trial_num += 1
 
         # Shuffle trials
-        np.random.shuffle(trials)
+        shuffle(trials)
 
         return trials
 
-    def _generate_pattern(self, pattern_type: str) -> np.ndarray:
+    def _generate_pattern(self, pattern_type: str) -> NDArray[np.float64]:
         """
         Generate a stimulus pattern for rivalry.
 
@@ -192,7 +194,7 @@ class BinocularRivalryTask:
 
         return pattern
 
-    def _create_rivalry_stimulus(self, trial: Trial, time_ms: float) -> np.ndarray:
+    def _create_rivalry_stimulus(self, trial: Trial, time_ms: float) -> NDArray[np.float64]:
         """
         Create the rivalry stimulus at a given time point.
 
@@ -280,7 +282,7 @@ class BinocularRivalryTask:
         trial = self.trials[self.current_trial_idx]
         return trial
 
-    def run_trial(self, apgi_system, trial: Trial) -> TrialResult:
+    def run_trial(self, apgi_system: Any, trial: Trial) -> TrialResult:
         """
         Run a single rivalry trial on the APGI system.
 
@@ -373,7 +375,7 @@ class BinocularRivalryTask:
 
         num_alternations = len(dominance_periods) - 1 if dominance_periods else 0
         avg_dominance = (
-            np.mean([p.duration for p in dominance_periods]) if dominance_periods else 0.0
+            float(np.mean([p.duration for p in dominance_periods])) if dominance_periods else 0.0
         )
         alternation_rate = (
             num_alternations / (trial.duration_ms / 1000.0) if trial.duration_ms > 0 else 0.0
@@ -398,7 +400,7 @@ class BinocularRivalryTask:
 
         return result
 
-    def run_all_trials(self, apgi_system) -> Dict[str, Any]:
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Run all trials and return summary statistics.
 
@@ -417,7 +419,7 @@ class BinocularRivalryTask:
             if trial_idx % 5 == 0:
                 print(f"Progress: {trial_idx}/{len(self.trials)} trials...")
 
-            result = self.run_trial(apgi_system, trial)
+            self.run_trial(apgi_system, trial)
 
         # Analyze results
         return self.analyze_results()
@@ -443,7 +445,7 @@ class BinocularRivalryTask:
         avg_pattern_a_ratio = np.mean([r.pattern_a_dominance_ratio for r in self.results])
 
         # Statistics by strength ratio
-        results_by_strength = {}
+        results_by_strength: Dict[Tuple[float, float], List[TrialResult]] = {}
         for result in self.results:
             key = (result.pattern_a_strength, result.pattern_b_strength)
             if key not in results_by_strength:
@@ -497,7 +499,7 @@ class BinocularRivalryTask:
 
         return summary
 
-    def print_results(self, analysis: Optional[Dict[str, Any]] = None):
+    def print_results(self, analysis: Optional[Dict[str, Any]] = None) -> None:
         """Print formatted results."""
         if analysis is None:
             analysis = self.analyze_results()
@@ -562,10 +564,9 @@ class BinocularRivalryTask:
         print("  - Characteristic alternation rate around 0.3-0.5 per second")
         print()
 
-    def save_results(self, filename: str):
+    def save_results(self, filename: str) -> None:
         """Save results to JSON file."""
         import json
-        from pathlib import Path
 
         analysis = self.analyze_results()
 
@@ -605,7 +606,7 @@ class BinocularRivalryTask:
 
         print(f"Results saved to: {filename}")
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset task for new run."""
         self.trials = self._generate_trials()
         self.current_trial_idx = 0
@@ -613,7 +614,7 @@ class BinocularRivalryTask:
         self._step_state = None
         self._current_trial_result = None
 
-    def step(self, apgi_system) -> Dict[str, Any]:
+    def step(self, apgi_system: Any) -> Dict[str, Any]:
         """
         Execute one step of the current trial.
 
@@ -658,7 +659,7 @@ class BinocularRivalryTask:
             self._current_trial_result = None
 
         state = self._step_state
-        trial = state["trial"]
+        trial = cast(Trial, state["trial"])
 
         # Check if trial is complete
         if state["step"] >= int(trial.duration_ms):
@@ -680,7 +681,7 @@ class BinocularRivalryTask:
                 len(state["dominance_periods"]) - 1 if state["dominance_periods"] else 0
             )
             avg_dominance = (
-                np.mean([p.duration for p in state["dominance_periods"]])
+                float(np.mean([p.duration for p in state["dominance_periods"]]))
                 if state["dominance_periods"]
                 else 0.0
             )

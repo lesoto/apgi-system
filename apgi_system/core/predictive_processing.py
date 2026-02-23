@@ -6,7 +6,7 @@ prediction error channels.
 """
 
 import numpy as np
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional
 from collections import deque
 
 from apgi_system.validation import InputValidator
@@ -90,7 +90,7 @@ class PredictionErrorChannel:
         self.timestep_ms = timestep_ms
 
         # Sliding window buffer
-        self.error_buffer = deque(maxlen=self.window_size)
+        self.error_buffer: deque[np.ndarray] = deque(maxlen=self.window_size)
 
         # Current state
         self.current_error = np.zeros(dimension)
@@ -135,7 +135,7 @@ class PredictionErrorChannel:
         >>> error = channel.update(obs, pred, precision=1.5)
         >>> print(f"Error magnitude: {np.linalg.norm(error):.3f}")
         """
-        self.current_error = observation - prediction
+        self.current_error = observation - prediction  # type: ignore[assignment]
         self.precision = precision
 
         # Add to sliding window
@@ -428,7 +428,11 @@ class HierarchicalPredictor:
 
         InputValidator.validate_scalar(dt_ms, "dt_ms", positive=True, value_range=(0.001, 1000.0))
 
-        results = {"exteroceptive": {}, "interoceptive": {}, "hierarchical_errors": []}
+        results: Dict[str, Any] = {
+            "exteroceptive": {},
+            "interoceptive": {},
+            "hierarchical_errors": [],
+        }
 
         # Process exteroceptive stream
         if extero_input is not None:
@@ -467,7 +471,7 @@ class HierarchicalPredictor:
             }
 
             # Update interoceptive prediction (simple running average)
-            self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input
+            self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input  # type: ignore[assignment]
 
             # Check stability of updated prediction
             self.stability_monitor.check_stability(
@@ -479,7 +483,7 @@ class HierarchicalPredictor:
 
         # Collect hierarchical errors
         for level in self.levels:
-            results["hierarchical_errors"].append(
+            results["hierarchical_errors"].append(  # type: ignore[attr-defined]
                 {
                     "level": level["name"],
                     "error": level["error"].copy(),
@@ -578,13 +582,13 @@ class HierarchicalPredictor:
             result[: len(state)] = state
             return result
 
-    def get_prediction_errors(self) -> Dict[str, float]:
+    def get_prediction_errors(self) -> Dict[str, Any]:
         """
         Get current prediction errors across all channels.
 
         Returns
         -------
-        errors : Dict[str, float]
+        errors : Dict[str, Any]
             Dictionary containing:
             - 'exteroceptive_signal': Precision-weighted extero signal
             - 'interoceptive_signal': Precision-weighted intero signal

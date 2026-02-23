@@ -158,7 +158,7 @@ class GlobalWorkspace:
         self.recurrent_strength = 0.8
 
         # Subscribers (other systems that receive broadcasts)
-        self.subscribers: List[Callable] = []
+        self.subscribers: List[Callable[[BroadcastContent], None]] = []
 
         # Broadcast history
         self.broadcast_history: List[BroadcastContent] = []
@@ -388,7 +388,7 @@ class GlobalWorkspace:
             return
 
         # Store original magnitude for normalization
-        original_magnitude = np.linalg.norm(self.current_content.content)
+        original_magnitude = float(np.linalg.norm(self.current_content.content))
         if original_magnitude < 1e-10:  # Avoid division by zero
             original_magnitude = 1e-10
 
@@ -427,7 +427,7 @@ class GlobalWorkspace:
                 # Don't let subscriber errors crash the workspace
                 print(f"Subscriber error: {e}")
 
-    def subscribe(self, callback: Callable) -> None:
+    def subscribe(self, callback: Callable[[BroadcastContent], None]) -> None:
         """
         Subscribe a system to receive workspace broadcasts.
 
@@ -514,7 +514,7 @@ class GlobalWorkspace:
 
     def _get_state_info(self) -> Dict[str, Any]:
         """Get current state information."""
-        info = {
+        info: Dict[str, Any] = {
             "state": self.state.value,
             "state_time": float(self.state_time),
             "is_broadcasting": self.state

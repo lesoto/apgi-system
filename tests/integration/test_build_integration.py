@@ -9,15 +9,11 @@ Feature: cross-platform-executable
 
 import pytest
 import sys
-import subprocess
-import shutil
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 import tempfile
-import os
 
 # Import build modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from utils.build_common import (
     analyze_dependencies,
     collect_resources,
@@ -486,7 +482,7 @@ class TestBuildErrorHandling:
 
         # Test with None (should not crash)
         try:
-            result = should_exclude_module(None)
+            should_exclude_module(None)
             # If it doesn't crash, that's acceptable
         except (TypeError, AttributeError):
             # Expected for None input

@@ -12,9 +12,7 @@ Requirements tested:
 - 8.5: Complete state information
 """
 
-import pytest
 import numpy as np
-from apgi_system.system import APGISystem
 
 
 class TestFullSystemStepExecution:
@@ -432,7 +430,7 @@ class TestCausalRelationships:
         Validates: Requirements 8.4
         """
         # Get initial threshold
-        initial_threshold = apgi_system.ignition_threshold.current_threshold
+        apgi_system.ignition_threshold.current_threshold
 
         # Run simulation to accumulate allostatic load
         for _ in range(50):
@@ -470,7 +468,6 @@ class TestCausalRelationships:
         Validates: Requirements 8.4
         """
         ignition_occurred = False
-        workspace_active = False
 
         # Run until we get an ignition
         for _ in range(100):
@@ -478,14 +475,10 @@ class TestCausalRelationships:
 
             if state["ignition"]["ignition_occurred"]:
                 ignition_occurred = True
-                # Workspace should be active immediately when ignition occurs
-                if state["workspace"]["is_reportable"]:
-                    workspace_active = True
                 # Also check subsequent steps
                 for _ in range(5):
                     next_state = apgi_system.step(random_observation)
                     if next_state["workspace"]["is_reportable"]:
-                        workspace_active = True
                         break
                 break
 

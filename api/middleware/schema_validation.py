@@ -5,9 +5,10 @@ Validates API responses against OpenAPI schemas to ensure contract compliance.
 Logs validation failures for monitoring and debugging.
 """
 
-import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable, Awaitable, List
+
+import json
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -40,7 +41,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         openapi_schema: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         fail_on_error: bool = False,
-    ):
+    ) -> None:
         """
         Initialize the response schema validation middleware.
 
@@ -63,7 +64,9 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                 fail_on_error=fail_on_error,
             )
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and validate response against schema.
 
@@ -299,7 +302,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
 
         return str(body)
 
-    def _validate_schema(self, data: Any, schema: Dict[str, Any]) -> list:
+    def _validate_schema(self, data: Any, schema: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Validate data against schema.
 
@@ -350,7 +353,9 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
 
         return errors
 
-    def _validate_field(self, value: Any, schema: Dict[str, Any], field_path: str) -> list:
+    def _validate_field(
+        self, value: Any, schema: Dict[str, Any], field_path: str
+    ) -> List[Dict[str, Any]]:
         """
         Validate a single field against its schema.
 
@@ -397,7 +402,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         response: Response,
         error: str,
         schema: Dict[str, Any],
-        validation_errors: Optional[list] = None,
+        validation_errors: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """
         Log response validation failure.

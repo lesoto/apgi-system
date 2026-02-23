@@ -5,7 +5,7 @@ API endpoints for user management including registration,
 password reset, and user administration.
 """
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ from api.services.authorization import (
     get_current_user,
     TokenPayload,
 )
-from api.services.user_management import get_user_management_service, UserManagementService
+from api.services.user_management import get_user_management_service
 
 router = APIRouter(
     prefix="/v1/users",
