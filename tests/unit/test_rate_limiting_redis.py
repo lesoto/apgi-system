@@ -33,7 +33,16 @@ def client_with_rate_limiting(redis_client: AsyncMock) -> TestClient:
         if hasattr(middleware, "cls") and "RateLimitingMiddleware" in str(middleware.cls):
             # Replace the middleware instance
             original_middleware = middleware.cls
-            test_middleware = original_middleware(redis_client=redis_client, enabled=True)  # type: ignore[call-arg]
+
+            def create_test_middleware(app):
+                return original_middleware(app, redis_client=redis_client, enabled=True)  # type: ignore[call-arg]
+
+            # Create a new middleware object with the same interface
+            from types import SimpleNamespace
+
+            test_middleware = SimpleNamespace(
+                cls=create_test_middleware, options=middleware.options
+            )
             app.user_middleware[i] = test_middleware
             break
 
@@ -50,7 +59,7 @@ class TestRateLimitingWithRedis:
         # Mock Redis to simulate rate limiting
         call_count = 0
 
-        def mock_incr(key):
+        def mock_incr(key: str) -> int:
             nonlocal call_count
             call_count += 1
             return call_count
@@ -155,7 +164,16 @@ class TestRateLimitingWithRedis:
         for i, middleware in enumerate(app.user_middleware):
             if hasattr(middleware, "cls") and "RateLimitingMiddleware" in str(middleware.cls):
                 original_middleware = middleware.cls
-                test_middleware = original_middleware(redis_client=redis_client, enabled=False)  # type: ignore[call-arg]
+
+                def create_test_middleware(app):
+                    return original_middleware(app, redis_client=redis_client, enabled=False)  # type: ignore[call-arg]
+
+                # Create a new middleware object with the same interface
+                from types import SimpleNamespace
+
+                test_middleware = SimpleNamespace(
+                    cls=create_test_middleware, options=middleware.options
+                )
                 app.user_middleware[i] = test_middleware
                 break
 

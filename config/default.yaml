@@ -114,9 +114,3 @@ validation:
   compute_pci: true  # Perturbational complexity
   track_erp_analogs: true
   measure_ignition_frequency: true
-
-# Webhook configuration
-webhook:
-  secret: "your-webhook-secret-key-change-this-in-production"  # HMAC secret for webhook signatures
-  signature_algorithm: "sha256"  # HMAC algorithm for webhook signatures
-  signature_header: "X-Webhook-Signature"  # Header name for webhook signatures

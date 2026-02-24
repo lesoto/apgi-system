@@ -12,11 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from api.models.schemas import ErrorResponse, SummaryStatistics
-from api.services.authorization import (
-    Permission,
-    require_permission,
-    get_current_user,
-)
 from api.services.data_export import DataExportService
 from api.services.session_manager import SessionManager
 
@@ -70,7 +65,7 @@ def init_export_routes(session_manager: SessionManager):
     "/{session_id}/export",
     summary="Export simulation data",
     description="Export complete simulation history in JSON or CSV format with optional filtering",
-    dependencies=[Depends(require_permission(Permission.DATA_EXPORT))],
+    dependencies=[],
 )
 async def export_session_data(
     session_id: str,
@@ -81,7 +76,6 @@ async def export_session_data(
     start_time: Optional[float] = Query(None, description="Start time for export (ms)"),
     end_time: Optional[float] = Query(None, description="End time for export (ms)"),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
 ):
     """
     Export simulation data.
@@ -145,12 +139,11 @@ async def export_session_data(
     response_model=SummaryStatistics,
     summary="Get summary statistics",
     description="Retrieve computed summary statistics for simulation session",
-    dependencies=[Depends(require_permission(Permission.DATA_READ))],
+    dependencies=[],
 )
 async def get_summary_statistics(
     session_id: str,
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
 ):
     """
     Get summary statistics.
@@ -193,7 +186,7 @@ async def get_summary_statistics(
     "/{session_id}/timeseries",
     summary="Get time series data",
     description="Retrieve timestamped sequences for specified variables with optional downsampling and pagination",
-    dependencies=[Depends(require_permission(Permission.DATA_READ))],
+    dependencies=[],
 )
 async def get_time_series_data(
     session_id: str,
@@ -208,7 +201,6 @@ async def get_time_series_data(
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
 ):
     """
     Get time series data.
@@ -269,13 +261,12 @@ async def get_time_series_data(
     "/{session_id}/events",
     summary="Get event analysis",
     description="Retrieve aggregated statistics for ignition events including duration distribution and trigger patterns",
-    dependencies=[Depends(require_permission(Permission.DATA_READ))],
+    dependencies=[],
 )
 async def get_event_analysis(
     session_id: str,
     event_type: str = Query("ignition", description="Type of event to analyze"),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
 ):
     """
     Get event analysis.

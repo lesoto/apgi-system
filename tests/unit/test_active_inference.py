@@ -41,7 +41,7 @@ def simple_config():
 class TestActiveInferenceEngine:
     """Test ActiveInferenceEngine functionality."""
 
-    def test_initialization(self, simple_config):
+    def test_initialization(self, simple_config) -> None:
         """Test engine initializes correctly."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -52,7 +52,7 @@ class TestActiveInferenceEngine:
         assert engine.time == 0.0
         assert engine.timestep == 0.001
 
-    def test_step_with_observation(self, simple_config):
+    def test_step_with_observation(self, simple_config) -> None:
         """Test single step with observation."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)
@@ -74,7 +74,7 @@ class TestActiveInferenceEngine:
         assert info["time"] > 0.0
         assert engine.time > 0.0
 
-    def test_step_with_actions(self, simple_config):
+    def test_step_with_actions(self, simple_config) -> None:
         """Test step with available actions."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)
@@ -91,7 +91,7 @@ class TestActiveInferenceEngine:
         # EFE components might be empty if no valid policy evaluation occurred
         assert isinstance(info["efe_components"], dict)
 
-    def test_step_without_actions(self, simple_config):
+    def test_step_without_actions(self, simple_config) -> None:
         """Test step without available actions."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)
@@ -102,7 +102,7 @@ class TestActiveInferenceEngine:
         assert np.allclose(action, np.zeros(1))
         assert info["efe_components"] == {}
 
-    def test_multiple_steps(self, simple_config):
+    def test_multiple_steps(self, simple_config) -> None:
         """Test multiple consecutive steps."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -120,7 +120,7 @@ class TestActiveInferenceEngine:
             assert np.isfinite(fe)
             assert fe >= 0
 
-    def test_reset(self, simple_config):
+    def test_reset(self, simple_config) -> None:
         """Test engine reset functionality."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -141,7 +141,7 @@ class TestActiveInferenceEngine:
             assert np.allclose(belief.mean, 0.0)
             assert np.allclose(belief.prediction_error, 0.0)
 
-    def test_invalid_observation_shape(self, simple_config):
+    def test_invalid_observation_shape(self, simple_config) -> None:
         """Test error handling for invalid observation shape."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -149,7 +149,7 @@ class TestActiveInferenceEngine:
         with pytest.raises(ValueError):
             engine.step(np.random.randn(32))  # Should be 64
 
-    def test_invalid_observation_values(self, simple_config):
+    def test_invalid_observation_values(self, simple_config) -> None:
         """Test error handling for invalid observation values."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -167,7 +167,7 @@ class TestActiveInferenceEngine:
 class TestHierarchicalGaussianFilter:
     """Test HierarchicalGaussianFilter functionality."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test filter initializes correctly."""
         filter = HierarchicalGaussianFilter(
             num_levels=3, state_dims=[64, 32, 16], observation_dim=64
@@ -179,7 +179,7 @@ class TestHierarchicalGaussianFilter:
         assert filter.beliefs[1].mean.shape == (32,)
         assert filter.beliefs[2].mean.shape == (16,)
 
-    def test_update_basic(self):
+    def test_update_basic(self) -> None:
         """Test basic update functionality."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[32, 16], observation_dim=32)
 
@@ -191,7 +191,7 @@ class TestHierarchicalGaussianFilter:
         assert fe >= 0
         assert np.isfinite(fe)
 
-    def test_learning_reduces_error(self):
+    def test_learning_reduces_error(self) -> None:
         """Test that repeated observations reduce prediction error."""
         filter = HierarchicalGaussianFilter(
             num_levels=2, state_dims=[16, 8], observation_dim=16, config={"learning_rate": 0.1}
@@ -209,7 +209,7 @@ class TestHierarchicalGaussianFilter:
         # Error should generally decrease (allowing some fluctuation)
         assert errors[-1] < errors[0] * 1.1  # Allow 10% tolerance
 
-    def test_precision_updates(self):
+    def test_precision_updates(self) -> None:
         """Test precision updates with error variance."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[16, 8], observation_dim=16)
 
@@ -222,7 +222,7 @@ class TestHierarchicalGaussianFilter:
         # Precision should adjust
         assert filter.beliefs[0].precision != initial_precision
 
-    def test_invalid_inputs(self):
+    def test_invalid_inputs(self) -> None:
         """Test error handling for invalid inputs."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[16, 8], observation_dim=16)
 
@@ -238,7 +238,7 @@ class TestHierarchicalGaussianFilter:
         with pytest.raises(ValueError):
             filter.update(np.random.randn(16), dt=-1.0)
 
-    def test_free_energy_components(self):
+    def test_free_energy_components(self) -> None:
         """Test free energy computation."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[8, 4], observation_dim=8)
 
@@ -255,7 +255,7 @@ class TestHierarchicalGaussianFilter:
         # Use larger tolerance for numerical stability
         assert abs(fe - manual_fe) < 1e-5
 
-    def test_edge_case_zero_observation(self):
+    def test_edge_case_zero_observation(self) -> None:
         """Test edge case with zero observation."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[8, 4], observation_dim=8)
 
@@ -265,7 +265,7 @@ class TestHierarchicalGaussianFilter:
         assert np.isfinite(fe)
         assert fe >= 0
 
-    def test_edge_case_large_observation(self):
+    def test_edge_case_large_observation(self) -> None:
         """Test edge case with large observation values."""
         filter = HierarchicalGaussianFilter(num_levels=2, state_dims=[8, 4], observation_dim=8)
 
@@ -275,7 +275,7 @@ class TestHierarchicalGaussianFilter:
         assert np.isfinite(fe)
         assert fe >= 0
 
-    def test_boundary_precision_range(self):
+    def test_boundary_precision_range(self) -> None:
         """Test precision stays within configured bounds."""
         filter = HierarchicalGaussianFilter(
             num_levels=2,

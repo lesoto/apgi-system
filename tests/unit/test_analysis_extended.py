@@ -62,7 +62,7 @@ class TestAnalysisResults:
 class TestSystemAnalyzer:
     """Test the SystemAnalyzer class."""
 
-    def test_analyzer_initialization(self):
+    def test_analyzer_initialization(self) -> None:
         """Test that SystemAnalyzer initializes correctly."""
         config = {
             "analysis_window_ms": 1000.0,
@@ -75,13 +75,13 @@ class TestSystemAnalyzer:
         assert analyzer.config == config
         assert hasattr(analyzer, "config")
 
-    def test_analyzer_default_config(self):
+    def test_analyzer_default_config(self) -> None:
         """Test SystemAnalyzer with default configuration."""
         analyzer = SystemAnalyzer({})
 
         assert isinstance(analyzer.config, dict)
 
-    def test_analyze_system_basic(self):
+    def test_analyze_system_basic(self) -> None:
         """Test basic system analysis."""
         config = {"analysis_window_ms": 5000.0}
         analyzer = SystemAnalyzer(config)
@@ -157,7 +157,7 @@ class TestSystemAnalyzer:
         assert stats["ignition_rate_hz"] == 0.0
         assert stats["mean_ignition_duration_ms"] == 0.0
 
-    def test_compute_energy_budget_summary(self):
+    def test_compute_energy_budget_summary(self) -> None:
         """Test energy budget summary computation."""
         config = {}
         analyzer = SystemAnalyzer(config)
@@ -176,7 +176,7 @@ class TestSystemAnalyzer:
         assert summary["final_reserves"] == 0.15
         assert summary["min_reserves"] == 0.15
 
-    def test_compute_coherence_metrics(self):
+    def test_compute_coherence_metrics(self) -> None:
         """Test coherence metrics computation."""
         config = {}
         analyzer = SystemAnalyzer(config)
@@ -190,7 +190,7 @@ class TestSystemAnalyzer:
         assert metrics["max_coherence"] == 0.9
         assert "std_coherence" in metrics
 
-    def test_generate_report(self):
+    def test_generate_report(self) -> None:
         """Test analysis report generation."""
         config = {}
         analyzer = SystemAnalyzer(config)
@@ -216,7 +216,7 @@ class TestSystemAnalyzer:
         assert "5" in report  # Should contain ignition count
         assert "0.25" in report  # Should contain ignition rate
 
-    def test_export_results(self):
+    def test_export_results(self) -> None:
         """Test exporting results to different formats."""
         config = {}
         analyzer = SystemAnalyzer(config)
@@ -241,7 +241,7 @@ class TestSystemAnalyzer:
 class TestAnalyzeSimulationRun:
     """Test the analyze_simulation_run function."""
 
-    def test_analyze_simulation_run_basic(self):
+    def test_analyze_simulation_run_basic(self) -> None:
         """Test basic simulation run analysis."""
         # Mock system
         mock_system = MagicMock()
@@ -261,7 +261,7 @@ class TestAnalyzeSimulationRun:
         assert isinstance(results, AnalysisResults)
         assert isinstance(results.ignition_statistics, dict)
 
-    def test_analyze_simulation_run_empty_system(self):
+    def test_analyze_simulation_run_empty_system(self) -> None:
         """Test analysis with empty system state."""
         mock_system = MagicMock()
         mock_system.get_state.return_value = {
@@ -281,7 +281,7 @@ class TestAnalyzeSimulationRun:
 class TestAnalysisIntegration:
     """Integration tests for analysis functionality."""
 
-    def test_full_analysis_pipeline(self):
+    def test_full_analysis_pipeline(self) -> None:
         """Test the complete analysis pipeline."""
         config = {"analysis_window_ms": 10000.0, "enable_detailed_analysis": True}
         analyzer = SystemAnalyzer(config)
@@ -348,7 +348,7 @@ class TestAnalysisIntegration:
         if "ignition_rate_hz" in results.ignition_statistics:
             assert results.ignition_statistics["ignition_rate_hz"] == 0.4  # 4 in 10 seconds
 
-    def test_analysis_with_missing_data(self):
+    def test_analysis_with_missing_data(self) -> None:
         """Test analysis robustness with missing data."""
         config = {}
         analyzer = SystemAnalyzer(config)
@@ -372,7 +372,7 @@ class TestAnalysisIntegration:
         assert isinstance(results, AnalysisResults)
         # Should not raise exceptions even with incomplete data
 
-    def test_performance_with_large_dataset(self):
+    def test_performance_with_large_dataset(self) -> None:
         """Test analysis performance with large datasets."""
         config = {}
         analyzer = SystemAnalyzer(config)

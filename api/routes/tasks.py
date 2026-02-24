@@ -5,7 +5,7 @@ API endpoints for executing and managing experimental tasks.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -15,11 +15,6 @@ from api.models.schemas import (
     TaskStatusResponse,
     TaskSubmitRequest,
     TaskSubmitResponse,
-)
-from api.services.authorization import (
-    Permission,
-    require_permission,
-    get_current_user,
 )
 from api.services.task_executor import TaskExecutor
 
@@ -50,7 +45,7 @@ def get_task_executor() -> TaskExecutor:
     return _task_executor
 
 
-def init_task_routes():
+def init_task_routes() -> None:
     """Initialize task routes with TaskExecutor."""
     global _task_executor
     _task_executor = TaskExecutor()
@@ -62,11 +57,8 @@ def init_task_routes():
     response_model=TaskListResponse,
     summary="List available tasks",
     description="Get a list of all available experimental tasks with their descriptions and parameters",
-    dependencies=[Depends(require_permission(Permission.TASK_READ))],
 )
-async def list_tasks(
-    executor: TaskExecutor = Depends(get_task_executor), current_user=Depends(get_current_user)
-):
+async def list_tasks(executor: TaskExecutor = Depends(get_task_executor)) -> TaskListResponse:
     """
     List all available experimental tasks.
 
@@ -94,14 +86,12 @@ async def list_tasks(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Execute experimental task",
     description="Submit an experimental task for asynchronous execution on specified session",
-    dependencies=[Depends(require_permission(Permission.TASK_CREATE))],
 )
 async def execute_task(
     session_id: str,
     request: TaskSubmitRequest,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+) -> TaskSubmitResponse:
     """
     Execute experimental task on a session.
 
@@ -150,13 +140,12 @@ async def execute_task(
     response_model=TaskStatusResponse,
     summary="Get task status",
     description="Get current status and results of an experimental task",
-    dependencies=[Depends(require_permission(Permission.TASK_READ))],
+    dependencies=[],
 )
 async def get_task_status(
     task_id: str,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+) -> TaskStatusResponse:
     """
     Get task status and results.
 
@@ -207,13 +196,12 @@ async def get_task_status(
     status_code=status.HTTP_200_OK,
     summary="Cancel task",
     description="Cancel a running experimental task",
-    dependencies=[Depends(require_permission(Permission.TASK_DELETE))],
+    dependencies=[],
 )
 async def cancel_task(
     task_id: str,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+) -> Dict[str, Any]:
     """
     Cancel a running task.
 

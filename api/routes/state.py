@@ -29,7 +29,6 @@ from api.models.schemas import (
 )
 from api.routes.sessions import get_session_manager
 from api.services.session_manager import SessionManager
-from api.middleware.authentication import is_authenticated
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +78,6 @@ async def get_system_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -196,12 +189,6 @@ async def get_ignition_history(  # noqa: C901
     Raises:
         HTTPException: If session not found or history cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Warn about potentially expensive queries
         if limit and limit > 500:
@@ -328,12 +315,6 @@ async def get_interoceptive_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -390,12 +371,6 @@ async def get_prediction_errors(
     Raises:
         HTTPException: If session not found or errors cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -455,12 +430,6 @@ async def get_somatic_markers(
     Raises:
         HTTPException: If session not found or markers cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)

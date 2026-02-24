@@ -9,7 +9,7 @@ from apgi_system.core.free_energy import FreeEnergyCalculator
 class TestFreeEnergyCalculator:
     """Test FreeEnergyCalculator functionality."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test calculator initializes correctly."""
         calc = FreeEnergyCalculator()
         assert calc.eps == 1e-10
@@ -19,7 +19,7 @@ class TestFreeEnergyCalculator:
         calc = FreeEnergyCalculator(config)
         assert calc.config == config
 
-    def test_compute_variational_free_energy_basic(self):
+    def test_compute_variational_free_energy_basic(self) -> None:
         """Test basic variational free energy computation."""
         calc = FreeEnergyCalculator()
 
@@ -47,7 +47,7 @@ class TestFreeEnergyCalculator:
         assert components["complexity"] >= 0
         assert components["prediction_error"] >= 0
 
-    def test_accuracy_term_computation(self):
+    def test_accuracy_term_computation(self) -> None:
         """Test accuracy term computation."""
         calc = FreeEnergyCalculator()
 
@@ -67,7 +67,7 @@ class TestFreeEnergyCalculator:
         # Accuracy should be zero for perfect prediction
         assert abs(components["accuracy"]) < 1e-10
 
-    def test_complexity_term_computation(self):
+    def test_complexity_term_computation(self) -> None:
         """Test complexity term (KL divergence) computation."""
         calc = FreeEnergyCalculator()
 
@@ -85,7 +85,7 @@ class TestFreeEnergyCalculator:
         # Complexity should be zero when posterior equals prior
         assert abs(components["complexity"]) < 1e-10
 
-    def test_precision_matrix_formats(self):
+    def test_precision_matrix_formats(self) -> None:
         """Test different precision matrix formats."""
         calc = FreeEnergyCalculator()
 
@@ -121,12 +121,17 @@ class TestFreeEnergyCalculator:
         assert np.isfinite(fe1)
         assert np.isfinite(fe2)
 
-    def test_compute_expected_free_energy_basic(self):
+    def test_compute_expected_free_energy_basic(self) -> None:
         """Test basic expected free energy computation."""
         calc = FreeEnergyCalculator()
 
         policy = np.array([1.0])
-        predicted_states = [np.random.randn(8) for _ in range(3)]
+        predicted_states = [
+            np.random.randn(
+                8,
+            )
+            for _ in range(3)
+        ]
         predicted_observations = np.random.rand(3, 8)
         preferences = np.ones(8) / 8  # Uniform preferences
         state_uncertainty = np.array([0.5, 0.4, 0.3])
@@ -149,12 +154,12 @@ class TestFreeEnergyCalculator:
         # Exploration drive should be negative of epistemic value
         assert abs(components["exploration_drive"] + components["epistemic_value"]) < 1e-10
 
-    def test_epistemic_value_uncertainty_relationship(self):
+    def test_epistemic_value_uncertainty_relationship(self) -> None:
         """Test epistemic value increases with uncertainty."""
         calc = FreeEnergyCalculator()
 
         policy = np.array([1.0])
-        predicted_states = [np.ones(4)]
+        predicted_states = [np.ones((4,))]
         predicted_observations = np.ones((1, 4)) * 0.25
         preferences = np.ones(4) / 4
 
@@ -183,7 +188,7 @@ class TestFreeEnergyCalculator:
         # Higher uncertainty should give more negative epistemic value (more exploration)
         assert comp_high["epistemic_value"] < comp_low["epistemic_value"]
 
-    def test_kl_divergence_gaussian(self):
+    def test_kl_divergence_gaussian(self) -> None:
         """Test KL divergence computation between Gaussians."""
         calc = FreeEnergyCalculator()
 
@@ -202,7 +207,7 @@ class TestFreeEnergyCalculator:
         kl = calc._kl_divergence_gaussian(mu_q, sigma, mu_p, sigma)
         assert kl > 0
 
-    def test_kl_divergence_properties(self):
+    def test_kl_divergence_properties(self) -> None:
         """Test KL divergence mathematical properties."""
         calc = FreeEnergyCalculator()
 
@@ -219,7 +224,7 @@ class TestFreeEnergyCalculator:
         # Should be finite
         assert np.isfinite(kl)
 
-    def test_compute_prediction_error(self):
+    def test_compute_prediction_error(self) -> None:
         """Test prediction error computation."""
         calc = FreeEnergyCalculator()
 
@@ -245,7 +250,7 @@ class TestFreeEnergyCalculator:
         assert errors["mean_absolute_error"] >= 0
         assert errors["max_error"] >= 0
 
-    def test_compute_surprise(self):
+    def test_compute_surprise(self) -> None:
         """Test surprise computation."""
         calc = FreeEnergyCalculator()
 
@@ -263,7 +268,7 @@ class TestFreeEnergyCalculator:
         assert surprise_low >= 0
         assert surprise_high >= 0
 
-    def test_numerical_edge_cases(self):
+    def test_numerical_edge_cases(self) -> None:
         """Test numerical edge cases."""
         calc = FreeEnergyCalculator()
 
@@ -283,7 +288,7 @@ class TestFreeEnergyCalculator:
         assert np.isfinite(fe)
         assert fe >= 0
 
-    def test_large_values(self):
+    def test_large_values(self) -> None:
         """Test with large values."""
         calc = FreeEnergyCalculator()
 
@@ -302,7 +307,7 @@ class TestFreeEnergyCalculator:
 
         assert np.isfinite(fe)
 
-    def test_singular_covariance_handling(self):
+    def test_singular_covariance_handling(self) -> None:
         """Test handling of singular covariance matrices."""
         calc = FreeEnergyCalculator()
 
@@ -317,7 +322,7 @@ class TestFreeEnergyCalculator:
         assert np.isfinite(kl)
         assert kl >= 0
 
-    def test_input_validation_errors(self):
+    def test_input_validation_errors(self) -> None:
         """Test input validation error handling."""
         calc = FreeEnergyCalculator()
 
@@ -365,7 +370,7 @@ class TestFreeEnergyCalculator:
                 prior_cov,
             )
 
-    def test_zero_precision_handling(self):
+    def test_zero_precision_handling(self) -> None:
         """Test handling of zero precision."""
         calc = FreeEnergyCalculator()
 
@@ -382,7 +387,7 @@ class TestFreeEnergyCalculator:
                 observation, prediction, 0.0, posterior_mean, posterior_cov, prior_mean, prior_cov
             )
 
-    def test_prediction_error_without_precision(self):
+    def test_prediction_error_without_precision(self) -> None:
         """Test prediction error computation without precision."""
         calc = FreeEnergyCalculator()
 
@@ -398,7 +403,7 @@ class TestFreeEnergyCalculator:
         # Without precision weighting, weighted should equal raw
         assert abs(errors["raw_error"] - errors["weighted_error"]) < 1e-10
 
-    def test_surprise_boundary_conditions(self):
+    def test_surprise_boundary_conditions(self) -> None:
         """Test surprise computation boundary conditions."""
         calc = FreeEnergyCalculator()
 
@@ -415,7 +420,7 @@ class TestFreeEnergyCalculator:
         assert surprise >= 0
         assert surprise < 1e-6  # Should be very small
 
-    def test_free_energy_decomposition(self):
+    def test_free_energy_decomposition(self) -> None:
         """Test that free energy equals accuracy plus complexity."""
         calc = FreeEnergyCalculator()
 

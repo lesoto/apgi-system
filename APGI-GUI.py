@@ -23,7 +23,6 @@ from pathlib import Path
 from typing import Dict, Optional, Any, cast
 from numpy.typing import NDArray
 import psutil
-import requests
 
 from apgi_system.system import APGISystem
 from apgi_system.config_validator import validate_config_file, ConfigValidationError
@@ -59,22 +58,6 @@ class APGIGui:
 
         # Configuration
         self.config_file = Path.home() / ".apgi_gui_config.json"
-
-        # API configuration
-        self.api_base_url = "http://localhost:8000"  # Default API URL
-        self.auth_token: Optional[str] = None
-        self.current_session_id: Optional[str] = None
-        self.api_headers: Dict[str, str] = {}
-
-        # Load API URL from config if available
-        try:
-            if self.config_file.exists():
-                with open(self.config_file, "r") as f:
-                    config = json.load(f)
-                    if "api_url" in config:
-                        self.api_base_url = config["api_url"]
-        except Exception as e:
-            logger.warning(f"Failed to load API URL from config: {e}")
 
         # Set responsive window size based on screen dimensions
         screen_width = self.root.winfo_screenwidth()
@@ -197,14 +180,8 @@ class APGIGui:
             traceback.print_exc()
             return
 
-        # Authenticate with API before initializing system
-        if not self._show_login_dialog():
-            self._log_event("Login cancelled or failed. Exiting.")
-            self.root.quit()
-            return
-
-        # Initialize system with API session
-        self._initialize_system_with_api()
+        # Initialize system directly (no login required)
+        self._initialize_system()
 
         # Start update loop
         self._update_displays()
@@ -301,139 +278,6 @@ class APGIGui:
 
         # Force redraw of all components
         self.root.update_idletasks()
-
-    def _show_login_dialog(self) -> bool:
-        """Show login dialog and authenticate with API.
-
-        Returns:
-            True if login successful, False otherwise
-        """
-        # Create login dialog
-        login_dialog = tk.Toplevel(self.root)
-        login_dialog.title("APGI System Login")
-        login_dialog.geometry("400x300")
-        login_dialog.resizable(False, False)
-        login_dialog.transient(self.root)
-        login_dialog.grab_set()
-
-        # Center dialog
-        login_dialog.geometry(
-            "+{}+{}".format(
-                (self.root.winfo_screenwidth() - 400) // 2,
-                (self.root.winfo_screenheight() - 300) // 2,
-            )
-        )
-
-        # Create form
-        frame = ttk.Frame(login_dialog, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text="APGI System Login", font=("Arial", 14, "bold")).pack(pady=10)
-
-        # API URL
-        ttk.Label(frame, text="API URL:").pack(anchor=tk.W, pady=2)
-        api_url_var = tk.StringVar(value=self.api_base_url)
-        api_url_entry = ttk.Entry(frame, textvariable=api_url_var, width=40)
-        api_url_entry.pack(pady=2)
-
-        # Username
-        ttk.Label(frame, text="Username:").pack(anchor=tk.W, pady=2)
-        username_var = tk.StringVar()
-        username_entry = ttk.Entry(frame, textvariable=username_var, width=40)
-        username_entry.pack(pady=2)
-
-        # Password
-        ttk.Label(frame, text="Password:").pack(anchor=tk.W, pady=2)
-        password_var = tk.StringVar()
-        password_entry = ttk.Entry(frame, textvariable=password_var, width=40, show="*")
-        password_entry.pack(pady=2)
-
-        # Status label
-        status_var = tk.StringVar()
-        status_label = ttk.Label(frame, textvariable=status_var, foreground="red")
-        status_label.pack(pady=10)
-
-        # Buttons
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(pady=10)
-
-        login_success = False
-
-        def attempt_login():
-            nonlocal login_success
-            try:
-                api_url = api_url_var.get().strip()
-                username = username_var.get().strip()
-                password = password_var.get().strip()
-
-                if not api_url or not username or not password:
-                    status_var.set("Please fill all fields")
-                    return
-
-                # Test connection and login
-                status_var.set("Connecting to API...")
-
-                # First test if API is reachable
-                try:
-                    response = requests.get(f"{api_url}/v1/health", timeout=5)
-                    response.raise_for_status()
-                except requests.RequestException as e:
-                    status_var.set(f"API not reachable: {str(e)}")
-                    return
-
-                # Attempt login
-                status_var.set("Authenticating...")
-                login_data = {"username": username, "password": password}
-                response = requests.post(f"{api_url}/v1/auth/login", json=login_data, timeout=10)
-                response.raise_for_status()
-
-                token_data = response.json()
-                self.auth_token = token_data["access_token"]
-                self.api_base_url = api_url
-                self.api_headers = {"Authorization": f"Bearer {self.auth_token}"}
-
-                # Save API URL to config
-                try:
-                    config = {}
-                    if self.config_file.exists():
-                        with open(self.config_file, "r") as f:
-                            config = json.load(f)
-                    config["api_url"] = api_url
-                    with open(self.config_file, "w") as f:
-                        json.dump(config, f)
-                except Exception as e:
-                    logger.warning(f"Failed to save API URL: {e}")
-
-                status_var.set("Login successful!")
-                login_success = True
-                login_dialog.destroy()
-
-            except requests.HTTPError as e:
-                if e.response.status_code == 401:
-                    status_var.set("Invalid username or password")
-                else:
-                    status_var.set(f"Login failed: {e.response.status_code}")
-            except requests.RequestException as e:
-                status_var.set(f"Connection error: {str(e)}")
-            except Exception as e:
-                status_var.set(f"Error: {str(e)}")
-
-        def cancel_login():
-            login_dialog.destroy()
-
-        ttk.Button(button_frame, text="Login", command=attempt_login).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=cancel_login).pack(side=tk.LEFT, padx=5)
-
-        # Bind Enter key to login
-        login_dialog.bind("<Return>", lambda e: attempt_login())
-
-        # Focus on username entry
-        username_entry.focus()
-
-        # Wait for dialog to close
-        self.root.wait_window(login_dialog)
-
-        return login_success
 
     def _change_theme(self, theme_name: str) -> None:
         """Change the current theme."""

@@ -30,7 +30,6 @@ from api.config import settings
 from api.database.connection import close_db, init_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.alerting import configure_alerting
-from api.middleware.authentication import AuthenticationMiddleware
 from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
 from api.middleware.request_size_limit import RequestSizeLimitMiddleware
@@ -42,7 +41,7 @@ from api.middleware.logging import (
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from api.routes import auth, export, health, metrics, sessions, state, tasks, users, version
+from api.routes import export, health, metrics, sessions, state, tasks, version
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -178,10 +177,6 @@ def create_app(test_mode: bool = False) -> FastAPI:
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
-    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
-    if not test_mode:
-        app.add_middleware(AuthenticationMiddleware)
-
     # Add response schema validation middleware
     app.add_middleware(
         ResponseSchemaValidationMiddleware,
@@ -240,8 +235,6 @@ def create_app(test_mode: bool = False) -> FastAPI:
         }
 
     # Include routers
-    app.include_router(auth.router)
-    app.include_router(users.router)
     app.include_router(sessions.router)
     app.include_router(state.router)
     app.include_router(tasks.router)
