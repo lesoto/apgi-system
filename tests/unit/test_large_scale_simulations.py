@@ -16,6 +16,7 @@ import psutil
 import gc
 import tempfile
 import csv
+from typing import Dict, Any
 
 from apgi_system.system import APGISystem
 
@@ -24,12 +25,12 @@ class TestLargeScaleSimulations:
     """Tests for large-scale simulation scenarios."""
 
     @pytest.fixture
-    def apgi_system(self):
+    def apgi_system(self) -> APGISystem:
         """Create APGI system instance for testing."""
         return APGISystem()
 
     @pytest.fixture
-    def large_simulation_config(self):
+    def large_simulation_config(self) -> Dict[str, Any]:
         """Configuration optimized for large-scale testing."""
         return {
             "system": {
@@ -46,7 +47,7 @@ class TestLargeScaleSimulations:
             },
         }
 
-    def test_1000_timestep_simulation(self, apgi_system):
+    def test_1000_timestep_simulation(self, apgi_system: APGISystem) -> None:
         """Test running a simulation for 1000+ timesteps."""
         # Run 1000 simulation steps
         num_steps = 1000
@@ -84,7 +85,7 @@ class TestLargeScaleSimulations:
 
         print(".3f")
 
-    def test_2000_timestep_simulation_stability(self, apgi_system):
+    def test_2000_timestep_simulation_stability(self, apgi_system: APGISystem) -> None:
         """Test system stability over 2000 timesteps."""
         num_steps = 2000
         stability_metrics = []
@@ -118,7 +119,7 @@ class TestLargeScaleSimulations:
         # System time should advance correctly
         assert stability_metrics[-1]["time"] > stability_metrics[0]["time"]
 
-    def test_memory_usage_during_long_simulation(self, apgi_system):
+    def test_memory_usage_during_long_simulation(self, apgi_system: APGISystem) -> None:
         """Test memory usage during long simulation runs."""
         process = psutil.Process()
         gc.collect()  # Clean up before measurement
@@ -156,7 +157,7 @@ class TestLargeScaleSimulations:
             decrease_ratio = 1 - (increases / len(memory_samples))
             assert decrease_ratio > 0.3  # At least 30% should be decreases or stable
 
-    def test_data_accumulation_over_long_runs(self):
+    def test_data_accumulation_over_long_runs(self) -> None:
         """Test data accumulation and export for long simulations."""
         # Create system with data recording enabled (simulated)
         system = APGISystem()
@@ -209,7 +210,7 @@ class TestLargeScaleSimulations:
 
             os.unlink(csv_filename)
 
-    def test_performance_scaling_with_timesteps(self):
+    def test_performance_scaling_with_timesteps(self) -> None:
         """Test that performance scales reasonably with increasing timesteps."""
         system = APGISystem()
 
@@ -243,7 +244,7 @@ class TestLargeScaleSimulations:
             degradation_ratio = curr_result["steps_per_second"] / prev_result["steps_per_second"]
             assert degradation_ratio > 0.5  # Allow some degradation but not drastic
 
-    def test_system_state_consistency_long_runs(self):
+    def test_system_state_consistency_long_runs(self) -> None:
         """Test that system state remains consistent over long runs."""
         system = APGISystem()
         num_steps = 2000
@@ -287,7 +288,7 @@ class TestLargeScaleSimulations:
         assert max(free_energies) < 50.0
         assert min(free_energies) > -50.0
 
-    def test_recovery_from_perturbations_long_runs(self):
+    def test_recovery_from_perturbations_long_runs(self) -> None:
         """Test system recovery from perturbations during long runs."""
         system = APGISystem()
         num_steps = 1300
@@ -307,11 +308,13 @@ class TestLargeScaleSimulations:
             # Check for recovery (return to baseline free energy)
             if i > 0 and "perturbation_timestep" in locals():
                 prev_state = (
-                    system.step.__defaults__[0] if hasattr(system.step, "__defaults__") else None
+                    system.step.__defaults__[0]
+                    if hasattr(system.step, "__defaults__") and system.step.__defaults__
+                    else None
                 )
                 # Simplified recovery check
                 if abs(state["free_energy"]) < 10.0:  # Recovered to reasonable range
-                    if perturbation_timestep in locals():
+                    if "perturbation_timestep" in locals():
                         recovery_time = i - perturbation_timestep
                         recovery_events.append(recovery_time)
                         del perturbation_timestep
@@ -321,7 +324,7 @@ class TestLargeScaleSimulations:
             avg_recovery_time = sum(recovery_events) / len(recovery_events)
             assert avg_recovery_time < 50  # Should recover within reasonable time
 
-    def test_data_quality_over_long_runs(self):
+    def test_data_quality_over_long_runs(self) -> None:
         """Test that data quality remains high over long simulation runs."""
         system = APGISystem()
         num_steps = 1800
@@ -364,7 +367,7 @@ class TestLargeScaleSimulations:
         assert no_nan_count / num_steps > 0.99  # >99% no NaN values
 
     @pytest.mark.slow
-    def test_3000_timestep_extreme_simulation(self):
+    def test_3000_timestep_extreme_simulation(self) -> None:
         """Test extreme simulation with 3000+ timesteps (marked as slow)."""
         system = APGISystem()
         num_steps = 3000
@@ -402,7 +405,7 @@ class TestLargeScaleGUIIntegration:
         "tkinter" not in globals() or not hasattr(globals().get("tkinter", None), "Tk"),
         reason="Tkinter not available",
     )
-    def test_gui_large_scale_data_handling(self):
+    def test_gui_large_scale_data_handling(self) -> None:
         """Test GUI data handling during large-scale simulations."""
         import tkinter as tk
 
@@ -441,7 +444,7 @@ class TestLargeScaleGUIIntegration:
         "tkinter" not in globals() or not hasattr(globals().get("tkinter", None), "Tk"),
         reason="Tkinter not available",
     )
-    def test_gui_memory_management_large_scale(self):
+    def test_gui_memory_management_large_scale(self) -> None:
         """Test GUI memory management during large-scale operations."""
         import tkinter as tk
 

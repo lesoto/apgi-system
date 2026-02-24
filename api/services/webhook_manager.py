@@ -4,13 +4,17 @@ Webhook Manager Service
 Manages webhook registration, validation, delivery with retry logic and exponential backoff.
 """
 
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 import httpx
 from sqlalchemy.orm import Session as DBSession
+from typing import cast
 
 from api.database.models import WebhookDelivery
 
@@ -48,12 +52,52 @@ class WebhookManager:
     # HTTP timeout configuration
     REQUEST_TIMEOUT_SECONDS = 30
 
-    def __init__(self) -> None:
-        """Initialize webhook manager."""
+    def __init__(self, webhook_config: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize webhook manager.
+
+        Args:
+            webhook_config: Webhook configuration containing secret and signature settings
+        """
+        self.webhook_config = webhook_config or {}
+        self.webhook_secret = self.webhook_config.get("secret", "")
+        self.signature_algorithm = self.webhook_config.get("signature_algorithm", "sha256")
+        self.signature_header = self.webhook_config.get("signature_header", "X-Webhook-Signature")
+
         self.http_client = httpx.AsyncClient(
             timeout=self.REQUEST_TIMEOUT_SECONDS, follow_redirects=True
         )
         logger.info("WebhookManager initialized")
+
+    def _generate_webhook_signature(self, payload: Dict[str, Any]) -> str:
+        """
+        Generate HMAC signature for webhook payload.
+
+        Args:
+            payload: Webhook payload dictionary
+
+        Returns:
+            Hex-encoded signature string
+        """
+        if not self.webhook_secret:
+            logger.warning("Webhook secret not configured - signature verification disabled")
+            return ""
+
+        # Serialize payload to JSON with sorted keys for consistent signatures
+        payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+
+        # Generate HMAC signature
+        secret_bytes = self.webhook_secret.encode("utf-8")
+        payload_bytes = payload_json.encode("utf-8")
+
+        if self.signature_algorithm == "sha256":
+            signature = hmac.new(secret_bytes, payload_bytes, hashlib.sha256).hexdigest()
+        elif self.signature_algorithm == "sha512":
+            signature = hmac.new(secret_bytes, payload_bytes, hashlib.sha512).hexdigest()
+        else:
+            # Default to sha256
+            signature = hmac.new(secret_bytes, payload_bytes, hashlib.sha256).hexdigest()
+
+        return signature
 
     async def validate_webhook_url(self, url: str) -> bool:
         """
@@ -149,7 +193,7 @@ class WebhookManager:
         # Deliver webhook with circuit breaker protection
         return await self._deliver_webhook_request_safe(db, delivery)
 
-    @circuit_breaker(name="webhook_delivery_get_record", failure_threshold=5, recovery_timeout=30.0)  # type: ignore[no-untyped-decorator]
+    @circuit_breaker(name="webhook_delivery_get_record", failure_threshold=5, recovery_timeout=30.0)
     async def _get_delivery_record_safe(
         self, db: DBSession, delivery_id: str
     ) -> Optional[WebhookDelivery]:
@@ -163,7 +207,7 @@ class WebhookManager:
             logger.error(f"Database error getting delivery record {delivery_id}: {e}")
             raise CircuitBreakerException(f"Database operation failed: {e}")
 
-    @circuit_breaker(name="webhook_delivery_update", failure_threshold=3, recovery_timeout=15.0)  # type: ignore[no-untyped-decorator]
+    @circuit_breaker(name="webhook_delivery_update", failure_threshold=3, recovery_timeout=15.0)
     async def _update_delivery_attempt_safe(self, db: DBSession, delivery: WebhookDelivery) -> None:
         """Update delivery attempt with circuit breaker protection."""
         try:
@@ -177,7 +221,7 @@ class WebhookManager:
                     if delivery.attempts > 1
                     else WebhookStatus.PENDING.value
                 ),
-            )
+            )  # type: ignore[assignment]
             db.commit()
         except Exception as e:
             db.rollback()
@@ -186,7 +230,7 @@ class WebhookManager:
             )
             raise CircuitBreakerException(f"Database operation failed: {e}")
 
-    @circuit_breaker(name="webhook_http_delivery", failure_threshold=3, recovery_timeout=120.0)  # type: ignore[no-untyped-decorator]
+    @circuit_breaker(name="webhook_http_delivery", failure_threshold=3, recovery_timeout=120.0)
     async def _deliver_webhook_request_safe(self, db: DBSession, delivery: WebhookDelivery) -> bool:
         """Deliver webhook request with circuit breaker protection."""
         try:
@@ -196,15 +240,25 @@ class WebhookManager:
                 f"(attempt {delivery.attempts}/{self.MAX_RETRIES}) to {delivery.webhook_url}"
             )
 
+            # Generate webhook signature
+            signature = self._generate_webhook_signature(delivery.payload)  # type: ignore[arg-type]
+
+            # Prepare headers
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "APGI-API-Webhook/1.0",
+                "X-Webhook-Delivery-ID": str(delivery.delivery_id),
+                "X-Webhook-Attempt": str(delivery.attempts),
+            }
+
+            # Add signature header if signature was generated
+            if signature:
+                headers[self.signature_header] = signature
+
             response = await self.http_client.post(
                 delivery.webhook_url,  # type: ignore[arg-type]
                 json=delivery.payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "APGI-API-Webhook/1.0",
-                    "X-Webhook-Delivery-ID": str(delivery.delivery_id),
-                    "X-Webhook-Attempt": str(delivery.attempts),
-                },
+                headers=headers,
             )
 
             # Store response
@@ -253,7 +307,7 @@ class WebhookManager:
             await self._schedule_retry(db, delivery)
             return False
 
-    async def _schedule_retry(self, db: DBSession, delivery: WebhookDelivery):
+    async def _schedule_retry(self, db: DBSession, delivery: WebhookDelivery) -> None:
         """
         Schedule retry for failed webhook delivery with exponential backoff.
 
@@ -287,7 +341,7 @@ class WebhookManager:
 
         db.commit()
 
-    async def process_pending_webhooks(self, db: DBSession):
+    async def process_pending_webhooks(self, db: DBSession) -> None:
         """
         Process all pending webhook deliveries that are ready for retry.
 
@@ -299,11 +353,11 @@ class WebhookManager:
 
         pending_deliveries = (
             db.query(WebhookDelivery)
-            .filter(  # type: ignore[arg-type]
-                WebhookDelivery.status.in_(  # type: ignore[attr-defined]
+            .filter(
+                WebhookDelivery.status.in_(
                     [WebhookStatus.PENDING.value, WebhookStatus.RETRYING.value]
                 ),
-                (WebhookDelivery.next_retry_at.is_(None)) | (WebhookDelivery.next_retry_at <= now),  # type: ignore[union-attr, operator]
+                (WebhookDelivery.next_retry_at.is_(None)) | (WebhookDelivery.next_retry_at <= now),
             )
             .all()
         )
@@ -333,7 +387,7 @@ class WebhookManager:
             Dict with delivery status information, or None if not found
         """
         delivery = (
-            db.query(WebhookDelivery).filter(WebhookDelivery.delivery_id == delivery_id).first()  # type: ignore[arg-type]
+            db.query(WebhookDelivery).filter(WebhookDelivery.delivery_id == delivery_id).first()
         )
 
         if not delivery:
@@ -365,7 +419,7 @@ class WebhookManager:
         Returns:
             List of delivery status dicts
         """
-        deliveries = db.query(WebhookDelivery).filter(WebhookDelivery.task_id == task_id).all()  # type: ignore[arg-type]
+        deliveries = db.query(WebhookDelivery).filter(WebhookDelivery.task_id == task_id).all()
 
         return [
             {
@@ -380,7 +434,7 @@ class WebhookManager:
             for d in deliveries
         ]
 
-    async def close(self):
+    async def close(self) -> None:
         """Close HTTP client."""
         await self.http_client.aclose()
         logger.info("WebhookManager closed")

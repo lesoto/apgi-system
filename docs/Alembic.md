@@ -1,6 +1,6 @@
 # Database Migrations
 
-This directory contains Alembic database migrations for the APGI REST API.
+This Alembic database migrations for the APGI REST API.
 
 ## Setup
 

@@ -48,6 +48,7 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Register new user",
     description="Create a new user account with auto-generated password if not provided",
+    dependencies=[Depends(require_permission(Permission.USER_CREATE))],
 )
 async def register_user(
     request: UserCreateRequest,
@@ -73,7 +74,7 @@ async def register_user(
             username=request.username,
             email=request.email,
             password=request.password,
-            roles=request.roles or ["user"],
+            roles=request.roles or ["researcher"],
         )
 
         return UserCreateResponse(
@@ -183,6 +184,7 @@ async def list_users(
     response_model=UserResponse,
     summary="Get current user profile",
     description="Retrieve profile of currently authenticated user",
+    dependencies=[Depends(require_permission(Permission.USER_READ))],
 )
 async def get_current_user_profile(
     current_user: TokenPayload = Depends(get_current_user),
@@ -213,6 +215,103 @@ async def get_current_user_profile(
         created_at=user.created_at,
         updated_at=user.updated_at,
         last_login=user.last_login,
+    )
+
+
+@router.put(
+    "/me",
+    response_model=UserResponse,
+    summary="Update current user profile",
+    description="Update profile of currently authenticated user",
+    dependencies=[Depends(require_permission(Permission.USER_UPDATE))],
+)
+async def update_current_user_profile(
+    request: UserUpdateRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update current user profile.
+
+    Users can update their own email. Only admins can change roles and active status.
+
+    Args:
+        request: User update request
+        current_user: Authenticated user token payload
+        db: Database session
+
+    Returns:
+        Updated UserResponse object
+
+    Raises:
+        HTTPException: If user not found or unauthorized
+    """
+    user_service = get_user_management_service(db)
+
+    # Users can only update themselves
+    user_id = current_user.user_id
+
+    # Check permissions - users can update their own email, but only admins can change roles/active status
+    is_admin = Permission.USER_ADMIN in current_user.roles
+
+    try:
+        user = user_service.update_user(
+            user_id=user_id,
+            email=request.email,
+            roles=request.roles if is_admin else None,  # Only admins can change roles
+            is_active=request.is_active
+            if is_admin
+            else None,  # Only admins can change active status
+        )
+
+        return UserResponse(
+            user_id=user.user_id,
+            username=user.username,
+            email=user.email,
+            roles=user.roles,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login=user.last_login,
+        )
+
+    except UserNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user: {str(e)}",
+        )
+
+
+@router.get(
+    "/stats",
+    response_model=UserStatsResponse,
+    summary="Get user statistics",
+    description="Retrieve user statistics (requires admin privileges)",
+    dependencies=[Depends(require_permission(Permission.USER_READ))],
+)
+async def get_user_stats(
+    db: Session = Depends(get_db),
+):
+    """
+    Get user statistics.
+
+    Args:
+        db: Database session
+        user_service: User management service
+
+    Returns:
+        UserStatsResponse object
+    """
+    user_service = get_user_management_service(db)
+    stats = user_service.get_user_stats()
+
+    return UserStatsResponse(
+        total_users=stats["total_users"],
+        active_users=stats["active_users"],
+        inactive_users=stats["inactive_users"],
+        role_counts=stats["role_counts"],
     )
 
 
@@ -415,34 +514,3 @@ async def delete_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete user: {str(e)}",
         )
-
-
-@router.get(
-    "/stats",
-    response_model=UserStatsResponse,
-    summary="Get user statistics",
-    description="Retrieve user statistics (requires admin privileges)",
-    dependencies=[Depends(require_permission(Permission.USER_READ))],
-)
-async def get_user_stats(
-    db: Session = Depends(get_db),
-):
-    """
-    Get user statistics.
-
-    Args:
-        db: Database session
-        user_service: User management service
-
-    Returns:
-        UserStatsResponse object
-    """
-    user_service = get_user_management_service(db)
-    stats = user_service.get_user_stats()
-
-    return UserStatsResponse(
-        total_users=stats["total_users"],
-        active_users=stats["active_users"],
-        inactive_users=stats["inactive_users"],
-        role_counts=stats["role_counts"],
-    )

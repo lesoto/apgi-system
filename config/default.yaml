@@ -115,11 +115,8 @@ validation:
   track_erp_analogs: true
   measure_ignition_frequency: true
 
-# Visualization
-visualization:
-  update_rate_ms: 100
-  plot_prediction_errors: true
-  plot_precision_dynamics: true
-  plot_ignition_events: true
-  plot_oscillations: true
-  plot_energy_budget: true
+# Webhook configuration
+webhook:
+  secret: "your-webhook-secret-key-change-this-in-production"  # HMAC secret for webhook signatures
+  signature_algorithm: "sha256"  # HMAC algorithm for webhook signatures
+  signature_header: "X-Webhook-Signature"  # Header name for webhook signatures

@@ -92,11 +92,36 @@ class SessionResponse(BaseModel):
 
 
 class SessionActionResponse(BaseModel):
-    """Response for session actions (start, pause, stop, reset)."""
+    """Response for session action operations."""
 
     session_id: str = Field(..., description="Session identifier")
     status: str = Field(..., description="New session status")
     timestamp: datetime = Field(..., description="Action timestamp")
+
+
+class SessionListItem(BaseModel):
+    """Individual session item in list."""
+
+    session_id: str = Field(..., description="Unique session identifier")
+    user_id: str = Field(..., description="User identifier")
+    state: str = Field(..., description="Session state")
+    created_at: str = Field(..., description="Creation timestamp ISO format")
+    updated_at: str = Field(..., description="Last update timestamp ISO format")
+    description: Optional[str] = Field(None, description="Session description")
+
+
+class PaginationInfo(BaseModel):
+    """Pagination information."""
+
+    next_cursor: Optional[str] = Field(None, description="Cursor for next page")
+    has_more: bool = Field(..., description="Whether more data is available")
+
+
+class SessionListResponse(BaseModel):
+    """List of sessions with pagination."""
+
+    sessions: List[SessionListItem] = Field(..., description="List of sessions")
+    pagination: Optional[PaginationInfo] = Field(None, description="Pagination info")
 
 
 # ============================================================================
@@ -246,7 +271,9 @@ class TaskExecuteRequest(BaseModel):
     """Request to execute experimental task."""
 
     task_type: str = Field(..., description="Type of task to execute")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
+    parameters: Dict[str, Any] = Field(
+        default_factory=lambda: {}, description="Task-specific parameters"
+    )
     webhook_url: Optional[str] = Field(
         None, description="URL for webhook notification on completion"
     )
@@ -288,7 +315,7 @@ class TaskSubmitRequest(BaseModel):
 
     task_type: str = Field(..., description="Type of experimental task")
     parameters: Optional[Dict[str, Any]] = Field(
-        default_factory=dict, description="Task-specific parameters"
+        default_factory=lambda: {}, description="Task-specific parameters"
     )
     webhook_url: Optional[str] = Field(
         None, description="URL for webhook notification on task completion"
@@ -408,13 +435,6 @@ class ErrorResponse(BaseModel):
 # ============================================================================
 # Data Export Models
 # ============================================================================
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    next_cursor: Optional[str] = Field(None, description="Cursor for next page")
-    has_more: bool = Field(..., description="Whether more data is available")
 
 
 class IgnitionEvent(BaseModel):

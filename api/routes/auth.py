@@ -80,18 +80,22 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
     status_code=status.HTTP_200_OK,
     summary="Refresh access token",
     description="""
-    Use a refresh token to obtain a new access token.
+    Use a refresh token to obtain new access and refresh tokens.
 
-    This endpoint should be called when the access token expires to get a new one
-    without requiring the user to log in again.
+    This endpoint implements refresh token rotation for security:
+    - The old refresh token is revoked after use
+    - A new refresh token is issued along with the new access token
+
+    This prevents refresh token reuse attacks and improves security.
     """,
     responses={
         200: {
-            "description": "Token refreshed successfully",
+            "description": "Tokens refreshed successfully",
             "content": {
                 "application/json": {
                     "example": {
                         "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                         "token_type": "bearer",
                         "expires_in": 1800,
                     }

@@ -123,13 +123,13 @@ def create_default_user() -> None:
         # Import here to avoid circular import
         from api.services.auth_manager import AuthManager
 
-        # Create default user
+        # Create default user with admin privileges for full system access
         default_user = User(
             user_id=secure_username,
             username=secure_username,
             email=f"{secure_username}@apgi-system.local",
             password_hash=AuthManager.hash_password(secure_password),
-            roles=["user", "session_manager"],
+            roles=["admin"],
         )
 
         db.add(default_user)
@@ -246,11 +246,16 @@ def test_database_connection() -> Dict[str, Any]:
 
             connection_time = time.time() - start_time
 
+            try:
+                pool_size = engine.pool.size()
+            except AttributeError:
+                pool_size = "unknown"
+
             return {
                 "status": "healthy",
                 "version": version,
                 "connection_time": connection_time,
-                "pool_size": engine.pool.size() if hasattr(engine.pool, "size") else "unknown",
+                "pool_size": pool_size,
                 "checked_at": time.time(),
             }
 

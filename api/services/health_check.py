@@ -6,10 +6,10 @@ Service for checking the health of API dependencies.
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import redis.asyncio as redis
-from celery import Celery
+from celery import Celery  # type: ignore
 from sqlalchemy import text
 
 from api.celery_app import celery_app as default_celery_app
@@ -79,25 +79,57 @@ class HealthCheckService:
             Tuple of (status, message) where status is "healthy" or "unhealthy"
         """
         try:
-            # Inspect active workers
+            # Check if Celery app is properly configured
+            if not self.celery_app:
+                return "unhealthy", "Celery application not configured"
+
+            # Check if broker URL is configured
+            broker_url = getattr(self.celery_app, "conf", {}).get("broker_url") or getattr(
+                self.celery_app, "broker_url", None
+            )
+            if not broker_url:
+                return "unhealthy", "Celery broker URL not configured"
+
+            # Try to ping workers first (more reliable than active())
             inspect = self.celery_app.control.inspect()
 
-            # Get active workers with timeout
-            active_workers = inspect.active()
+            # Use ping instead of active for better error handling
+            ping_result = inspect.ping(timeout=5.0)
 
-            if active_workers is None:
-                return "unhealthy", "No Celery workers available"
+            if ping_result is None:
+                return (
+                    "unhealthy",
+                    "Celery broker unreachable - check broker connection and configuration",
+                )
 
-            worker_count = len(active_workers)
-            if worker_count == 0:
-                return "unhealthy", "No active Celery workers"
+            # Check if any workers responded to ping
+            if not ping_result:
+                return "unhealthy", "No Celery workers available - ensure workers are running"
 
-            return "healthy", f"{worker_count} Celery worker(s) active"
+            worker_count = len(ping_result)
+            return "healthy", f"{worker_count} Celery worker(s) responding to ping"
+
         except Exception as e:
-            logger.error(f"Celery health check failed: {e}")
-            return "unhealthy", f"Celery check failed: {str(e)}"
+            error_msg = str(e).lower()
+            if "connection refused" in error_msg or "connection error" in error_msg:
+                return (
+                    "unhealthy",
+                    f"Celery broker connection failed - check broker URL and network: {str(e)}",
+                )
+            elif "timeout" in error_msg:
+                return (
+                    "unhealthy",
+                    f"Celery broker timeout - broker may be overloaded or unreachable: {str(e)}",
+                )
+            elif "no workers" in error_msg or "no active workers" in error_msg:
+                return "unhealthy", f"No Celery workers running - start worker processes: {str(e)}"
+            else:
+                return (
+                    "unhealthy",
+                    f"Celery health check failed - configuration or broker issue: {str(e)}",
+                )
 
-    async def perform_health_check(self) -> Dict:
+    async def perform_health_check(self) -> Dict[str, Any]:
         """
         Perform comprehensive health check on all dependencies.
 

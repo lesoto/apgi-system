@@ -4,18 +4,14 @@ This module provides type aliases and custom types used throughout the APGI syst
 to improve type safety and code clarity.
 """
 
-from typing import Dict, List, Union, Any
 import numpy as np
 import numpy.typing as npt
+
+from typing import Dict, Any
 
 # Array types
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
-
-# State types
-BodyState = Dict[str, float]
-BeliefState = Dict[str, Union[FloatArray, float]]
-SystemState = Dict[str, Union[float, FloatArray, Dict[str, Any], List[Any], bool, str]]
 
 # Configuration types
 ConfigDict = Dict[str, Any]

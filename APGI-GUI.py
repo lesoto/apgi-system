@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any, cast
 from numpy.typing import NDArray
 import psutil
+import requests
 
 from apgi_system.system import APGISystem
 from apgi_system.config_validator import validate_config_file, ConfigValidationError
@@ -59,6 +60,22 @@ class APGIGui:
         # Configuration
         self.config_file = Path.home() / ".apgi_gui_config.json"
 
+        # API configuration
+        self.api_base_url = "http://localhost:8000"  # Default API URL
+        self.auth_token: Optional[str] = None
+        self.current_session_id: Optional[str] = None
+        self.api_headers: Dict[str, str] = {}
+
+        # Load API URL from config if available
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, "r") as f:
+                    config = json.load(f)
+                    if "api_url" in config:
+                        self.api_base_url = config["api_url"]
+        except Exception as e:
+            logger.warning(f"Failed to load API URL from config: {e}")
+
         # Set responsive window size based on screen dimensions
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -73,6 +90,9 @@ class APGIGui:
 
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.minsize(1000, 700)  # Set minimum window size
+
+        # Register WM_DELETE_WINDOW protocol handler to properly shut down
+        self.root.protocol("WM_DELETE_WINDOW", self._exit_app)
 
         # Force window to be visible and bring to front
         self.root.deiconify()
@@ -177,8 +197,14 @@ class APGIGui:
             traceback.print_exc()
             return
 
-        # Initialize system
-        self._initialize_system()
+        # Authenticate with API before initializing system
+        if not self._show_login_dialog():
+            self._log_event("Login cancelled or failed. Exiting.")
+            self.root.quit()
+            return
+
+        # Initialize system with API session
+        self._initialize_system_with_api()
 
         # Start update loop
         self._update_displays()
@@ -189,6 +215,44 @@ class APGIGui:
 
         # Apply theme to all components after GUI is fully created
         self.root.after(300, self.apply_theme_to_gui)
+
+        # Setup keyboard shortcuts
+        self._setup_keyboard_shortcuts()
+
+    def _setup_keyboard_shortcuts(self) -> None:
+        """Setup keyboard shortcuts for the application."""
+        # Zoom shortcuts (handle both =/+ and -)
+        self.root.bind("<Control-equal>", lambda e: self._zoom_in())
+        self.root.bind("<Control-plus>", lambda e: self._zoom_in())
+        self.root.bind("<Control-minus>", lambda e: self._zoom_out())
+        self.root.bind("<Control-underscore>", lambda e: self._zoom_out())
+
+        # Simulation shortcuts
+        self.root.bind("<F5>", lambda e: self._start_simulation())
+        self.root.bind("<F6>", lambda e: self._pause_simulation())
+        self.root.bind("<F7>", lambda e: self._stop_simulation())
+        self.root.bind("<F8>", lambda e: self._reset_simulation())
+        self.root.bind("<F1>", lambda e: self._show_help())
+
+        # File operations (avoid conflicts with toolbar)
+        self.root.bind("<Control-n>", lambda e: self._new_session())
+        self.root.bind("<Control-o>", lambda e: self._load_config())
+        self.root.bind("<Control-e>", lambda e: self._export_data())
+        self.root.bind("<Control-q>", lambda e: self._exit_app())
+
+        # View operations
+        self.root.bind("<Control-p>", lambda e: self._toggle_parameter_panel())
+        self.root.bind("<Control-l>", lambda e: self._toggle_log_panel())
+        self.root.bind("<Control-0>", lambda e: self._zoom_fit())
+
+        # Navigation
+        self.root.bind("<Tab>", self._handle_tab_navigation)
+        self.root.bind("<Shift-Tab>", self._handle_shift_tab_navigation)
+        self.root.bind("<Control-Tab>", lambda e: self._cycle_notebook_tabs(1))
+        self.root.bind("<Control-Shift-Tab>", lambda e: self._cycle_notebook_tabs(-1))
+
+        # Ensure shortcuts work even when widgets have focus
+        self.root.focus_set()
 
     def _apply_theme_to_root(self) -> None:
         """Apply current theme to root window."""
@@ -238,6 +302,139 @@ class APGIGui:
         # Force redraw of all components
         self.root.update_idletasks()
 
+    def _show_login_dialog(self) -> bool:
+        """Show login dialog and authenticate with API.
+
+        Returns:
+            True if login successful, False otherwise
+        """
+        # Create login dialog
+        login_dialog = tk.Toplevel(self.root)
+        login_dialog.title("APGI System Login")
+        login_dialog.geometry("400x300")
+        login_dialog.resizable(False, False)
+        login_dialog.transient(self.root)
+        login_dialog.grab_set()
+
+        # Center dialog
+        login_dialog.geometry(
+            "+{}+{}".format(
+                (self.root.winfo_screenwidth() - 400) // 2,
+                (self.root.winfo_screenheight() - 300) // 2,
+            )
+        )
+
+        # Create form
+        frame = ttk.Frame(login_dialog, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text="APGI System Login", font=("Arial", 14, "bold")).pack(pady=10)
+
+        # API URL
+        ttk.Label(frame, text="API URL:").pack(anchor=tk.W, pady=2)
+        api_url_var = tk.StringVar(value=self.api_base_url)
+        api_url_entry = ttk.Entry(frame, textvariable=api_url_var, width=40)
+        api_url_entry.pack(pady=2)
+
+        # Username
+        ttk.Label(frame, text="Username:").pack(anchor=tk.W, pady=2)
+        username_var = tk.StringVar()
+        username_entry = ttk.Entry(frame, textvariable=username_var, width=40)
+        username_entry.pack(pady=2)
+
+        # Password
+        ttk.Label(frame, text="Password:").pack(anchor=tk.W, pady=2)
+        password_var = tk.StringVar()
+        password_entry = ttk.Entry(frame, textvariable=password_var, width=40, show="*")
+        password_entry.pack(pady=2)
+
+        # Status label
+        status_var = tk.StringVar()
+        status_label = ttk.Label(frame, textvariable=status_var, foreground="red")
+        status_label.pack(pady=10)
+
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(pady=10)
+
+        login_success = False
+
+        def attempt_login():
+            nonlocal login_success
+            try:
+                api_url = api_url_var.get().strip()
+                username = username_var.get().strip()
+                password = password_var.get().strip()
+
+                if not api_url or not username or not password:
+                    status_var.set("Please fill all fields")
+                    return
+
+                # Test connection and login
+                status_var.set("Connecting to API...")
+
+                # First test if API is reachable
+                try:
+                    response = requests.get(f"{api_url}/v1/health", timeout=5)
+                    response.raise_for_status()
+                except requests.RequestException as e:
+                    status_var.set(f"API not reachable: {str(e)}")
+                    return
+
+                # Attempt login
+                status_var.set("Authenticating...")
+                login_data = {"username": username, "password": password}
+                response = requests.post(f"{api_url}/v1/auth/login", json=login_data, timeout=10)
+                response.raise_for_status()
+
+                token_data = response.json()
+                self.auth_token = token_data["access_token"]
+                self.api_base_url = api_url
+                self.api_headers = {"Authorization": f"Bearer {self.auth_token}"}
+
+                # Save API URL to config
+                try:
+                    config = {}
+                    if self.config_file.exists():
+                        with open(self.config_file, "r") as f:
+                            config = json.load(f)
+                    config["api_url"] = api_url
+                    with open(self.config_file, "w") as f:
+                        json.dump(config, f)
+                except Exception as e:
+                    logger.warning(f"Failed to save API URL: {e}")
+
+                status_var.set("Login successful!")
+                login_success = True
+                login_dialog.destroy()
+
+            except requests.HTTPError as e:
+                if e.response.status_code == 401:
+                    status_var.set("Invalid username or password")
+                else:
+                    status_var.set(f"Login failed: {e.response.status_code}")
+            except requests.RequestException as e:
+                status_var.set(f"Connection error: {str(e)}")
+            except Exception as e:
+                status_var.set(f"Error: {str(e)}")
+
+        def cancel_login():
+            login_dialog.destroy()
+
+        ttk.Button(button_frame, text="Login", command=attempt_login).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=cancel_login).pack(side=tk.LEFT, padx=5)
+
+        # Bind Enter key to login
+        login_dialog.bind("<Return>", lambda e: attempt_login())
+
+        # Focus on username entry
+        username_entry.focus()
+
+        # Wait for dialog to close
+        self.root.wait_window(login_dialog)
+
+        return login_success
+
     def _change_theme(self, theme_name: str) -> None:
         """Change the current theme."""
         if self.theme_manager.set_theme(theme_name):
@@ -271,10 +468,12 @@ class APGIGui:
                         view_menu.add_cascade(label="Theme", menu=theme_menu)
 
                         # Add theme options
+                        from functools import partial
+
                         for theme_name in self.theme_manager.get_available_themes():
                             theme_menu.add_command(
-                                label=theme_name.title(),
-                                command=lambda t=theme_name: self._change_theme(t),  # type: ignore
+                                label=theme_name.title().replace("_", " "),
+                                command=partial(self._change_theme, theme_name),
                             )
 
                         # Add separator and high contrast toggle
@@ -292,7 +491,7 @@ class APGIGui:
             self._change_theme("normal")
         else:
             # Switch to high contrast
-            self._change_theme("high_contrast_dark")
+            self._change_theme("high_contrast")
 
     def _initialize_buffers(self, size: int) -> None:
         """Initialize data buffers with specified size."""
@@ -682,22 +881,66 @@ class APGIGui:
         self._create_theme_menu()
 
     def _exit_app(self) -> None:
-        """Exit the application."""
-        self.root.quit()
-        self.root.bind("<Control-plus>", lambda e: self._zoom_in())
-        self.root.bind("<Control-minus>", lambda e: self._zoom_out())
-        self.root.bind("<Control-s>", lambda e: self.on_start_clicked())  # type: ignore
-        self.root.bind("<Control-p>", lambda e: self._toggle_parameter_panel())
-        self.root.bind("<Control-l>", lambda e: self._toggle_log_panel())
-        self.root.bind("<F5>", lambda e: self._start_simulation())
-        self.root.bind("<F6>", lambda e: self._pause_simulation())
-        self.root.bind("<F7>", lambda e: self._stop_simulation())
-        self.root.bind("<F8>", lambda e: self._reset_simulation())
-        self.root.bind("<F1>", lambda e: self._show_help())
-        self.root.bind("<Tab>", self._handle_tab_navigation)
-        self.root.bind("<Shift-Tab>", self._handle_shift_tab_navigation)
-        self.root.bind("<Control-Tab>", lambda e: self._cycle_notebook_tabs(1))
-        self.root.bind("<Control-Shift-Tab>", lambda e: self._cycle_notebook_tabs(-1))
+        """Exit the application with proper cleanup."""
+        try:
+            # Stop simulation if running
+            if self.is_running:
+                self._stop_simulation()
+
+            # Stop auto-save timer if active
+            if hasattr(self, "auto_save_timer") and self.auto_save_timer is not None:
+                self._stop_auto_save_timer()
+
+            # Cancel any pending after callbacks
+            if hasattr(self, "_update_after_id"):
+                self.root.after_cancel(self._update_after_id)
+
+            # Wait for simulation thread to finish if it exists
+            if (
+                hasattr(self, "simulation_thread")
+                and self.simulation_thread
+                and self.simulation_thread.is_alive()
+            ):
+                self.simulation_thread.join(timeout=2.0)  # Wait up to 2 seconds
+                if self.simulation_thread.is_alive():
+                    # Thread didn't finish, but continue with shutdown
+                    pass
+
+            # Clean up matplotlib canvases to prevent warnings
+            canvases = [
+                getattr(self, attr, None)
+                for attr in [
+                    "neural_canvas",
+                    "intero_canvas",
+                    "metrics_canvas",
+                    "self_canvas",
+                    "osc_canvas",
+                    "state_canvas",
+                ]
+            ]
+            for canvas in canvases:
+                if canvas:
+                    try:
+                        canvas.get_tk_widget().destroy()
+                    except Exception:
+                        pass
+
+            # Clean up auto-save files on exit
+            self._cleanup_auto_save_files()
+
+            # Clean up toplevel windows
+            self._cleanup_toplevel_windows()
+
+            # Log shutdown
+            self._log_event("Application shutting down")
+
+        except Exception as e:
+            # Log error but continue with shutdown
+            print(f"Error during shutdown: {e}")
+
+        finally:
+            # Force quit
+            self.root.quit()
 
     def _create_main_layout(self) -> None:
         """Create main application layout."""
@@ -2029,36 +2272,141 @@ class APGIGui:
                 messagebox.showerror("Error", "Failed to export data")
 
     def _export_plot(self) -> None:
-        """Export current plot."""
-        # Determine which tab is currently active
-        try:
-            current_tab_index = self.notebook.index("current")  # type: ignore
-            # Map tab index to corresponding canvas
-            canvases = [
-                self.neural_canvas,  # Neural Activity (tab 0)
-                self.intero_canvas,  # Interoception (tab 1)
-                self.metrics_canvas,  # System Metrics (tab 2)
-                self.self_canvas,  # Self-Model (tab 3)
-                self.osc_canvas,  # Oscillations (tab 4)
-                self.state_canvas,  # State Space (tab 5)
-            ]
-            canvas = canvases[current_tab_index]
-        except (AttributeError, IndexError):
-            # Fallback to neural canvas if something goes wrong
-            canvas = self.neural_canvas
+        """Export current plot or all plots."""
+        # Create export options dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Export Plot Options")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
 
-        filename = filedialog.asksaveasfilename(
-            title="Export Plot",
-            defaultextension=".png",
-            filetypes=[("PNG files", "*.png"), ("PDF files", "*.pdf"), ("All files", "*.*")],
+        # Center dialog
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Choose export option:", font=("Arial", 12, "bold")).pack(pady=20)
+
+        export_var = tk.StringVar(value="current")
+
+        # Radio buttons for export options
+        options_frame = ttk.Frame(dialog)
+        options_frame.pack(pady=10)
+
+        ttk.Radiobutton(
+            options_frame, text="Export current tab only", variable=export_var, value="current"
+        ).pack(anchor=tk.W, pady=5)
+        ttk.Radiobutton(
+            options_frame,
+            text="Export all tabs to separate files",
+            variable=export_var,
+            value="separate",
+        ).pack(anchor=tk.W, pady=5)
+        ttk.Radiobutton(
+            options_frame,
+            text="Export all tabs to multi-page PDF",
+            variable=export_var,
+            value="pdf",
+        ).pack(anchor=tk.W, pady=5)
+
+        def proceed_with_export():
+            dialog.destroy()
+            self._do_export_plot(export_var.get())
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="Export", command=proceed_with_export).pack(
+            side=tk.LEFT, padx=10
         )
-        if filename:
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=10)
+
+    def _do_export_plot(self, export_type: str) -> None:
+        """Perform the actual plot export."""
+        canvases = [
+            ("Neural_Activity", self.neural_canvas),
+            ("Interoception", self.intero_canvas),
+            ("System_Metrics", self.metrics_canvas),
+            ("Self_Model", self.self_canvas),
+            ("Oscillations", self.osc_canvas),
+            ("State_Space", self.state_canvas),
+        ]
+
+        if export_type == "current":
+            # Export current tab only
             try:
-                canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
-                self._log_event(f"Plot exported: {filename}")
-                messagebox.showinfo("Success", f"Plot saved to {filename}")
-            except Exception:
-                messagebox.showerror("Error", "Failed to export plot")
+                current_tab_index = self.notebook.index("current")  # type: ignore
+                tab_name, canvas = canvases[current_tab_index]
+            except (AttributeError, IndexError):
+                tab_name, canvas = canvases[0]  # Fallback to neural canvas
+
+            filename = filedialog.asksaveasfilename(
+                title="Export Plot",
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("PDF files", "*.pdf"), ("All files", "*.*")],
+            )
+
+            if filename:
+                try:
+                    canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
+                    self._log_event(f"Plot exported: {filename}")
+                    messagebox.showinfo("Success", f"Plot saved to {filename}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to export plot: {str(e)}")
+
+        elif export_type == "separate":
+            # Export each tab to separate files
+            initial_dir = get_data_dir()
+            initial_dir.mkdir(parents=True, exist_ok=True)
+
+            for tab_name, canvas in canvases:
+                filename = filedialog.asksaveasfilename(
+                    title=f"Export {tab_name} Plot",
+                    initialdir=str(initial_dir),
+                    initialfile=f"{tab_name.lower()}_plot.png",
+                    defaultextension=".png",
+                    filetypes=[
+                        ("PNG files", "*.png"),
+                        ("PDF files", "*.pdf"),
+                        ("All files", "*.*"),
+                    ],
+                )
+
+                if filename:
+                    try:
+                        canvas.figure.savefig(filename, dpi=300, bbox_inches="tight")
+                        self._log_event(f"Plot exported: {filename}")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to export {tab_name} plot: {str(e)}")
+                        return
+
+            messagebox.showinfo("Success", "All plots exported successfully!")
+
+        elif export_type == "pdf":
+            # Export all tabs to multi-page PDF
+            filename = filedialog.asksaveasfilename(
+                title="Export All Plots to PDF",
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            )
+
+            if filename:
+                try:
+                    from matplotlib.backends.backend_pdf import PdfPages
+
+                    with PdfPages(filename) as pdf:
+                        for tab_name, canvas in canvases:
+                            pdf.savefig(canvas.figure, dpi=300, bbox_inches="tight")
+
+                    self._log_event(f"All plots exported to PDF: {filename}")
+                    messagebox.showinfo("Success", f"All plots saved to PDF: {filename}")
+
+                except ImportError:
+                    messagebox.showerror(
+                        "Error",
+                        "PDF export requires matplotlib. Please install matplotlib with PDF support.",
+                    )
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to export PDF: {str(e)}")
 
     def _toggle_auto_save(self) -> None:
         """Toggle auto-save feature."""
@@ -2179,7 +2527,34 @@ class APGIGui:
         except Exception:
             self._log_event("Auto-save failed")
 
-    def _cleanup_toplevel_windows(self) -> None:
+    def _cleanup_auto_save_files(self) -> None:
+        """Clean up old auto-save files on exit."""
+        try:
+            data_dir = get_data_dir()
+            if not data_dir.exists():
+                return
+
+            # Find all auto-save files
+            autosave_files = list(data_dir.glob("apgi_autosave_*.json"))
+
+            if len(autosave_files) <= 5:  # Keep at least 5 recent files
+                return
+
+            # Sort by modification time (newest first)
+            autosave_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+            # Remove older files, keeping only the 5 most recent
+            files_to_remove = autosave_files[5:]
+            for file_path in files_to_remove:
+                try:
+                    file_path.unlink()
+                except Exception as e:
+                    # Log but don't fail if cleanup fails
+                    print(f"Failed to remove auto-save file {file_path}: {e}")
+
+        except Exception as e:
+            # Log error but don't fail shutdown
+            print(f"Error during auto-save cleanup: {e}")
         """Clean up all toplevel windows to prevent Tkinter warnings."""
         try:
             for widget in self.root.winfo_children():
@@ -4452,94 +4827,271 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _generate_report(self) -> None:
         """Generate comprehensive report with statistical analysis."""
-        filename = filedialog.asksaveasfilename(
-            title="Save Report",
-            defaultextension=".txt",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        # Create dialog to choose export format
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Generate Report")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+
+        # Center dialog
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Choose export format:", font=("Arial", 12, "bold")).pack(pady=20)
+
+        format_var = tk.StringVar(value="text")
+
+        # Radio buttons for format selection
+        format_frame = ttk.Frame(dialog)
+        format_frame.pack(pady=10)
+
+        ttk.Radiobutton(
+            format_frame, text="Text Report (.txt)", variable=format_var, value="text"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            format_frame, text="PDF Report (.pdf)", variable=format_var, value="pdf"
+        ).pack(anchor=tk.W)
+
+        def proceed_with_format():
+            dialog.destroy()
+            self._do_generate_report(format_var.get())
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="Generate", command=proceed_with_format).pack(
+            side=tk.LEFT, padx=10
         )
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=10)
+
+    def _do_generate_report(self, format_type: str) -> None:
+        """Generate report in specified format."""
+        if format_type == "pdf":
+            filename = filedialog.asksaveasfilename(
+                title="Save PDF Report",
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            )
+        else:
+            filename = filedialog.asksaveasfilename(
+                title="Save Text Report",
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            )
 
         if filename:
             try:
-                with open(filename, "w") as f:
-                    f.write("APGI System Comprehensive Report\n")
-                    f.write("=" * 50 + "\n\n")
-                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                if format_type == "pdf":
+                    self._generate_pdf_report(filename)
+                else:
+                    self._generate_text_report(filename)
 
-                    if self.apgi_system:
-                        # Basic summary
-                        summary = self.apgi_system.get_state_summary()
-                        f.write(f"Simulation Time: {summary['time_ms'] / 1000.0:.2f} seconds\n")
-                        f.write(
-                            f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n"
-                        )
-                        f.write(f"Metabolic Reserves: {summary['metabolic_reserves']:.1f}\n")
-                        f.write(f"Allostatic Load: {summary['allostatic_load'] * 100:.1f}%\n\n")
-
-                        # Enhanced statistical analysis
-                        try:
-                            from apgi_system.analysis import SystemAnalyzer
-
-                            analyzer = SystemAnalyzer(self.apgi_system.config)
-                            analysis_results = analyzer.analyze_system(self.apgi_system)
-                            statistical_summary = analyzer.generate_statistical_summary(
-                                analysis_results
-                            )
-
-                            f.write("STATISTICAL ANALYSIS\n")
-                            f.write("-" * 30 + "\n\n")
-
-                            # Ignition analysis
-                            f.write("Ignition Dynamics:\n")
-                            ign_stats = statistical_summary["ignition_analysis"]
-                            f.write(
-                                f"  Rate: {ign_stats['statistics']['ignition_rate_hz']:.3f} Hz\n"
-                            )
-                            f.write(
-                                f"  Mean Interval: {ign_stats['statistics']['mean_ignition_interval_ms']:.1f} ms\n"
-                            )
-                            f.write(f"  Interpretation: {ign_stats['interpretation']}\n\n")
-
-                            # Energy analysis
-                            f.write("Energy Budget:\n")
-                            energy_stats = statistical_summary["energy_analysis"]
-                            f.write(
-                                f"  Total Consumed: {energy_stats['statistics']['total_energy_consumed']:.3f}\n"
-                            )
-                            f.write(
-                                f"  Depletion Rate: {energy_stats['statistics']['reserve_depletion_rate']:.4f}/s\n"
-                            )
-                            f.write(f"  Interpretation: {energy_stats['interpretation']}\n\n")
-
-                            # Learning analysis
-                            f.write("Learning & Memory:\n")
-                            learning_stats = statistical_summary["learning_analysis"]
-                            f.write(
-                                f"  Total Markers: {learning_stats['statistics']['total_markers']}\n"
-                            )
-                            f.write(
-                                f"  Retrieval Success: {learning_stats['statistics']['retrieval_success_rate']:.1%}\n"
-                            )
-                            f.write(f"  Interpretation: {learning_stats['interpretation']}\n\n")
-
-                            # Coherence analysis
-                            f.write("Self-Model Coherence:\n")
-                            coherence_stats = statistical_summary["coherence_analysis"]
-                            f.write(
-                                f"  Mean Coherence: {coherence_stats['statistics']['mean_coherence']:.3f}\n"
-                            )
-                            f.write(f"  Interpretation: {coherence_stats['interpretation']}\n\n")
-
-                        except Exception as e:
-                            f.write(f"Statistical analysis failed: {str(e)}\n\n")
-
-                    f.write("\n" + "=" * 50 + "\n")
-                    f.write("Event Log:\n")
-                    f.write(self.log_text.get(1.0, tk.END))
-
-                self._log_event(f"Enhanced report saved: {filename}")
-                messagebox.showinfo("Success", f"Comprehensive report saved to {filename}")
+                messagebox.showinfo("Success", f"Report saved to {filename}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save report:\n{str(e)}")
+
+    def _generate_text_report(self, filename: str) -> None:
+        """Generate text report (original implementation)."""
+        with open(filename, "w") as f:
+            f.write("APGI System Comprehensive Report\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            if self.apgi_system:
+                # Basic summary
+                summary = self.apgi_system.get_state_summary()
+                f.write(f"Simulation Time: {summary['time_ms'] / 1000.0:.2f} seconds\n")
+                f.write(f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n")
+                f.write(f"Metabolic Reserves: {summary['metabolic_reserves']:.1f}\n")
+                f.write(f"Allostatic Load: {summary['allostatic_load'] * 100:.1f}%\n\n")
+
+                # Enhanced statistical analysis
+                try:
+                    from apgi_system.analysis import SystemAnalyzer
+
+                    analyzer = SystemAnalyzer(self.apgi_system.config)
+                    analysis_results = analyzer.analyze_system(self.apgi_system)
+                    statistical_summary = analyzer.generate_statistical_summary(analysis_results)
+
+                    f.write("STATISTICAL ANALYSIS\n")
+                    f.write("-" * 30 + "\n\n")
+
+                    # Ignition analysis
+                    f.write("Ignition Dynamics:\n")
+                    ign_stats = statistical_summary["ignition_analysis"]
+                    f.write(f"  Rate: {ign_stats['statistics']['ignition_rate_hz']:.3f} Hz\n")
+                    f.write(
+                        f"  Mean Interval: {ign_stats['statistics']['mean_ignition_interval_ms']:.1f} ms\n"
+                    )
+                    f.write(f"  Interpretation: {ign_stats['interpretation']}\n\n")
+
+                    # Energy analysis
+                    f.write("Energy Budget:\n")
+                    energy_stats = statistical_summary["energy_analysis"]
+                    f.write(
+                        f"  Total Consumed: {energy_stats['statistics']['total_energy_consumed']:.3f}\n"
+                    )
+                    f.write(
+                        f"  Depletion Rate: {energy_stats['statistics']['reserve_depletion_rate']:.4f}/s\n"
+                    )
+                    f.write(f"  Interpretation: {energy_stats['interpretation']}\n\n")
+
+                    # Learning analysis
+                    f.write("Learning & Memory:\n")
+                    learning_stats = statistical_summary["learning_analysis"]
+                    f.write(f"  Total Markers: {learning_stats['statistics']['total_markers']}\n")
+                    f.write(
+                        f"  Retrieval Success: {learning_stats['statistics']['retrieval_success_rate']:.1%}\n"
+                    )
+                    f.write(f"  Interpretation: {learning_stats['interpretation']}\n\n")
+
+                    # Coherence analysis
+                    f.write("Self-Model Coherence:\n")
+                    coherence_stats = statistical_summary["coherence_analysis"]
+                    f.write(
+                        f"  Mean Coherence: {coherence_stats['statistics']['mean_coherence']:.3f}\n"
+                    )
+                    f.write(f"  Interpretation: {coherence_stats['interpretation']}\n\n")
+
+                except Exception as e:
+                    f.write(f"Statistical analysis failed: {str(e)}\n\n")
+
+            f.write("\n" + "=" * 50 + "\n")
+            f.write("Event Log:\n")
+            f.write(self.log_text.get(1.0, tk.END))
+
+        self._log_event(f"Text report saved: {filename}")
+
+    def _generate_pdf_report(self, filename: str) -> None:
+        """Generate PDF report using reportlab."""
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+            # Create PDF document
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+
+            doc = SimpleDocTemplate(filename, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+
+            # Title
+            title_style = ParagraphStyle(
+                "CustomTitle",
+                parent=styles["Heading1"],
+                fontSize=16,
+                spaceAfter=30,
+                alignment=1,  # Center
+            )
+            story.append(Paragraph("APGI System Comprehensive Report", title_style))
+            story.append(Spacer(1, 12))
+
+            # Generation info
+            story.append(
+                Paragraph(
+                    f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]
+                )
+            )
+            story.append(Spacer(1, 12))
+
+            if self.apgi_system:
+                # Basic summary
+                summary = self.apgi_system.get_state_summary()
+                story.append(Paragraph("<b>Simulation Summary</b>", styles["Heading2"]))
+                story.append(Spacer(1, 6))
+
+                summary_text = f"""
+                <b>Simulation Time:</b> {summary['time_ms'] / 1000.0:.2f} seconds<br/>
+                <b>Ignition Events:</b> {summary['ignition_stats']['recent_ignitions']}<br/>
+                <b>Metabolic Reserves:</b> {summary['metabolic_reserves']:.1f}<br/>
+                <b>Allostatic Load:</b> {summary['allostatic_load'] * 100:.1f}%
+                """
+                story.append(Paragraph(summary_text, styles["Normal"]))
+                story.append(Spacer(1, 12))
+
+                # Enhanced statistical analysis
+                try:
+                    from apgi_system.analysis import SystemAnalyzer
+
+                    analyzer = SystemAnalyzer(self.apgi_system.config)
+                    analysis_results = analyzer.analyze_system(self.apgi_system)
+                    statistical_summary = analyzer.generate_statistical_summary(analysis_results)
+
+                    story.append(Paragraph("<b>Statistical Analysis</b>", styles["Heading2"]))
+                    story.append(Spacer(1, 6))
+
+                    # Ignition analysis
+                    story.append(Paragraph("<b>Ignition Dynamics:</b>", styles["Heading3"]))
+                    ign_stats = statistical_summary["ignition_analysis"]
+                    ignition_text = f"""
+                    Rate: {ign_stats['statistics']['ignition_rate_hz']:.3f} Hz<br/>
+                    Mean Interval: {ign_stats['statistics']['mean_ignition_interval_ms']:.1f} ms<br/>
+                    <i>{ign_stats['interpretation']}</i>
+                    """
+                    story.append(Paragraph(ignition_text, styles["Normal"]))
+                    story.append(Spacer(1, 6))
+
+                    # Energy analysis
+                    story.append(Paragraph("<b>Energy Budget:</b>", styles["Heading3"]))
+                    energy_stats = statistical_summary["energy_analysis"]
+                    energy_text = f"""
+                    Total Consumed: {energy_stats['statistics']['total_energy_consumed']:.3f}<br/>
+                    Depletion Rate: {energy_stats['statistics']['reserve_depletion_rate']:.4f}/s<br/>
+                    <i>{energy_stats['interpretation']}</i>
+                    """
+                    story.append(Paragraph(energy_text, styles["Normal"]))
+                    story.append(Spacer(1, 6))
+
+                    # Learning analysis
+                    story.append(Paragraph("<b>Learning & Memory:</b>", styles["Heading3"]))
+                    learning_stats = statistical_summary["learning_analysis"]
+                    learning_text = f"""
+                    Total Markers: {learning_stats['statistics']['total_markers']}<br/>
+                    Retrieval Success: {learning_stats['statistics']['retrieval_success_rate']:.1%}<br/>
+                    <i>{learning_stats['interpretation']}</i>
+                    """
+                    story.append(Paragraph(learning_text, styles["Normal"]))
+                    story.append(Spacer(1, 6))
+
+                    # Coherence analysis
+                    story.append(Paragraph("<b>Self-Model Coherence:</b>", styles["Heading3"]))
+                    coherence_stats = statistical_summary["coherence_analysis"]
+                    coherence_text = f"""
+                    Mean Coherence: {coherence_stats['statistics']['mean_coherence']:.3f}<br/>
+                    <i>{coherence_stats['interpretation']}</i>
+                    """
+                    story.append(Paragraph(coherence_text, styles["Normal"]))
+                    story.append(Spacer(1, 6))
+
+                except Exception as e:
+                    story.append(
+                        Paragraph(f"Statistical analysis failed: {str(e)}", styles["Normal"])
+                    )
+                    story.append(Spacer(1, 12))
+
+            # Event log
+            story.append(PageBreak())
+            story.append(Paragraph("<b>Event Log</b>", styles["Heading2"]))
+            story.append(Spacer(1, 6))
+
+            # Add event log as preformatted text
+            log_content = self.log_text.get(1.0, tk.END)
+            log_style = ParagraphStyle(
+                "LogStyle", parent=styles["Normal"], fontSize=8, fontName="Courier", leftIndent=20
+            )
+            story.append(Paragraph(log_content.replace("\n", "<br/>"), log_style))
+
+            # Build PDF
+            doc.build(story)
+            self._log_event(f"PDF report saved: {filename}")
+
+        except ImportError:
+            raise Exception(
+                "PDF generation requires reportlab. Please install with: pip install reportlab"
+            )
+        except Exception as e:
+            raise Exception(f"PDF generation failed: {str(e)}")
 
     def _show_statistical_analysis(self):
         """Show detailed statistical analysis dialog."""

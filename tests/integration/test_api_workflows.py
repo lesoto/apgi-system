@@ -606,7 +606,276 @@ class TestAuthenticationWorkflow:
         assert "error" in error_data
 
 
-class TestTaskExecutionWorkflow:
+class TestFullAuthWorkflowWithRealDatabase:
+    """
+    Test complete authenticated workflow with real database.
+
+    Tests full auth → create session → start → get state → stop → export flow
+    end-to-end using real database operations.
+
+    Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
+    """
+
+    def test_complete_authenticated_workflow_with_real_db(self, client, db):
+        """
+        Test complete authenticated workflow using real database operations.
+
+        This test creates a real user, authenticates, creates a session,
+        runs a simulation, exports data, and cleans up.
+
+        Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
+        """
+        from api.database.models import User
+        from werkzeug.security import generate_password_hash
+        import json
+
+        # Step 1: Create a real user in the database
+        password_hash = generate_password_hash("testpassword123")
+        test_user = User(
+            user_id="integration-test-user",
+            username="integration_test_user",
+            email="integration@test.com",
+            password_hash=password_hash,
+            roles=["researcher"],
+        )
+        db.add(test_user)
+        db.commit()
+
+        try:
+            # Step 2: Authenticate with real credentials
+            login_response = client.post(
+                "/v1/auth/login",
+                json={"username": "integration_test_user", "password": "testpassword123"},
+            )
+            assert login_response.status_code == 200
+            login_data = login_response.json()
+            assert "access_token" in login_data
+            assert "refresh_token" in login_data
+
+            access_token = login_data["access_token"]
+
+            # Set up authenticated client
+            client.headers.update({"Authorization": f"Bearer {access_token}"})
+
+            # Step 3: Create a session
+            create_response = client.post(
+                "/v1/sessions",
+                json={
+                    "config_path": "config/default.yaml",
+                    "description": "Integration test session",
+                },
+            )
+            assert create_response.status_code == 201
+            session_data = create_response.json()
+            assert "session_id" in session_data
+            session_id = session_data["session_id"]
+
+            # Step 4: Start the session
+            start_response = client.post(f"/v1/sessions/{session_id}/start")
+            assert start_response.status_code == 200
+            start_data = start_response.json()
+            assert start_data["status"] in ["running", "started"]
+
+            # Step 5: Get system state
+            state_response = client.get(f"/v1/sessions/{session_id}/state")
+            assert state_response.status_code == 200
+            state_data = state_response.json()
+
+            # Verify state contains expected subsystems
+            required_subsystems = [
+                "time_ms",
+                "ignition",
+                "workspace",
+                "body",
+                "allostasis",
+                "precision",
+                "metabolism",
+                "self_model",
+            ]
+            for subsystem in required_subsystems:
+                assert subsystem in state_data, f"Missing subsystem: {subsystem}"
+
+            # Step 6: Stop the session
+            stop_response = client.post(f"/v1/sessions/{session_id}/stop")
+            assert stop_response.status_code == 200
+            stop_data = stop_response.json()
+            assert stop_data["status"] in ["stopped", "completed"]
+
+            # Step 7: Export data
+            export_response = client.get(f"/v1/sessions/{session_id}/export?format=json")
+            assert export_response.status_code == 200
+
+            # Parse export data (it's a file download)
+            export_content = export_response.content.decode("utf-8")
+            export_data = json.loads(export_content)
+
+            # Verify export contains expected data
+            assert "session_id" in export_data
+            assert "history" in export_data
+            assert "config" in export_data
+            assert export_data["session_id"] == session_id
+
+            # Step 8: Clean up - delete session
+            delete_response = client.delete(f"/v1/sessions/{session_id}")
+            assert delete_response.status_code == 204
+
+            # Verify session is deleted
+            get_response = client.get(f"/v1/sessions/{session_id}")
+            assert get_response.status_code == 404
+
+        finally:
+            # Clean up test user
+            db.delete(test_user)
+            db.commit()
+
+
+class TestUserStatsOrdering:
+    """
+    Test user statistics ordering issue (BUG-006).
+
+    Tests that role_counts in GET /v1/users/stats are returned in a consistent order.
+    """
+
+    def test_user_stats_role_counts_ordering(self, client, db):
+        """
+        Test that role_counts are returned in a consistent, predictable order.
+
+        This addresses BUG-006 where role_counts ordering was inconsistent
+        due to dictionary insertion order depending on database query results.
+        """
+        from api.database.models import User
+        from werkzeug.security import generate_password_hash
+
+        # Create test users with different roles in a specific order
+        test_users = [
+            ("user_alpha", ["admin"]),
+            ("user_beta", ["user"]),
+            ("user_gamma", ["researcher"]),
+            ("user_delta", ["admin", "researcher"]),
+            ("user_epsilon", ["user"]),
+        ]
+
+        created_users = []
+        try:
+            for username, roles in test_users:
+                user = User(
+                    user_id=f"test-user-{username}",
+                    username=username,
+                    email=f"{username}@test.com",
+                    password_hash=generate_password_hash("password123"),
+                    roles=roles,
+                    is_active=True,
+                )
+                db.add(user)
+                created_users.append(user)
+
+            db.commit()
+
+            # Get user stats
+            response = client.get("/v1/users/stats")
+            assert response.status_code == 200
+
+            stats_data = response.json()
+            role_counts = stats_data["role_counts"]
+
+            # Expected role counts based on our test users
+            expected_counts = {
+                "admin": 2,  # user_alpha + user_delta
+                "user": 2,  # user_beta + user_epsilon
+                "researcher": 2,  # user_gamma + user_delta
+            }
+
+            # Verify counts are correct
+            assert role_counts == expected_counts
+
+            # Verify ordering is consistent (should be insertion order: admin, user, researcher)
+            role_keys = list(role_counts.keys())
+            assert role_keys == ["admin", "user", "researcher"]
+
+            # Make another request to ensure ordering is consistent across calls
+            response2 = client.get("/v1/users/stats")
+            assert response2.status_code == 200
+
+            stats_data2 = response2.json()
+            role_counts2 = stats_data2["role_counts"]
+
+            # Should be identical
+            assert role_counts2 == expected_counts
+            assert list(role_counts2.keys()) == role_keys
+
+        finally:
+            # Clean up test users
+            for user in created_users:
+                db.delete(user)
+            db.commit()
+
+    def test_user_stats_empty_database(self, client):
+        """
+        Test user stats with empty database.
+        """
+        response = client.get("/v1/users/stats")
+        assert response.status_code == 200
+
+        stats_data = response.json()
+        assert stats_data["total_users"] == 0
+        assert stats_data["active_users"] == 0
+        assert stats_data["inactive_users"] == 0
+        assert stats_data["role_counts"] == {}
+
+    def test_user_stats_mixed_roles_ordering(self, client, db):
+        """
+        Test role_counts ordering with mixed role assignments.
+        """
+        from api.database.models import User
+        from werkzeug.security import generate_password_hash
+
+        # Create users with roles in different order than expected
+        test_users = [
+            ("z_user", ["zebra"]),  # Role that should come last alphabetically
+            ("a_user", ["alpha"]),  # Role that should come first alphabetically
+            ("m_user", ["zebra", "alpha"]),  # Multiple roles
+        ]
+
+        created_users = []
+        try:
+            for username, roles in test_users:
+                user = User(
+                    user_id=f"test-user-{username}",
+                    username=username,
+                    email=f"{username}@test.com",
+                    password_hash=generate_password_hash("password123"),
+                    roles=roles,
+                    is_active=True,
+                )
+                db.add(user)
+                created_users.append(user)
+
+            db.commit()
+
+            response = client.get("/v1/users/stats")
+            assert response.status_code == 200
+
+            stats_data = response.json()
+            role_counts = stats_data["role_counts"]
+
+            # Expected: alpha appears first in insertion order, then zebra
+            expected_counts = {
+                "alpha": 2,  # a_user + m_user
+                "zebra": 2,  # z_user + m_user
+            }
+
+            assert role_counts == expected_counts
+
+            # Verify the order is consistent
+            role_keys = list(role_counts.keys())
+            assert role_keys == ["alpha", "zebra"]
+
+        finally:
+            # Clean up test users
+            for user in created_users:
+                db.delete(user)
+            db.commit()
+
     """
     Test experimental task execution workflow.
 

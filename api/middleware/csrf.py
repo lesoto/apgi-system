@@ -34,6 +34,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         cookie_name: str = "csrf_token",
         header_name: str = "X-CSRF-Token",
         token_expiry_minutes: int = 60,
+        secure: bool = False,
     ):
         """
         Initialize CSRF middleware.
@@ -44,12 +45,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             cookie_name: Name of the CSRF token cookie
             header_name: Name of the CSRF token header
             token_expiry_minutes: How long CSRF tokens are valid
+            secure: Whether to set the secure flag on cookies (HTTPS only)
         """
         super().__init__(app)
         self.enabled = enabled
         self.cookie_name = cookie_name
         self.header_name = header_name
         self.token_expiry_minutes = token_expiry_minutes
+        self.secure = secure
 
     def _generate_csrf_token(self) -> str:
         """
@@ -157,7 +160,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 max_age=self.token_expiry_minutes * 60,
                 httponly=False,  # JavaScript needs to read this for AJAX requests
                 samesite="strict",
-                secure=True,  # Only send over HTTPS
+                secure=self.secure,  # Configurable based on HTTPS
             )
 
             return response

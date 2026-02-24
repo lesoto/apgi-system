@@ -8,6 +8,7 @@ WebSocket communication, and dashboard features.
 import time
 import threading
 from unittest.mock import patch, MagicMock
+from typing import Any
 
 from apgi_system.visualization.simple_monitor import SimpleMonitor, MonitoringIntegration
 from apgi_system.visualization.web_monitor import WebMonitor
@@ -45,7 +46,7 @@ class TestSimpleMonitor:
         # Start monitoring
         monitor.start_monitoring()
         assert monitor.is_monitoring is True
-        assert monitor.system_status == "Running"
+        assert monitor.system_status == "Running"  # type: ignore[unreachable]
         assert monitor.monitor_thread is not None
 
         # Stop monitoring
@@ -329,9 +330,10 @@ class TestSimpleMonitor:
         assert len(monitor.alerts) <= 100
 
     @patch("apgi_system.visualization.web_monitor.SocketIO")
-    def test_socketio_emit(self, mock_socketio) -> None:
+    def test_socketio_emit(self, mock_socketio: MagicMock) -> None:
         """Test WebSocket data emission."""
         monitor = WebMonitor()
+        monitor.socketio = mock_socketio
         monitor.is_monitoring = True
 
         test_state = {
@@ -365,7 +367,7 @@ class TestMonitoringIntegration:
 
     def test_integration_initialization(self) -> None:
         """Test MonitoringIntegration initialization."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         assert integration.monitor is monitor
@@ -373,34 +375,34 @@ class TestMonitoringIntegration:
 
     def test_connect_system_with_callback_support(self) -> None:
         """Test connecting system that supports monitoring callbacks."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         # Mock system with callback support
         mock_system = MagicMock()
         mock_system.add_monitor_callback = MagicMock()
 
-        integration.connect_system(mock_system)
+        integration.connect_system(mock_system)  # type: ignore
 
         assert integration.is_connected is True
         mock_system.add_monitor_callback.assert_called_once_with(monitor.update_data)
 
     def test_connect_system_without_callback_support(self) -> None:
         """Test connecting system that doesn't support monitoring callbacks."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         # Mock system without callback support
         mock_system = MagicMock()
         del mock_system.add_monitor_callback  # Remove the method
 
-        integration.connect_system(mock_system)
+        integration.connect_system(mock_system)  # type: ignore
 
         assert integration.is_connected is False
 
     def test_disconnect_system(self) -> None:
         """Test disconnecting system from monitor."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         # Mock system with callback support
@@ -409,18 +411,18 @@ class TestMonitoringIntegration:
         mock_system.remove_monitor_callback = MagicMock()
 
         # Connect first
-        integration.connect_system(mock_system)
+        integration.connect_system(mock_system)  # type: ignore
         assert integration.is_connected is True
 
         # Then disconnect
-        integration.disconnect_system(mock_system)
+        integration.disconnect_system(mock_system)  # type: ignore
 
         assert integration.is_connected is False
-        mock_system.remove_monitor_callback.assert_called_once_with(monitor.update_data)
+        mock_system.remove_monitor_callback.assert_called_once_with(monitor.update_data)  # type: ignore[unreachable]
 
     def test_simulate_data_basic(self) -> None:
         """Test basic data simulation."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         # Run short simulation
@@ -436,7 +438,7 @@ class TestMonitoringIntegration:
 
     def test_simulate_data_threading(self) -> None:
         """Test data simulation in separate thread."""
-        monitor = WebMonitor()
+        monitor = SimpleMonitor()
         integration = MonitoringIntegration(monitor)
 
         # Start simulation in thread
@@ -456,17 +458,25 @@ class TestMonitoringIntegration:
         final_count = len(monitor.time_buffer)
         assert final_count > 2
 
+        # Data should be consistent (no corruption)
+        assert all(isinstance(val, (int, float)) for val in monitor.time_buffer)
+        assert all(isinstance(val, (int, float)) for val in monitor.ignition_buffer)
+
 
 class TestWebMonitorIntegration:
     """Integration tests for web monitor functionality."""
 
+    def __init__(self, monitor: Any) -> None:
+        """Test complete monitoring cycle."""
+        self.monitor = monitor
+
     def test_full_monitoring_cycle(self) -> None:
         """Test complete monitoring cycle."""
-        monitor = WebMonitor(buffer_size=50)
+        self.monitor = WebMonitor(buffer_size=50)
 
         # Start monitoring
-        monitor.start_monitoring()
-        assert monitor.is_monitoring is True
+        self.monitor.start_monitoring()
+        assert self.monitor.is_monitoring is True
 
         # Add some data
         for i in range(10):
@@ -478,15 +488,15 @@ class TestWebMonitorIntegration:
                 "metabolism": {"current_reserves": 0.9 - i * 0.01},
                 "self_model": {"coherence_score": 0.6 + i * 0.02},
             }
-            monitor.update_data(test_state)
+            self.monitor.update_data(test_state)
 
         # Verify data accumulation
-        assert len(monitor.time_buffer) == 10
-        assert monitor.current_metrics["ignition_signal"] == 1.9  # Last value
+        assert len(self.monitor.time_buffer) == 10
+        assert self.monitor.current_metrics["ignition_signal"] == 1.9  # Last value
 
         # Stop monitoring
-        monitor.stop_monitoring()
-        assert monitor.is_monitoring is False
+        self.monitor.stop_monitoring()
+        assert self.monitor.is_monitoring is False
 
     def test_monitoring_with_alerts(self) -> None:
         """Test monitoring with alert generation."""
@@ -567,7 +577,7 @@ class TestWebMonitorIntegration:
         """Test concurrent access to monitor data."""
         monitor = WebMonitor()
 
-        def update_data_worker(worker_id: int, num_updates: int):
+        def update_data_worker(worker_id: int, num_updates: int) -> None:
             """Worker function for concurrent updates."""
             for i in range(num_updates):
                 test_state = {

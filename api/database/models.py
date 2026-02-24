@@ -19,7 +19,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -74,11 +74,21 @@ class User(Base):  # type: ignore[misc, valid-type]
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
     roles = Column(PickleType, nullable=False, default=list, comment="User roles for RBAC")
+    is_active = Column(
+        Boolean, nullable=False, default=True, comment="Whether the user account is active"
+    )
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         comment="Account creation timestamp",
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Last update timestamp",
     )
     last_login = Column(DateTime(timezone=True), nullable=True, comment="Last login timestamp")
 

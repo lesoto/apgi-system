@@ -92,6 +92,32 @@ class ThemeManager:
                 "error": "#FF0000",
             },
         },
+        "high_contrast_dark": {
+            "bg": "#000000",
+            "fg": "#FFFFFF",
+            "canvas_bg": "#1a1a1a",
+            "accent": "#00FFFF",
+            "info": "#00FFFF",
+            "success": "#00FF00",
+            "warning": "#FFFF00",
+            "error": "#FF0000",
+            "notification_colors": {
+                "high": "#FF0000",
+                "medium": "#FFFF00",
+                "low": "#00FFFF",
+            },
+            "battery_colors": {
+                "high": "#00FF00",
+                "medium": "#FFFF00",
+                "low": "#FF0000",
+            },
+            "state_colors": {
+                "idle": "#666666",
+                "processing": "#00FFFF",
+                "complete": "#00FF00",
+                "error": "#FF0000",
+            },
+        },
     }
 
     def __init__(self, initial_theme: str = "normal"):

@@ -5,24 +5,30 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Any, Optional
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status
 
 from api.database.connection import SessionLocal
 from api.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
+from sqlalchemy import select
 from api.models.schemas import (
     ErrorResponse,
+    PaginationInfo,
     SessionActionResponse,
     SessionCreateRequest,
     SessionCreateResponse,
+    SessionListItem,
+    SessionListResponse,
     SessionResponse,
 )
 from api.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
+    check_resource_ownership,
+    TokenPayload,
 )
 from api.services.session_manager import SessionLifecycleState, SessionManager
 
@@ -59,7 +65,7 @@ def get_session_manager() -> SessionManager:
     return _session_manager
 
 
-def init_session_routes(redis_client: redis.Redis):
+def init_session_routes(redis_client: redis.Redis) -> None:
     """
     Initialize session routes with Redis client.
 
@@ -72,19 +78,78 @@ def init_session_routes(redis_client: redis.Redis):
     logger.info("Session routes initialized")
 
 
-@router.post(
+@router.get(
     "",
-    response_model=SessionCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create new simulation session",
-    description="Initialize a new APGI simulation session with provided configuration",
-    dependencies=[Depends(require_permission(Permission.SESSION_CREATE))],
+    response_model=SessionListResponse,
+    summary="List sessions",
+    description="Retrieve a list of simulation sessions, filtered by user permissions, with pagination",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
+async def list_sessions(
+    limit: int = 50,
+    cursor: Optional[str] = None,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionListResponse:
+    """
+    List sessions.
+
+    Returns sessions owned by the current user, or all sessions if user is admin, with pagination.
+
+    Args:
+        limit: Maximum number of sessions to return (1-100, default 50)
+        cursor: Cursor for pagination (ISO timestamp)
+        manager: Session manager dependency
+        current_user: Current authenticated user
+
+    Returns:
+        SessionListResponse with list of sessions and pagination info
+    """
+    # Validate limit
+    limit = min(max(1, limit), 100)
+
+    # Check if user is admin - if so, list all sessions
+    from api.services.authorization import Role, has_any_role
+
+    if has_any_role(current_user.roles, [Role.ADMIN]):
+        user_filter = None
+    else:
+        user_filter = current_user.user_id
+
+    result: Dict[str, Any] = await manager.list_sessions(
+        user_id=user_filter, limit=limit, cursor=cursor
+    )
+
+    # Convert to response format
+    sessions = [
+        SessionListItem(
+            session_id=s["session_id"],
+            user_id=s["user_id"],
+            state=s["state"],
+            created_at=s["created_at"],
+            updated_at=s["updated_at"],
+            description=s["description"],
+        )
+        for s in result["sessions"]
+    ]
+
+    pagination = (
+        PaginationInfo(
+            next_cursor=result["pagination"]["next_cursor"],
+            has_more=result["pagination"]["has_more"],
+        )
+        if result["pagination"]["next_cursor"] or result["pagination"]["has_more"]
+        else None
+    )
+
+    return SessionListResponse(sessions=sessions, pagination=pagination)
+
+
 async def create_session(
     request: SessionCreateRequest,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionCreateResponse:
     """
     Create new simulation session.
 
@@ -124,8 +189,8 @@ async def create_session(
 async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionResponse:
     """
     Get session details.
 
@@ -143,6 +208,19 @@ async def get_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership - get user_id from database
+    db_session = SessionLocal()
+    try:
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if db_model:
+            check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
 
     return SessionResponse(
         session_id=session_id,
@@ -164,8 +242,8 @@ async def get_session(
 async def start_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionActionResponse:
     """
     Start simulation.
 
@@ -183,6 +261,19 @@ async def start_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    db_session = SessionLocal()
+    try:
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if db_model:
+            check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
 
     try:
         result = await sim_session.start()
@@ -210,8 +301,8 @@ async def start_session(
 async def pause_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionActionResponse:
     """
     Pause simulation.
 
@@ -229,6 +320,19 @@ async def pause_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    db_session = SessionLocal()
+    try:
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if db_model:
+            check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
 
     try:
         result = await sim_session.pause()
@@ -256,8 +360,8 @@ async def pause_session(
 async def stop_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionActionResponse:
     """
     Stop simulation.
 
@@ -275,6 +379,19 @@ async def stop_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    db_session = SessionLocal()
+    try:
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if db_model:
+            check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
 
     result = await sim_session.stop()
 
@@ -298,8 +415,8 @@ async def stop_session(
 async def reset_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionActionResponse:
     """
     Reset simulation to initial state.
 
@@ -317,6 +434,19 @@ async def reset_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    db_session = SessionLocal()
+    try:
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if db_model:
+            check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
 
     result = await sim_session.reset()
 
@@ -340,8 +470,8 @@ async def reset_session(
 async def delete_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> None:
     """
     Delete session and clean up resources.
 
@@ -355,8 +485,22 @@ async def delete_session(
     Raises:
         HTTPException: If session not found or deletion fails
     """
+    # Check ownership first - get user_id from database
+    db_session = SessionLocal()
     try:
-        # Verify session exists before deletion
+        from api.database.models import Session as SessionModel
+
+        stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+        sql_result = db_session.execute(stmt)
+        db_model: Optional[SessionModel] = sql_result.scalar_one_or_none()
+        if not db_model:
+            raise SessionNotFoundError(session_id)
+        check_resource_ownership(str(db_model.user_id), current_user)
+    finally:
+        db_session.close()
+
+    # Verify session exists in manager (this will raise if not found)
+    try:
         await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)

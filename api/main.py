@@ -7,14 +7,12 @@ FastAPI application providing RESTful access to the APGI System.
 import socket
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
 
 # Check dependencies before starting
 try:
@@ -203,6 +201,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
             cookie_name="csrf_token",
             header_name="X-CSRF-Token",
             token_expiry_minutes=60,
+            secure=settings.https_enabled,  # Set secure flag based on HTTPS configuration
         )
 
     # Add deprecation middleware
@@ -214,9 +213,6 @@ def create_app(test_mode: bool = False) -> FastAPI:
         app,
         redis_client=None,  # Will be set in startup
         enabled=settings.rate_limit_enabled,
-    )
-    app.add_middleware(
-        rate_limiting_middleware.__class__, redis_client=None, enabled=settings.rate_limit_enabled
     )
 
     # Configure CORS
@@ -231,19 +227,6 @@ def create_app(test_mode: bool = False) -> FastAPI:
     # Register exception handlers
     register_exception_handlers(app)
 
-    # Health check endpoint
-    @app.get("/health", tags=["Health"])
-    async def health_check():
-        """Basic health check endpoint."""
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "1.0.0",
-            },
-        )
-
     # Root endpoint
     @app.get("/", tags=["Root"])
     async def root():
@@ -253,7 +236,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
             "version": "1.0.0",
             "description": "REST API for consciousness modeling",
             "docs": "/docs",
-            "health": "/health",
+            "health": "/v1/health",  # Updated to point to the comprehensive health endpoint
         }
 
     # Include routers
@@ -299,4 +282,26 @@ if __name__ == "__main__":
             )
             sys.exit(1)
 
-    uvicorn.run("api.main:app", host=default_host, port=default_port, reload=True, log_level="info")
+    # Configure uvicorn arguments based on HTTPS settings
+    uvicorn_kwargs = {
+        "host": default_host,
+        "port": default_port,
+        "reload": True,
+        "log_level": "info",
+    }
+
+    if settings.https_enabled:
+        if not settings.ssl_certfile or not settings.ssl_keyfile:
+            print(
+                "❌ HTTPS enabled but SSL_CERTFILE and SSL_KEYFILE environment variables are not set"
+            )
+            print("   Please set SSL_CERTFILE and SSL_KEYFILE to enable HTTPS")
+            print("   Falling back to HTTP...")
+        else:
+            uvicorn_kwargs["ssl_keyfile"] = settings.ssl_keyfile
+            uvicorn_kwargs["ssl_certfile"] = settings.ssl_certfile
+            print(
+                f"✓ HTTPS enabled with cert: {settings.ssl_certfile}, key: {settings.ssl_keyfile}"
+            )
+
+    uvicorn.run("api.main:app", **uvicorn_kwargs)

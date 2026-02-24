@@ -6,6 +6,7 @@ results processing, and reporting functionality.
 """
 
 import numpy as np
+from typing import Any, Dict, List
 from unittest.mock import MagicMock
 from apgi_system.analysis import (
     AnalysisResults,
@@ -17,7 +18,7 @@ from apgi_system.analysis import (
 class TestAnalysisResults:
     """Test the AnalysisResults dataclass."""
 
-    def test_analysis_results_initialization(self):
+    def test_analysis_results_initialization(self) -> None:
         """Test that AnalysisResults can be initialized with default values."""
         results = AnalysisResults()
 
@@ -27,7 +28,7 @@ class TestAnalysisResults:
         assert isinstance(results.coherence_metrics, dict)
         assert isinstance(results.temporal_dynamics, dict)
 
-    def test_analysis_results_with_data(self):
+    def test_analysis_results_with_data(self) -> None:
         """Test AnalysisResults with actual data."""
         ignition_stats = {
             "total_ignitions": 10,
@@ -116,25 +117,30 @@ class TestSystemAnalyzer:
         assert isinstance(results.ignition_statistics, dict)
         assert isinstance(results.energy_budget_summary, dict)
 
-    def test_compute_ignition_statistics(self):
+    def test_compute_ignition_statistics(self) -> None:
         """Test ignition statistics computation."""
-        config = {}
+        config: Dict[str, Any] = {}
         analyzer = SystemAnalyzer(config)
 
         # Mock ignition data
-        ignition_times = [1000.0, 3000.0, 7000.0]
-        ignition_durations = [50.0, 75.0, 100.0]
+        ignition_times: List[float] = [1000.0, 3000.0, 7000.0]
+        ignition_durations: List[float] = [50.0, 75.0, 100.0]
         total_time = 10000.0
 
-        stats = analyzer._compute_ignition_statistics(
-            ignition_times, ignition_durations, total_time
+        stats = analyzer.compute_ignition_statistics(
+            0.5,
+            {
+                "ignition_times": ignition_times,
+                "ignition_durations": ignition_durations,
+                "total_time": total_time,
+            },
         )
 
         assert stats["total_ignitions"] == 3
         assert stats["ignition_rate_hz"] == 0.3  # 3 events in 10 seconds
         assert stats["mean_ignition_duration_ms"] == 75.0  # (50+75+100)/3
 
-    def test_compute_ignition_statistics_empty(self):
+    def test_compute_ignition_statistics_empty(self) -> None:
         """Test ignition statistics with no ignition events."""
         config = {}
         analyzer = SystemAnalyzer(config)

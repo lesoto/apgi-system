@@ -5,15 +5,14 @@ Manages APGI simulation sessions with Redis caching and database persistence.
 """
 
 import asyncio
-import threading
 import json
 import logging
 import re
-import uuid
 import time
+import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 from collections import OrderedDict
 
 # from sqlalchemy.orm import Session
@@ -129,7 +128,7 @@ class SimulationSession:
         deep_merge(self.apgi_system.config, custom_config)
 
         # Reinitialize subsystems with new config
-        self.apgi_system._initialize_subsystems()  # type: ignore
+        self.apgi_system._initialize_subsystems()
 
     async def start(self) -> Dict[str, Any]:
         """
@@ -218,7 +217,7 @@ class SimulationSession:
         """
         async with self.lock:
             # Reset APGI system
-            self.apgi_system.reset()  # type: ignore
+            self.apgi_system.reset()
 
             # Clear paused state
             self._paused_state = None
@@ -319,7 +318,7 @@ class SessionManager:
         ] = OrderedDict()  # (session, last_access_time)
 
         # Lock for session cache access
-        self.cache_lock = threading.Lock()
+        self.cache_lock = asyncio.Lock()
 
         logger.info("SessionManager initialized")
 
@@ -369,7 +368,7 @@ class SessionManager:
         sim_session = SimulationSession(session_id, config)
 
         # Atomic cache + database operation
-        with self.cache_lock:
+        async with self.cache_lock:
             # Cleanup expired sessions before adding new one
             self._cleanup_expired_sessions()
 
@@ -390,9 +389,13 @@ class SessionManager:
 
         return session_id
 
-    @circuit_breaker(name="database_session_persist", failure_threshold=3, recovery_timeout=30.0)  # type: ignore
+    @circuit_breaker(name="database_session_persist", failure_threshold=3, recovery_timeout=30.0)
     async def _persist_session_to_database(
-        self, session_id: str, user_id: str, config: Dict[str, Any], description: str
+        self,
+        session_id: str,
+        user_id: str,
+        config: Dict[str, Any],
+        description: Optional[str] = None,
     ) -> None:
         """Persist session to database with circuit breaker protection."""
         db_session = self.db_session_factory()
@@ -414,7 +417,7 @@ class SessionManager:
         finally:
             db_session.close()
 
-    @circuit_breaker(name="redis_session_cache", failure_threshold=5, recovery_timeout=60.0)  # type: ignore
+    @circuit_breaker(name="redis_session_cache", failure_threshold=5, recovery_timeout=60.0)
     async def _cache_session_metadata_safe(
         self, session_id: str, sim_session: SimulationSession
     ) -> None:
@@ -442,7 +445,7 @@ class SessionManager:
         validate_session_id(session_id)
 
         # Check memory cache first
-        with self.cache_lock:
+        async with self.cache_lock:
             # Cleanup expired sessions
             self._cleanup_expired_sessions()
 
@@ -468,7 +471,7 @@ class SessionManager:
             )
 
             # Add to memory cache
-            with self.cache_lock:
+            async with self.cache_lock:
                 self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
             return sim_session
@@ -515,12 +518,12 @@ class SessionManager:
         validate_session_id(session_id)
 
         # Check if session exists in cache first
-        with self.cache_lock:
+        async with self.cache_lock:
             if session_id not in self.sessions:
                 raise ValueError(f"Session {session_id} not found")
 
         # Remove from memory cache
-        with self.cache_lock:
+        async with self.cache_lock:
             if session_id in self.sessions:
                 del self.sessions[session_id]
 
@@ -595,35 +598,72 @@ class SessionManager:
         # Cache for 1 hour
         await self.redis.setex(f"session:{session_id}", 3600, json.dumps(metadata))
 
-    async def list_sessions(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_sessions(
+        self, user_id: Optional[str] = None, limit: int = 50, cursor: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        List all sessions, optionally filtered by user.
+        List all sessions, optionally filtered by user, with pagination.
 
         Args:
             user_id: Optional user ID filter
+            limit: Maximum number of sessions to return (default 50, max 100)
+            cursor: Cursor for pagination (ISO timestamp)
 
         Returns:
-            List of session metadata
+            Dict with sessions list and pagination info
         """
+        # Validate limit
+        limit = min(max(1, limit), 100)  # Between 1 and 100
+
         db_session = self.db_session_factory()
         try:
-            stmt = select(SessionModel)
+            stmt = select(SessionModel).order_by(SessionModel.created_at.desc())
+
             if user_id:
                 stmt = stmt.where(SessionModel.user_id == user_id)
 
-            result = db_session.execute(stmt)
-            sessions = result.scalars().all()
+            # Apply cursor if provided
+            if cursor:
+                from datetime import datetime
 
-            return [
-                {
-                    "session_id": s.session_id,
-                    "user_id": s.user_id,
-                    "state": s.state,
-                    "created_at": s.created_at.isoformat() + "Z",
-                    "updated_at": s.updated_at.isoformat() + "Z",
-                    "description": s.description,
-                }
-                for s in sessions
-            ]
+                try:
+                    cursor_dt = datetime.fromisoformat(cursor.replace("Z", "+00:00"))
+                    stmt = stmt.where(SessionModel.created_at < cursor_dt)
+                except ValueError:
+                    # Invalid cursor, ignore
+                    pass
+
+            # Limit results
+            stmt = stmt.limit(limit + 1)  # Get one extra to check if there are more
+
+            result = db_session.execute(stmt)
+            db_sessions = result.scalars().all()
+
+            # Check if there are more results
+            has_more = len(db_sessions) > limit
+            sessions = db_sessions[:limit]
+
+            # Next cursor is the created_at of the last session
+            next_cursor = None
+            if has_more and sessions:
+                next_cursor = sessions[-1].created_at.isoformat() + "Z"
+
+            return {
+                "sessions": [
+                    {
+                        "session_id": s.session_id,
+                        "user_id": s.user_id,
+                        "state": s.state,
+                        "created_at": s.created_at.isoformat() + "Z",
+                        "updated_at": s.updated_at.isoformat() + "Z",
+                        "description": s.description,
+                    }
+                    for s in sessions
+                ],
+                "pagination": {
+                    "next_cursor": next_cursor,
+                    "has_more": has_more,
+                },
+            }
         finally:
             db_session.close()

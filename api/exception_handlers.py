@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Union
 
-from fastapi import Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
@@ -105,7 +105,7 @@ async def validation_error_handler(
                 "code": "VALIDATION_ERROR",
                 "message": "Request validation failed",
                 "request_id": request_id,
-                "timestamp": None,  # Will be set by middleware if available
+                "timestamp": datetime.utcnow().isoformat() + "Z",
                 "details": {"validation_errors": errors},
             }
         },
@@ -167,7 +167,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
                 "code": error_code,
                 "message": str(exc.detail),
                 "request_id": request_id,
-                "timestamp": None,  # Will be set by middleware if available
+                "timestamp": datetime.utcnow().isoformat() + "Z",
                 "details": {},
             }
         },
@@ -266,7 +266,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-def register_exception_handlers(app):
+def register_exception_handlers(app: FastAPI) -> None:
     """
     Register all exception handlers with the FastAPI application.
 

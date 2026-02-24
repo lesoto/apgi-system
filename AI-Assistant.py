@@ -941,9 +941,7 @@ class APGI_LFM2(nn.Module):
 
         return error.mean()
 
-    def compute_somatic_bias(
-        self, interoceptive_signals: Optional[Union[Dict[str, float], torch.Tensor]]
-    ) -> torch.Tensor:
+    def compute_somatic_bias(self, interoceptive_signals: Any) -> torch.Tensor:
         """Compute somatic bias from interoceptive signals"""
         if interoceptive_signals is None:
             return torch.tensor(1.0)
@@ -961,9 +959,7 @@ class APGI_LFM2(nn.Module):
 
         return torch.clamp(bias, min=0.5, max=2.0)
 
-    def _process_interoceptive_signals(
-        self, interoceptive_signals: Union[Dict[str, float], torch.Tensor, List[float]]
-    ) -> torch.Tensor:
+    def _process_interoceptive_signals(self, interoceptive_signals: Any) -> torch.Tensor:
         """Convert interoceptive signals to tensor"""
         if isinstance(interoceptive_signals, dict):
             signals = []
@@ -2003,7 +1999,7 @@ class APGIEvaluator:
             "std_surprise": float(np.std(surprises)),
         }
 
-    def evaluate_computational_efficiency(self, dataset):
+    def evaluate_computational_efficiency(self, dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Evaluate FLOPs and efficiency.
 
@@ -2263,7 +2259,7 @@ def _print_cognitive_report(assistant: Any) -> None:
         print("\nConfidence statistics:")
         print(f"  Mean: {report['confidence_stats']['mean']:.2f}")
         print(
-            f"  Range: [{report['confidence_stats']['min']:.2f}, {report['confidence_stats']['max']:.2f}]"  # type: ignore
+            f"  Range: [{report['confidence_stats']['min']:.2f}, {report['confidence_stats']['max']:.2f}]"
         )
 
 
@@ -2314,7 +2310,7 @@ def _generate_visualizations(assistant: Any) -> None:
 
     viz = APGIVisualizer()
 
-    fig1 = viz.plot_state_timeline(list(assistant.state_history))  # type: ignore
+    fig1 = viz.plot_state_timeline(list(assistant.state_history))
     if fig1:
         plt.savefig("/tmp/apgi_state_timeline.png", dpi=150, bbox_inches="tight")
         print("✓ State timeline saved to /tmp/apgi_state_timeline.png")
@@ -2404,7 +2400,7 @@ if __name__ == "__main__":
 # Missing benchmark helper functions - implemented for research validation
 
 
-def load_dataset(name: str, difficulty: str = "medium"):
+def load_dataset(name: str, difficulty: str = "medium") -> List[Dict[str, Any]]:
     """Mock dataset loading for benchmarking"""
     # Generate synthetic data based on difficulty
     n_samples = 1000 if difficulty == "low" else 2000
@@ -2442,7 +2438,7 @@ def LFM2(config: Dict[str, Any]) -> Any:
     """Mock standard LFM2 model for comparison"""
 
     class MockLFM2(nn.Module):
-        def __init__(self, config):
+        def __init__(self, config: Dict[str, Any]) -> None:
             super().__init__()
             self.config = config
             # Make this larger and more expensive than APGI's adaptive pathways
@@ -2460,7 +2456,7 @@ def LFM2(config: Dict[str, Any]) -> Any:
                 nn.Linear(512, config.get("output_dim", 64)),
             )
 
-        def forward(self, x):
+        def forward(self, x: Union[Dict[str, Any], torch.Tensor]) -> torch.Tensor:
             if isinstance(x, dict):
                 x = x.get("input", torch.randn(1, 128))
             return self.net(x)
@@ -3130,11 +3126,7 @@ def demonstrate_apgi_assistant_enhanced() -> "APGIAssistant":
     # Performance metrics
     print("\nPerformance Metrics:")
     print("Total queries: {total}".format(total=assistant.performance_metrics["total_queries"]))
-    print(
-        "Average response time: {time:.3f}s".format(
-            time=assistant.performance_metrics["average_response_time"]
-        )
-    )
+    print(f"Average response time: {assistant.performance_metrics['average_response_time']:.3f}s")
 
     return assistant
 
@@ -3231,9 +3223,6 @@ def run_comprehensive_benchmark() -> Dict[str, Any]:
 
     return energy_results
 
-    print("\n✓ Benchmark suite complete")
-    return results
-
 
 class LLMAssistant:
     """
@@ -3245,8 +3234,8 @@ class LLMAssistant:
 
     def __init__(self, model_name: str = "gpt2"):
         self.model_name = model_name
-        self.model = None
-        self.tokenizer = None
+        self.model: Optional[Any] = None
+        self.tokenizer: Optional[Any] = None
         self.conversation_history: List[str] = []
 
         if HAS_TRANSFORMERS:
@@ -3265,12 +3254,12 @@ class LLMAssistant:
             self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
 
             # Set pad token if not present
-            if self.tokenizer.pad_token is None:
+            if self.tokenizer is not None and self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
             # Move to GPU if available
-            if torch.cuda.is_available():
-                self.model = self.model.cuda()
+            if torch.cuda.is_available() and self.model is not None:
+                self.model = self.model.cuda()  # type: ignore
                 LOGGER.info("LLM model moved to GPU")
             else:
                 LOGGER.info("LLM model running on CPU")
@@ -3342,7 +3331,7 @@ class LLMAssistant:
 
     def is_available(self) -> bool:
         """Check if LLM is available."""
-        return self.model is not None and self.tokenizer is not None
+        return self.model is not None
 
 
 # ============================================================================

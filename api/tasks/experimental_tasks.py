@@ -8,7 +8,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
-from celery import Task
+import yaml
+from celery import Task  # type: ignore
 
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
@@ -25,7 +26,7 @@ from api.services.webhook_manager import WebhookManager
 logger = logging.getLogger(__name__)
 
 
-async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
+async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]) -> None:
     """
     Trigger webhook delivery when task completes.
 
@@ -38,14 +39,14 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
         db = next(get_db())
 
         # Find task record
-        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()  # type: ignore[arg-type]
+        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
 
         if not task_record:
             logger.warning(f"Task record not found for task {task_id}")
             return
 
         # Update task status in database
-        task_record.status = result.get("status", "completed")  # type: ignore[assignment]
+        task_record.status = result.get("status", "completed")
         task_record.completed_at = datetime.utcnow()  # type: ignore[assignment]
         task_record.result_data = result  # type: ignore[assignment]
 
@@ -68,8 +69,14 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
                 "result": result,
             }
 
+            # Load webhook config
+            config_path = get_resource_path("config/default.yaml")
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            webhook_config = config.get("webhook", {})
+
             # Create webhook delivery
-            webhook_manager = WebhookManager()
+            webhook_manager = WebhookManager(webhook_config=webhook_config)
             delivery_id = await webhook_manager.create_webhook_delivery(
                 db=db, task_id=task_id, webhook_url=task_record.webhook_url, payload=payload  # type: ignore[arg-type]
             )
@@ -88,13 +95,13 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
         logger.error(f"Failed to trigger webhook for task {task_id}: {e}", exc_info=True)
 
 
-class APGITask(Task):
+class APGITask(Task):  # type: ignore[misc]
     """Base task class with APGI system initialization."""
 
     _apgi_system = None
 
     @property
-    def apgi_system(self):
+    def apgi_system(self) -> APGISystem:
         """Lazy initialization of APGI system."""
         if self._apgi_system is None:
             # Use platform-aware resource path resolution
@@ -104,10 +111,12 @@ class APGITask(Task):
         return self._apgi_system
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_iowa_gambling_task"
 )
-def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+def execute_iowa_gambling_task(
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Execute Iowa Gambling Task.
 
@@ -178,11 +187,11 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
     return result
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_masking_paradigm_task"
 )
 def execute_masking_paradigm_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Masking Paradigm Task.
@@ -254,11 +263,11 @@ def execute_masking_paradigm_task(
     return result
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_attentional_blink_task"
 )
 def execute_attentional_blink_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Attentional Blink Task.
@@ -327,11 +336,11 @@ def execute_attentional_blink_task(
     return result
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_change_blindness_task"
 )
 def execute_change_blindness_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Change Blindness Task.
@@ -348,17 +357,15 @@ def execute_change_blindness_task(
     result = None
     try:
         # Extract parameters with defaults
-        image_size = parameters.get("image_size", (256, 256))
         change_magnitude = parameters.get("change_magnitude", 0.3)
         flicker_duration_ms = parameters.get("flicker_duration_ms", 100.0)
         num_trials = parameters.get("num_trials", 50)
 
         # Create task instance
         task = ChangeBlindnessTask(
-            image_size=image_size,
-            change_magnitude=change_magnitude,
-            flicker_duration_ms=flicker_duration_ms,
-            num_trials=num_trials,
+            blank_duration_ms=flicker_duration_ms,
+            change_magnitudes=[change_magnitude],
+            num_trials_per_condition=num_trials,
         )
 
         # Run all trials
@@ -393,11 +400,11 @@ def execute_change_blindness_task(
     return result
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_binocular_rivalry_task"
 )
 def execute_binocular_rivalry_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Binocular Rivalry Task.
@@ -414,7 +421,6 @@ def execute_binocular_rivalry_task(
     result = None
     try:
         # Extract parameters with defaults
-        pattern_size = parameters.get("pattern_size", (256, 256))
         contrast_left = parameters.get("contrast_left", 1.0)
         contrast_right = parameters.get("contrast_right", 1.0)
         duration_seconds = parameters.get("duration_seconds", 60.0)
@@ -422,11 +428,10 @@ def execute_binocular_rivalry_task(
 
         # Create task instance
         task = BinocularRivalryTask(
-            pattern_size=pattern_size,
-            contrast_left=contrast_left,
-            contrast_right=contrast_right,
-            duration_seconds=duration_seconds,
-            sampling_rate_hz=sampling_rate_hz,
+            trial_duration_ms=duration_seconds,
+            sampling_interval_ms=sampling_rate_hz,
+            strength_ratios=[(contrast_left, contrast_right)],
+            num_trials=1,  # Single trial with one strength ratio
         )
 
         # Run all trials

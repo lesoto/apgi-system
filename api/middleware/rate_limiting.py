@@ -133,18 +133,39 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP response with rate limit headers
         """
-        # Skip if rate limiting is disabled
-        if not self.enabled:
-            return await call_next(request)
-
-        # Skip for certain endpoints
-        if self._should_skip_rate_limiting(request):
-            return await call_next(request)
-
         # Get client and endpoint identifiers
         client_id = self._get_client_id(request)
         endpoint = self._get_endpoint_identifier(request)
 
+        # Check if rate limiting should be skipped
+        skip_rate_limiting = self._should_skip_rate_limiting(request) or not self.enabled
+
+        if skip_rate_limiting:
+            # For skipped endpoints, get rate limit info without enforcing limits
+            try:
+                result = await self.rate_limiter.get_rate_limit_status(
+                    client_id=client_id, endpoint=endpoint
+                )
+                rate_limit_headers = self.rate_limiter.get_rate_limit_headers(result)
+            except Exception as e:
+                # If rate limit check fails, provide default headers
+                logger.warning(f"Failed to get rate limit info for skipped endpoint: {e}")
+                rate_limit_headers = {
+                    "X-RateLimit-Limit": "60",
+                    "X-RateLimit-Remaining": "60",
+                    "X-RateLimit-Reset": str(int(datetime.utcnow().timestamp()) + 60),
+                }
+
+            # Process request
+            response = await call_next(request)
+
+            # Add rate limit headers to response
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
+
+            return response
+
+        # Rate limiting is enabled - enforce limits
         try:
             # Check rate limit
             result = await self.rate_limiter.check_rate_limit(
@@ -196,5 +217,10 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                 "Rate limiting error", error=str(e), client_id=client_id, endpoint=endpoint
             )
 
-            # Continue without rate limiting
-            return await call_next(request)
+            # Continue without rate limiting but still add default headers
+            response = await call_next(request)
+            response.headers["X-RateLimit-Limit"] = "60"
+            response.headers["X-RateLimit-Remaining"] = "60"
+            response.headers["X-RateLimit-Reset"] = str(int(datetime.utcnow().timestamp()) + 60)
+
+            return response

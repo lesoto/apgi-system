@@ -319,13 +319,14 @@ class AuthManager:
 
     def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
         """
-        Create a new access token using a refresh token.
+        Create a new access token and refresh token using an existing refresh token.
+        Implements refresh token rotation by revoking the old token and issuing a new one.
 
         Args:
             refresh_token: Refresh token string
 
         Returns:
-            Dictionary with new access_token, token_type, and expires_in
+            Dictionary with new access_token, refresh_token, token_type, and expires_in
 
         Raises:
             InvalidTokenError: If refresh token is invalid
@@ -362,13 +363,37 @@ class AuthManager:
         if datetime.utcnow() > db_token.expires_at:
             raise ExpiredTokenError("Refresh token has expired")
 
+        # Revoke the old refresh token (token rotation)
+        db_token.revoked = True  # type: ignore[assignment]
+
         # Create new access token
         access_token = self.create_access_token(
             user_id=payload.user_id, username=payload.username, roles=payload.roles
         )
 
+        # Create new refresh token
+        new_refresh_token = self.create_refresh_token(
+            user_id=payload.user_id, username=payload.username, roles=payload.roles
+        )
+
+        # Store new refresh token in database
+        new_token_hash = self.hash_password(new_refresh_token)
+        expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+
+        try:
+            new_db_token = RefreshToken(
+                user_id=payload.user_id, token_hash=new_token_hash, expires_at=expires_at
+            )
+            self.db.add(new_db_token)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to create new refresh token for user {payload.user_id}: {e}")
+            raise
+
         return {
             "access_token": access_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer",
             "expires_in": self.access_token_expire_minutes * 60,
         }

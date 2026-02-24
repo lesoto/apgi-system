@@ -286,7 +286,78 @@ class RateLimiter:
         if result.retry_after is not None:
             headers["Retry-After"] = str(result.retry_after)
 
-        return headers
+            return headers
+
+    async def get_rate_limit_status(
+        self,
+        client_id: str,
+        endpoint: str,
+        limit: Optional[int] = None,
+        window_seconds: Optional[int] = None,
+    ) -> RateLimitResult:
+        """
+        Get current rate limit status without enforcing limits.
+
+        Used for informational purposes (e.g., headers on skipped endpoints).
+
+        Args:
+            client_id: Unique identifier for the client
+            endpoint: Endpoint identifier
+            limit: Optional override for rate limit
+            window_seconds: Optional override for time window
+
+        Returns:
+            RateLimitResult with current status (always allowed=True)
+        """
+        # Get limit configuration
+        if limit is None or window_seconds is None:
+            default_limit, default_window = self._get_limit_config(endpoint)
+            limit = limit or default_limit
+            window_seconds = window_seconds or default_window
+
+        # Generate key
+        key = self._get_redis_key(client_id, endpoint)
+
+        # Current timestamp
+        now = time.time()
+        window_start = now - window_seconds
+
+        if self.in_memory:
+            # In-memory implementation
+            timestamps = self._memory_store[key]
+
+            # Remove old timestamps outside the window
+            timestamps[:] = [t for t in timestamps if t > window_start]
+
+            # Get current count
+            current_count = len(timestamps)
+            remaining = max(0, limit - current_count)
+            reset_at = datetime.utcnow() + timedelta(seconds=window_seconds)
+
+            return RateLimitResult(
+                allowed=True, limit=limit, remaining=remaining, reset_at=reset_at
+            )
+        else:
+            # Redis implementation
+            try:
+                # Get current count without modifying
+                current_count = await self.redis.zcount(key, window_start, now)  # type: ignore[misc]
+
+                remaining = max(0, limit - current_count)
+                reset_at = datetime.utcnow() + timedelta(seconds=window_seconds)
+
+                return RateLimitResult(
+                    allowed=True, limit=limit, remaining=remaining, reset_at=reset_at
+                )
+            except Exception as e:
+                # If Redis fails, return default values
+                import logging
+
+                logging.warning(f"Failed to get rate limit status from Redis: {e}")
+                reset_at = datetime.utcnow() + timedelta(seconds=window_seconds)
+                return RateLimitResult(
+                    allowed=True, limit=limit, remaining=limit, reset_at=reset_at
+                )
 
     async def reset_rate_limit(self, client_id: str, endpoint: str):
         """

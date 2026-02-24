@@ -6,7 +6,7 @@ Configuration settings for the APGI REST API.
 
 import os
 import warnings
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -21,7 +21,7 @@ class Settings:
     Settings can be overridden via environment variables.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # API Settings
         self.api_title: str = "APGI System API"
         self.api_version: str = "1.0.0"
@@ -31,6 +31,11 @@ class Settings:
         self.host: str = "0.0.0.0"
         self.port: int = 8000
         self.reload: bool = True
+
+        # HTTPS/TLS Settings
+        self.https_enabled: bool = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
+        self.ssl_keyfile: Optional[str] = os.getenv("SSL_KEYFILE")
+        self.ssl_certfile: Optional[str] = os.getenv("SSL_CERTFILE")
 
         # Database Settings
         self.database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost/apgi_api")
@@ -45,7 +50,7 @@ class Settings:
         )
 
         # Authentication Settings
-        self.jwt_secret_key: str = os.getenv("JWT_SECRET_KEY")
+        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.environment: str = os.getenv("ENVIRONMENT", "development")
         self.jwt_algorithm: str = "HS256"
         self.jwt_access_token_expire_minutes: int = 30
@@ -56,11 +61,16 @@ class Settings:
         self.rate_limit_per_minute: int = 60
 
         # CORS Settings
-        self.cors_origins: List[str] = (
-            os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
-            if os.getenv("CORS_ORIGINS")
-            else ["http://localhost:3000", "http://localhost:8000"]
-        )
+        cors_origins_env = os.getenv("CORS_ORIGINS")
+        if cors_origins_env:
+            self.cors_origins: List[str] = cors_origins_env.split(",")
+        else:
+            self.cors_origins = [
+                "http://localhost:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:8000",
+            ]
         self.cors_allow_credentials: bool = (
             os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
         )
@@ -98,17 +108,11 @@ class Settings:
         # Validate security settings after initialization
         self.__post_init__()
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate critical security settings after initialization."""
         # Handle JWT secret key for development vs production
         if not self.jwt_secret_key:
-            if self.environment.lower() in ["production", "prod"]:
-                raise ValueError(
-                    "CRITICAL: JWT_SECRET_KEY environment variable is not set for production. "
-                    "This is required for secure JWT token generation. "
-                    "Set a secure JWT_SECRET_KEY environment variable before starting the API."
-                )
-            else:
+            if self.environment.lower() == "development":
                 # Development mode - provide a secure default with warning
                 self.jwt_secret_key = "development-secret-key-change-in-production-32-chars-min"
                 warnings.warn(
@@ -117,6 +121,13 @@ class Settings:
                     "Set JWT_SECRET_KEY environment variable for production deployment. "
                     "Copy .env.example to .env and configure your settings.",
                     UserWarning,
+                )
+            else:
+                raise ValueError(
+                    "CRITICAL: JWT_SECRET_KEY environment variable is not set. "
+                    "This is required for secure JWT token generation. "
+                    "Set a secure JWT_SECRET_KEY environment variable before starting the API. "
+                    "For development, set ENVIRONMENT=development to use the development default."
                 )
 
         # Check for known insecure default values
