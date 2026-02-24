@@ -124,31 +124,31 @@ def safe_widget_method(widget_attr: str) -> Callable[[F], F]:
             try:
                 # Check if application is shutting down
                 if hasattr(self, "is_shutting_down") and self.is_shutting_down:
-                    return None
+                    return None  # type: ignore[return-value]
 
                 # Check if root window exists
                 if hasattr(self, "root") and not self.root.winfo_exists():
-                    return None
+                    return None  # type: ignore[return-value]
 
                 # Get widget with comprehensive validation
                 widget = getattr(self, widget_attr, None)
                 if widget is None:
-                    return None
+                    return None  # type: ignore[return-value]
 
                 # Check widget has winfo_exists method and widget exists
                 if not hasattr(widget, "winfo_exists"):
-                    return None
+                    return None  # type: ignore[return-value]
 
                 if not widget.winfo_exists():
-                    return None
+                    return None  # type: ignore[return-value]
 
                 # Additional validation for certain widget types
                 if hasattr(widget, "master") and widget.master:
                     if not widget.master.winfo_exists():
-                        return None
+                        return None  # type: ignore[return-value]
 
                 # All checks passed, execute the function
-                return func(self, *args, **kwargs)
+                return func(self, *args, **kwargs)  # type: ignore[return-value]
 
             except Exception as e:
                 # Enhanced error logging with context
@@ -157,11 +157,11 @@ def safe_widget_method(widget_attr: str) -> Callable[[F], F]:
                     logger.debug(f"Safe widget method error for {widget_attr}: {e}")
                 else:
                     print(f"Safe widget method error for {widget_attr}: {e}")
-                return None
+                return None  # type: ignore[return-value]
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
-    return decorator
+    return decorator  # type: ignore[return-value]
 
 
 try:
@@ -211,7 +211,7 @@ class HistoryManager:
         maxlen_final: int = int(maxlen or strategy["maxlen"])
 
         managed_deque = ManagedDeque(maxlen=maxlen_final, history_type=history_type, manager=self)
-        return managed_deque
+        return managed_deque  # type: ignore[return-value]
 
     def check_memory_usage(self) -> Dict[str, float]:
         """Check current memory usage of all managed deques
@@ -223,7 +223,7 @@ class HistoryManager:
 
         # Only check memory usage periodically to avoid overhead
         if current_time - self.last_prune_time < 30:  # Check every 30 seconds
-            return self.memory_usage
+            return self.memory_usage  # type: ignore[return-value]
 
         total_memory: float = 0
         usage = {}
@@ -246,13 +246,13 @@ class HistoryManager:
         if self.auto_prune and total_memory > self.max_memory_mb:
             self._perform_auto_prune()
 
-        return usage
+        return usage  # type: ignore[return-value]
 
     def _perform_auto_prune(self) -> None:
         """Perform automatic pruning based on strategies"""
         current_time = time.time()
         if current_time - self.last_prune_time < self.prune_interval:
-            return
+            return  # type: ignore[return-value]
 
         pruned = False
         for history_type, strategy in self.pruning_strategies.items():
@@ -273,7 +273,7 @@ class HistoryManager:
             Dictionary with memory statistics
         """
         usage = self.check_memory_usage()
-        return {
+        return {  # type: ignore[return-value]
             "memory_usage_mb": usage,
             "max_memory_mb": self.max_memory_mb,
             "memory_utilization": (
@@ -309,7 +309,7 @@ class HistoryManager:
         # Update last prune time
         self.last_prune_time = time.time()
 
-        return cleared_count
+        return cleared_count  # type: ignore[return-value]
 
 
 class ManagedDeque(deque[Any]):
@@ -346,7 +346,7 @@ class ManagedDeque(deque[Any]):
 
         # Only prune if enough time has passed
         if current_time - self._last_prune < 60:  # At most once per minute
-            return
+            return  # type: ignore[return-value]
 
         # Check if we're approaching memory limits
         if hasattr(self.manager, "check_memory_usage"):
@@ -365,7 +365,7 @@ class ManagedDeque(deque[Any]):
             ratio: Fraction of entries to remove (0.0 to 1.0)
         """
         if not self or ratio <= 0:
-            return
+            return  # type: ignore[return-value]
 
         # Calculate how many items to remove
         items_to_remove = max(1, int(len(self) * ratio))
@@ -380,7 +380,7 @@ class ManagedDeque(deque[Any]):
         """Smart pruning to reach target size"""
         current_size = len(self)
         if current_size <= target_size:
-            return
+            return  # type: ignore[return-value]
 
         # Calculate removal ratio
         ratio = (current_size - target_size) / current_size
@@ -544,7 +544,7 @@ class Debouncer:
         else:
             # Fallback for non-GUI contexts - execute immediately
             func(*args, **kwargs)
-            return
+            return  # type: ignore[return-value]
 
         self.pending_calls[key] = call_id
 
@@ -583,11 +583,11 @@ class ErrorContext:
         self.logger = logger or logging.getLogger("APGIGUI")
 
     def __enter__(self):
-        return self
+        return self  # type: ignore[return-value]
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         if exc_type is None:
-            return False
+            return False  # type: ignore[return-value]
 
         elapsed = time.time() - self.start_time
 
@@ -624,11 +624,11 @@ class ErrorContext:
         )
 
         if isinstance(exc_val, critical_exceptions):
-            return False  # Re-raise critical exceptions
+            return False  # Re-raise critical exceptions  # type: ignore[return-value]
 
         # For user-facing operations, suppress the exception since we showed it to the user
         # For non-user-facing operations, re-raise to allow proper handling
-        return self.user_facing
+        return self.user_facing  # type: ignore[return-value]
 
 
 class StatusManager:
@@ -689,7 +689,7 @@ class StatusManager:
                     (self.min_update_interval - (current_time - self.last_update_time)) * 1000
                 )
                 self.update_timer = self.status_label.after(delay_ms, self._process_pending_update)
-            return
+            return  # type: ignore[return-value]
 
         # Process the update immediately
         self._process_status_update(message, status_type, assistant_state)
@@ -747,7 +747,7 @@ class StatusManager:
         Returns:
             List of status entries with timestamps
         """
-        return list(self.status_history)
+        return list(self.status_history)  # type: ignore[return-value]
 
     def clear_history(self) -> None:
         """Clear status history"""
@@ -790,14 +790,14 @@ class DisplayUpdateManager:
             if not skip_check:
                 # Check if the GUI is shutting down
                 if hasattr(self.gui, "is_shutting_down") and self.gui.is_shutting_down:
-                    return
+                    return  # type: ignore[return-value]
 
             # Check required widgets exist
             for widget_name in required_widgets:
                 widget = getattr(self.gui, widget_name, None)
                 if not widget:
                     self.logger.debug(f"{display_name}: Widget {widget_name} not found")
-                    return
+                    return  # type: ignore[return-value]
 
                 # FigureCanvasTkAgg doesn't have winfo_exists, check differently
                 if hasattr(widget, "get_tk_widget"):
@@ -805,11 +805,11 @@ class DisplayUpdateManager:
                     tk_widget = widget.get_tk_widget()
                     if not tk_widget or not tk_widget.winfo_exists():
                         self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
-                        return
+                        return  # type: ignore[return-value]
                 elif hasattr(widget, "winfo_exists"):
                     if not widget.winfo_exists():
                         self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
-                        return
+                        return  # type: ignore[return-value]
 
             # Execute the update function
             update_func(*args, **kwargs)
@@ -827,8 +827,8 @@ class DisplayUpdateManager:
             The result of func(*args, **kwargs) or None if an error occurred
         """
         with ErrorContext(display_name, user_facing=False, logger=self.logger):
-            return func(*args, **kwargs)
-        return None
+            return func(*args, **kwargs)  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
 
 
 class GUIConfig:
@@ -1006,7 +1006,7 @@ class GUIConfig:
             "medium": cls.FONT_SIZE_MEDIUM,
             "large": cls.FONT_SIZE_LARGE,
         }
-        return (cls.FONT_FAMILY, size_map.get(size, cls.FONT_SIZE_MEDIUM), weight)
+        return (cls.FONT_FAMILY, size_map.get(size, cls.FONT_SIZE_MEDIUM), weight)  # type: ignore[return-value]
 
     @classmethod
     def get_padding(cls, x: bool = True, y: bool = True) -> Dict[str, int]:
@@ -1026,7 +1026,7 @@ class GUIConfig:
         if y:
             padding["pady"] = cls.PAD_Y
 
-        return padding
+        return padding  # type: ignore[return-value]
 
 
 def setup_logging() -> None:
@@ -1050,7 +1050,7 @@ def setup_logging() -> None:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-    return logger
+    return logger  # type: ignore[return-value]
 
 
 # Initialize logger
@@ -1068,13 +1068,13 @@ def check_pil():
         img.close()  # Explicit cleanup
 
         LOGGER.info("PIL/Pillow is available and working")
-        return True, {"Image": Image, "ImageTk": ImageTk}
+        return True, {"Image": Image, "ImageTk": ImageTk}  # type: ignore[return-value]
     except ImportError as e:
         LOGGER.warning(f"PIL/Pillow not available: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
     except Exception as e:
         LOGGER.error(f"PIL/Pillow import failed: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
 
 
 def check_psutil():
@@ -1086,13 +1086,13 @@ def check_psutil():
         psutil.cpu_percent()
 
         LOGGER.info("psutil is available and working")
-        return True, {"psutil": psutil}
+        return True, {"psutil": psutil}  # type: ignore[return-value]
     except ImportError as e:
         LOGGER.info(f"psutil not available: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
     except Exception as e:
         LOGGER.error(f"psutil import failed: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
 
 
 def check_transformers():
@@ -1104,13 +1104,13 @@ def check_transformers():
         transformers.__version__
 
         LOGGER.info("transformers is available and working")
-        return True, {"transformers": transformers}
+        return True, {"transformers": transformers}  # type: ignore[return-value]
     except ImportError as e:
         LOGGER.info(f"transformers not available: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
     except Exception as e:
         LOGGER.error(f"transformers import failed: {e}")
-        return False, {}
+        return False, {}  # type: ignore[return-value]
 
 
 # Check all optional dependencies
@@ -1149,7 +1149,7 @@ def load_apgi_module():
         import apgi_assistant
 
         LOGGER.info("Successfully loaded via direct import")
-        return apgi_assistant
+        return apgi_assistant  # type: ignore[return-value]
     except ImportError as e:
         LOGGER.debug(f"Direct import failed: {e}")
 
@@ -1172,7 +1172,7 @@ def load_apgi_module():
                     sys.modules["apgi_assistant"] = module
                     spec.loader.exec_module(module)
                     LOGGER.info(f"Successfully loaded from {filename}")
-                    return module
+                    return module  # type: ignore[return-value]
 
     # Last resort: try parent directory
     parent_dir = current_dir.parent
@@ -1188,7 +1188,7 @@ def load_apgi_module():
                     sys.modules["apgi_assistant"] = module
                     spec.loader.exec_module(module)
                     LOGGER.info(f"Successfully loaded from parent/{filename}")
-                    return module
+                    return module  # type: ignore[return-value]
 
     raise ImportError(
         "Could not find APGI Assistant module. Please ensure the module file "
@@ -1263,7 +1263,7 @@ class DebouncedUpdater:
 
         # Rapid operation detection
         self.rapid_operation_threshold = 3  # Operations within this time are "rapid"
-        self.operation_history = deque(maxlen=10)
+        self.operation_history: Deque[Any] = deque(maxlen=10)
 
     def schedule_update(self, root, update_id, callback, operation_type="default"):
         """Schedule debounced update with operation-specific timing
@@ -1323,7 +1323,7 @@ class DebouncedUpdater:
             ):  # Within 500ms
                 recent_count += 1
 
-        return recent_count >= self.rapid_operation_threshold
+        return recent_count >= self.rapid_operation_threshold  # type: ignore[return-value]
 
     def cancel_update(self, root, update_id):
         """Cancel a pending update
@@ -1363,7 +1363,7 @@ class DebouncedUpdater:
             Dictionary with operation statistics
         """
         if not self.operation_history:
-            return {"total_operations": 0, "rapid_sequences": 0}
+            return {"total_operations": 0, "rapid_sequences": 0}  # type: ignore[return-value]
 
         total_ops = len(self.operation_history)
         rapid_sequences = 0
@@ -1375,7 +1375,7 @@ class DebouncedUpdater:
             if time_span < 0.5:  # 500ms
                 rapid_sequences += 1
 
-        return {
+        return {  # type: ignore[return-value]
             "total_operations": total_ops,
             "rapid_sequences": rapid_sequences,
             "rapid_percentage": (rapid_sequences / max(1, total_ops - 2)) * 100,
@@ -1424,7 +1424,7 @@ class PermissionValidator:
         # Check cache first
         cache_key = (str(path_obj.absolute()), operation)
         if cache_key in self.permission_cache:
-            return self.permission_cache[cache_key]
+            return self.permission_cache[cache_key]  # type: ignore[return-value]
 
         try:
             # Check if path exists
@@ -1433,19 +1433,19 @@ class PermissionValidator:
                     # Check if parent directory exists and is writable
                     parent = path_obj.parent
                     if not parent.exists():
-                        return (
+                        return (  # type: ignore[return-value]
                             False,
                             f"Directory '{parent}' does not exist",
                             f"Create the directory first: mkdir -p '{parent}'",
                         )
                     if not os.access(parent, os.W_OK):
-                        return (
+                        return (  # type: ignore[return-value]
                             False,
                             f"No write permission for directory '{parent}'",
                             f"Check directory permissions or run: chmod u+w '{parent}'",
                         )
                 else:
-                    return (
+                    return (  # type: ignore[return-value]
                         False,
                         f"File '{file_path}' does not exist",
                         "Choose an existing file or create it first",
@@ -1454,7 +1454,7 @@ class PermissionValidator:
             # Check read permissions
             if operation in ["read", "write"]:
                 if not os.access(path_obj if path_obj.exists() else path_obj.parent, os.R_OK):
-                    return (
+                    return (  # type: ignore[return-value]
                         False,
                         f"No read permission for '{file_path}'",
                         f"Fix permissions: chmod u+r '{file_path}' or run as appropriate user",
@@ -1465,7 +1465,7 @@ class PermissionValidator:
                 if path_obj.exists():
                     # Check if we can write to existing file
                     if not os.access(path_obj, os.W_OK):
-                        return (
+                        return (  # type: ignore[return-value]
                             False,
                             f"No write permission for '{file_path}'",
                             f"Fix permissions: chmod u+w '{file_path}' or choose different location",
@@ -1473,7 +1473,7 @@ class PermissionValidator:
                 else:
                     # Check if we can write to parent directory
                     if not os.access(path_obj.parent, os.W_OK):
-                        return (
+                        return (  # type: ignore[return-value]
                             False,
                             f"No write permission for directory '{path_obj.parent}'",
                             f"Fix permissions: chmod u+w '{path_obj.parent}' or choose different location",
@@ -1482,7 +1482,7 @@ class PermissionValidator:
             # Check directory permissions
             if path_obj.is_dir():
                 if not os.access(path_obj, os.X_OK):
-                    return (
+                    return (  # type: ignore[return-value]
                         False,
                         f"No execute permission for directory '{file_path}'",
                         f"Fix permissions: chmod u+x '{file_path}' or run: chmod -R u+x '{file_path}'",
@@ -1496,7 +1496,7 @@ class PermissionValidator:
                     stat = shutil.disk_usage(path_obj.parent if path_obj.exists() else path_obj)
                     free_space_gb = stat.free / (1024**3)
                     if free_space_gb < 0.1:  # Less than 100MB
-                        return (
+                        return (  # type: ignore[return-value]
                             False,
                             f"Insufficient disk space ({free_space_gb:.1f}GB available)",
                             "Free up disk space or choose different location",
@@ -1525,7 +1525,7 @@ class PermissionValidator:
 
         # Cache result
         self.permission_cache[cache_key] = result
-        return result
+        return result  # type: ignore[return-value]
 
     def validate_config_directory(self):
         """Validate the configuration directory (home directory)
@@ -1541,7 +1541,7 @@ class PermissionValidator:
 
             # Check if home directory is accessible
             if not config_dir.exists():
-                return (
+                return (  # type: ignore[return-value]
                     False,
                     f"Home directory '{config_dir}' not found",
                     "Check user account and system configuration",
@@ -1549,7 +1549,7 @@ class PermissionValidator:
 
             # Check basic permissions
             if not os.access(config_dir, os.R_OK | os.W_OK | os.X_OK):
-                return (
+                return (  # type: ignore[return-value]
                     False,
                     "Insufficient permissions for home directory",
                     f"Fix permissions or run: chmod u+rwx '{config_dir}'",
@@ -1561,22 +1561,22 @@ class PermissionValidator:
                 test_file.write_text("test")
                 test_file.unlink()
             except PermissionError:
-                return (
+                return (  # type: ignore[return-value]
                     False,
                     "Cannot write to home directory",
                     f"Check permissions or run: chmod u+w '{config_dir}'",
                 )
             except Exception as e:
-                return (
+                return (  # type: ignore[return-value]
                     False,
                     f"Error testing write access: {e}",
                     "Check file system and available storage",
                 )
 
-            return (True, None, None)
+            return (True, None, None)  # type: ignore[return-value]
 
         except Exception as e:
-            return (
+            return (  # type: ignore[return-value]
                 False,
                 f"Error validating config directory: {e}",
                 "Check system configuration and user permissions",
@@ -1638,7 +1638,7 @@ Use the file dialog's browser to navigate to existing files.
             """,
         }
 
-        return help_texts.get(error_type, "Unknown error. Please check the logs for details.")
+        return help_texts.get(error_type, "Unknown error. Please check the logs for details.")  # type: ignore[return-value]
 
     def show_permission_error(self, parent, title, error_msg, suggestion):
         """Show user-friendly permission error dialog
@@ -1745,7 +1745,7 @@ class CancellableProgress:
             reason: Reason for cancellation
         """
         if self.cancelled:
-            return  # Already cancelled
+            return  # Already cancelled  # type: ignore[return-value]
 
         self.cancelled = True
         self.cancel_reason = reason
@@ -1780,11 +1780,11 @@ class CancellableProgress:
 
     def is_cancelled(self):
         """Check if cancelled"""
-        return self.cancelled
+        return self.cancelled  # type: ignore[return-value]
 
     def get_cancel_reason(self):
         """Get cancellation reason"""
-        return getattr(self, "cancel_reason", None)
+        return getattr(self, "cancel_reason", None)  # type: ignore[return-value]
 
     def show(self, message="Processing...", timeout=None):
         """Show progress dialog with optional timeout
@@ -1884,8 +1884,8 @@ class CancellableProgress:
             elapsed = time.time() - self.start_time
             if elapsed > self.timeout_seconds:
                 self.cancel("timeout")
-                return True
-        return False
+                return True  # type: ignore[return-value]
+        return False  # type: ignore[return-value]
 
     def set_timeout(self, seconds):
         """Update timeout duration
@@ -1941,11 +1941,11 @@ class ActionHistory:
 
     def can_undo(self):
         """Check if undo is available"""
-        return len(self.undo_stack) > 0
+        return len(self.undo_stack) > 0  # type: ignore[return-value]
 
     def can_redo(self):
         """Check if redo is available"""
-        return len(self.redo_stack) > 0
+        return len(self.redo_stack) > 0  # type: ignore[return-value]
 
 
 class SetPhysiologyAction:
@@ -2055,7 +2055,7 @@ class InputValidator:
                 f"Skin conductance must be between {GUIConfig.EDA_RANGE[0]}-{GUIConfig.EDA_RANGE[1]} µS"
             )
 
-        return len(errors) == 0, errors
+        return len(errors) == 0, errors  # type: ignore[return-value]
 
     @staticmethod
     def validate_query(query: str) -> Tuple[bool, str]:
@@ -2066,18 +2066,18 @@ class InputValidator:
             (is_valid, error_message)
         """
         if query is None:
-            return False, "Query cannot be None"
+            return False, "Query cannot be None"  # type: ignore[return-value]
 
         if not isinstance(query, str):
-            return False, "Query must be a string"
+            return False, "Query must be a string"  # type: ignore[return-value]
 
         if not query or not query.strip():
-            return False, "Query cannot be empty"
+            return False, "Query cannot be empty"  # type: ignore[return-value]
 
         if len(query) > GUIConfig.MAX_QUERY_LENGTH:
-            return False, f"Query too long (max {GUIConfig.MAX_QUERY_LENGTH} characters)"
+            return False, f"Query too long (max {GUIConfig.MAX_QUERY_LENGTH} characters)"  # type: ignore[return-value]
 
-        return True, ""
+        return True, ""  # type: ignore[return-value]
 
     @staticmethod
     def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -2091,7 +2091,7 @@ class InputValidator:
 
         if not isinstance(config, dict):
             errors.append("Configuration must be a dictionary")
-            return False, errors
+            return False, errors  # type: ignore[return-value]
 
         if "input_dim" in config:
             if not isinstance(config["input_dim"], (int, float)):
@@ -2111,7 +2111,7 @@ class InputValidator:
                     f"Hidden dimension must be between {GUIConfig.MODEL_HIDDEN_MIN}-{GUIConfig.MODEL_HIDDEN_MAX}"
                 )
 
-        return len(errors) == 0, errors
+        return len(errors) == 0, errors  # type: ignore[return-value]
 
 
 class UsageTracker:
@@ -2150,13 +2150,13 @@ class UsageTracker:
             average response time, and last activity timestamp
         """
         if not self.metrics_log:
-            return {}
+            return {}  # type: ignore[return-value]
 
         total_queries = len(self.metrics_log)
         avg_query_length = sum(m["query_length"] for m in self.metrics_log) / total_queries
         avg_response_time = sum(m["response_time_ms"] for m in self.metrics_log) / total_queries
 
-        return {
+        return {  # type: ignore[return-value]
             "total_queries": total_queries,
             "avg_query_length": avg_query_length,
             "avg_response_time_ms": avg_response_time,
@@ -2526,7 +2526,7 @@ class APGIGUI:
             theme_name: Name of the theme to apply
         """
         if not self.theme_manager:
-            return
+            return  # type: ignore[return-value]
 
         if self.theme_manager.set_theme(theme_name):
             self._apply_theme_to_widgets()
@@ -2534,7 +2534,7 @@ class APGIGUI:
     def _apply_theme_to_widgets(self):
         """Apply current theme to all widgets."""
         if not self.theme_manager:
-            return
+            return  # type: ignore[return-value]
 
         # Helper function to safely apply theme to text widget
         def apply_to_text_widget(widget, bg_color, fg_color):
@@ -2566,7 +2566,7 @@ class APGIGUI:
             status_type: Type of status ('info', 'success', 'error', 'warning', 'processing')
         """
         if not self.display_manager:
-            return
+            return  # type: ignore[return-value]
         self.display_manager.update_display(
             "Status Update",
             lambda: self._do_status_update(message, status_type),
@@ -2576,7 +2576,7 @@ class APGIGUI:
     def _do_status_update(self, message: str, status_type: str):
         """Internal method to update status label with proper styling."""
         if not hasattr(self, "status_label") or not self.status_label.winfo_exists():
-            return
+            return  # type: ignore[return-value]
 
         # Set status text
         self.status_label.config(text=message)
@@ -2901,7 +2901,7 @@ class APGIGUI:
             loading_label.config(
                 text="Matplotlib not available. Install with: pip install matplotlib"
             )
-            return
+            return  # type: ignore[return-value]
 
         # Create tab content after loading
         loading_label.destroy()
@@ -3645,7 +3645,7 @@ class APGIGUI:
             if (hasattr(self, "is_shutting_down") and self.is_shutting_down) or (
                 hasattr(self, "root") and not self.root.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             # Use enhanced debouncing for tab switching
             self.debouncer.schedule_update(
@@ -3661,12 +3661,12 @@ class APGIGUI:
                 or not hasattr(self, "notebook")
                 or not self.notebook.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             current = self.notebook.select()
             tabs = self.notebook.tabs()
             if not tabs:  # No tabs to navigate
-                return
+                return  # type: ignore[return-value]
             current_index = tabs.index(current)
             next_index = (current_index + 1) % len(tabs)
             self.notebook.select(tabs[next_index])
@@ -3680,7 +3680,7 @@ class APGIGUI:
             if (hasattr(self, "is_shutting_down") and self.is_shutting_down) or (
                 hasattr(self, "root") and not self.root.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             # Use enhanced debouncing for tab switching
             self.debouncer.schedule_update(
@@ -3696,12 +3696,12 @@ class APGIGUI:
                 or not hasattr(self, "notebook")
                 or not self.notebook.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             current = self.notebook.select()
             tabs = self.notebook.tabs()
             if not tabs:  # No tabs to navigate
-                return
+                return  # type: ignore[return-value]
             current_index = tabs.index(current)
             prev_index = (current_index - 1) % len(tabs)
             self.notebook.select(tabs[prev_index])
@@ -3751,7 +3751,7 @@ class APGIGUI:
         # Prevent multiple simultaneous handlers with thread-safe check
         if hasattr(self, "_handling_init") and self._handling_init:
             self.logger.debug("Initialization handler already running, skipping")
-            return
+            return  # type: ignore[return-value]
 
         # Use atomic check-and-set pattern
         if not hasattr(self, "_handling_init_lock"):
@@ -3762,7 +3762,7 @@ class APGIGUI:
         with self._handling_init_lock:
             if hasattr(self, "_handling_init") and self._handling_init:
                 self.logger.debug("Initialization handler already running, skipping")
-                return
+                return  # type: ignore[return-value]
 
             self._handling_init = True
 
@@ -3801,7 +3801,7 @@ class APGIGUI:
                         self.logger.debug(f"Safety timer cleanup error: {e}")
                     finally:
                         self.init_safety_timer_id = None
-                return
+                return  # type: ignore[return-value]
 
             # Hide progress dialog immediately and clean up
             if hasattr(self, "progress"):
@@ -3922,7 +3922,7 @@ class APGIGUI:
 
     def _get_init_config(self) -> Dict[str, Any]:
         """Get initialization configuration with safe defaults"""
-        return {
+        return {  # type: ignore[return-value]
             "input_dim": getattr(self, "input_dim_var", tk.IntVar(value=128)).get(),
             "hidden_dim": getattr(self, "hidden_dim_var", tk.IntVar(value=256)).get(),
             "output_dim": 64,
@@ -3943,7 +3943,7 @@ class APGIGUI:
         ]:
             # Initialization finished (success or failure)
             self._cleanup_init_timer()
-            return
+            return  # type: ignore[return-value]
 
         # Check for timeout
         elapsed = time.time() - self.init_start_time
@@ -3952,7 +3952,7 @@ class APGIGUI:
             self.logger.error(f"Initialization timeout after {elapsed:.1f}s")
             self.init_state = InitializationState.TIMEOUT
             self._handle_init_timeout()
-            return
+            return  # type: ignore[return-value]
 
         # Update progress message with time remaining
         if hasattr(self, "progress") and hasattr(self.progress, "update_message"):
@@ -3963,7 +3963,7 @@ class APGIGUI:
         # Check if result is available in queue
         if not self.init_queue.empty():
             self.root.event_generate("<<AssistantInitEvent>>", when="tail")
-            return
+            return  # type: ignore[return-value]
 
         # Schedule next check (every 100ms)
         self.init_check_timer_id = self.root.after(100, self._check_init_progress)
@@ -4052,11 +4052,11 @@ class APGIGUI:
         # Prevent duplicate initialization
         if self.init_state in [InitializationState.STARTING, InitializationState.IN_PROGRESS]:
             self.logger.debug("Initialization already in progress")
-            return
+            return  # type: ignore[return-value]
 
         if self.init_state == InitializationState.SUCCESS:
             self.logger.debug("Assistant already initialized")
-            return
+            return  # type: ignore[return-value]
 
         self.logger.info("=== Starting Assistant Initialization ===")
 
@@ -4156,7 +4156,7 @@ class APGIGUI:
             # Check for cancellation at start
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return
+                return  # type: ignore[return-value]
 
             # Step 1: Create assistant instance
             update_progress("Creating APGI Assistant instance (this may take a moment)...")
@@ -4165,7 +4165,7 @@ class APGIGUI:
             # Check for cancellation before heavy operations
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return
+                return  # type: ignore[return-value]
 
             assistant = APGIAssistant(
                 config={
@@ -4185,7 +4185,7 @@ class APGIGUI:
             # Check for cancellation
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return
+                return  # type: ignore[return-value]
 
             # Step 2: Initialize components
             update_progress("Initializing neural networks (this may take 30+ seconds)...")
@@ -4236,7 +4236,7 @@ class APGIGUI:
         """Periodically check initialization status"""
         with ErrorContext("Check Initialization Status", user_facing=False):
             if not self.is_initializing:
-                return
+                return  # type: ignore[return-value]
 
             if not self.init_queue.empty():
                 # Trigger the event handler immediately
@@ -4307,18 +4307,18 @@ class APGIGUI:
             }
             self.logger.warning(f"Initialization check failed: {debug_info}")
             messagebox.showwarning("Not Ready", "Please wait for assistant initialization")
-            return
+            return  # type: ignore[return-value]
 
         if self.is_processing:
             messagebox.showinfo("Processing", "Already processing a query. Please wait.")
-            return
+            return  # type: ignore[return-value]
 
         # Get and validate query
         query = self.query_input.get(1.0, tk.END).strip()
         is_valid, error_msg = InputValidator.validate_query(query)
         if not is_valid:
             messagebox.showwarning("Invalid Query", error_msg)
-            return
+            return  # type: ignore[return-value]
 
         # Get and validate physiological data
         physio_data = {
@@ -4331,7 +4331,7 @@ class APGIGUI:
         is_valid, errors = InputValidator.validate_physiological(**physio_data)
         if not is_valid:
             messagebox.showwarning("Invalid Physiological Data", "\n".join(errors))
-            return
+            return  # type: ignore[return-value]
 
         # Start processing
         self.is_processing = True
@@ -4366,7 +4366,7 @@ class APGIGUI:
             for i in range(100):  # Check 100 times during processing
                 if hasattr(self, "progress") and self.progress.is_cancelled():
                     self.logger.info(f"Query processing cancelled at check {i}")
-                    return
+                    return  # type: ignore[return-value]
 
                 # Process in small chunks to allow cancellation
                 if i == 0:
@@ -4384,7 +4384,7 @@ class APGIGUI:
                 # Check cancellation before processing
                 if hasattr(self, "progress") and self.progress.is_cancelled():
                     self.logger.info("Query processing cancelled before assistant processing")
-                    return
+                    return  # type: ignore[return-value]
 
                 try:
                     # Set shorter timeout for assistant processing
@@ -4401,7 +4401,7 @@ class APGIGUI:
                     # Check if this is a cancellation-related error
                     if hasattr(self, "progress") and self.progress.is_cancelled():
                         self.logger.info(f"Processing interrupted by cancellation: {e}")
-                        return
+                        return  # type: ignore[return-value]
                     else:
                         # Re-raise non-cancellation errors
                         raise
@@ -4409,7 +4409,7 @@ class APGIGUI:
             # Check cancellation after processing
             if hasattr(self, "progress") and self.progress.is_cancelled():
                 self.logger.info("Query processing cancelled after assistant processing")
-                return
+                return  # type: ignore[return-value]
 
             # Queue response for main thread only if not cancelled
             if not (hasattr(self, "progress") and self.progress.is_cancelled()):
@@ -4427,7 +4427,7 @@ class APGIGUI:
 
             # Check if main response widget still exists
             if not hasattr(self, "response_display") or not self.response_display.winfo_exists():
-                return
+                return  # type: ignore[return-value]
 
             # Display response with formatting
             self.response_display.delete(1.0, tk.END)
@@ -4633,7 +4633,7 @@ class APGIGUI:
         osc_profile = metadata.get("oscillatory_profile", {})
 
         if not osc_profile:
-            return
+            return  # type: ignore[return-value]
 
         # Clear and redraw spectrum
         self.spectrum_ax.clear()
@@ -4713,7 +4713,7 @@ class APGIGUI:
     def _do_energy_update(self):
         """Internal method for energy display update logic"""
         if not self.assistant or not self.assistant.enable_energy_aware:
-            return
+            return  # type: ignore[return-value]
 
         # Get current battery level
         battery_level = self.assistant.energy_monitor.get_level()
@@ -4902,7 +4902,7 @@ class APGIGUI:
                     not hasattr(self, "energy_canvas")
                     or not self.energy_canvas.get_tk_widget().winfo_exists()
                 ):
-                    return
+                    return  # type: ignore[return-value]
 
                 self.energy_ax.clear()
 
@@ -5010,14 +5010,14 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
         with ErrorContext("Update Cognitive Display", user_facing=False):
             # Check if widgets still exist
             if not hasattr(self, "state_canvas"):
-                return
+                return  # type: ignore[return-value]
             if hasattr(self.state_canvas, "winfo_exists") and not self.state_canvas.winfo_exists():
-                return
+                return  # type: ignore[return-value]
 
             if not hasattr(self, "metrics_text"):
-                return
+                return  # type: ignore[return-value]
             if hasattr(self.metrics_text, "winfo_exists") and not self.metrics_text.winfo_exists():
-                return
+                return  # type: ignore[return-value]
 
             # Update state canvas
             self.state_canvas.delete("all")
@@ -5229,15 +5229,15 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                 not hasattr(self, "energy_canvas")
                 or not self.energy_canvas.get_tk_widget().winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             if not hasattr(self, "battery_canvas"):
-                return
+                return  # type: ignore[return-value]
             if (
                 hasattr(self.battery_canvas, "winfo_exists")
                 and not self.battery_canvas.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             self.update_energy_display()
         except Exception as e:
@@ -5247,12 +5247,12 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
         """Safely update performance metrics with widget validation"""
         try:
             if not hasattr(self, "performance_text"):
-                return
+                return  # type: ignore[return-value]
             if (
                 hasattr(self.performance_text, "winfo_exists")
                 and not self.performance_text.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             self.update_performance_metrics()
         except Exception as e:
@@ -5319,7 +5319,7 @@ Energy Usage:
         """Safely update cognitive monitoring display with widget validation"""
         try:
             if not hasattr(self, "metrics_text") or not self.metrics_text.winfo_exists():
-                return
+                return  # type: ignore[return-value]
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5341,12 +5341,12 @@ Energy Usage:
         """Safely update oscillatory analysis display with widget validation"""
         try:
             if not hasattr(self, "osc_metrics_text"):
-                return
+                return  # type: ignore[return-value]
             if (
                 hasattr(self.osc_metrics_text, "winfo_exists")
                 and not self.osc_metrics_text.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5369,12 +5369,12 @@ Energy Usage:
         """Safely update biofeedback display with widget validation"""
         try:
             if not hasattr(self, "biofeedback_text"):
-                return
+                return  # type: ignore[return-value]
             if (
                 hasattr(self.biofeedback_text, "winfo_exists")
                 and not self.biofeedback_text.winfo_exists()
             ):
-                return
+                return  # type: ignore[return-value]
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5403,7 +5403,7 @@ Energy Usage:
                         f"Initializing... {int(self.init_progress * 100)}%"
                     )
                 self.root.after(100, self.update_displays)
-                return
+                return  # type: ignore[return-value]
 
             # Only update if fully initialized and assistant is available
             if self.is_initialized and hasattr(self, "assistant") and self.assistant:
@@ -5527,7 +5527,7 @@ Energy Usage:
         """Update system information display"""
         # Check if info_text widget exists
         if not hasattr(self, "info_text") or not self.info_text.winfo_exists():
-            return
+            return  # type: ignore[return-value]
 
         self.info_text.delete(1.0, tk.END)
         info_text = "System Information:\n" + "=" * 40 + "\n\n"
@@ -5568,7 +5568,7 @@ Energy Usage:
     def update_char_count(self, event=None) -> None:
         """Update character count for query input with undo/redo tracking"""
         if not hasattr(self, "query_input"):
-            return
+            return  # type: ignore[return-value]
 
         text = self.query_input.get(1.0, tk.END)
         count = len(text.strip())
@@ -5651,7 +5651,7 @@ Energy Usage:
             }
             self.logger.warning(f"Assistant check failed in calibrate_baseline: {debug_info}")
             messagebox.showwarning("Not Ready", "Please wait for assistant initialization")
-            return
+            return  # type: ignore[return-value]
 
         # Use current physiology as baseline
         resting_data = [
@@ -5707,7 +5707,7 @@ Energy Usage:
         if not messagebox.askyesno(
             "Reset Assistant", "This will reset the assistant and clear all history. Continue?"
         ):
-            return
+            return  # type: ignore[return-value]
 
         with ErrorContext("Reset Assistant", user_facing=True):
             self.show_progress("Resetting assistant...")
@@ -5761,7 +5761,7 @@ Energy Usage:
                         self.root, "Save Session Error", error_msg, suggestion
                     )
                     self.logger.error(f"Permission error saving session: {error_msg}")
-                    return
+                    return  # type: ignore[return-value]
 
                 try:
                     with ErrorContext("Save Session File", user_facing=True):
@@ -5805,7 +5805,7 @@ Energy Usage:
                         self.root, "Load Session Error", error_msg, suggestion
                     )
                     self.logger.error(f"Permission error loading session: {error_msg}")
-                    return
+                    return  # type: ignore[return-value]
 
                 try:
                     with ErrorContext("Load Session File", user_facing=True):
@@ -5893,7 +5893,7 @@ Energy Usage:
                         self.root, "Export Configuration Error", error_msg, suggestion
                     )
                     self.logger.error(f"Permission error exporting config: {error_msg}")
-                    return
+                    return  # type: ignore[return-value]
 
                 try:
                     with ErrorContext("Export Configuration", user_facing=True):
@@ -5936,7 +5936,7 @@ Energy Usage:
                         self.root, "Import Configuration Error", error_msg, suggestion
                     )
                     self.logger.error(f"Permission error importing config: {error_msg}")
-                    return
+                    return  # type: ignore[return-value]
 
                 try:
                     with ErrorContext("Import Configuration", user_facing=True):
@@ -5985,7 +5985,7 @@ Energy Usage:
         if not hasattr(self, "input_dim_var") or not hasattr(self, "hidden_dim_var"):
             # Variables not initialized yet, skip loading config for now
             # It will be loaded again after UI is fully initialized
-            return
+            return  # type: ignore[return-value]
 
         if self.config_file.exists():
             try:
@@ -6041,7 +6041,7 @@ Energy Usage:
         with ErrorContext("Export Session CSV", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return
+                return  # type: ignore[return-value]
 
             filename = filedialog.asksaveasfilename(
                 title="Export Session Data as CSV",
@@ -6051,7 +6051,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled
+                return  # User cancelled  # type: ignore[return-value]
 
             # Validate file permissions before attempting export
             is_valid, error_msg, suggestion = self.permission_validator.validate_file_access(
@@ -6062,7 +6062,7 @@ Energy Usage:
                     self.root, "Export CSV Error", error_msg, suggestion
                 )
                 self.logger.error(f"Permission error exporting CSV: {error_msg}")
-                return
+                return  # type: ignore[return-value]
 
             try:
                 self.show_progress("Exporting session data to CSV...")
@@ -6205,7 +6205,7 @@ Energy Usage:
         with ErrorContext("Export Metrics CSV", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No metrics data available to export")
-                return
+                return  # type: ignore[return-value]
 
             filename = filedialog.asksaveasfilename(
                 title="Export Performance Metrics as CSV",
@@ -6215,7 +6215,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled
+                return  # User cancelled  # type: ignore[return-value]
 
             try:
                 self.show_progress("Exporting performance metrics to CSV...")
@@ -6368,7 +6368,7 @@ Energy Usage:
         with ErrorContext("Export Session JSON", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return
+                return  # type: ignore[return-value]
 
             filename = filedialog.asksaveasfilename(
                 title="Export Complete Session as JSON",
@@ -6378,7 +6378,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled
+                return  # User cancelled  # type: ignore[return-value]
 
             try:
                 self.show_progress("Exporting complete session data to JSON...")
@@ -6516,7 +6516,7 @@ Energy Usage:
                         self.root, "Export Session JSON Error", error_msg, suggestion
                     )
                     self.logger.error(f"Permission error exporting session JSON: {error_msg}")
-                    return
+                    return  # type: ignore[return-value]
 
                 # Write JSON with pretty formatting
                 with open(filename, "w", encoding="utf-8") as f:
@@ -6550,27 +6550,27 @@ Energy Usage:
                 )
 
                 duration = last_time - first_time
-                return str(duration)
-            return "00:00:00"
+                return str(duration)  # type: ignore[return-value]
+            return "00:00:00"  # type: ignore[return-value]
         except Exception:
-            return "00:00:00"
+            return "00:00:00"  # type: ignore[return-value]
 
     def _classify_query_type(self, query):
         """Classify the type of query for analysis"""
         query_lower = query.lower()
 
         if any(word in query_lower for word in ["what is", "define", "explain", "tell me"]):
-            return "informational"
+            return "informational"  # type: ignore[return-value]
         elif any(word in query_lower for word in ["how to", "help", "guide", "instructions"]):
-            return "procedural"
+            return "procedural"  # type: ignore[return-value]
         elif any(word in query_lower for word in ["analyze", "compare", "evaluate", "assess"]):
-            return "analytical"
+            return "analytical"  # type: ignore[return-value]
         elif any(word in query_lower for word in ["create", "generate", "make", "produce"]):
-            return "creative"
+            return "creative"  # type: ignore[return-value]
         elif any(word in query_lower for word in ["why", "when", "where", "who"]):
-            return "interrogative"
+            return "interrogative"  # type: ignore[return-value]
         else:
-            return "general"
+            return "general"  # type: ignore[return-value]
 
     def _calculate_performance_metrics(self):
         """Calculate comprehensive performance metrics"""
@@ -6651,7 +6651,7 @@ Energy Usage:
                     ),
                 }
 
-        return metrics
+        return metrics  # type: ignore[return-value]
 
     def _get_system_info(self):
         """Get system information for the export"""
@@ -6684,7 +6684,7 @@ Energy Usage:
             except Exception as e:
                 self.logger.warning(f"Could not get system info: {e}")
 
-        return system_info
+        return system_info  # type: ignore[return-value]
 
     def export_session_pdf(self):
         """Export comprehensive session report to PDF format"""
@@ -6696,11 +6696,11 @@ Energy Usage:
                     "Install with: pip install reportlab\n\n"
                     "Falling back to image export for visualizations.",
                 )
-                return
+                return  # type: ignore[return-value]
 
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return
+                return  # type: ignore[return-value]
 
             filename = filedialog.asksaveasfilename(
                 title="Export Session Report as PDF",
@@ -6710,7 +6710,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled
+                return  # User cancelled  # type: ignore[return-value]
 
             try:
                 self.show_progress("Generating PDF report...")
@@ -7197,14 +7197,14 @@ Energy Usage:
                 "• Monitor energy consumption and consider energy-saving optimizations"
             )
 
-        return " ".join(summary_parts)
+        return " ".join(summary_parts)  # type: ignore[return-value]
 
     # Visualization methods
     def generate_state_timeline(self):
         """Generate state timeline visualization"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         fig = None
         try:
@@ -7258,7 +7258,7 @@ Energy Usage:
         """Generate energy usage plot"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         fig = None
         try:
@@ -7309,7 +7309,7 @@ Energy Usage:
         """Display a matplotlib figure in the visualization tab"""
         if not HAS_PIL:
             messagebox.showwarning("PIL Required", "PIL/Pillow is required to display plots")
-            return
+            return  # type: ignore[return-value]
 
         try:
             # Save to temporary buffer
@@ -7347,11 +7347,11 @@ Energy Usage:
         """Save state timeline plot to file"""
         if not self.assistant or not self.assistant.state_history:
             messagebox.showwarning("No Data", "No state history available")
-            return
+            return  # type: ignore[return-value]
 
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         self._save_plot_with_dialog(
             plot_type="State Timeline",
@@ -7363,11 +7363,11 @@ Energy Usage:
         """Save energy plot to file"""
         if not self.assistant or not self.assistant.energy_history:
             messagebox.showwarning("No Data", "No energy history available")
-            return
+            return  # type: ignore[return-value]
 
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         self._save_plot_with_dialog(
             plot_type="Energy Plot",
@@ -7379,12 +7379,12 @@ Energy Usage:
         """Save oscillatory spectrum plot to file"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         # Check if we have oscillatory data
         if not hasattr(self, "spectrum_fig") or not self.spectrum_fig:
             messagebox.showwarning("No Data", "No oscillatory spectrum available")
-            return
+            return  # type: ignore[return-value]
 
         self._save_plot_with_dialog(
             plot_type="Oscillatory Spectrum",
@@ -7409,7 +7409,7 @@ Energy Usage:
             )
 
             if not file_path:
-                return  # User cancelled
+                return  # User cancelled  # type: ignore[return-value]
 
             try:
                 self.show_progress(f"Generating {plot_type.lower()}...")
@@ -7418,7 +7418,7 @@ Energy Usage:
                 fig = plot_generator()
                 if not fig:
                     messagebox.showwarning("Error", f"Failed to generate {plot_type.lower()}")
-                    return
+                    return  # type: ignore[return-value]
 
                 # Determine format from file extension or use default
                 file_ext = Path(file_path).suffix.lower()
@@ -7484,13 +7484,13 @@ Energy Usage:
         """Save all visualization plots"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return
+            return  # type: ignore[return-value]
 
         with ErrorContext("Save All Plots", user_facing=True):
             # Ask for directory
             directory = filedialog.askdirectory(title="Select Directory to Save Plots")
             if not directory:
-                return
+                return  # type: ignore[return-value]
 
             save_dir = Path(directory)
             plots_saved = []
@@ -7606,7 +7606,7 @@ Energy Usage:
         """Show memory usage statistics"""
         if not hasattr(self, "history_manager"):
             messagebox.showinfo("Not Available", "History manager not initialized")
-            return
+            return  # type: ignore[return-value]
 
         stats = self.history_manager.get_memory_stats()
         usage = stats["memory_usage_mb"]
@@ -7631,7 +7631,7 @@ Energy Usage:
         if not messagebox.askyesno(
             "Clear History", "Clear all history data? This action cannot be undone."
         ):
-            return
+            return  # type: ignore[return-value]
 
         if hasattr(self, "history_manager"):
             self.history_manager.clear_all_history()
@@ -7642,7 +7642,7 @@ Energy Usage:
         """Configure history limits dialog"""
         if not hasattr(self, "history_manager"):
             messagebox.showinfo("Not Available", "History manager not initialized")
-            return
+            return  # type: ignore[return-value]
 
         # Create configuration dialog
         dialog = tk.Toplevel(self.root)
@@ -7995,11 +7995,11 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 "The psutil package is required for memory profiling.\n\n"
                 "Install it with: pip install psutil",
             )
-            return
+            return  # type: ignore[return-value]
 
         if hasattr(self, "memory_profiling_enabled") and self.memory_profiling_enabled:
             self.logger.info("Memory profiling already enabled")
-            return
+            return  # type: ignore[return-value]
 
         def profile_memory():
             try:
@@ -8072,7 +8072,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
         if not log_file.exists():
             messagebox.showinfo("No Logs", "No log file found")
-            return
+            return  # type: ignore[return-value]
 
         try:
             log_window = tk.Toplevel(self.root)
@@ -8163,7 +8163,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
     def auto_save_session(self):
         """Auto-save session data for crash recovery"""
         if not self.auto_save_enabled:
-            return
+            return  # type: ignore[return-value]
 
         try:
             session_data = {
@@ -8198,7 +8198,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
     def check_auto_save_recovery(self):
         """Check for auto-save file and offer recovery"""
         if not os.path.exists(self.auto_save_file):
-            return
+            return  # type: ignore[return-value]
 
         try:
             with open(self.auto_save_file, "r") as f:
@@ -8209,7 +8209,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             if datetime.now() - save_time > timedelta(hours=24):
                 # Old auto-save, remove it
                 os.remove(self.auto_save_file)
-                return
+                return  # type: ignore[return-value]
 
             # Offer recovery to user
             result = messagebox.askyesno(
@@ -8410,7 +8410,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         """Apply a theme to the entire GUI"""
         if theme_name not in GUIConfig.THEMES:
             self.logger.warning(f"Unknown theme: {theme_name}")
-            return
+            return  # type: ignore[return-value]
 
         self.current_theme = theme_name
         self._save_theme_preference()
@@ -8429,7 +8429,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
     def get_theme_color(self, color_type: str) -> str:
         """Get a color from the current theme"""
-        return GUIConfig.THEMES[self.current_theme].get(color_type, "black")
+        return GUIConfig.THEMES[self.current_theme].get(color_type, "black")  # type: ignore[return-value]
 
     def _update_canvas_themes(self):
         """Update all canvas backgrounds including matplotlib figures"""
@@ -8576,17 +8576,17 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                     self.memory_length_var.set(config["buffer_size"])
         except Exception:
             pass
-        return "normal"  # Default theme
+        return "normal"  # Default theme  # type: ignore[return-value]
 
     def send_query(self, event: Optional[Any] = None) -> None:
         """Send user query to the APGI Assistant and display response."""
         if not hasattr(self, "query_input") or not hasattr(self, "response_display"):
-            return
+            return  # type: ignore[return-value]
 
         # Get user input
         user_input = self.query_input.get().strip()
         if not user_input:
-            return
+            return  # type: ignore[return-value]
 
         # Clear input
         self.query_input.delete(0, tk.END)
@@ -8597,7 +8597,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 tk.END, "APGI Assistant not available. Please check dependencies.\n"
             )
             self.response_display.see(tk.END)
-            return
+            return  # type: ignore[return-value]
 
         # Start conversation if not active
         if not self.assistant.conversation_active:
@@ -8623,7 +8623,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
     def _display_response(self, user_input: str, result: Dict[str, Any]) -> None:
         """Display the assistant response in the GUI."""
         if not hasattr(self, "response_display"):
-            return
+            return  # type: ignore[return-value]
 
         # Display user input
         self.response_display.insert(tk.END, f"You: {user_input}\n", "user")
