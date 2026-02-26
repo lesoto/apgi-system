@@ -295,15 +295,15 @@ class IowaGamblingTask:
         elif deck_type == DeckType.C:
             # Deck C: Mid-high frequency pattern
             freq = 2 * np.pi * 6
-            stimulus[
-                self.stim_dim // 4 : 3 * self.stim_dim // 4
-            ] = self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
+            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
+                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
+            )
         else:  # DeckType.D
             # Deck D: High frequency pattern
             freq = 2 * np.pi * 8
-            stimulus[
-                self.stim_dim // 4 : 3 * self.stim_dim // 4
-            ] = self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
+            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
+                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
+            )
 
         # Add small noise for variability
         stimulus += 0.1 * np.random.randn(self.stim_dim)

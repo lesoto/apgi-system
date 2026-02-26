@@ -4583,9 +4583,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                     trend_direction = (
                         "increasing"
                         if slope > 0.001
-                        else "decreasing"
-                        if slope < -0.001
-                        else "stable"
+                        else "decreasing" if slope < -0.001 else "stable"
                     )
                 else:
                     trend_direction = "insufficient data"
@@ -4979,11 +4977,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                         significance = (
                             "***"
                             if p_val < 0.001
-                            else "**"
-                            if p_val < 0.01
-                            else "*"
-                            if p_val < 0.05
-                            else ""
+                            else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
                         )
                         text_widget.insert(
                             tk.END, f"  {var2}: r={corr:.3f} {significance} (p={p_val:.3f})\n"

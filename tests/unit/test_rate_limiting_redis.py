@@ -135,11 +135,7 @@ class TestRateLimitingWithRedis:
         # This is harder to test with TestClient since it doesn't simulate different IPs
         # We can test by mocking the client identification
 
-        # Mock different client IDs
-        current_client = 0
-
         def mock_incr(key: Any) -> int:
-            nonlocal current_client
             if "192.168.1.1" in key:
                 return 1  # First client, first request
             elif "192.168.1.2" in key:

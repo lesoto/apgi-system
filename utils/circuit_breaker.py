@@ -509,8 +509,7 @@ def circuit_breaker(  # noqa: E704
     success_threshold: int = 3,
     timeout: float = 10.0,
     monitor_failures: bool = True,
-) -> Callable[P, R]:
-    ...
+) -> Callable[P, R]: ...
 
 
 @overload
@@ -522,8 +521,7 @@ def circuit_breaker(  # noqa: E704
     success_threshold: int = 3,
     timeout: float = 10.0,
     monitor_failures: bool = True,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    ...
+) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
 
 def circuit_breaker(

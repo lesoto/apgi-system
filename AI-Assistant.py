@@ -462,9 +462,9 @@ class DynamicThreshold(nn.Module):
         self.register_buffer("theta_t", torch.tensor(theta_0))
         self.theta_t: torch.Tensor
         self.ignition_history: List[float] = []
-        self.threshold_history: List[
-            float
-        ] = []  # Track threshold changes for adaptation measurement
+        self.threshold_history: List[float] = (
+            []
+        )  # Track threshold changes for adaptation measurement
         self.last_dS_dt = 0.0
 
     def update(self, S_t: torch.Tensor, dt: float = 0.01) -> torch.Tensor:
@@ -1790,9 +1790,9 @@ class APGIAssistant:
             "state_distribution": {
                 state: cognitive_states.count(state) for state in set(cognitive_states)
             },
-            "average_surprise": sum(surprise_levels) / len(surprise_levels)
-            if surprise_levels
-            else 0.0,
+            "average_surprise": (
+                sum(surprise_levels) / len(surprise_levels) if surprise_levels else 0.0
+            ),
             "surprise_trend": self._analyze_surprise_trend(recent_states),
             "total_states_processed": len(self.state_history),
             "timeframe": timeframe,
@@ -1800,9 +1800,11 @@ class APGIAssistant:
 
         if include_trends:
             report["trend_analysis"] = {
-                "dominant_state": max(cognitive_states, key=cognitive_states.count)
-                if cognitive_states
-                else "unknown",
+                "dominant_state": (
+                    max(cognitive_states, key=cognitive_states.count)
+                    if cognitive_states
+                    else "unknown"
+                ),
                 "state_stability": len(set(cognitive_states[-5:])) / min(5, len(cognitive_states)),
             }
 
@@ -1817,14 +1819,14 @@ class APGIAssistant:
             return {"error": "Energy monitoring not available"}
 
         return {
-            "current_energy_level": float(self.energy_history[-1]["level"])
-            if self.energy_history
-            else 0.0,
-            "average_energy_consumption": float(
-                sum(d["level"] for d in self.energy_history) / len(self.energy_history)
-            )
-            if self.energy_history
-            else 0.0,
+            "current_energy_level": (
+                float(self.energy_history[-1]["level"]) if self.energy_history else 0.0
+            ),
+            "average_energy_consumption": (
+                float(sum(d["level"] for d in self.energy_history) / len(self.energy_history))
+                if self.energy_history
+                else 0.0
+            ),
             "total_energy_consumed": float(sum(d["level"] for d in self.energy_history)),
             "energy_efficiency_score": max(
                 0.0,

@@ -259,9 +259,9 @@ async def update_current_user_profile(
             user_id=user_id,
             email=request.email,
             roles=request.roles if is_admin else None,  # Only admins can change roles
-            is_active=request.is_active
-            if is_admin
-            else None,  # Only admins can change active status
+            is_active=(
+                request.is_active if is_admin else None
+            ),  # Only admins can change active status
         )
 
         return UserResponse(
