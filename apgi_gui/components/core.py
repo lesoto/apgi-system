@@ -65,11 +65,11 @@ class ToolTip:
         self.widget.bind("<Leave>", self.on_leave)
         self.widget.bind("<ButtonPress>", self.on_leave)
 
-    def on_enter(self, event: Optional[tk.Event[Any]] = None) -> None:
+    def on_enter(self, event: Optional[tk.Event] = None) -> None:
         """Show tooltip when mouse enters widget"""
         self.schedule()
 
-    def on_leave(self, event: Optional[tk.Event[Any]] = None) -> None:
+    def on_leave(self, event: Optional[tk.Event] = None) -> None:
         """Hide tooltip when mouse leaves widget"""
         self.unschedule()
         self.hidetip()
@@ -279,7 +279,7 @@ class ParameterPanel(BaseFrame):
             )
 
     def _validate_parameter(
-        self, event: tk.Event[Any], key: str, var: tk.DoubleVar, min_val: float, max_val: float
+        self, event: tk.Event, key: str, var: tk.DoubleVar, min_val: float, max_val: float
     ) -> None:
         """Validate parameter value."""
         try:

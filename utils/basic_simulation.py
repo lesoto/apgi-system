@@ -237,20 +237,20 @@ def main() -> None:
         if not args.no_plot:
             plot_results(history=system.history, output_file=args.output, show=args.show)
 
-        print("\n✓ Simulation completed successfully!")
+        print("\n[OK] Simulation completed successfully!")
 
     except KeyboardInterrupt:
         print("\n\nSimulation interrupted by user")
         sys.exit(130)
 
     except ImportError as e:
-        print(f"\n✗ Import error: {e}")
+        print(f"\n[FAIL] Import error: {e}")
         print("Please ensure all required dependencies are installed:")
         print("  pip install -r requirements.txt")
         sys.exit(1)
 
     except Exception as e:
-        print(f"\n✗ Error: {e}")
+        print(f"\n[FAIL] Error: {e}")
         import traceback
 
         traceback.print_exc()

@@ -453,10 +453,10 @@ class ScriptRunnerGUI:
                 return_code = process.returncode
 
                 if return_code == 0:
-                    self.log_output(f"✅ {display_name} completed successfully", self.TAG_SUCCESS)
+                    self.log_output(f"[OK] {display_name} completed successfully", self.TAG_SUCCESS)
                 else:
                     self.log_output(
-                        f"❌ {display_name} failed with return code {return_code}",
+                        f"[FAIL] {display_name} failed with return code {return_code}",
                         self.TAG_ERROR,
                     )
 

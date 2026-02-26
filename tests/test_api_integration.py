@@ -36,14 +36,14 @@ class APITestClient:
                 # Set authorization header for future requests
                 self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
 
-                print(f"✅ Login successful for user: {username}")
+                print(f"[OK] Login successful for user: {username}")
                 return True
             else:
-                print(f"❌ Login failed: {response.status_code} - {response.text}")
+                print(f"[FAIL] Login failed: {response.status_code} - {response.text}")
                 return False
 
         except Exception as e:
-            print(f"❌ Login error: {e}")
+            print(f"[FAIL] Login error: {e}")
             return False
 
     def create_default_user(self) -> Dict[str, Any]:
@@ -53,15 +53,15 @@ class APITestClient:
 
             if response.status_code == 201:
                 data = response.json()
-                print(f"✅ Default user created: {data['username']}")
+                print(f"[OK] Default user created: {data['username']}")
                 print(f"   Password: {data['password']}")
                 return data
             else:
-                print(f"❌ Default user creation failed: {response.status_code}")
+                print(f"[FAIL] Default user creation failed: {response.status_code}")
                 return {}
 
         except Exception as e:
-            print(f"❌ Default user creation error: {e}")
+            print(f"[FAIL] Default user creation error: {e}")
             return {}
 
     def get_user_profile(self) -> Dict[str, Any]:
@@ -71,14 +71,14 @@ class APITestClient:
 
             if response.status_code == 200:
                 data = response.json()
-                print(f"✅ User profile retrieved: {data['username']}")
+                print(f"[OK] User profile retrieved: {data['username']}")
                 return data
             else:
-                print(f"❌ Profile retrieval failed: {response.status_code}")
+                print(f"[FAIL] Profile retrieval failed: {response.status_code}")
                 return {}
 
         except Exception as e:
-            print(f"❌ Profile retrieval error: {e}")
+            print(f"[FAIL] Profile retrieval error: {e}")
             return {}
 
     def create_session(self) -> Dict[str, Any]:
@@ -94,14 +94,14 @@ class APITestClient:
 
             if response.status_code == 201:
                 data = response.json()
-                print(f"✅ Session created: {data['session_id']}")
+                print(f"[OK] Session created: {data['session_id']}")
                 return data
             else:
-                print(f"❌ Session creation failed: {response.status_code} - {response.text}")
+                print(f"[FAIL] Session creation failed: {response.status_code} - {response.text}")
                 return {}
 
         except Exception as e:
-            print(f"❌ Session creation error: {e}")
+            print(f"[FAIL] Session creation error: {e}")
             return {}
 
     def get_session(self, session_id: str) -> Dict[str, Any]:
@@ -111,14 +111,14 @@ class APITestClient:
 
             if response.status_code == 200:
                 data = response.json()
-                print(f"✅ Session retrieved: {data['status']}")
+                print(f"[OK] Session retrieved: {data['status']}")
                 return data
             else:
-                print(f"❌ Session retrieval failed: {response.status_code}")
+                print(f"[FAIL] Session retrieval failed: {response.status_code}")
                 return {}
 
         except Exception as e:
-            print(f"❌ Session retrieval error: {e}")
+            print(f"[FAIL] Session retrieval error: {e}")
             return {}
 
     def start_session(self, session_id: str) -> bool:
@@ -127,14 +127,14 @@ class APITestClient:
             response = self.session.post(f"{self.base_url}/v1/sessions/{session_id}/start")
 
             if response.status_code == 200:
-                print(f"✅ Session started: {session_id}")
+                print(f"[OK] Session started: {session_id}")
                 return True
             else:
-                print(f"❌ Session start failed: {response.status_code}")
+                print(f"[FAIL] Session start failed: {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"❌ Session start error: {e}")
+            print(f"[FAIL] Session start error: {e}")
             return False
 
     def test_protected_endpoint_without_auth(self) -> bool:
@@ -147,14 +147,14 @@ class APITestClient:
             )
 
             if response.status_code == 401:
-                print("✅ Protected endpoint correctly rejects unauthenticated requests")
+                print("[OK] Protected endpoint correctly rejects unauthenticated requests")
                 return True
             else:
-                print(f"❌ Protected endpoint should return 401, got: {response.status_code}")
+                print(f"[FAIL] Protected endpoint should return 401, got: {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"❌ Protected endpoint test error: {e}")
+            print(f"[FAIL] Protected endpoint test error: {e}")
             return False
 
     def test_health_endpoint(self) -> bool:
@@ -164,14 +164,14 @@ class APITestClient:
 
             if response.status_code == 200:
                 data = response.json()
-                print(f"✅ Health check: {data['status']}")
+                print(f"[OK] Health check: {data['status']}")
                 return True
             else:
-                print(f"❌ Health check failed: {response.status_code}")
+                print(f"[FAIL] Health check failed: {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"❌ Health check error: {e}")
+            print(f"[FAIL] Health check error: {e}")
             return False
 
 
@@ -223,12 +223,12 @@ def run_api_integration_tests() -> None:
     print("=" * 80)
 
     print("\nSUMMARY:")
-    print("- Public endpoints: ✅ Accessible")
-    print("- Protected endpoints: ✅ Require authentication")
-    print("- Authentication: ✅ Working with JWT tokens")
-    print("- User management: ✅ Functional")
-    print("- Session management: ✅ Integrated with auth")
-    print("\n✅ API INTEGRATION IS COMPLETE AND FUNCTIONAL")
+    print("- Public endpoints: [OK] Accessible")
+    print("- Protected endpoints: [OK] Require authentication")
+    print("- Authentication: [OK] Working with JWT tokens")
+    print("- User management: [OK] Functional")
+    print("- Session management: [OK] Integrated with auth")
+    print("\n[OK] API INTEGRATION IS COMPLETE AND FUNCTIONAL")
 
 
 if __name__ == "__main__":

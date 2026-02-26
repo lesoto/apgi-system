@@ -17,10 +17,10 @@ def test_imports() -> bool:
         import yaml  # noqa: F401
         import tkinter  # noqa: F401
 
-        print("✓ All core dependencies imported successfully")
+        print("[OK] All core dependencies imported successfully")
         return True
     except ImportError as e:
-        print(f"✗ Import error: {e}")
+        print(f"[FAIL] Import error: {e}")
         return False
 
 
@@ -32,10 +32,10 @@ def test_apgi_system() -> bool:
         from apgi_system.platform_utils import get_resource_path
 
         APGISystem(config_path=str(get_resource_path("config/default.yaml")))
-        print("✓ APGI System initialized successfully")
+        print("[OK] APGI System initialized successfully")
         return True
     except Exception as e:
-        print(f"✗ APGI System error: {e}")
+        print(f"[FAIL] APGI System error: {e}")
         traceback.print_exc()
         return False
 
@@ -66,16 +66,16 @@ def test_system_step() -> bool:
         missing_keys = [k for k in required_keys if k not in state]
 
         if missing_keys:
-            print(f"✗ Missing keys in state: {missing_keys}")
+            print(f"[FAIL] Missing keys in state: {missing_keys}")
             return False
 
-        print("✓ System step executed successfully")
+        print("[OK] System step executed successfully")
         print(f"  - Time: {state['time']:.2f} ms")
         print(f"  - Ignition occurred: {state['ignition']['ignition_occurred']}")
         print(f"  - Workspace broadcasting: {state['workspace']['is_broadcasting']}")
         return True
     except Exception as e:
-        print(f"✗ System step error: {e}")
+        print(f"[FAIL] System step error: {e}")
         traceback.print_exc()
         return False
 
@@ -89,10 +89,10 @@ def test_gui_imports() -> bool:
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # noqa: F401
         from matplotlib.figure import Figure  # noqa: F401
 
-        print("✓ GUI dependencies imported successfully")
+        print("[OK] GUI dependencies imported successfully")
         return True
     except ImportError as e:
-        print(f"✗ GUI import error: {e}")
+        print(f"[FAIL] GUI import error: {e}")
         return False
 
 
@@ -106,7 +106,7 @@ def test_config_file() -> bool:
 
         config_path = get_resource_path("config/default.yaml")
         if not config_path.exists():
-            print(f"✗ Config file not found: {config_path}")
+            print(f"[FAIL] Config file not found: {config_path}")
             return False
 
         with open(config_path, "r") as f:
@@ -116,15 +116,15 @@ def test_config_file() -> bool:
         missing_sections = [s for s in required_sections if s not in config]
 
         if missing_sections:
-            print(f"✗ Missing config sections: {missing_sections}")
+            print(f"[FAIL] Missing config sections: {missing_sections}")
             return False
 
-        print("✓ Configuration file valid")
+        print("[OK] Configuration file valid")
         print(f"  - System name: {config['system']['name']}")
         print(f"  - Timestep: {config['system']['timestep_ms']} ms")
         return True
     except Exception as e:
-        print(f"✗ Config file error: {e}")
+        print(f"[FAIL] Config file error: {e}")
         traceback.print_exc()
         return False
 
@@ -141,10 +141,10 @@ def test_experimental_tasks() -> bool:
             MaskingParadigmTask,
         )
 
-        print("✓ All experimental tasks imported successfully")
+        print("[OK] All experimental tasks imported successfully")
         return True
     except ImportError as e:
-        print(f"✗ Task import error: {e}")
+        print(f"[FAIL] Task import error: {e}")
         traceback.print_exc()
         return False
 
@@ -162,7 +162,7 @@ def test_gui_launch() -> bool:
         # Create GUI instance
         APGIGui(root)
 
-        print("✓ GUI window opened successfully!")
+        print("[OK] GUI window opened successfully!")
         print(f"  - Window title: {root.title()}")
         print(f"  - Window size: {root.geometry()}")
 
@@ -172,11 +172,11 @@ def test_gui_launch() -> bool:
         # Run main loop
         root.mainloop()
 
-        print("✓ GUI closed successfully!")
+        print("[OK] GUI closed successfully!")
         return True
 
     except Exception as e:
-        print(f"✗ GUI launch failed: {e}")
+        print(f"[FAIL] GUI launch failed: {e}")
         traceback.print_exc()
         return False
 
@@ -203,7 +203,7 @@ def main() -> None:
             result = test()
             results.append(result)
         except Exception as e:
-            print(f"✗ Test failed with exception: {e}")
+            print(f"[FAIL] Test failed with exception: {e}")
             traceback.print_exc()
             results.append(False)
 
@@ -215,14 +215,14 @@ def main() -> None:
     print(f"Tests passed: {passed}/{total}")
 
     if passed == total:
-        print("\n✓ ALL TESTS PASSED - Application is ready to use!")
+        print("\n[OK] ALL TESTS PASSED - Application is ready to use!")
         print("\nTo launch the GUI, run:")
         print("  python run_gui.py")
         print("  or")
         print("  python apgi_gui.py")
         return 0
     else:
-        print("\n✗ SOME TESTS FAILED - Please review errors above")
+        print("\n[FAIL] SOME TESTS FAILED - Please review errors above")
         return 1
 
 

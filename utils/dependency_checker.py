@@ -144,12 +144,12 @@ class DependencyChecker:
             return []
 
         instructions = [
-            "\n🔧 System Services:",
+            "\n[TOOLS] System Services:",
         ]
         for warning in service_warnings:
-            instructions.append(f"   ⚠️  {warning}")
+            instructions.append(f"   [!] {warning}")
 
-        instructions.append("\n   💡 Start services:")
+        instructions.append("\n   [INFO] Start services:")
         if self.platform == "Darwin":  # macOS
             instructions.append("      brew services start redis")
             instructions.append("      brew services start postgresql@14")
@@ -175,24 +175,24 @@ class DependencyChecker:
             instructions.extend(self._format_package_instructions(package_errors))
 
         if self.warnings:
-            instructions.append("\n⚠️  SERVICE WARNINGS:")
+            instructions.append("\n[!] SERVICE WARNINGS:")
             instructions.append("=" * 50)
 
             service_warnings = [w for w in self.warnings if "Service" in w]
             instructions.extend(self._format_service_instructions(service_warnings))
 
         if not self.errors and not self.warnings:
-            instructions.append("\n✅ All dependencies satisfied!")
+            instructions.append("\n[OK] All dependencies satisfied!")
 
         return "\n".join(instructions)
 
     def _print_python_version(self, results: Dict[str, bool]):
         """Print Python version information."""
-        print(f"\n🐍 Python Version: {'.'.join(map(str, self.python_version[:2]))}")
+        print(f"\n[PYTHON] Python Version: {'.'.join(map(str, self.python_version[:2]))}")
         if results["python_version"]:
-            print("   ✅ Meets minimum requirements (3.8+)")
+            print("   [OK] Meets minimum requirements (3.8+)")
         else:
-            print("   ❌ Does not meet minimum requirements")
+            print("   [FAIL] Does not meet minimum requirements")
 
     def _print_package_group(self, title: str, packages: List[str], results: Dict[str, bool]):
         """Print a group of packages with their status."""
@@ -200,27 +200,27 @@ class DependencyChecker:
         for package in packages:
             key = f"package_{package}"
             if results.get(key, False):
-                print(f"   ✅ {package}")
+                print(f"   [OK] {package}")
             else:
-                print(f"   ❌ {package}")
+                print(f"   [FAIL] {package}")
 
     def _print_services(self, results: Dict[str, bool]):
         """Print system services status."""
-        print("\n🔧 System Services:")
+        print("\n[TOOLS] System Services:")
 
         if "service_redis" in results:
-            status = "✅" if results["service_redis"] else "⚠️"
+            status = "[OK]" if results["service_redis"] else "[!]"
             note = "" if results["service_redis"] else " (may not be running)"
             print(f"   {status} Redis{note}")
 
         if "service_postgresql" in results:
-            status = "✅" if results["service_postgresql"] else "⚠️"
+            status = "[OK]" if results["service_postgresql"] else "[!]"
             note = "" if results["service_postgresql"] else " (may not be running)"
             print(f"   {status} PostgreSQL{note}")
 
     def print_dependency_report(self):
         """Print a comprehensive dependency report."""
-        print("\n🔍 APGI System Dependency Check")
+        print("\n[SEARCH] APGI System Dependency Check")
         print("=" * 50)
 
         results = self.check_all_dependencies()
@@ -239,15 +239,15 @@ class DependencyChecker:
             "torch",
             "jax",
         ]
-        self._print_package_group("\n📦 Core Scientific Packages:", core_packages, results)
+        self._print_package_group("\n[PACKAGES] Core Scientific Packages:", core_packages, results)
 
         # Web framework packages
         web_packages = ["fastapi", "uvicorn", "pydantic", "sqlalchemy", "redis", "psycopg2"]
-        self._print_package_group("\n🌐 Web Framework Packages:", web_packages, results)
+        self._print_package_group("\n[WEB] Web Framework Packages:", web_packages, results)
 
         # GUI packages
-        gui_status = "✅" if results.get("package_tkinter", False) else "❌"
-        print(f"\n🖥️  GUI Packages:\n   {gui_status} tkinter")
+        gui_status = "[OK]" if results.get("package_tkinter", False) else "[FAIL]"
+        print(f"\n[GUI] GUI Packages:\n   {gui_status} tkinter")
 
         # System services
         self._print_services(results)
