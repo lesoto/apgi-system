@@ -16,6 +16,10 @@ from hypothesis import given, settings, HealthCheck  # noqa: E402
 from typing import Any  # noqa: E402
 
 from tests.strategies import (  # noqa: E402
+    belief_states,
+    precision_values,
+    observations,
+    configurations,
     body_state_strategy,
     observation_strategy,
     belief_state_strategy,
@@ -26,6 +30,109 @@ from tests.strategies import (  # noqa: E402
     allostatic_load_strategy,
     somatic_marker_gain_strategy,
 )
+
+
+# ============================================================================
+# Tests for Core Strategies (as specified in design document)
+# ============================================================================
+
+
+@given(belief_states())
+@settings(max_examples=10)
+def test_belief_states_generates_valid_distributions(belief: np.ndarray) -> None:
+    """Test that belief_states() generates valid probability distributions.
+
+    Validates Requirements 13.1, 13.2, 13.3, 13.5
+    """
+    # Check it's a numpy array
+    assert isinstance(belief, np.ndarray)
+
+    # Check size is between 2 and 10
+    assert 2 <= len(belief) <= 10
+
+    # Check all values are non-negative
+    assert np.all(belief >= 0)
+
+    # Check sum is approximately 1.0 (probability distribution)
+    assert np.isclose(np.sum(belief), 1.0, rtol=1e-9)
+
+    # Check no NaN or Inf
+    assert not np.any(np.isnan(belief))
+    assert not np.any(np.isinf(belief))
+
+
+@given(precision_values())
+@settings(max_examples=10)
+def test_precision_values_generates_bounded_weights(precision: float) -> None:
+    """Test that precision_values() generates bounded precision weights.
+
+    Validates Requirements 13.1, 13.2, 13.3, 13.5
+    """
+    # Check it's a float
+    assert isinstance(precision, float)
+
+    # Check it's bounded between 0 and 1
+    assert 0.0 <= precision <= 1.0
+
+    # Check no NaN or Inf
+    assert not np.isnan(precision)
+    assert not np.isinf(precision)
+
+
+@given(observations())
+@settings(max_examples=10)
+def test_observations_generates_valid_sensor_data(obs: list) -> None:
+    """Test that observations() generates valid sensor data.
+
+    Validates Requirements 13.1, 13.2, 13.3, 13.5
+    """
+    # Check it's a list
+    assert isinstance(obs, list)
+
+    # Check size is between 1 and 10
+    assert 1 <= len(obs) <= 10
+
+    # Check all values are floats in valid range
+    for value in obs:
+        assert isinstance(value, float)
+        assert -10.0 <= value <= 10.0
+        assert not np.isnan(value)
+        assert not np.isinf(value)
+
+
+@given(configurations())
+@settings(max_examples=10)
+def test_configurations_generates_valid_system_configs(config: dict) -> None:
+    """Test that configurations() generates valid system configs.
+
+    Validates Requirements 13.1, 13.2, 13.3, 13.5
+    """
+    # Check it's a dictionary
+    assert isinstance(config, dict)
+
+    # Check required keys are present
+    assert "learning_rate" in config
+    assert "precision_threshold" in config
+    assert "max_iterations" in config
+    assert "convergence_tolerance" in config
+
+    # Check learning_rate is in valid range
+    assert 0.001 <= config["learning_rate"] <= 0.1
+
+    # Check precision_threshold is in valid range
+    assert 0.0 <= config["precision_threshold"] <= 1.0
+
+    # Check max_iterations is in valid range
+    assert 1 <= config["max_iterations"] <= 1000
+    assert isinstance(config["max_iterations"], int)
+
+    # Check convergence_tolerance is in valid range
+    assert 1e-6 <= config["convergence_tolerance"] <= 1e-2
+
+
+# ============================================================================
+# Tests for Extended Strategies (for specific APGI subsystems)
+# ============================================================================
 
 
 @given(body_state_strategy())

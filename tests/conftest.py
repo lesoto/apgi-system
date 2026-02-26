@@ -5,6 +5,7 @@ This module provides common fixtures used across unit, property-based,
 and integration tests.
 """
 
+import os
 import pytest
 import numpy as np
 import yaml
@@ -18,19 +19,32 @@ from sqlalchemy.orm import Session
 
 # Configure Hypothesis profiles
 settings.register_profile(
-    "ci", max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow]
+    "ci",
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+    print_blob=True,
 )
 
 settings.register_profile(
-    "dev", max_examples=20, deadline=None, suppress_health_check=[HealthCheck.too_slow]
+    "dev",
+    max_examples=20,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+    print_blob=True,
 )
 
 settings.register_profile(
-    "thorough", max_examples=1000, deadline=None, suppress_health_check=[HealthCheck.too_slow]
+    "thorough",
+    max_examples=1000,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+    print_blob=True,
 )
 
-# Load the appropriate profile (default to 'dev' for faster local testing)
-settings.load_profile("dev")
+# Load the appropriate profile from environment or default to 'dev'
+profile = os.getenv("HYPOTHESIS_PROFILE", "dev")
+settings.load_profile(profile)
 
 
 @pytest.fixture
@@ -168,3 +182,178 @@ def db() -> Generator[Session, None, None]:
     # Cleanup
     session.close()
     Base.metadata.drop_all(engine)
+
+
+# Additional fixtures for comprehensive testing
+
+
+@pytest.fixture
+def valid_belief_state() -> NDArray[np.float64]:
+    """
+    Provide a valid normalized belief state.
+
+    Returns
+    -------
+    np.ndarray
+        Probability distribution that sums to 1.0, shape (10,).
+    """
+    beliefs = np.random.rand(10)
+    return beliefs / beliefs.sum()
+
+
+@pytest.fixture
+def valid_precision() -> float:
+    """
+    Provide a valid precision value.
+
+    Returns
+    -------
+    float
+        Precision value in range [0.1, 10.0].
+    """
+    return np.random.uniform(0.1, 10.0)
+
+
+@pytest.fixture
+def empty_input_cases():
+    """
+    Provide various empty input cases for edge case testing.
+
+    Returns
+    -------
+    dict
+        Dictionary of empty input types.
+    """
+    return {
+        "empty_list": [],
+        "empty_array": np.array([]),
+        "empty_dict": {},
+        "empty_string": "",
+        "none_value": None,
+        "zero_array": np.zeros(0),
+    }
+
+
+@pytest.fixture
+def boundary_values():
+    """
+    Provide boundary value test cases.
+
+    Returns
+    -------
+    dict
+        Dictionary of boundary values for different types.
+    """
+    return {
+        "zero": 0,
+        "one": 1,
+        "negative_one": -1,
+        "small_positive": 1e-10,
+        "small_negative": -1e-10,
+        "large_positive": 1e10,
+        "large_negative": -1e10,
+        "max_float": np.finfo(np.float64).max,
+        "min_float": np.finfo(np.float64).min,
+        "epsilon": np.finfo(np.float64).eps,
+    }
+
+
+@pytest.fixture
+def invalid_inputs():
+    """
+    Provide invalid input cases for error handling tests.
+
+    Returns
+    -------
+    dict
+        Dictionary of invalid input types.
+    """
+    return {
+        "nan": float("nan"),
+        "inf": float("inf"),
+        "neg_inf": float("-inf"),
+        "wrong_type_str": "not_a_number",
+        "wrong_type_list": ["a", "b", "c"],
+        "negative_precision": -1.0,
+        "out_of_range": 1000.0,
+    }
+
+
+@pytest.fixture(scope="session")
+def test_data_dir(tmp_path_factory) -> Path:
+    """
+    Provide a temporary directory for test data.
+
+    Parameters
+    ----------
+    tmp_path_factory : pytest fixture
+        Factory for creating temporary directories.
+
+    Returns
+    -------
+    Path
+        Path to temporary test data directory.
+    """
+    return tmp_path_factory.mktemp("test_data")
+
+
+@pytest.fixture
+def mock_config_minimal() -> Dict[str, Any]:
+    """
+    Provide a minimal valid configuration for testing.
+
+    Returns
+    -------
+    dict
+        Minimal configuration with only required fields.
+    """
+    return {
+        "system": {
+            "timestep_ms": 1.0,
+            "random_seed": 42,
+        },
+        "active_inference": {
+            "learning_rate": 0.01,
+            "precision_init": 1.0,
+        },
+    }
+
+
+@pytest.fixture
+def sample_time_series() -> NDArray[np.float64]:
+    """
+    Generate a sample time series for testing temporal dynamics.
+
+    Returns
+    -------
+    np.ndarray
+        Time series data of shape (100, 10).
+    """
+    t = np.linspace(0, 10, 100)
+    # Create multi-dimensional time series with different frequencies
+    data = np.column_stack(
+        [np.sin(2 * np.pi * f * t) for f in [0.5, 1.0, 2.0, 3.0, 5.0]]
+        + [np.cos(2 * np.pi * f * t) for f in [0.5, 1.0, 2.0, 3.0, 5.0]]
+    )
+    return data
+
+
+@pytest.fixture
+def performance_timer():
+    """
+    Provide a context manager for timing test execution.
+
+    Yields
+    ------
+    callable
+        Context manager that measures execution time.
+    """
+    import time
+    from contextlib import contextmanager
+
+    @contextmanager
+    def timer():
+        start = time.perf_counter()
+        yield lambda: time.perf_counter() - start
+
+    return timer

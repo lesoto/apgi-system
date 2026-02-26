@@ -111,7 +111,9 @@ def check_build_environment() -> Dict[str, bool]:
     return checks
 
 
-def analyze_dependencies(file_path: str, exclude_modules: Optional[Set[str]] = None) -> Set[str]:
+def analyze_dependencies(
+    file_path: str, exclude_modules: Optional[Set[str]] = None
+) -> Dependencies:
     """Analyze dependencies from a Python file.
 
     Parameters
@@ -123,8 +125,8 @@ def analyze_dependencies(file_path: str, exclude_modules: Optional[Set[str]] = N
 
     Returns
     -------
-    Set[str]
-        Set of top-level module dependencies
+    Dependencies
+        Dictionary with categorized dependencies
     """
     if exclude_modules is None:
         exclude_modules = set()
@@ -154,52 +156,123 @@ def analyze_dependencies(file_path: str, exclude_modules: Optional[Set[str]] = N
                         dependencies.add(module)
 
     except (SyntaxError, FileNotFoundError, UnicodeDecodeError):
-        # Return empty set on any parsing error
-        pass
+        # Return empty dependencies on any parsing error
+        dependencies = set()
 
-    return dependencies
+    # Categorize dependencies
+    requirements_txt_deps = set()
+    pyproject_toml_deps = set()
+
+    # Common dependencies that are typically in requirements.txt
+    requirements_common = {"numpy", "scipy", "matplotlib", "pandas", "sklearn", "networkx"}
+    # Dependencies that might be in pyproject.toml
+    pyproject_common = {
+        "torch",
+        "jax",
+        "fastapi",
+        "uvicorn",
+        "pydantic",
+        "sqlalchemy",
+        "redis",
+        "psycopg2-binary",
+    }
+
+    for dep in dependencies:
+        if dep in requirements_common:
+            requirements_txt_deps.add(dep)
+        elif dep in pyproject_common:
+            pyproject_toml_deps.add(dep)
+        else:
+            # Default to requirements.txt for unknown dependencies
+            requirements_txt_deps.add(dep)
+
+    return {
+        "requirements_txt": requirements_txt_deps,
+        "pyproject_toml": pyproject_toml_deps,
+        "total_dependencies": len(dependencies),
+    }
 
 
 def collect_resources(
-    project_path: str, patterns: Optional[List[str]] = None
-) -> List[tuple[str, str]]:
-    """Collect resources from a directory.
+    project_path: str, resource_dirs: Optional[List[str]] = None
+) -> Dict[str, List[str]]:
+    """Collect resources from specified directories.
 
     Parameters
     ----------
     project_path : str
-        Path to directory to collect from
-    patterns : List[str], optional
-        File patterns to include, e.g. ["*.yaml", "*.yml"]
+        Path to project root
+    resource_dirs : List[str], optional
+        List of directory names to collect from
 
     Returns
     -------
-    List[tuple[str, str]]
-        List of (source_path, dest_path) tuples
+    Dict[str, List[str]]
+        Dictionary with categorized resources
     """
-    from fnmatch import fnmatch
+    from pathlib import Path
 
     project_path_obj = Path(project_path)
-    resources: List[tuple[str, str]] = []
+    resources = {"config_files": [], "data_files": [], "resource_files": [], "icon_files": []}
 
     if not project_path_obj.exists() or not project_path_obj.is_dir():
         return resources
 
-    # Default patterns if none provided
-    if patterns is None:
-        patterns = ["*.yaml", "*.yml", "*.json", "*.png", "*.ico", "*.csv", "*.txt"]
+    # Default to common directories if none specified
+    if resource_dirs is None:
+        resource_dirs = ["config", "resources", "data", "icons"]
 
-    for pattern in patterns:
-        for file_path in project_path_obj.rglob("*"):
-            if file_path.is_file() and fnmatch(file_path.name, pattern):
-                try:
-                    # Make destination relative to project root
-                    rel_path = file_path.relative_to(project_path_obj)
-                    dest_path = str(rel_path)
-                    source_path = str(file_path)
-                    resources.append((source_path, dest_path))
-                except ValueError:
-                    continue
+    # Define file patterns for each category
+    config_patterns = ["*.yaml", "*.yml", "*.json", "*.toml", "*.ini"]
+    data_patterns = ["*.csv", "*.json", "*.txt", "*.dat"]
+    resource_patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.ico", "*.svg"]
+    icon_patterns = ["*.ico", "*.png", "*.icns"]
+
+    for dir_name in resource_dirs:
+        dir_path = project_path_obj / dir_name
+        if not dir_path.exists() or not dir_path.is_dir():
+            continue
+
+        # Collect config files
+        for pattern in config_patterns:
+            for file_path in dir_path.rglob(pattern):
+                if file_path.is_file():
+                    try:
+                        rel_path = file_path.relative_to(project_path_obj)
+                        resources["config_files"].append(str(rel_path))
+                    except ValueError:
+                        continue
+
+        # Collect data files
+        for pattern in data_patterns:
+            for file_path in dir_path.rglob(pattern):
+                if file_path.is_file():
+                    try:
+                        rel_path = file_path.relative_to(project_path_obj)
+                        resources["data_files"].append(str(rel_path))
+                    except ValueError:
+                        continue
+
+        # Collect resource files
+        for pattern in resource_patterns:
+            for file_path in dir_path.rglob(pattern):
+                if file_path.is_file():
+                    try:
+                        rel_path = file_path.relative_to(project_path_obj)
+                        resources["resource_files"].append(str(rel_path))
+                    except ValueError:
+                        continue
+
+        # Collect icon files specifically
+        if dir_name.lower() in ["icons", "resources"]:
+            for pattern in icon_patterns:
+                for file_path in dir_path.rglob(pattern):
+                    if file_path.is_file():
+                        try:
+                            rel_path = file_path.relative_to(project_path_obj)
+                            resources["icon_files"].append(str(rel_path))
+                        except ValueError:
+                            continue
 
     return resources
 
@@ -241,21 +314,21 @@ def get_version(project_path: Optional[str] = None) -> str:
     return "0.1.0"
 
 
-def detect_hidden_imports(package: str) -> List[str]:
-    """Detect hidden imports for a specific package.
+def get_hidden_imports(package: Optional[str] = None) -> List[str]:
+    """Get hidden imports for packaging.
 
     Parameters
     ----------
-    package : str
-        Package name to get hidden imports for
+    package : str, optional
+        Package name to get hidden imports for. If None, returns all hidden imports.
 
     Returns
     -------
     List[str]
-        List of hidden imports for the package
+        List of hidden imports
     """
     # Known hidden imports for common packages
-    hidden_imports_map = {
+    all_hidden_imports = {
         "scipy": [
             "scipy._lib.messagestream",
             "scipy.special._ufuncs_cxx",
@@ -292,11 +365,18 @@ def detect_hidden_imports(package: str) -> List[str]:
         ],
     }
 
-    return hidden_imports_map.get(package, [])
+    if package is None:
+        # Return all hidden imports as a flat list
+        all_imports = []
+        for imports in all_hidden_imports.values():
+            all_imports.extend(imports)
+        return all_imports
+    else:
+        return all_hidden_imports.get(package, [])
 
 
 # Alias for backward compatibility
-get_hidden_imports = detect_hidden_imports
+detect_hidden_imports = get_hidden_imports
 
 
 def should_exclude_module(module_name: str, custom_exclusions: Optional[Set[str]] = None) -> bool:
@@ -346,15 +426,15 @@ def should_exclude_module(module_name: str, custom_exclusions: Optional[Set[str]
     return any(excl in module_name.lower() for excl in exclusions)
 
 
-def get_excluded_modules() -> Set[str]:
+def get_excluded_modules() -> List[str]:
     """Get list of commonly excluded modules.
 
     Returns
     -------
-    Set[str]
-        Set of excluded modules
+    List[str]
+        List of excluded modules
     """
-    return {
+    return [
         "test",
         "tests",
         "pytest",
@@ -387,4 +467,4 @@ def get_excluded_modules() -> Set[str]:
         "urllib",
         "xml",
         "xmlrpc",
-    }
+    ]

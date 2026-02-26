@@ -323,3 +323,58 @@ class TestPrecisionWeighting:
         # Results should be close (allowing for smoothing effects)
         assert abs(result1["exteroceptive"] - result2["exteroceptive"]) < 0.5
         assert abs(result1["interoceptive"] - result2["interoceptive"]) < 0.5
+
+    def test_intero_only_update(self, simple_config: dict[str, Any]) -> None:
+        """Test updating only interoceptive precision without exteroceptive."""
+        precision = PrecisionWeighting(simple_config)
+
+        # Update only interoceptive variance
+        result = precision.update(intero_error_variance=2.0)
+
+        # Should update interoceptive precision
+        assert result["interoceptive"] > 0
+        assert result["interoceptive"] != precision.intero_baseline
+
+        # Exteroceptive should remain at baseline (with modulations applied)
+        assert result["exteroceptive"] > 0
+
+    def test_no_attention_target(self, simple_config: dict[str, Any]) -> None:
+        """Test update without attention target (neutral attention)."""
+        precision = PrecisionWeighting(simple_config)
+
+        # Update without attention target
+        result = precision.update(extero_error_variance=1.0, intero_error_variance=1.0)
+
+        # Attention gain should be neutral (1.0)
+        assert result["attention_gain"] == 1.0
+        assert precision.attention_focus is None
+
+    def test_task_demand_context(self, simple_config: dict[str, Any]) -> None:
+        """Test task demand context modulation."""
+        precision = PrecisionWeighting(simple_config)
+
+        # Low task demand
+        result_low = precision.update(
+            extero_error_variance=1.0, intero_error_variance=1.0, context={"task_demand": 0.0}
+        )
+
+        # Reset and test high task demand
+        precision = PrecisionWeighting(simple_config)
+        result_high = precision.update(
+            extero_error_variance=1.0, intero_error_variance=1.0, context={"task_demand": 0.8}
+        )
+
+        # High task demand should increase exteroceptive precision
+        assert result_high["exteroceptive"] > result_low["exteroceptive"]
+
+    def test_apply_attention_else_branch(self, simple_config: dict[str, Any]) -> None:
+        """Test the else branch in _apply_attention for neutral attention."""
+        precision = PrecisionWeighting(simple_config)
+
+        # Directly call _apply_attention with a value that triggers else branch
+        # This tests defensive programming even though it shouldn't happen in normal use
+        precision._apply_attention(None)
+
+        # Should set neutral attention gain
+        assert precision.attention_gain == 1.0
+        assert precision.attention_focus is None

@@ -1,13 +1,19 @@
-.PHONY: help install run test clean format lint
+.PHONY: help install run test test-unit test-property test-integration test-coverage coverage-report coverage-gaps clean format lint
 
 help:
 	@echo "APGI REST API - Available commands:"
-	@echo "  make install    - Install dependencies"
-	@echo "  make run        - Run the API server"
-	@echo "  make test       - Run tests"
-	@echo "  make clean      - Clean up generated files"
-	@echo "  make format     - Format code with black and isort"
-	@echo "  make lint       - Run linting checks"
+	@echo "  make install           - Install dependencies"
+	@echo "  make run               - Run the API server"
+	@echo "  make test              - Run all tests"
+	@echo "  make test-unit         - Run unit tests only"
+	@echo "  make test-property     - Run property-based tests only"
+	@echo "  make test-integration  - Run integration tests only"
+	@echo "  make test-coverage     - Run tests with coverage analysis"
+	@echo "  make coverage-report   - Generate and display coverage report"
+	@echo "  make coverage-gaps     - Analyze coverage gaps in detail"
+	@echo "  make clean             - Clean up generated files"
+	@echo "  make format            - Format code with black and isort"
+	@echo "  make lint              - Run linting checks"
 
 install:
 	pip install -r requirements.txt
@@ -18,17 +24,39 @@ run:
 test:
 	pytest tests/ -v
 
+test-unit:
+	pytest tests/unit/ -v -m unit
+
+test-property:
+	pytest tests/property/ -v -m property
+
+test-integration:
+	pytest tests/integration/ -v -m integration
+
+test-coverage:
+	python scripts/run_coverage.py
+
+coverage-report:
+	pytest tests/ -v --cov=apgi_system --cov=api --cov-report=html --cov-report=term-missing
+	@echo "\nHTML report: htmlcov/index.html"
+
+coverage-gaps:
+	python scripts/analyze_gaps.py
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	find . -type d -name "htmlcov" -exec rm -rf {} +
 	find . -type f -name ".coverage" -delete
+	find . -type f -name "coverage.json" -delete
+	find . -type f -name "coverage.xml" -delete
+	find . -type f -name "coverage_gap_analysis.json" -delete
 
 format:
-	black api/
-	isort api/
+	black apgi_system/ api/ tests/
+	isort apgi_system/ api/ tests/
 
 lint:
-	flake8 api/
-	mypy api/
+	flake8 apgi_system/ api/ tests/
+	mypy apgi_system/ api/ --ignore-missing-imports

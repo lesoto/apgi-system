@@ -44,8 +44,10 @@ jobs:
         continue-on-error: true
 
       - name: Run pytest with coverage
+        env:
+          HYPOTHESIS_PROFILE: ci
         run: |
-          pytest tests/ -v --cov=apgi_system --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=80
+          pytest tests/ -v --cov=apgi_system --cov=api --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=100
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3

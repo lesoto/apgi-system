@@ -45,7 +45,7 @@ class TestsRunnerGUI(ScriptRunnerGUI):
         """Add a summary panel to display test results statistics."""
         # Create summary frame
         self.summary_frame = tk.LabelFrame(
-            self.control_frame, text="Test Results Summary", padx=10, pady=5  # type: ignore
+            self.control_frame, text="Test Results Summary", padx=10, pady=5
         )
         self.summary_frame.pack(fill=tk.X, pady=(10, 0))
 

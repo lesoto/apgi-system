@@ -67,12 +67,24 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --strict-markers --tb=short --cov=apgi_system --cov-report=term-missing --cov-report=html --cov-fail-under=90"
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=apgi_system",
+    "--cov=api",
+    "--cov-report=html:htmlcov",
+    "--cov-report=term-missing",
+    "--cov-report=json:coverage.json",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=100",
+]
 markers = [
     "unit: Unit tests for individual components",
     "property: Property-based tests using Hypothesis",
     "integration: Integration tests for subsystem interactions",
     "slow: Tests that take significant time to run",
+    "edge_case: Tests for edge cases and boundary conditions",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -80,12 +92,34 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
+source = ["apgi_system", "api"]
 omit = [
     "**/apgi_gui.py",
-    "**/Psychological_States_GUI.py", 
-    "**/Utils_GUI.py",
-    "**/Tests-GUI.py",
+    "**/*_GUI.py",
+    "**/tests/*",
+    "**/conftest.py",
+    "**/__pycache__/*",
+    "**/.*",
 ]
+branch = true
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.mypy]
 ignore_missing_imports = false

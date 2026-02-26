@@ -310,7 +310,13 @@ class TestResourceBundling:
             assert not file_path.startswith(
                 str(project_root)
             ), "File paths should be relative to project root"
-            assert file_path.startswith("config/"), "Config files should start with config/"
+            # Use os.path.normpath to handle different path separators
+            import os
+
+            normalized_path = os.path.normpath(file_path)
+            assert normalized_path.startswith("config" + os.sep) or normalized_path.startswith(
+                "config/"
+            ), f"Config files should start with config/, got {file_path}"
 
     @given(st.lists(st.sampled_from(["config", "resources"]), min_size=1, max_size=2, unique=True))
     @settings(max_examples=5)
