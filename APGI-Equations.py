@@ -29,6 +29,14 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Define module exports to prevent import issues
+__all__ = [
+    "EnhancedSurpriseIgnitionSystem",
+    "APGIParameters",
+    "PsychologicalState",
+    "StateCategory",
+]
+
 # Check for optional visualization packages
 try:
     import plotly.io as pio  # type: ignore
@@ -865,12 +873,52 @@ SOMATIC_MARKER_BASE = 1.0
 SOMATIC_MARKER_SCALE = 0.3
 
 
+# =============================================================================
+# STATE CATEGORIES (moved here to fix forward reference)
+# =============================================================================
+
+
+class StateCategory(Enum):
+    """Enhanced state categories with psychiatric associations"""
+
+    OPTIMAL_FUNCTIONING = ("#2E86AB", "Optimal Functioning", "Normal range")
+    POSITIVE_AFFECTIVE = ("#48BF84", "Positive Affective", "Elevated positive mood")
+    COGNITIVE_ATTENTIONAL = ("#FF9F1C", "Cognitive/Attentional", "Cognitive engagement")
+    AVERSIVE_AFFECTIVE = ("#E63946", "Aversive Affective", "Negative affective states")
+    PATHOLOGICAL_EXTREME = ("#7209B7", "Pathological/Extreme", "Clinical conditions")
+    ALTERED_BOUNDARY = ("#8338EC", "Altered/Boundary", "States with altered boundaries")
+    TRANSITIONAL_CONTEXTUAL = ("#06D6A0", "Transitional/Contextual", "Context-dependent states")
+    UNELABORATED = ("#8D99AE", "Unelaborated", "Poorly differentiated states")
+
+    def __init__(self, color: str, display_name: str, description: str):
+        self._color = color
+        self._display_name = display_name
+        self._description = description
+
+    @property
+    def color(self) -> str:
+        return self._color
+
+    @property
+    def display_name(self) -> str:
+        return self._display_name
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+
+# =============================================================================
+# PSYCHOLOGICAL STATE DEFINITIONS
+# =============================================================================
+
+
 @dataclass
 class PsychologicalState:
     """Enhanced state with Π vs Π̂ distinction for anxiety modeling"""
 
     name: str
-    category: "StateCategory"
+    category: "'StateCategory'"  # Forward reference as string
     description: str
     phenomenology: List[str]
 
@@ -993,31 +1041,7 @@ class PsychologicalState:
 # 3. COMPLETE 51 PSYCHOLOGICAL STATES IMPLEMENTATION
 # =============================================================================
 
-
-class StateCategory(Enum):
-    """Enhanced state categories with psychiatric associations"""
-
-    OPTIMAL_FUNCTIONING = ("#2E86AB", "Optimal Functioning", "Normal range")
-    POSITIVE_AFFECTIVE = ("#48BF84", "Positive Affective", "Positive valence")
-    COGNITIVE_ATTENTIONAL = (
-        "#FF9F1C",
-        "Cognitive/Attentional",
-        "Information processing",
-    )
-    AVERSIVE_AFFECTIVE = ("#E63946", "Aversive Affective", "Negative valence")
-    PATHOLOGICAL_EXTREME = ("#7209B7", "Pathological/Extreme", "Clinical range")
-    ALTERED_BOUNDARY = ("#8338EC", "Altered/Boundary", "Altered consciousness")
-    TRANSITIONAL_CONTEXTUAL = (
-        "#06D6A0",
-        "Transitional/Contextual",
-        "Context-dependent",
-    )
-    UNELABORATED = ("#8D99AE", "Unelaborated", "Requires specification")
-
-    def __init__(self, color: str, display_name: str, description: str) -> None:
-        self.color = color
-        self.display_name = display_name
-        self.description = description
+# NOTE: StateCategory class already defined above at line 880
 
 
 class APGIStateLibrary:

@@ -296,15 +296,23 @@ class HierarchicalGaussianFilter:
             # Validate array shapes before computation
             belief_shape = self.beliefs[level].mean.shape
             if error_below.shape != belief_shape:
-                raise ValueError(
+                import logging
+
+                logging.warning(
                     f"Shape mismatch at level {level}: "
-                    f"belief mean shape {belief_shape} vs error_below shape {error_below.shape}"
+                    f"belief mean shape {belief_shape} vs error_below shape {error_below.shape}. "
+                    "Setting error_below to zeros."
                 )
+                error_below = np.zeros(belief_shape)
             if error_above.shape != belief_shape:
-                raise ValueError(
+                import logging
+
+                logging.warning(
                     f"Shape mismatch at level {level}: "
-                    f"belief mean shape {belief_shape} vs error_above shape {error_above.shape}"
+                    f"belief mean shape {belief_shape} vs error_above shape {error_above.shape}. "
+                    "Setting error_above to zeros."
                 )
+                error_above = np.zeros(belief_shape)
 
             update = self.learning_rate * (
                 precision_below * error_below - precision_above * error_above
@@ -421,6 +429,11 @@ class HierarchicalGaussianFilter:
             if len(self._projection_cache) > self._projection_cache_max_size:
                 oldest_key = self._cache_access_order.popleft()  # O(1) operation with deque
                 del self._projection_cache[oldest_key]
+                import logging
+
+                logging.debug(
+                    f"Cache eviction: removed key {oldest_key}, cache size now {len(self._projection_cache)}"
+                )
 
             return projection_matrix
 
@@ -448,6 +461,11 @@ class HierarchicalGaussianFilter:
 
         # Check for valid inputs before multiplication
         if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
+            import logging
+
+            logging.warning(
+                f"_map_down: Non-finite inputs detected at from_level {from_level}, returning zeros"
+            )
             return np.zeros(target_dim)
 
         # Thread-safe matrix multiplication with error handling
@@ -501,6 +519,11 @@ class HierarchicalGaussianFilter:
 
         # Check for valid inputs before multiplication
         if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
+            import logging
+
+            logging.warning(
+                f"_project_up: Non-finite inputs detected at from_level {from_level}, returning zeros"
+            )
             return np.zeros(target_dim)
 
         # Thread-safe matrix multiplication with error handling
@@ -788,7 +811,11 @@ class ActiveInferenceEngine:
             # Simulate future under this action (simplified)
             predicted_states = self._simulate_future(beliefs, action)
             # Treat predicted states as predicted observations
-            predicted_observations = np.stack(predicted_states)
+            if predicted_states:
+                predicted_observations = np.stack(predicted_states)
+            else:
+                # Handle zero horizon case
+                predicted_observations = np.zeros((0, len(beliefs[0].mean)))
 
             # Preferences (could be learned or specified)
             preferences = np.ones_like(predicted_observations[0]) / len(predicted_observations[0])

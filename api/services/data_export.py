@@ -136,6 +136,10 @@ class DataExportService:
                 logger.warning(f"Variable '{var}' not found in history")
                 time_series[var] = []
 
+        # Validate downsample parameter
+        if downsample is not None and downsample <= 0:
+            raise ValueError(f"downsample must be a positive integer, got {downsample}")
+
         # Apply downsampling if requested
         if downsample and downsample > 1:
             times = times[::downsample]
@@ -146,7 +150,13 @@ class DataExportService:
         start_idx = 0
         if cursor:
             try:
-                cursor_data = json.loads(base64.b64decode(cursor))
+                import jwt
+                from api.config import settings
+
+                # Decode JWT cursor
+                cursor_data = jwt.decode(
+                    cursor, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+                )
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")

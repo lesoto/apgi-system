@@ -76,7 +76,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         # Verify token and attach user to request state
         try:
-            user_payload = self._verify_token(token)
+            user_payload = await self._verify_token(token)
 
             # Attach user information to request state
             request.state.user = user_payload
@@ -154,7 +154,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         return parts[1]
 
-    def _verify_token(self, token: str) -> TokenPayload:
+    async def _verify_token(self, token: str) -> TokenPayload:
         """
         Verify JWT token and extract payload.
 
@@ -172,6 +172,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         db = SessionLocal()
         try:
             auth_manager = AuthManager(db)
+
+            # Check if token is blacklisted before verification
+            if await auth_manager.is_token_blacklisted(token):
+                raise InvalidTokenError("Token has been revoked")
+
             payload = auth_manager.verify_token(token, expected_type="access")
             return payload
         finally:

@@ -6,11 +6,14 @@ Manages webhook registration, validation, delivery with retry logic and exponent
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
+import socket
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy.orm import Session as DBSession
@@ -68,6 +71,36 @@ class WebhookManager:
         )
         logger.info("WebhookManager initialized")
 
+    def _is_private_ip(self, ip: ipaddress.IPv4Address) -> bool:
+        """
+        Check if an IP address is private or blocked.
+
+        Args:
+            ip: IP address to check
+
+        Returns:
+            True if the IP is private or blocked, False otherwise
+        """
+        private_ranges = [
+            ipaddress.IPv4Network("10.0.0.0/8"),  # Private network
+            ipaddress.IPv4Network("172.16.0.0/12"),  # Private network
+            ipaddress.IPv4Network("192.168.0.0/16"),  # Private network
+            ipaddress.IPv4Network("127.0.0.0/8"),  # Loopback
+            ipaddress.IPv4Network("169.254.0.0/16"),  # Link-local
+            ipaddress.IPv4Network("0.0.0.0/8"),  # This host on this network
+        ]
+
+        # Check if IP is in any private range
+        for network in private_ranges:
+            if ip in network:
+                return True
+
+        # Block specific cloud metadata IPs
+        if ip == ipaddress.IPv4Address("169.254.169.254"):  # AWS metadata
+            return True
+
+        return False
+
     def _generate_webhook_signature(self, payload: Dict[str, Any]) -> str:
         """
         Generate HMAC signature for webhook payload.
@@ -122,6 +155,30 @@ class WebhookManager:
         # Check URL length
         if len(url) > 500:
             raise ValueError("Webhook URL exceeds maximum length of 500 characters")
+
+        # Parse URL to extract hostname
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+
+        if not hostname:
+            raise ValueError("Invalid URL: no hostname")
+
+        # Check if hostname is an IP address
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if self._is_private_ip(ip):
+                raise ValueError("Webhook URL points to private or blocked IP address")
+        except ValueError:
+            # Hostname is not an IP, resolve it
+            try:
+                resolved_ip = socket.gethostbyname(hostname)
+                ip = ipaddress.ip_address(resolved_ip)
+                if self._is_private_ip(ip):
+                    raise ValueError("Webhook URL resolves to private or blocked IP address")
+            except socket.gaierror as e:
+                raise ValueError(f"Cannot resolve hostname '{hostname}': {e}")
+            except ValueError as e:
+                raise ValueError(f"Resolved IP address is invalid: {e}")
 
         # Optionally perform a HEAD request to verify accessibility
         # (commented out to avoid blocking during validation)

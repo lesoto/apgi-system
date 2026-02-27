@@ -8,7 +8,8 @@ import logging
 from typing import Dict, Any, Optional
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.orm import Session as SessionLocal
 
 from api.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from api.models.schemas import (
@@ -21,8 +22,15 @@ from api.models.schemas import (
     SessionListResponse,
     SessionResponse,
 )
-from api.services.session_manager import SessionLifecycleState, SessionManager
-from api.database.connection import SessionLocal
+from api.services.authorization import (
+    require_permission,
+    Permission,
+    get_current_user,
+    Role,
+    has_any_role,
+    TokenPayload,
+)
+from api.services.session_manager import SessionManager, SessionLifecycleState
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +83,13 @@ def init_session_routes(redis_client: redis.Redis) -> None:
     response_model=SessionListResponse,
     summary="List sessions",
     description="Retrieve a list of simulation sessions, filtered by user permissions, with pagination",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def list_sessions(
     limit: int = 50,
     cursor: Optional[str] = None,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionListResponse:
     """
     List sessions.
@@ -99,8 +108,12 @@ async def list_sessions(
     # Validate limit
     limit = min(max(1, limit), 100)
 
-    # List all sessions (no user filtering)
-    result: Dict[str, Any] = await manager.list_sessions(user_id=None, limit=limit, cursor=cursor)
+    # Determine user_id for filtering: None for admins, user_id for regular users
+    user_id = None if has_any_role(current_user.roles, [Role.ADMIN]) else current_user.user_id
+
+    result: Dict[str, Any] = await manager.list_sessions(
+        user_id=user_id, limit=limit, cursor=cursor
+    )
 
     # Convert to response format
     sessions = [
@@ -127,6 +140,14 @@ async def list_sessions(
     return SessionListResponse(sessions=sessions, pagination=pagination)
 
 
+@router.post(
+    "",
+    response_model=SessionCreateResponse,
+    summary="Create session",
+    description="Create a new simulation session with specified configuration",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permission.SESSION_CREATE))],
+)
 async def create_session(
     request: SessionCreateRequest,
     manager: SessionManager = Depends(get_session_manager),
@@ -165,11 +186,12 @@ async def create_session(
     response_model=SessionResponse,
     summary="Get session details",
     description="Retrieve detailed information about a specific simulation session",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionResponse:
     """
     Get session details.
@@ -189,6 +211,12 @@ async def get_session(
     except ValueError:
         raise SessionNotFoundError(session_id)
 
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+
     return SessionResponse(
         session_id=session_id,
         status=sim_session.state.value,
@@ -204,11 +232,12 @@ async def get_session(
     response_model=SessionActionResponse,
     summary="Start simulation",
     description="Start or resume simulation for specified session",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
 async def start_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionActionResponse:
     """
     Start simulation.
@@ -216,6 +245,7 @@ async def start_session(
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         SessionActionResponse with updated status
@@ -227,6 +257,12 @@ async def start_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to control this session")
 
     try:
         result = await sim_session.start()
@@ -249,11 +285,12 @@ async def start_session(
     response_model=SessionActionResponse,
     summary="Pause simulation",
     description="Pause simulation while preserving current state",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
 async def pause_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionActionResponse:
     """
     Pause simulation.
@@ -261,6 +298,7 @@ async def pause_session(
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         SessionActionResponse with updated status
@@ -272,6 +310,12 @@ async def pause_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to control this session")
 
     try:
         result = await sim_session.pause()
@@ -294,11 +338,12 @@ async def pause_session(
     response_model=SessionActionResponse,
     summary="Stop simulation",
     description="Stop simulation for specified session",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
 async def stop_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionActionResponse:
     """
     Stop simulation.
@@ -306,6 +351,7 @@ async def stop_session(
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         SessionActionResponse with updated status
@@ -317,6 +363,12 @@ async def stop_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to control this session")
 
     result = await sim_session.stop()
 
@@ -335,11 +387,12 @@ async def stop_session(
     response_model=SessionActionResponse,
     summary="Reset simulation",
     description="Reset simulation to initial conditions",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
 )
 async def reset_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionActionResponse:
     """
     Reset simulation to initial state.
@@ -347,6 +400,7 @@ async def reset_session(
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         SessionActionResponse with updated status
@@ -358,6 +412,12 @@ async def reset_session(
         sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to control this session")
 
     result = await sim_session.reset()
 
@@ -376,11 +436,12 @@ async def reset_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete session",
     description="Delete session and clean up all associated resources",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.SESSION_DELETE))],
 )
 async def delete_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> None:
     """
     Delete session and clean up resources.
@@ -388,6 +449,7 @@ async def delete_session(
     Args:
         session_id: Unique session identifier
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         No content (204)
@@ -397,9 +459,15 @@ async def delete_session(
     """
     # Verify session exists in manager (this will raise if not found)
     try:
-        await manager.get_session(session_id)
+        sim_session = await manager.get_session(session_id)
     except ValueError:
         raise SessionNotFoundError(session_id)
+
+    # Check ownership
+    if sim_session.user_id != current_user.user_id and not has_any_role(
+        current_user.roles, [Role.ADMIN]
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this session")
 
     # Delete session
     await manager.delete_session(session_id)

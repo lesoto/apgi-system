@@ -92,9 +92,21 @@ ESSENTIAL_DIRS = {
     "views",
     "static",
     "public",  # Web assets
+    ".vscode",  # VS Code workspace settings
+    ".idea",  # PyCharm/IntelliJ settings
+    ".eclipse",  # Eclipse settings
+    ".netbeans",  # NetBeans settings
+    ".atom",  # Atom editor settings
+    ".sublime-project",  # Sublime Text project files
+    ".vim",  # Vim settings
+    ".emacs",  # Emacs settings
+    ".c9",  # Cloud9 settings
+    ".cloud9",  # Cloud9 settings
 }
 
 # Temporary and cache directories to remove
+# NOTE: Only includes directories that are clearly temporary or generated.
+# Essential directories like source code, documentation, tests, and IDE settings are preserved.
 TEMP_DIR_NAMES = {
     "__pycache__",
     "_pycache_",  # Alternative naming
@@ -144,10 +156,6 @@ TEMP_DIR_NAMES = {
     "wheel-house",
     ".platformio",
     ".pio",
-    ".vscode",
-    ".idea",
-    ".eclipse",
-    ".netbeans",
     ".DS_Store",
     "Thumbs.db",
     "desktop.ini",
@@ -238,17 +246,6 @@ TEMP_DIR_NAMES = {
     ".pnpm",
     "bower_components",
     "jspm_packages",
-    ".vscode",
-    ".idea",
-    ".eclipse",
-    ".netbeans",
-    ".atom",
-    ".sublime-*",
-    ".vim",
-    ".emacs",
-    ".emacs.d",
-    ".c9",
-    ".cloud9",
     "*.tmp",
     "*.temp",
     "*.bak",
@@ -348,6 +345,8 @@ TEMP_DIR_NAMES = {
 }
 
 # Temporary file patterns to remove
+# NOTE: Only includes patterns for truly temporary and generated files.
+# Essential files like documentation, media assets, and project files are preserved.
 TEMP_FILE_PATTERNS = [
     # Python compiled files
     "*.pyc",
@@ -442,17 +441,6 @@ TEMP_FILE_PATTERNS = [
     "*.stats.*",
     "*.lprof.*",
     "*.pstats.*",
-    # Database files
-    "*.s3db",
-    "*.sqlite-shm",
-    "*.sqlite-wal",
-    "*.db-shm",
-    "*.db-wal",
-    "*.s3db.*",
-    "*.sqlite-shm.*",
-    "*.sqlite-wal.*",
-    "*.db-shm.*",
-    "*.db-wal.*",
     # Python packaging files
     "*.egg-info",
     "*.egg",
@@ -467,33 +455,14 @@ TEMP_FILE_PATTERNS = [
     # Archive files (temporary only)
     "*.tgz",
     "*.tar.gz",
-    "*.zip",
-    "*.rar",
-    "*.7z",
     "*.tar",
     "*.tar.bz2",
     "*.tar.xz",
     "*.tgz.*",
     "*.tar.gz.*",
-    "*.zip.*",
-    "*.rar.*",
-    "*.7z.*",
     "*.tar.*",
     "*.tar.bz2.*",
     "*.tar.xz.*",
-    # Installation files
-    "*.deb",
-    "*.rpm",
-    "*.dmg",
-    "*.pkg",
-    "*.msi",
-    "*.exe",
-    "*.deb.*",
-    "*.rpm.*",
-    "*.dmg.*",
-    "*.pkg.*",
-    "*.msi.*",
-    "*.exe.*",
     # Development files
     "*.patch",
     "*.diff",
@@ -521,36 +490,6 @@ TEMP_FILE_PATTERNS = [
     "*.tests.*",
     "*.spec.*",
     "*.mock.*",
-    # Temporary media files
-    "*.svg",
-    "*.png",
-    "*.jpg",
-    "*.jpeg",
-    "*.gif",
-    "*.bmp",
-    "*.ico",
-    "*.svg.*",
-    "*.png.*",
-    "*.jpg.*",
-    "*.jpeg.*",
-    "*.gif.*",
-    "*.bmp.*",
-    "*.ico.*",
-    # Temporary document files
-    "*.pdf",
-    "*.doc",
-    "*.docx",
-    "*.xls",
-    "*.xlsx",
-    "*.ppt",
-    "*.pptx",
-    "*.pdf.*",
-    "*.doc.*",
-    "*.docx.*",
-    "*.xls.*",
-    "*.xlsx.*",
-    "*.ppt.*",
-    "*.pptx.*",
     # Additional temporary patterns
     "temp*",
     "tmp*",

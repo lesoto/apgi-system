@@ -27,6 +27,8 @@ from api.services.authorization import (
     require_permission,
     get_current_user,
     TokenPayload,
+    Role,
+    has_any_role,
 )
 from api.services.user_management import get_user_management_service
 
@@ -89,10 +91,10 @@ async def register_user(
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create user: {str(e)}",
+            detail="Failed to create user",
         )
 
 
@@ -132,10 +134,10 @@ async def create_default_user(
             message="Default user created successfully",
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create default user: {str(e)}",
+            detail="Failed to create default user",
         )
 
 
@@ -149,6 +151,7 @@ async def create_default_user(
 async def list_users(
     active_only: bool = True,
     db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """
     List all users.
@@ -156,11 +159,22 @@ async def list_users(
     Args:
         active_only: Only return active users
         db: Database session
-        user_service: User management service
+        current_user: Authenticated user
 
     Returns:
         List of UserResponse objects
+
+    Raises:
+        HTTPException: If unauthorized
     """
+    # Check if user can list inactive users
+    is_admin = has_any_role(current_user.roles, [Role.ADMIN])
+    if not active_only and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can list inactive users",
+        )
+
     user_service = get_user_management_service(db)
     users = user_service.list_users(active_only=active_only)
 
@@ -252,7 +266,7 @@ async def update_current_user_profile(
     user_id = current_user.user_id
 
     # Check permissions - users can update their own email, but only admins can change roles/active status
-    is_admin = Permission.USER_ADMIN in current_user.roles
+    is_admin = has_any_role(current_user.roles, [Role.ADMIN])
 
     try:
         user = user_service.update_user(
@@ -277,10 +291,10 @@ async def update_current_user_profile(
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update user: {str(e)}",
+            detail="Failed to update user",
         )
 
 
@@ -387,7 +401,7 @@ async def update_user(
     """
     user_service = get_user_management_service(db)
     # Check permissions (admin can update any user, users can only update themselves)
-    is_admin = Permission.USER_ADMIN in current_user.roles
+    is_admin = has_any_role(current_user.roles, [Role.ADMIN])
     is_own_user = current_user.user_id == user_id
 
     if not (is_admin or is_own_user):
@@ -418,10 +432,10 @@ async def update_user(
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update user: {str(e)}",
+            detail="Failed to update user",
         )
 
 
@@ -455,7 +469,7 @@ async def reset_user_password(
     """
     user_service = get_user_management_service(db)
     # Check permissions
-    is_admin = Permission.USER_ADMIN in current_user.roles
+    is_admin = has_any_role(current_user.roles, [Role.ADMIN])
     is_own_user = current_user.user_id == user_id
 
     if not (is_admin or is_own_user):
@@ -475,10 +489,10 @@ async def reset_user_password(
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reset password: {str(e)}",
+            detail="Failed to reset password",
         )
 
 
@@ -509,8 +523,8 @@ async def delete_user(
         deleted = user_service.delete_user(user_id)
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete user: {str(e)}",
+            detail="Failed to delete user",
         )

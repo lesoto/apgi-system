@@ -54,6 +54,7 @@ class RateLimiter:
             "session:read": (100, 60),
             "task:execute": (20, 60),
             "data:export": (10, 60),
+            "auth:login": (5, 900),  # 5 login attempts per 15 minutes
         }
 
         # Operation weights (how many "credits" each operation costs)
@@ -286,7 +287,7 @@ class RateLimiter:
         if result.retry_after is not None:
             headers["Retry-After"] = str(result.retry_after)
 
-            return headers
+        return headers
 
     async def get_rate_limit_status(
         self,

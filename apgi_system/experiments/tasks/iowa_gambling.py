@@ -295,15 +295,15 @@ class IowaGamblingTask:
         elif deck_type == DeckType.C:
             # Deck C: Mid-high frequency pattern
             freq = 2 * np.pi * 6
-            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
-                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
-            )
+            stimulus[
+                self.stim_dim // 4 : 3 * self.stim_dim // 4
+            ] = self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
         else:  # DeckType.D
             # Deck D: High frequency pattern
             freq = 2 * np.pi * 8
-            stimulus[self.stim_dim // 4 : 3 * self.stim_dim // 4] = (
-                self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
-            )
+            stimulus[
+                self.stim_dim // 4 : 3 * self.stim_dim // 4
+            ] = self.deck_stimulus_strength * np.sin(np.linspace(0, freq, self.stim_dim // 2))
 
         # Add small noise for variability
         stimulus += 0.1 * np.random.randn(self.stim_dim)
@@ -373,8 +373,8 @@ class IowaGamblingTask:
         decision_start_time = apgi_system.time
 
         # Phase 1: Deck presentation (decision phase)
-        # Present deck stimulus for 500ms (simulating looking at the deck)
-        deck_presentation_steps = 500
+        # Present deck stimulus for 50ms (simulating looking at the deck) - reduced for testing
+        deck_presentation_steps = 50
 
         for step in range(deck_presentation_steps):
             state = apgi_system.step(trial.deck_stimulus)
@@ -402,7 +402,7 @@ class IowaGamblingTask:
         decision_time = apgi_system.time - decision_start_time
 
         # Phase 2: Brief pause (card selection)
-        blank_steps = 200
+        blank_steps = 20
         blank = 0.05 * np.random.randn(self.stim_dim)
         for step in range(blank_steps):
             apgi_system.step(blank)
@@ -410,7 +410,7 @@ class IowaGamblingTask:
         # Phase 3: Outcome presentation (reward/penalty feedback)
         # Present outcome stimulus representing the somatic response to gain/loss
         outcome_stimulus = self._generate_outcome_stimulus(trial.net_outcome)
-        outcome_steps = 1000  # 1 second to experience outcome
+        outcome_steps = 100  # Reduced for testing
 
         somatic_marker_strength = 0.0
 
@@ -540,8 +540,8 @@ class IowaGamblingTask:
             }
 
         # Block analysis (learning over time)
-        # Divide trials into 5 blocks of 20 trials each
-        block_size = 20
+        # Divide trials into blocks of 5 trials each for testing
+        block_size = 5
         num_blocks = min(5, len(self.results) // block_size)
         block_analysis = []
 

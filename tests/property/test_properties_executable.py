@@ -208,6 +208,11 @@ class TestGUIFunctionalityProperties:
 
             gui = APGIGui(root)
 
+            # Manually trigger the tkinter variable conversion
+            # This normally happens after a 200ms delay via root.after()
+            gui._convert_to_tkinter_variables()
+            root.update_idletasks()
+
             # Test control buttons exist and are in correct initial state
             assert (
                 str(gui.start_btn["state"]) == "normal"
@@ -227,6 +232,10 @@ class TestGUIFunctionalityProperties:
 
             # Test that parameter variables have valid initial values
             for key, var in gui.param_vars.items():
+                # After conversion, all vars should be tkinter Variables
+                assert hasattr(
+                    var, "get"
+                ), f"Parameter {key} should be a tkinter Variable with get() method"
                 value = var.get()
                 assert isinstance(value, (int, float)), f"Parameter {key} should have numeric value"
                 assert not (
@@ -283,6 +292,11 @@ class TestGUIFunctionalityProperties:
             from apgi_gui import APGIGui
 
             gui = APGIGui(root)
+
+            # Manually trigger the tkinter variable conversion
+            # This normally happens after a 200ms delay via root.after()
+            gui._convert_to_tkinter_variables()
+            root.update_idletasks()
 
             # Set parameter values
             if "baseline_threshold" in gui.param_vars:

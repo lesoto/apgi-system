@@ -31,13 +31,15 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
         Args:
             app: FastAPI application
-            redis_client: Redis client for rate limiting (optional, uses in-memory if None)
+            redis_client: Redis client for rate limiting (optional)
             enabled: Whether rate limiting is enabled
         """
         super().__init__(app)
         self.redis_client = redis_client
         self.enabled = enabled
         self.rate_limiter = RateLimiter(redis_client)
+        # Fallback in-memory rate limiter for when Redis is unavailable
+        self.fallback_rate_limiter = RateLimiter(redis_client=None)  # In-memory
 
     def set_redis_client(self, redis_client: redis.Redis):
         """
@@ -53,7 +55,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         """
         Extract client identifier from request.
 
-        Uses authenticated user ID if available, otherwise falls back to IP address.
+        Uses authenticated user ID if available, otherwise falls back to IP address
+        from X-Forwarded-For header or client host.
 
         Args:
             request: HTTP request
@@ -65,9 +68,40 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         if hasattr(request.state, "user") and request.state.user:
             return f"user:{request.state.user.user_id}"
 
-        # Fall back to IP address
-        client_ip = request.client.host if request.client else "unknown"
+        # Fall back to IP address, checking proxy headers first
+        client_ip = self._get_client_ip(request)
         return f"ip:{client_ip}"
+
+    def _get_client_ip(self, request: Request) -> str:
+        """
+        Get the real client IP address, checking proxy headers.
+
+        Checks X-Forwarded-For header first (taking the first IP in the chain),
+        then falls back to X-Real-IP, then request.client.host.
+
+        Args:
+            request: HTTP request
+
+        Returns:
+            Client IP address string
+        """
+        # Check X-Forwarded-For header (most common proxy header)
+        x_forwarded_for = request.headers.get("X-Forwarded-For")
+        if x_forwarded_for:
+            # X-Forwarded-For can contain multiple IPs separated by commas
+            # The first IP is the original client IP
+            first_ip = x_forwarded_for.split(",")[0].strip()
+            if first_ip:
+                return first_ip
+
+        # Check X-Real-IP header (used by some proxies)
+        x_real_ip = request.headers.get("X-Real-IP")
+        if x_real_ip:
+            return x_real_ip.strip()
+
+        # Fall back to request.client.host
+        client_ip = request.client.host if request.client else "unknown"
+        return client_ip
 
     def _get_endpoint_identifier(self, request: Request) -> str:
         """
@@ -97,6 +131,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             return "data:export"
         elif path.startswith("/v1/tasks"):
             return "task:execute"
+        elif path == "/v1/auth/login" and method == "POST":
+            return "auth:login"
         else:
             return "global"
 
@@ -212,15 +248,60 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
-            # Log error but don't block request if rate limiting fails
+            # Log error but try fallback in-memory rate limiting
             logger.error(
                 "Rate limiting error", error=str(e), client_id=client_id, endpoint=endpoint
             )
 
-            # Continue without rate limiting but still add default headers
-            response = await call_next(request)
-            response.headers["X-RateLimit-Limit"] = "60"
-            response.headers["X-RateLimit-Remaining"] = "60"
-            response.headers["X-RateLimit-Reset"] = str(int(datetime.utcnow().timestamp()) + 60)
+            # Try in-memory fallback rate limiting
+            try:
+                result = self.fallback_rate_limiter.check_rate_limit(
+                    client_id=client_id, endpoint=endpoint
+                )
 
-            return response
+                # Get rate limit headers
+                rate_limit_headers = self.fallback_rate_limiter.get_rate_limit_headers(result)
+
+                if not result.allowed:
+                    # Rate limit exceeded even with fallback
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": {
+                                "code": "RATE_LIMIT_EXCEEDED",
+                                "message": "Too many requests. Please try again later.",
+                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                                "details": {
+                                    "limit": result.limit,
+                                    "retry_after": result.retry_after,
+                                    "reset_at": result.reset_at.isoformat() + "Z",
+                                },
+                            }
+                        },
+                        headers=rate_limit_headers,
+                    )
+
+                # Process request with fallback rate limiting
+                response = await call_next(request)
+
+                # Add rate limit headers to response
+                for header_name, header_value in rate_limit_headers.items():
+                    response.headers[header_name] = header_value
+
+                return response
+
+            except Exception as fallback_e:
+                # If even fallback fails, allow request with restrictive headers
+                logger.error(
+                    "Fallback rate limiting error",
+                    error=str(fallback_e),
+                    client_id=client_id,
+                    endpoint=endpoint,
+                )
+                response = await call_next(request)
+                # Set very restrictive headers when rate limiting is completely unavailable
+                response.headers["X-RateLimit-Limit"] = "1"
+                response.headers["X-RateLimit-Remaining"] = "0"
+                response.headers["X-RateLimit-Reset"] = str(int(datetime.utcnow().timestamp()) + 60)
+
+                return response

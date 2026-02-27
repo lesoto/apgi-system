@@ -130,7 +130,6 @@ class UserManagementService:
 
         # Create user
         user = User(
-            user_id=secrets.token_urlsafe(16),
             username=username,
             email=email or f"{username}@apgi.local",
             password_hash=password_hash,
@@ -285,8 +284,6 @@ class UserManagementService:
         """
         stmt = select(User)
         if active_only:
-            stmt = stmt.where(User.is_active.is_(True))
-        else:
             stmt = stmt.where(User.is_active.is_(True))
 
         stmt = stmt.order_by(User.created_at.desc())

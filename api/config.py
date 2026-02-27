@@ -30,7 +30,7 @@ class Settings:
         # Server Settings
         self.host: str = "0.0.0.0"
         self.port: int = 8000
-        self.reload: bool = True
+        self.reload: bool = os.getenv("UVICORN_RELOAD", "true").lower() == "true"
 
         # HTTPS/TLS Settings
         self.https_enabled: bool = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
@@ -38,7 +38,9 @@ class Settings:
         self.ssl_certfile: Optional[str] = os.getenv("SSL_CERTFILE")
 
         # Database Settings
-        self.database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost/apgi_api")
+        self.database_url: str = os.getenv(
+            "DATABASE_URL", "postgresql://localhost/apgi_api?sslmode=require"
+        )
 
         # Redis Settings
         self.redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -52,7 +54,7 @@ class Settings:
         # Authentication Settings
         self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.environment: str = os.getenv("ENVIRONMENT", "development")
-        self.jwt_algorithm: str = "HS256"
+        self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
         self.jwt_access_token_expire_minutes: int = 30
         self.jwt_refresh_token_expire_days: int = 7
 
@@ -133,6 +135,7 @@ class Settings:
         # Check for known insecure default values
         insecure_defaults = [
             "your-secret-key-change-in-production",
+            "your-secret-key-change-in-production-min-32-chars",
             "secret",
             "default-secret",
             "change-me",

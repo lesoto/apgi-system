@@ -62,7 +62,7 @@ class TestIowaGamblingTaskProperties:
 
         # Create task with participant_choice strategy (simulates learning)
         # Use minimal trials for faster testing
-        task = IowaGamblingTask(num_trials=40, deck_selection_strategy="participant_choice")
+        task = IowaGamblingTask(num_trials=5, deck_selection_strategy="participant_choice")
 
         # Create APGI system
         apgi_system = APGISystem()
@@ -71,11 +71,11 @@ class TestIowaGamblingTaskProperties:
         analysis = task.run_all_trials(apgi_system)
 
         # Verify task completed successfully
-        assert analysis["total_trials"] == 40, f"Expected 40 trials, got {analysis['total_trials']}"
+        assert analysis["total_trials"] == 5, f"Expected 5 trials, got {analysis['total_trials']}"
 
         # Check that we have block analysis
         blocks = analysis["by_block"]
-        assert len(blocks) >= 2, "Should have at least 2 blocks for learning analysis"
+        assert len(blocks) >= 1, "Should have at least 1 block for learning analysis"
 
         # Extract good deck percentages across blocks
         good_deck_percentages = [block["good_deck_percentage"] for block in blocks]

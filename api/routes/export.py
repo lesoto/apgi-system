@@ -6,14 +6,15 @@ API endpoints for exporting simulation data, summary statistics, and event analy
 
 import io
 import logging
-from typing import Optional
+import re
+from typing import Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from api.models.schemas import ErrorResponse, SummaryStatistics
+from api.services.authorization import require_permission, Permission
 from api.services.data_export import DataExportService
-from api.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def get_data_export_service() -> DataExportService:
     Returns:
         DataExportService instance
     """
-    global _data_export_service  # type: ignore # noqa: F824
+    global _data_export_service
     if _data_export_service is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -49,14 +50,14 @@ def get_data_export_service() -> DataExportService:
     return _data_export_service
 
 
-def init_export_routes(session_manager: SessionManager):
+def init_export_routes(session_manager: Any) -> None:
     """
     Initialize export routes with session manager.
 
     Args:
         session_manager: SessionManager instance
     """
-    global _data_export_service  # type: ignore # noqa: F824
+    global _data_export_service
     _data_export_service = DataExportService(session_manager)
     logger.info("Export routes initialized")
 
@@ -65,7 +66,7 @@ def init_export_routes(session_manager: SessionManager):
     "/{session_id}/export",
     summary="Export simulation data",
     description="Export complete simulation history in JSON or CSV format with optional filtering",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.DATA_EXPORT))],
 )
 async def export_session_data(
     session_id: str,
@@ -76,7 +77,7 @@ async def export_session_data(
     start_time: Optional[float] = Query(None, description="Start time for export (ms)"),
     end_time: Optional[float] = Query(None, description="End time for export (ms)"),
     service: DataExportService = Depends(get_data_export_service),
-):
+) -> StreamingResponse:
     """
     Export simulation data.
 
@@ -114,13 +115,14 @@ async def export_session_data(
 
         # Determine filename
         extension = "json" if format.lower() == "json" else "csv"
-        filename = f"session_{session_id}_export.{extension}"
+        safe_session_id = re.sub(r"[^a-zA-Z0-9_-]", "", session_id)
+        filename = f"session_{safe_session_id}_export.{extension}"
 
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(data_bytes),
             media_type=content_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     except ValueError as e:
@@ -139,12 +141,12 @@ async def export_session_data(
     response_model=SummaryStatistics,
     summary="Get summary statistics",
     description="Retrieve computed summary statistics for simulation session",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_summary_statistics(
     session_id: str,
     service: DataExportService = Depends(get_data_export_service),
-):
+) -> SummaryStatistics:
     """
     Get summary statistics.
 
@@ -178,7 +180,7 @@ async def get_summary_statistics(
         logger.error(f"Failed to generate summary for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate summary statistics: {str(e)}",
+            detail="Failed to generate summary statistics",
         )
 
 
@@ -186,7 +188,7 @@ async def get_summary_statistics(
     "/{session_id}/timeseries",
     summary="Get time series data",
     description="Retrieve timestamped sequences for specified variables with optional downsampling and pagination",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_time_series_data(
     session_id: str,
@@ -201,7 +203,7 @@ async def get_time_series_data(
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     service: DataExportService = Depends(get_data_export_service),
-):
+) -> dict:
     """
     Get time series data.
 
@@ -253,7 +255,7 @@ async def get_time_series_data(
         logger.error(f"Failed to get time series for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get time series data: {str(e)}",
+            detail="Failed to get time series data",
         )
 
 
@@ -261,13 +263,13 @@ async def get_time_series_data(
     "/{session_id}/events",
     summary="Get event analysis",
     description="Retrieve aggregated statistics for ignition events including duration distribution and trigger patterns",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_event_analysis(
     session_id: str,
     event_type: str = Query("ignition", description="Type of event to analyze"),
     service: DataExportService = Depends(get_data_export_service),
-):
+) -> dict:
     """
     Get event analysis.
 
@@ -301,5 +303,5 @@ async def get_event_analysis(
         logger.error(f"Failed to analyze events for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to analyze events: {str(e)}",
+            detail="Failed to analyze events",
         )

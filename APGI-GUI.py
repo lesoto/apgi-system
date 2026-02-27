@@ -75,7 +75,7 @@ class APGIGui:
         self.root.minsize(1000, 700)  # Set minimum window size
 
         # Register WM_DELETE_WINDOW protocol handler to properly shut down
-        self.root.protocol("WM_DELETE_WINDOW", self._exit_app)
+        self.root.protocol("WM_DELETE_WINDOW", self._confirm_exit)
 
         # Force window to be visible and bring to front
         self.root.deiconify()
@@ -512,6 +512,15 @@ class APGIGui:
         button_frame.pack(pady=10)
 
         def apply_buffer_size() -> None:
+            # Check if simulation is running
+            if self.is_running:
+                messagebox.showwarning(
+                    "Simulation Running",
+                    "Cannot change buffer size while simulation is running.\n\n"
+                    "Please stop the simulation first.",
+                )
+                return
+
             try:
                 new_size = int(self.buffer_size_var.get())
                 if self.min_buffer_size <= new_size <= self.max_buffer_size:
@@ -723,6 +732,21 @@ class APGIGui:
 
         # Create theme menu
         self._create_theme_menu()
+
+    def _confirm_exit(self) -> None:
+        """Confirm exit with user if simulation is running."""
+        if self.is_running:
+            result = messagebox.askyesno(
+                "Confirm Exit",
+                "A simulation is currently running.\n\n"
+                "Exiting will stop the simulation and unsaved data may be lost.\n\n"
+                "Do you want to exit anyway?",
+                icon="warning",
+            )
+            if not result:
+                return  # User cancelled exit
+
+        self._exit_app()
 
     def _exit_app(self) -> None:
         """Exit the application with proper cleanup."""
@@ -2035,6 +2059,22 @@ class APGIGui:
             title="Load Configuration", filetypes=[("YAML files", "*.yaml"), ("All files", "*.*")]
         )
         if filename:
+            config_path = Path(filename)
+
+            # Validate config_path against allowlist of directories
+            allowed_dirs = [Path.home(), Path.cwd()]
+            if not any(
+                config_path.parent == allowed_dir or config_path.parent.is_relative_to(allowed_dir)
+                for allowed_dir in allowed_dirs
+            ):
+                messagebox.showerror(
+                    "Security Error",
+                    "Configuration files can only be loaded from allowed directories:\n\n"
+                    f"- {Path.home()}\n- {Path.cwd()}\n\n"
+                    "Please select a file from one of these locations.",
+                )
+                return
+
             try:
                 with open(filename, "r") as f:
                     yaml.safe_load(f)
@@ -2049,7 +2089,7 @@ class APGIGui:
                     )
                     return
 
-                self.config_path = Path(filename)
+                self.config_path = config_path
                 self._initialize_system()
                 self._log_event(f"Configuration loaded: {filename}")
                 messagebox.showinfo("Success", "Configuration loaded successfully")
@@ -2346,6 +2386,14 @@ class APGIGui:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         data_dir = get_data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check if directory is writable
+        import os
+
+        if not os.access(data_dir, os.W_OK):
+            self._log_event("Auto-save failed: Data directory not writable")
+            return
+
         filename = data_dir / f"apgi_autosave_{timestamp}.json"
         try:
             with self.log_lock:
@@ -2418,7 +2466,7 @@ class APGIGui:
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         # Create main frame with scrollbar
         main_frame = ttk.Frame(dialog)
@@ -2518,7 +2566,7 @@ class APGIGui:
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         # Precision settings frame
         frame = ttk.Frame(dialog, padding="10")
@@ -2588,7 +2636,7 @@ class APGIGui:
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         # Threshold settings frame
         frame = ttk.Frame(dialog, padding="10")
@@ -4071,10 +4119,60 @@ class APGIGui:
         self._log_event("Manual ignition trigger activated")
 
     def _induce_stressor(self):
-        """Induce stressor event."""
-        if self.apgi_system:
-            self.apgi_system.allostasis.trigger_stressor(intensity=0.5)
-            self._log_event("Stressor induced (intensity: 0.5)")
+        """Induce stressor event with configurable intensity."""
+        if not self.apgi_system:
+            messagebox.showinfo("No System", "Please initialize the system first.")
+            return
+
+        # Create dialog for intensity selection
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Induce Stressor")
+        dialog.geometry("350x200")
+        dialog.resizable(False, False)
+
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Select Stressor Intensity:", font=("Arial", 12, "bold")).pack(
+            pady=20
+        )
+
+        # Intensity slider
+        intensity_var = tk.DoubleVar(value=0.5)
+        intensity_frame = ttk.Frame(dialog)
+        intensity_frame.pack(pady=10)
+
+        ttk.Label(intensity_frame, text="Intensity:").pack(side=tk.LEFT)
+        intensity_scale = ttk.Scale(
+            intensity_frame,
+            from_=0.1,
+            to=2.0,
+            variable=intensity_var,
+            orient=tk.HORIZONTAL,
+            length=200,
+        )
+        intensity_scale.pack(side=tk.LEFT, padx=10)
+
+        intensity_label = ttk.Label(intensity_frame, text="0.50")
+        intensity_label.pack(side=tk.LEFT)
+        intensity_var.trace(
+            "w", lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}")
+        )
+
+        def apply_stressor():
+            intensity = intensity_var.get()
+            self.apgi_system.allostasis.trigger_stressor(intensity=intensity)
+            self._log_event(f"Stressor induced (intensity: {intensity:.2f})")
+            messagebox.showinfo("Success", f"Stressor induced with intensity {intensity:.2f}")
+            dialog.destroy()
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="Apply", command=apply_stressor).pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=10)
 
     def _modulate_precision(self):
         """Open precision modulation dialog."""
@@ -4127,7 +4225,7 @@ class APGIGui:
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -4296,7 +4394,7 @@ class APGIGui:
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -4535,7 +4633,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
         # Make dialog modal
         dialog.transient(self.root)
-        dialog.grab_set()
+        # dialog.grab_set()  # Removed to prevent blocking simulation updates
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -4583,7 +4681,9 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                     trend_direction = (
                         "increasing"
                         if slope > 0.001
-                        else "decreasing" if slope < -0.001 else "stable"
+                        else "decreasing"
+                        if slope < -0.001
+                        else "stable"
                     )
                 else:
                     trend_direction = "insufficient data"
@@ -4977,7 +5077,11 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                         significance = (
                             "***"
                             if p_val < 0.001
-                            else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
+                            else "**"
+                            if p_val < 0.01
+                            else "*"
+                            if p_val < 0.05
+                            else ""
                         )
                         text_widget.insert(
                             tk.END, f"  {var2}: r={corr:.3f} {significance} (p={p_val:.3f})\n"
@@ -5016,9 +5120,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
             except Exception as e:
                 text_widget.insert(tk.END, f"Analysis failed: {str(e)}\n")
-                import traceback
-
-                text_widget.insert(tk.END, traceback.format_exc())
+                # Removed traceback exposure for security
 
         # Button frame
         button_frame = ttk.Frame(dialog)
@@ -5200,8 +5302,76 @@ For more information, visit: https://github.com/lesoto/apgi-system
             pass
 
     def _show_help(self) -> None:
-        """Show help dialog."""
-        self._show_docs()
+        """Show comprehensive help dialog."""
+        help_text = """APGI System Help
+
+GETTING STARTED
+---------------
+1. Load Configuration: File > Load Configuration (YAML file)
+2. Start Simulation: Click 'Start' or press F5
+3. Monitor: Watch the plots and status indicators
+4. Adjust Parameters: Use the sliders in the left panel
+5. Stop Simulation: Click 'Stop' or press F7
+
+KEYBOARD SHORTCUTS
+------------------
+File Operations:
+  Ctrl+N - New Session
+  Ctrl+O - Load Configuration
+  Ctrl+S - Save Configuration
+  Ctrl+E - Export Data
+  Ctrl+Q - Exit
+
+Simulation Control:
+  F5 - Start Simulation
+  F6 - Pause/Resume
+  F7 - Stop Simulation
+  F8 - Reset System
+
+View Operations:
+  Ctrl+P - Toggle Parameter Panel
+  Ctrl+L - Toggle Log Panel
+  Ctrl+0 - Fit to Window
+  Ctrl++/- - Zoom In/Out
+
+Navigation:
+  Tab - Navigate Between Controls
+  Ctrl+Tab - Cycle Through Tabs
+
+TOOLS
+-----
+- Trigger Ignition: Manually trigger ignition event
+- Induce Stressor: Apply stressor with configurable intensity
+- Modulate Precision: Adjust extero/intero precision
+- Inject Input: Add custom sensory input patterns
+
+ANALYSIS
+--------
+- Ignition Statistics: View detailed ignition data
+- Energy Budget Report: Monitor system energy usage
+- Somatic Marker Analysis: Examine learned associations
+- Self-Model Coherence: Check self-model integrity
+
+TROUBLESHOOTING
+---------------
+- If simulation won't start: Check configuration file
+- If plots are empty: Ensure simulation is running
+- If system unresponsive: Check log panel for errors
+- For detailed help: See APGI-System-README.md
+
+For more information, visit the documentation or contact support.
+"""
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("APGI System Help")
+        dialog.geometry("600x500")
+
+        text_widget = scrolledtext.ScrolledText(dialog, wrap=tk.WORD, font=("Arial", 10))
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text_widget.insert(1.0, help_text)
+        text_widget.config(state=tk.DISABLED)
+
+        ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
 
     def _toggle_parameter_panel(self) -> None:
         """Toggle parameter panel visibility."""
@@ -5233,13 +5403,13 @@ For more information, visit: https://github.com/lesoto/apgi-system
 
     def _handle_tab_navigation(self, event: tk.Event) -> Optional[str]:
         """Handle Tab key navigation."""
-        # Let tkinter handle default tab navigation
-        return None
+        # Allow default Tkinter tab navigation
+        return "break"
 
     def _handle_shift_tab_navigation(self, event: tk.Event) -> Optional[str]:
         """Handle Shift+Tab key navigation."""
-        # Let tkinter handle default shift+tab navigation
-        return None
+        # Allow default Tkinter shift+tab navigation
+        return "break"
 
     def _cycle_notebook_tabs(self, direction: int) -> None:
         """Cycle through notebook tabs."""

@@ -27,8 +27,15 @@ from api.models.schemas import (
     PredictionErrorsResponse,
     SomaticMarkersResponse,
 )
-from api.routes.sessions import get_session_manager
-from api.services.session_manager import SessionManager
+from api.services.authorization import (
+    require_permission,
+    Permission,
+    get_current_user,
+    TokenPayload,
+    has_any_role,
+    Role,
+)
+from api.services.session_manager import SessionManager, get_session_manager
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +56,13 @@ router = APIRouter(
     response_model=SystemStateResponse,
     summary="Get complete system state",
     description="Retrieve the complete current state of all APGI subsystems for the specified session",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_system_state(
     session_id: str,
     request: Request,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """
     Get complete system state.
@@ -81,6 +90,12 @@ async def get_system_state(
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
+
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
 
         # Get complete state
         state = await sim_session.get_state()
@@ -153,6 +168,7 @@ async def get_system_state(
     response_model=IgnitionHistoryResponse,
     summary="Get ignition event history",
     description="Retrieve historical ignition events with optional filtering and pagination",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_ignition_history(  # noqa: C901
     session_id: str,
@@ -167,6 +183,7 @@ async def get_ignition_history(  # noqa: C901
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """
     Get ignition event history.
@@ -190,14 +207,21 @@ async def get_ignition_history(  # noqa: C901
         HTTPException: If session not found or history cannot be retrieved
     """
     try:
-        # Warn about potentially expensive queries
+        # Enforce maximum limit to prevent excessive memory usage
         if limit and limit > 500:
-            logger.warning(
-                f"Expensive query requested for session {session_id}: limit={limit}. Consider using smaller limits or time filters."
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Limit exceeds maximum allowed value of 500. Use smaller limits or time filters to reduce data size.",
             )
 
         # Get session
         sim_session = await manager.get_session(session_id)
+
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
 
         # Get complete state to access history
         state = await sim_session.get_state()
@@ -206,6 +230,7 @@ async def get_ignition_history(  # noqa: C901
         # Extract ignition events from history
         times = history.get("time", [])
         ignitions = history.get("ignitions", [])
+        ignition_history = history.get("ignition", [])
 
         # Build event list
         events = []
@@ -217,15 +242,15 @@ async def get_ignition_history(  # noqa: C901
                 if end_time is not None and time_val > end_time:
                     continue
 
-                # Calculate ignition event details from state data
-                ignition_data = state.get("ignition", {})
+                # Use historical ignition data for this event
+                ignition_data = ignition_history[i] if i < len(ignition_history) else {}
                 total_signal = ignition_data.get("total_signal", 0.0)
                 threshold = ignition_data.get("threshold", 2.0)
 
                 # Estimate duration based on signal decay (simplified calculation)
                 duration_ms = min(500.0, max(100.0, total_signal * 100))
 
-                # Use actual signal and threshold values
+                # Use historical signal and threshold values
                 events.append(
                     IgnitionEvent(
                         time_ms=time_val,
@@ -240,10 +265,13 @@ async def get_ignition_history(  # noqa: C901
         start_idx = 0
         if cursor:
             try:
-                import base64
-                import json
+                import jwt
+                from api.config import settings
 
-                cursor_data = json.loads(base64.b64decode(cursor))
+                # Decode JWT cursor
+                cursor_data = jwt.decode(
+                    cursor, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+                )
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")
@@ -256,11 +284,13 @@ async def get_ignition_history(  # noqa: C901
         # Generate next cursor
         next_cursor = None
         if has_more:
-            import base64
-            import json
+            import jwt
+            from api.config import settings
 
             cursor_data = {"offset": end_idx}
-            next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
+            next_cursor = jwt.encode(
+                cursor_data, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+            )
 
         response = IgnitionHistoryResponse(
             events=paginated_events,
@@ -283,7 +313,7 @@ async def get_ignition_history(  # noqa: C901
         logger.error(f"Failed to get ignition history for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get ignition history: {str(e)}",
+            detail="Failed to get ignition history",
         )
 
 
@@ -292,9 +322,13 @@ async def get_ignition_history(  # noqa: C901
     response_model=BodyState,
     summary="Get interoceptive body state",
     description="Retrieve current interoceptive state including physiological parameters",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_interoceptive_state(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
+    session_id: str,
+    request: Request,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """
     Get interoceptive body state.
@@ -319,6 +353,12 @@ async def get_interoceptive_state(
         # Get session
         sim_session = await manager.get_session(session_id)
 
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
+
         # Get complete state
         state = await sim_session.get_state()
         body_data = state.get("body", {})
@@ -341,7 +381,7 @@ async def get_interoceptive_state(
         logger.error(f"Failed to get interoceptive state for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get interoceptive state: {str(e)}",
+            detail="Failed to get interoceptive state",
         )
 
 
@@ -350,9 +390,13 @@ async def get_interoceptive_state(
     response_model=PredictionErrorsResponse,
     summary="Get prediction errors",
     description="Retrieve hierarchical prediction errors from all levels of the predictive processing hierarchy",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_prediction_errors(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
+    session_id: str,
+    request: Request,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """
     Get prediction errors.
@@ -374,6 +418,12 @@ async def get_prediction_errors(
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
+
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
 
         # Get complete state
         state = await sim_session.get_state()
@@ -400,7 +450,7 @@ async def get_prediction_errors(
         logger.error(f"Failed to get prediction errors for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get prediction errors: {str(e)}",
+            detail="Failed to get prediction errors",
         )
 
 
@@ -409,10 +459,14 @@ async def get_prediction_errors(
     response_model=SomaticMarkersResponse,
     summary="Get somatic markers",
     description="Retrieve stored somatic markers (context-action-outcome associations)",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def get_somatic_markers(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
-):
+    session_id: str,
+    request: Request,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SomaticMarkersResponse:
     """
     Get somatic markers.
 
@@ -433,6 +487,12 @@ async def get_somatic_markers(
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
+
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
 
         # Get complete state
         state = await sim_session.get_state()
@@ -463,5 +523,5 @@ async def get_somatic_markers(
         logger.error(f"Failed to get somatic markers for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get somatic markers: {str(e)}",
+            detail="Failed to get somatic markers",
         )

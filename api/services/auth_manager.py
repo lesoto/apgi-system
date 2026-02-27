@@ -4,6 +4,7 @@ Authentication Manager Service
 Handles JWT token creation/verification and password hashing for user authentication.
 """
 
+import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import bcrypt
 import jwt
+import redis.asyncio as redis
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -85,6 +87,13 @@ class AuthManager:
         self.access_token_expire_minutes = settings.jwt_access_token_expire_minutes
         self.refresh_token_expire_days = settings.jwt_refresh_token_expire_days
 
+        # Initialize Redis client for token blacklisting
+        try:
+            self.redis_client = redis.Redis.from_url(settings.redis_url)
+        except Exception as e:
+            logger.warning(f"Failed to connect to Redis for token blacklisting: {e}")
+            self.redis_client = None
+
     # ========================================================================
     # Password Hashing
     # ========================================================================
@@ -107,6 +116,19 @@ class AuthManager:
         salt = bcrypt.gensalt(rounds=12)
         hashed = bcrypt.hashpw(password_bytes, salt)
         return hashed.decode("utf-8")
+
+    @staticmethod
+    def create_lookup_hash(token: str) -> str:
+        """
+        Create a SHA-256 hash for deterministic token lookup.
+
+        Args:
+            token: Token string to hash
+
+        Returns:
+            SHA-256 hash string
+        """
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -246,7 +268,21 @@ class AuthManager:
 
         # Verify password
         if not self.verify_password(password, user.password_hash):  # type: ignore[arg-type]
+            # Failed login - track attempts
+            if self.redis_client:
+                failed_key = f"failed_login:{user.user_id}"
+                failed_count = self.redis_client.incr(failed_key)
+                self.redis_client.expire(failed_key, 3600)  # Expire in 1 hour
+                if failed_count >= 5:
+                    # Lock the account
+                    user.is_active = False  # type: ignore[assignment]
+                    self.db.commit()
             return None
+
+        # Successful login - reset failed attempts
+        if self.redis_client:
+            failed_key = f"failed_login:{user.user_id}"
+            self.redis_client.delete(failed_key)
 
         # Update last login
         try:
@@ -278,12 +314,16 @@ class AuthManager:
         )
 
         # Store refresh token in database
+        lookup_hash = self.create_lookup_hash(refresh_token)
         token_hash = self.hash_password(refresh_token)
         expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
 
         try:
             db_refresh_token = RefreshToken(
-                user_id=user.user_id, token_hash=token_hash, expires_at=expires_at
+                user_id=user.user_id,
+                lookup_hash=lookup_hash,
+                token_hash=token_hash,
+                expires_at=expires_at,
             )
             self.db.add(db_refresh_token)
             self.db.commit()
@@ -336,17 +376,17 @@ class AuthManager:
         # Verify refresh token
         payload = self.verify_token(refresh_token, expected_type="refresh")
 
-        # Hash the provided token to lookup the exact token in database
-        token_hash = self.hash_password(refresh_token)
+        # Create lookup hash to find the token in database
+        lookup_hash = self.create_lookup_hash(refresh_token)
 
-        # Look up the specific token by hash and user_id (not just first non-revoked)
+        # Look up the specific token by lookup_hash and user_id (not just first non-revoked)
         db_token = (
             self.db.query(RefreshToken)
             .filter(
                 and_(
                     RefreshToken.user_id == payload.user_id,
-                    RefreshToken.token_hash == token_hash,
-                    not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                    RefreshToken.lookup_hash == lookup_hash,
+                    RefreshToken.revoked.is_(False),
                 )
             )
             .first()
@@ -355,8 +395,8 @@ class AuthManager:
         if not db_token:
             raise AuthenticationError("Invalid or revoked refresh token")
 
-        # Use constant-time comparison for token verification
-        if not self.constant_time_compare(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
+        # Verify the token using bcrypt.checkpw
+        if not self.verify_password(refresh_token, db_token.token_hash):
             raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
@@ -416,17 +456,17 @@ class AuthManager:
             # Verify token to get user_id
             payload = self.verify_token(refresh_token, expected_type="refresh")
 
-            # Hash the provided token to lookup the exact token in database
-            token_hash = self.hash_password(refresh_token)
+            # Create lookup hash to find the token in database
+            lookup_hash = self.create_lookup_hash(refresh_token)
 
-            # Find and revoke the specific token by hash and user_id
+            # Find and revoke the specific token by lookup_hash and user_id
             db_token = (
                 self.db.query(RefreshToken)
                 .filter(
                     and_(
                         RefreshToken.user_id == payload.user_id,
-                        RefreshToken.token_hash == token_hash,
-                        not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                        RefreshToken.lookup_hash == lookup_hash,
+                        RefreshToken.revoked.is_(False),
                     )
                 )
                 .first()
@@ -434,13 +474,15 @@ class AuthManager:
 
             try:
                 if db_token:
-                    db_token.revoked = True  # type: ignore[assignment]
-                    self.db.commit()
-                    return True
+                    # Verify the token using bcrypt.checkpw before revoking
+                    if self.verify_password(refresh_token, db_token.token_hash):
+                        db_token.revoked = True  # type: ignore[assignment]
+                        self.db.commit()
+                        return True
                 return False
             except Exception as e:
                 self.db.rollback()
-                logger.error(f"Failed to revoke refresh token {token_hash}: {e}")
+                logger.error(f"Failed to revoke refresh token {lookup_hash}: {e}")
                 return False
 
         except (InvalidTokenError, ExpiredTokenError):
@@ -460,7 +502,7 @@ class AuthManager:
         try:
             tokens = (
                 self.db.query(RefreshToken)
-                .filter(and_(RefreshToken.user_id == user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
+                .filter(and_(RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False)))
                 .all()
             )
         except Exception as e:
@@ -480,3 +522,60 @@ class AuthManager:
             self.db.rollback()
             logger.error(f"Failed to revoke tokens for user {user_id}: {e}")
             raise
+
+    # ========================================================================
+    # Token Blacklisting
+    # ========================================================================
+
+    async def blacklist_access_token(self, token: str, expires_at: datetime) -> bool:
+        """
+        Add an access token to the blacklist.
+
+        Args:
+            token: The JWT access token to blacklist
+            expires_at: When the token expires (to set TTL)
+
+        Returns:
+            True if successfully blacklisted, False otherwise
+        """
+        if not self.redis_client:
+            logger.warning("Redis not available, cannot blacklist token")
+            return False
+
+        try:
+            # Calculate TTL in seconds from now until expiration
+            ttl_seconds = int((expires_at - datetime.utcnow()).total_seconds())
+            if ttl_seconds <= 0:
+                # Token already expired, no need to blacklist
+                return True
+
+            # Use token as key, value can be anything (e.g., "blacklisted")
+            key = f"blacklisted_token:{token}"
+            await self.redis_client.setex(key, ttl_seconds, "blacklisted")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to blacklist access token: {e}")
+            return False
+
+    async def is_token_blacklisted(self, token: str) -> bool:
+        """
+        Check if an access token is blacklisted.
+
+        Args:
+            token: The JWT access token to check
+
+        Returns:
+            True if blacklisted, False otherwise
+        """
+        if not self.redis_client:
+            # If Redis not available, assume not blacklisted
+            return False
+
+        try:
+            key = f"blacklisted_token:{token}"
+            result = await self.redis_client.exists(key)
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Failed to check token blacklist: {e}")
+            # On error, allow the token (fail-safe)
+            return False

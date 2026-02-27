@@ -4869,7 +4869,9 @@ class APGIGUI:
             color = (
                 battery_colors["high"]
                 if battery_level > 0.5
-                else battery_colors["medium"] if battery_level > 0.2 else battery_colors["low"]
+                else battery_colors["medium"]
+                if battery_level > 0.2
+                else battery_colors["low"]
             )
 
             self.battery_canvas.create_rectangle(
@@ -5175,7 +5177,9 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 60 <= val <= 80
-                                else "orange" if 50 <= val <= 90 else "red"
+                                else "orange"
+                                if 50 <= val <= 90
+                                else "red"
                             )
                         elif label == "HRV":
                             color = "green" if val > 50 else "orange" if val > 30 else "red"
@@ -5183,7 +5187,9 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 12 <= val <= 20
-                                else "orange" if 10 <= val <= 24 else "red"
+                                else "orange"
+                                if 10 <= val <= 24
+                                else "red"
                             )
                         else:  # EDA
                             color = "green" if val < 6 else "orange" if val < 8 else "red"
@@ -6307,7 +6313,9 @@ Energy Usage:
                                 trend_direction = (
                                     "Increasing"
                                     if trend > 0
-                                    else "Decreasing" if trend < 0 else "Stable"
+                                    else "Decreasing"
+                                    if trend < 0
+                                    else "Stable"
                                 )
                                 writer.writerow(["Energy Trend", trend_direction, "qualitative"])
 

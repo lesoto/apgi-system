@@ -462,9 +462,9 @@ class DynamicThreshold(nn.Module):
         self.register_buffer("theta_t", torch.tensor(theta_0))
         self.theta_t: torch.Tensor
         self.ignition_history: List[float] = []
-        self.threshold_history: List[float] = (
-            []
-        )  # Track threshold changes for adaptation measurement
+        self.threshold_history: List[
+            float
+        ] = []  # Track threshold changes for adaptation measurement
         self.last_dS_dt = 0.0
 
     def update(self, S_t: torch.Tensor, dt: float = 0.01) -> torch.Tensor:
@@ -1377,11 +1377,219 @@ class APGIAssistant:
             "ignition_history": [],
         }
 
-        # Flag to control automatic performance metric updates
-        self._auto_update_metrics = True
-
-        # Explanation templates
+        # Initialize explanation templates
         self.explanation_templates = self._initialize_explanation_templates()
+
+    def _prepare_model_input(
+        self,
+        user_input: str,
+        context: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> torch.Tensor:
+        """
+        Prepare model input from user text input.
+
+        Args:
+            user_input: User query text
+            context: Optional context information
+            metadata: Optional metadata
+
+        Returns:
+            Tensor input for the model
+        """
+        # Simple fallback: return a random tensor with correct dimensions
+        input_tensor = torch.randn(1, self.model.input_dim, dtype=torch.float32)
+        device = next(self.model.parameters()).device
+        input_tensor = input_tensor.to(device)
+        return input_tensor
+
+    def _update_state_history(self, state: Dict[str, Any]) -> None:
+        """
+        Update the state history and track cognitive transitions.
+
+        Args:
+            state: Current cognitive state dictionary
+        """
+        # Add to state history
+        self.state_history.append(state)
+
+        # Track transitions
+        if self.cognitive_state["current"] is not None:
+            if self.cognitive_state["current"] != state["primary"]:
+                self.cognitive_state["transitions"] += 1
+                self.cognitive_state["previous"] = self.cognitive_state["current"]
+                self.cognitive_state["current"] = state["primary"]
+
+                # Determine trend
+                if self.cognitive_state["previous"] in ["confused", "idle"] and state[
+                    "primary"
+                ] in ["focused", "alert"]:
+                    self.cognitive_state["trend"] = "improving"
+                elif state["primary"] in ["confused", "idle"] and self.cognitive_state[
+                    "previous"
+                ] in ["focused", "alert"]:
+                    self.cognitive_state["trend"] = "declining"
+                else:
+                    self.cognitive_state["trend"] = "stable"
+        else:
+            # First state
+            self.cognitive_state["current"] = state["primary"]
+            self.cognitive_state["trend"] = "stable"
+
+        # Track transition details
+        transition = {
+            "from": self.cognitive_state["previous"],
+            "to": state["primary"],
+            "timestamp": state["timestamp"],
+            "surprise": state["surprise"],
+            "ignition_probability": state["ignition_probability"],
+        }
+        self.transition_history.append(transition)
+
+        # Update performance metrics for state accuracy
+        state_name = state["primary"]
+        if state_name not in self.performance_metrics["state_accuracy"]:
+            self.performance_metrics["state_accuracy"][state_name] = 0
+        self.performance_metrics["state_accuracy"][state_name] += 1
+
+    def _update_performance_metrics(self, response_time: float) -> None:
+        """
+        Update performance metrics with new response time.
+
+        Args:
+            response_time: Time taken to generate response in seconds
+        """
+        # Update total queries
+        self.performance_metrics["total_queries"] += 1
+
+        # Update average response time
+        current_avg = self.performance_metrics["average_response_time"]
+        total_queries = self.performance_metrics["total_queries"]
+        self.performance_metrics["average_response_time"] = (
+            current_avg * (total_queries - 1) + response_time
+        ) / total_queries
+
+        # Track response time history (keep last 50)
+        if "response_times" not in self.performance_metrics:
+            self.performance_metrics["response_times"] = []
+
+        self.performance_metrics["response_times"].append(response_time)
+        if len(self.performance_metrics["response_times"]) > 50:
+            self.performance_metrics["response_times"].pop(0)
+
+    def _detect_state_transition(self, current_state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Detect and analyze state transitions.
+
+        Args:
+            current_state: Current cognitive state dictionary
+
+        Returns:
+            Dictionary with transition information
+        """
+        transition_info = {
+            "transition_occurred": False,
+            "from_state": None,
+            "to_state": None,
+            "transition_type": "none",
+            "confidence": 0.0,
+        }
+
+        if len(self.state_history) > 1:
+            previous_state = self.state_history[-2]
+            if previous_state.get("primary") != current_state.get("primary"):
+                transition_info["transition_occurred"] = True
+                transition_info["from_state"] = previous_state.get("primary")
+                transition_info["to_state"] = current_state.get("primary")
+
+                # Classify transition type
+                from_state = previous_state.get("primary", "idle")
+                to_state = current_state.get("primary", "idle")
+
+                if from_state in ["confused", "idle"] and to_state in ["focused", "alert"]:
+                    transition_info["transition_type"] = "improvement"
+                elif from_state in ["focused", "alert"] and to_state in ["confused", "idle"]:
+                    transition_info["transition_type"] = "decline"
+                else:
+                    transition_info["transition_type"] = "shift"
+
+                # Calculate confidence based on surprise and ignition values
+                surprise_diff = abs(
+                    current_state.get("surprise", 0) - previous_state.get("surprise", 0)
+                )
+                ignition_diff = abs(
+                    current_state.get("ignition_probability", 0)
+                    - previous_state.get("ignition_probability", 0)
+                )
+                transition_info["confidence"] = min(1.0, (surprise_diff + ignition_diff) / 2.0)
+
+        return transition_info
+
+    def _compute_attention_profile(self, model_output: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+        """
+        Compute attention profile from model output.
+
+        Args:
+            model_output: Model output dictionary
+
+        Returns:
+            Dictionary with attention profile information
+        """
+        # Extract relevant metrics from model output
+        surprise = float(model_output.get("surprise", torch.tensor(0.0)).item())
+        ignition_prob = float(model_output.get("ignition_probability", torch.tensor(0.0)).item())
+
+        # Compute attention metrics
+        attention_level = min(1.0, ignition_prob + (1.0 - surprise) * 0.5)
+        focus_stability = 1.0 - min(1.0, surprise * 2.0)
+        processing_load = min(1.0, surprise + ignition_prob)
+
+        # Determine attention state
+        if attention_level > 0.8 and focus_stability > 0.7:
+            attention_state = "highly_focused"
+        elif attention_level > 0.6:
+            attention_state = "focused"
+        elif attention_level > 0.4:
+            attention_state = "moderately_attentive"
+        else:
+            attention_state = "distracted"
+
+        return {
+            "attention_level": attention_level,
+            "focus_stability": focus_stability,
+            "processing_load": processing_load,
+            "attention_state": attention_state,
+            "cognitive_load": processing_load,
+        }
+
+    def _adapt_input_processing(self, user_input: str, cognitive_state: str) -> str:
+        """
+        Adapt input processing based on cognitive state.
+
+        Args:
+            user_input: Original user input
+            cognitive_state: Current cognitive state
+
+        Returns:
+            Adapted user input
+        """
+        # For different cognitive states, we might want to adjust the input
+        # This is a simple implementation - in practice, this could be more sophisticated
+        if cognitive_state == "confused":
+            # Add clarification request for confused state
+            return f"{user_input} (Please provide a clear explanation)"
+        elif cognitive_state == "focused":
+            # Keep input as-is for focused state
+            return user_input
+        elif cognitive_state == "alert":
+            # Add urgency for alert state
+            return f"{user_input} (Quick response needed)"
+        elif cognitive_state == "idle":
+            # Add engagement prompt for idle state
+            return f"{user_input} (Interesting question!)"
+        else:
+            # Default: no adaptation
+            return user_input
 
     def reset_energy_state(self) -> None:
         """Reset energy monitoring state for fresh demo runs"""
@@ -1557,10 +1765,12 @@ class APGIAssistant:
             "processing_metadata": {
                 "time_elapsed": response_time,
                 "state_transition": self._detect_state_transition(state),  # type: ignore
-                "processing_mode": state["processing_mode"],
+                "processing_mode": self.processing_modes.get(
+                    state.get("primary", "idle"), {"depth": 1}
+                ),
                 "attention_profile": self._compute_attention_profile(model_output),  # type: ignore
                 "oscillatory_profile": {
-                    **state["oscillatory_profile"],
+                    **state.get("oscillatory_profile", {}),
                     **power_spectrum_values,  # Include actual power spectrum values
                 },
             },
@@ -1690,7 +1900,7 @@ class APGIAssistant:
             cognitive_state = "idle"
 
         state = {
-            "cognitive_state": cognitive_state,
+            "primary": cognitive_state,
             "surprise": surprise,
             "ignition_probability": ignition_prob,
             "timestamp": time.time(),
@@ -1760,7 +1970,7 @@ class APGIAssistant:
         self, user_input: Any, state: Dict[str, Any], detail_level: str = "normal"
     ) -> str:
         """Generate explanation of reasoning process"""
-        cognitive_state = state.get("cognitive_state", "working")
+        cognitive_state = state.get("primary", state.get("cognitive_state", "working"))
         template = self.explanation_templates.get(cognitive_state, {}).get(
             detail_level, "Processing."
         )
@@ -1835,6 +2045,29 @@ class APGIAssistant:
             ),
             "energy_history_length": len(self.energy_history),
         }
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive performance metrics"""
+        metrics = self.performance_metrics.copy()
+
+        # Calculate additional derived metrics
+        if "response_times" in metrics and metrics["response_times"]:
+            metrics["average_response_time_calculated"] = sum(metrics["response_times"]) / len(
+                metrics["response_times"]
+            )
+            metrics["min_response_time"] = min(metrics["response_times"])
+            metrics["max_response_time"] = max(metrics["response_times"])
+
+        # Calculate state transition rate
+        if hasattr(self, "transition_history"):
+            total_transitions = len(
+                [t for t in self.transition_history if t.get("transition_occurred", False)]
+            )
+            metrics["state_transitions"] = total_transitions
+            if metrics["total_queries"] > 0:
+                metrics["transition_rate"] = total_transitions / metrics["total_queries"]
+
+        return metrics
 
 
 # ============================================================================
@@ -2220,12 +2453,14 @@ def _process_demo_queries(
         print(f"\nResponse: {response['answer'][:150]}...")
         print(f"State: {response['cognitive_state']['primary']}")
         print(f"Confidence: {response['confidence']['level']}")
-        print(f"Processing Mode: {response['cognitive_state']['processing_mode']}")
-        print(f"Surprise Level: {response['cognitive_state']['surprise_level']}")
+        print(f"Processing Mode: {response['processing_metadata']['processing_mode']}")
+        print(f"Surprise Level: {response['cognitive_state']['surprise']:.3f}")
 
-        osc = response["cognitive_state"]["oscillatory_profile"]
-        print(f"Dominant Frequency: {osc['dominant_frequency']}")
-        print(f"Coherence: {osc['coherence']:.3f}")
+        osc = response["processing_metadata"]["oscillatory_profile"]
+        if "dominant_frequency" in osc:
+            print(f"Dominant Frequency: {osc['dominant_frequency']}")
+        if "coherence" in osc:
+            print(f"Coherence: {osc['coherence']:.3f}")
 
         if "biofeedback_recommendations" in response:
             bio = response["biofeedback_recommendations"]
@@ -2246,23 +2481,26 @@ def _print_cognitive_report(assistant: Any) -> None:
         timeframe="session", include_trends=True, include_energy_stats=True
     )
 
-    print(f"\nStates analyzed: {report['states_analyzed']}")
+    print(f"\nStates analyzed: {report['total_states_processed']}")
     print("State distribution:")
-    for state, ratio in report["state_distribution"].items():
-        print(f"  {state}: {ratio:.1%}")
+    for state, count in report["state_distribution"].items():
+        print(f"  {state}: {count}")
 
-    if "trends" in report:
-        print("\nTrends:")
-        print(f"  Stability: {report['trends']['stability']:.2f}")
-        print(f"  Pattern: {report['trends']['dominant_pattern']}")
-        print(f"  Surprise: {report['trends']['surprise_trend']}")
+    print(f"\nAverage surprise: {report['average_surprise']:.3f}")
+    print(f"Surprise trend: {report['surprise_trend']}")
 
-    if "confidence_stats" in report:
-        print("\nConfidence statistics:")
-        print(f"  Mean: {report['confidence_stats']['mean']:.2f}")
-        print(
-            f"  Range: [{report['confidence_stats']['min']:.2f}, {report['confidence_stats']['max']:.2f}]"
-        )
+    if "trend_analysis" in report:
+        print("\nTrend analysis:")
+        print(f"  Dominant state: {report['trend_analysis']['dominant_state']}")
+        print(f"  State stability: {report['trend_analysis']['state_stability']:.2f}")
+
+    if "energy_stats" in report:
+        print("\nEnergy statistics:")
+        energy = report["energy_stats"]
+        if "current_battery" in energy:
+            print(f"  Current battery: {energy['current_battery']:.1%}")
+        if "total_consumption" in energy:
+            print(f"  Total consumption: {energy['total_consumption']:.3f}")
 
 
 def _print_energy_report(assistant: Any) -> None:
@@ -3170,8 +3408,8 @@ def demonstrate_edge_deployment() -> None:
 
         print(f"\nFrame {i + 1}, Battery: {battery_level:.0%}")
         print(f"State: {response['cognitive_state']['primary']}")
-        print(f"Energy used: {response['processing_metadata']['energy_used']}")
-        print(f"Processing mode: {response['cognitive_state']['processing_mode']}")
+        print(f"Energy cost: {response['processing_metadata'].get('energy_cost', 'unknown')}")
+        print(f"Processing mode: {response['processing_metadata']['processing_mode']}")
 
         # Show adaptive behavior
         if battery_level < 0.5:

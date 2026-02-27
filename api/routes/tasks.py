@@ -16,6 +16,7 @@ from api.models.schemas import (
     TaskSubmitRequest,
     TaskSubmitResponse,
 )
+from api.services.authorization import require_permission, Permission
 from api.services.task_executor import TaskExecutor
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ def init_task_routes() -> None:
     response_model=TaskListResponse,
     summary="List available tasks",
     description="Get a list of all available experimental tasks with their descriptions and parameters",
+    dependencies=[Depends(require_permission(Permission.TASK_READ))],
 )
 async def list_tasks(executor: TaskExecutor = Depends(get_task_executor)) -> TaskListResponse:
     """
@@ -76,7 +78,7 @@ async def list_tasks(executor: TaskExecutor = Depends(get_task_executor)) -> Tas
         logger.error(f"Failed to list tasks: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list tasks: {str(e)}",
+            detail="Failed to list tasks",
         )
 
 
@@ -86,6 +88,7 @@ async def list_tasks(executor: TaskExecutor = Depends(get_task_executor)) -> Tas
     status_code=status.HTTP_202_ACCEPTED,
     summary="Execute experimental task",
     description="Submit an experimental task for asynchronous execution on specified session",
+    dependencies=[Depends(require_permission(Permission.TASK_CREATE))],
 )
 async def execute_task(
     session_id: str,
@@ -131,7 +134,7 @@ async def execute_task(
         logger.error(f"Failed to submit task: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit task: {str(e)}",
+            detail="Failed to submit task",
         )
 
 
@@ -140,7 +143,7 @@ async def execute_task(
     response_model=TaskStatusResponse,
     summary="Get task status",
     description="Get current status and results of an experimental task",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.TASK_READ))],
 )
 async def get_task_status(
     task_id: str,
@@ -187,7 +190,7 @@ async def get_task_status(
         logger.error(f"Failed to get task status for {task_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get task status: {str(e)}",
+            detail="Failed to get task status",
         )
 
 
@@ -196,7 +199,7 @@ async def get_task_status(
     status_code=status.HTTP_200_OK,
     summary="Cancel task",
     description="Cancel a running experimental task",
-    dependencies=[],
+    dependencies=[Depends(require_permission(Permission.TASK_DELETE))],
 )
 async def cancel_task(
     task_id: str,
@@ -236,5 +239,5 @@ async def cancel_task(
         logger.error(f"Failed to cancel task {task_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to cancel task: {str(e)}",
+            detail="Failed to cancel task",
         )

@@ -30,6 +30,7 @@ from api.config import settings
 from api.database.connection import close_db, init_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.alerting import configure_alerting
+from api.middleware.authentication import AuthenticationMiddleware
 from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
 from api.middleware.request_size_limit import RequestSizeLimitMiddleware
@@ -41,7 +42,9 @@ from api.middleware.logging import (
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from api.routes import export, health, metrics, sessions, state, tasks, version
+from api.middleware.https_redirect import HTTPSRedirectMiddleware
+from .middleware.security_headers import SecurityHeadersMiddleware
+from api.routes import auth, export, health, metrics, sessions, state, tasks, users, version
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -168,6 +171,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=getattr(settings, "request_size_limit_enabled", True),
     )
 
+    # Add HTTPS redirect middleware
+    app.add_middleware(HTTPSRedirectMiddleware, https_enabled=settings.https_enabled)
+
     # Add GZip compression middleware
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -183,6 +189,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=settings.schema_validation_enabled,
         fail_on_error=settings.schema_validation_fail_on_error,
     )
+
+    # Add security headers middleware
+    app.add_middleware(SecurityHeadersMiddleware, https_enabled=settings.https_enabled)
 
     # Add CSRF protection middleware - skip in test mode
     if not test_mode:
@@ -219,6 +228,10 @@ def create_app(test_mode: bool = False) -> FastAPI:
         allow_headers=settings.cors_allow_headers,
     )
 
+    # Add authentication middleware - skip in test mode
+    if not test_mode:
+        app.add_middleware(AuthenticationMiddleware)
+
     # Register exception handlers
     register_exception_handlers(app)
 
@@ -235,9 +248,11 @@ def create_app(test_mode: bool = False) -> FastAPI:
         }
 
     # Include routers
+    app.include_router(auth.router)
     app.include_router(sessions.router)
     app.include_router(state.router)
     app.include_router(tasks.router)
+    app.include_router(users.router)
     app.include_router(export.router)
     app.include_router(metrics.router)
     app.include_router(health.router)
@@ -279,7 +294,7 @@ if __name__ == "__main__":
     uvicorn_kwargs = {
         "host": default_host,
         "port": default_port,
-        "reload": True,
+        "reload": settings.reload,
         "log_level": "info",
     }
 

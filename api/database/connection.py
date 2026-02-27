@@ -9,6 +9,8 @@ import secrets
 import string
 from contextlib import contextmanager
 from typing import Any, Dict, Generator
+from pathlib import Path
+import os
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -113,11 +115,13 @@ def create_default_user() -> None:
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Log credentials securely (in production, this should go to a secure secrets manager)
-        logger.warning(
-            f"Generated default user credentials - STORE SECURELY. "
-            f"Username: {secure_username}, Password: {secure_password}. "
-            f"NOTE: These credentials allow full system access - change immediately"
+        # Write credentials to a secure one-time file
+        credentials_file = Path("/run/secrets/apgi_admin_credentials")
+        credentials_file.parent.mkdir(parents=True, exist_ok=True)
+        credentials_file.write_text(f"{secure_username}\n{secure_password}")
+        os.chmod(credentials_file, 0o600)
+        logger.info(
+            f"Default admin credentials written to {credentials_file}. Read once and delete."
         )
 
         # Import here to avoid circular import
@@ -246,10 +250,9 @@ def test_database_connection() -> Dict[str, Any]:
 
             connection_time = time.time() - start_time
 
-            try:
+            pool_size = "unknown"
+            if hasattr(engine.pool, "size"):
                 pool_size = engine.pool.size()
-            except AttributeError:
-                pool_size = "unknown"
 
             return {
                 "status": "healthy",

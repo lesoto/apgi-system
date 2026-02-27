@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ============================================================================
 # Enums
@@ -49,6 +49,15 @@ class SessionCreateRequest(BaseModel):
     description: Optional[str] = Field(
         None, description="Human-readable description of the session"
     )
+
+    @field_validator("config_path")
+    @classmethod
+    def validate_config_path(cls, v):
+        if v is None:
+            return v
+        if ".." in v or v.startswith("/"):
+            raise ValueError("Invalid config_path: path traversal not allowed")
+        return v
 
     model_config = ConfigDict(
         json_schema_extra={

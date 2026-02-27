@@ -15,7 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    PickleType,
+    JSON,
     String,
     Text,
 )
@@ -73,7 +73,7 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(PickleType, nullable=False, default=list, comment="User roles for RBAC")
+    roles = Column(JSON, nullable=False, default=list, comment="User roles for RBAC")
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
     )
@@ -117,7 +117,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Owner user ID",
     )
-    config = Column(PickleType, nullable=False, comment="Session configuration as JSON")
+    config = Column(JSON, nullable=False, comment="Session configuration as JSON")
     state = Column(
         String(20),
         nullable=False,
@@ -139,7 +139,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(PickleType, nullable=True, default=list, comment="Session tags for organization")
+    tags = Column(JSON, nullable=True, default=list, comment="Session tags for organization")
 
     # Relationships
     user = relationship("User", back_populates="sessions")
@@ -177,7 +177,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     task_type = Column(String(50), nullable=False, index=True, comment="Type of experimental task")
-    parameters = Column(PickleType, nullable=False, comment="Task parameters as JSON")
+    parameters = Column(JSON, nullable=False, comment="Task parameters as JSON")
     status = Column(
         String(20),
         nullable=False,
@@ -186,7 +186,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         comment="Current task status",
     )
     progress = Column(Integer, nullable=True, comment="Progress percentage (0-100)")
-    result_data = Column(PickleType, nullable=True, comment="Task results as JSON")
+    result_data = Column(JSON, nullable=True, comment="Task results as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -232,7 +232,7 @@ class SessionData(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     time_ms = Column(Float, nullable=False, comment="Simulation time in milliseconds")
-    data = Column(PickleType, nullable=False, comment="State data as JSON")
+    data = Column(JSON, nullable=False, comment="State data as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -271,7 +271,10 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Associated user ID",
     )
-    token_hash = Column(String(255), nullable=False, unique=True, comment="Hashed refresh token")
+    lookup_hash = Column(
+        String(64), nullable=False, index=True, comment="SHA-256 hash for token lookup"
+    )
+    token_hash = Column(String(255), nullable=False, comment="Bcrypt hash for token verification")
     expires_at = Column(
         DateTime(timezone=True), nullable=False, index=True, comment="Token expiration timestamp"
     )
@@ -314,7 +317,7 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         comment="Associated task ID",
     )
     webhook_url = Column(String(500), nullable=False, comment="Target webhook URL")
-    payload = Column(PickleType, nullable=False, comment="Webhook payload as JSON")
+    payload = Column(JSON, nullable=False, comment="Webhook payload as JSON")
     status = Column(String(20), nullable=False, default="pending", comment="Delivery status")
     attempts = Column(Integer, nullable=False, default=0, comment="Number of delivery attempts")
     last_attempt_at = Column(

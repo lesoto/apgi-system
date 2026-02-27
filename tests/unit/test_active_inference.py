@@ -8,6 +8,7 @@ from pathlib import Path
 from apgi_system.core.active_inference import (
     ActiveInferenceEngine,
     HierarchicalGaussianFilter,
+    BeliefState,
 )
 
 
@@ -162,6 +163,32 @@ class TestActiveInferenceEngine:
         observation = np.full(64, np.inf)
         with pytest.raises(ValueError):
             engine.step(observation)
+
+
+class TestBeliefState:
+    """Test BeliefState dataclass functionality."""
+
+    def test_belief_state_initialization(self) -> None:
+        """Test BeliefState initializes correctly."""
+        mean = np.array([1.0, 2.0])
+        covariance = np.eye(2)
+        precision = 2.0
+        prediction = np.array([0.5, 1.5])
+        prediction_error = np.array([0.5, 0.5])
+
+        belief = BeliefState(
+            mean=mean,
+            covariance=covariance,
+            precision=precision,
+            prediction=prediction,
+            prediction_error=prediction_error,
+        )
+
+        assert np.array_equal(belief.mean, mean)
+        assert np.array_equal(belief.covariance, covariance)
+        assert belief.precision == precision
+        assert np.array_equal(belief.prediction, prediction)
+        assert np.array_equal(belief.prediction_error, prediction_error)
 
 
 class TestHierarchicalGaussianFilter:
