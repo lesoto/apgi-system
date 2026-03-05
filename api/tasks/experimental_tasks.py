@@ -16,6 +16,8 @@ from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
 from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
+from apgi_system.experiments.tasks.nback_task import NBackTask
+from apgi_system.experiments.tasks.stroop_task import StroopTask
 from apgi_system.platform_utils import get_resource_path
 from apgi_system.system import APGISystem
 from api.celery_app import celery_app
@@ -384,6 +386,138 @@ def execute_change_blindness_task(
         logger.error(f"Change Blindness Task failed for session {session_id}: {e}", exc_info=True)
         result = {
             "task_type": "change_blindness",
+            "session_id": session_id,
+            "status": "failed",
+            "error": str(e),
+        }
+
+    # Trigger webhook on completion (async)
+    import asyncio
+
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+
+    return result
+
+
+@celery_app.task(  # type: ignore[misc]
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_nback_task"
+)
+def execute_nback_task(
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Execute N-Back Task.
+
+    Args:
+        session_id: Session identifier
+        parameters: Task parameters including:
+            - n_back: N-back level (default: 2)
+            - sequence_length: Length of stimulus sequence (default: 20)
+            - num_trials: Number of trials (default: 1)
+            - stimulus_duration_ms: Duration each stimulus is shown (default: 500.0)
+            - isi_ms: Inter-stimulus interval (default: 2500.0)
+
+    Returns:
+        Dict with task results and analysis
+    """
+    logger.info(f"Starting N-Back Task for session {session_id}")
+
+    result = None
+    try:
+        # Extract parameters with defaults
+        n_back = parameters.get("n_back", 2)
+        num_trials = parameters.get("num_trials", 100)
+
+        # Create task instance
+        task = NBackTask(
+            n_level=n_back,
+            num_trials=num_trials,
+        )
+
+        # Run all trials
+        results = task.run_all_trials(self.apgi_system)
+
+        logger.info(f"N-Back Task completed for session {session_id}")
+
+        result = {
+            "task_type": "nback_task",
+            "session_id": session_id,
+            "status": "completed",
+            "results": results,
+        }
+
+    except Exception as e:
+        logger.error(f"N-Back Task failed for session {session_id}: {e}", exc_info=True)
+        result = {
+            "task_type": "nback_task",
+            "session_id": session_id,
+            "status": "failed",
+            "error": str(e),
+        }
+
+    # Trigger webhook on completion (async)
+    import asyncio
+
+    try:
+        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
+
+    return result
+
+
+@celery_app.task(  # type: ignore[misc]
+    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_stroop_task"
+)
+def execute_stroop_task(
+    self: APGITask, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Execute Stroop Task.
+
+    Args:
+        session_id: Session identifier
+        parameters: Task parameters including:
+            - num_trials: Number of trials (default: 50)
+            - congruent_color: Color for congruent trials (default: "red")
+            - incongruent_color: Color for incongruent trials (default: "blue")
+            - stimulus_duration_ms: Duration each stimulus is shown (default: 1000.0)
+            - isi_ms: Inter-stimulus interval (default: 1500.0)
+
+    Returns:
+        Dict with task results and analysis
+    """
+    logger.info(f"Starting Stroop Task for session {session_id}")
+
+    result = None
+    try:
+        # Extract parameters with defaults
+        num_trials = parameters.get("num_trials", 50)
+
+        # Create task instance
+        task = StroopTask(
+            num_trials=num_trials,
+        )
+
+        # Run all trials
+        results = task.run_all_trials(self.apgi_system)
+
+        logger.info(f"Stroop Task completed for session {session_id}")
+
+        result = {
+            "task_type": "stroop_task",
+            "session_id": session_id,
+            "status": "completed",
+            "results": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Stroop Task failed for session {session_id}: {e}", exc_info=True)
+        result = {
+            "task_type": "stroop_task",
             "session_id": session_id,
             "status": "failed",
             "error": str(e),

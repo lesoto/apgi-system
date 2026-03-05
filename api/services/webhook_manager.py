@@ -22,7 +22,7 @@ from typing import cast
 from api.database.models import WebhookDelivery
 
 # Import circuit breaker utilities
-from utils.circuit_breaker import (
+from utils.circuit_breaker_utils import (
     circuit_breaker,
     CircuitBreakerException,
 )
@@ -311,6 +311,27 @@ class WebhookManager:
             # Add signature header if signature was generated
             if signature:
                 headers[self.signature_header] = signature
+
+            # Re-validate webhook URL to prevent DNS rebinding attacks
+            parsed = urlparse(delivery.webhook_url)
+            hostname = parsed.hostname
+
+            if hostname:
+                try:
+                    resolved_ip = socket.gethostbyname(hostname)
+                    ip = ipaddress.ip_address(resolved_ip)
+                    if self._is_private_ip(ip):
+                        delivery.error_message = (
+                            "Webhook URL resolves to private or blocked IP address"
+                        )
+                        await self._schedule_retry(db, delivery)
+                        return False
+                except (socket.gaierror, ValueError) as e:
+                    delivery.error_message = (
+                        f"Cannot resolve or validate hostname '{hostname}': {e}"
+                    )
+                    await self._schedule_retry(db, delivery)
+                    return False
 
             response = await self.http_client.post(
                 delivery.webhook_url,  # type: ignore[arg-type]

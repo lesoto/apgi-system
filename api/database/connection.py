@@ -9,8 +9,6 @@ import secrets
 import string
 from contextlib import contextmanager
 from typing import Any, Dict, Generator
-from pathlib import Path
-import os
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,7 +18,7 @@ from api.config import settings
 from api.database.models import Base, User
 
 # Import circuit breaker utilities
-from utils.circuit_breaker import (
+from utils.circuit_breaker_utils import (
     circuit_breaker,
     CircuitBreakerException,
 )
@@ -115,13 +113,10 @@ def create_default_user() -> None:
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Write credentials to a secure one-time file
-        credentials_file = Path("/run/secrets/apgi_admin_credentials")
-        credentials_file.parent.mkdir(parents=True, exist_ok=True)
-        credentials_file.write_text(f"{secure_username}\n{secure_password}")
-        os.chmod(credentials_file, 0o600)
-        logger.info(
-            f"Default admin credentials written to {credentials_file}. Read once and delete."
+        # Log credentials with warning to rotate immediately
+        logger.warning(
+            f"Default admin credentials generated - ROTATE IMMEDIATELY AFTER FIRST LOGIN: "
+            f"username={secure_username}, password={secure_password}"
         )
 
         # Import here to avoid circular import

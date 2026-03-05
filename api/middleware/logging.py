@@ -15,6 +15,7 @@ from typing import Callable, Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+from starlette.responses import StreamingResponse
 
 
 class StructuredLogger:
@@ -142,6 +143,106 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
             # Re-raise exception to be handled by exception handlers
             raise
+
+
+class ResponseLoggingMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware that logs HTTP response bodies with sensitive data stripped.
+
+    Strips fields like 'password', 'new_password' from JSON response bodies
+    before logging to prevent credential exposure in logs.
+    """
+
+    SENSITIVE_FIELDS = {"password", "new_password", "token", "secret", "key"}
+
+    def __init__(self, app: ASGIApp):
+        super().__init__(app)
+        self.logger = StructuredLogger("api.responses")
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """
+        Process request and log sanitized response body.
+
+        Args:
+            request: Incoming HTTP request
+            call_next: Next middleware/handler in chain
+
+        Returns:
+            HTTP response
+        """
+        response = await call_next(request)
+
+        # Only log JSON responses for API endpoints
+        if (
+            request.url.path.startswith("/v1/")
+            and response.headers.get("content-type", "").startswith("application/json")
+            and not isinstance(response, StreamingResponse)
+        ):
+            try:
+                # Read response body
+                body = b""
+                async for chunk in response.body_iterator:
+                    body += chunk
+
+                # Parse and sanitize JSON
+                try:
+                    json_data = json.loads(body.decode("utf-8"))
+                    sanitized_data = self._sanitize_json(json_data)
+                    sanitized_body = json.dumps(sanitized_data, indent=2)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    # If not valid JSON, don't log body
+                    sanitized_body = "[non-JSON response]"
+
+                # Log sanitized response
+                self.logger.info(
+                    "API response",
+                    request_id=getattr(request.state, "request_id", "unknown"),
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    response_body=sanitized_body[:1000],  # Limit log size
+                )
+
+                # Reconstruct response with original body
+                response = Response(
+                    content=body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                )
+
+            except Exception as e:
+                # If response logging fails, log the error but don't break the response
+                self.logger.warning(
+                    "Failed to log response body",
+                    request_id=getattr(request.state, "request_id", "unknown"),
+                    error=str(e),
+                )
+
+        return response
+
+    def _sanitize_json(self, data):
+        """
+        Recursively sanitize JSON data by removing sensitive fields.
+
+        Args:
+            data: JSON data (dict, list, or primitive)
+
+        Returns:
+            Sanitized data
+        """
+        if isinstance(data, dict):
+            sanitized = {}
+            for key, value in data.items():
+                if key.lower() in self.SENSITIVE_FIELDS:
+                    sanitized[key] = "[REDACTED]"
+                else:
+                    sanitized[key] = self._sanitize_json(value)
+            return sanitized
+        elif isinstance(data, list):
+            return [self._sanitize_json(item) for item in data]
+        else:
+            return data
 
 
 class ErrorLoggingHandler:

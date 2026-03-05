@@ -23,15 +23,17 @@ from sqlalchemy import select
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
 
-# from api.database.connection import get_db_context
-from api.models.schemas import SessionCreateRequest
-from apgi_system.system import APGISystem
+from api.exceptions import ServiceUnavailableError
+from sqlalchemy.orm import Session as SessionLocal
 
 # Import circuit breaker utilities
-from utils.circuit_breaker import (
+from utils.circuit_breaker_utils import (
     circuit_breaker,
     CircuitBreakerException,
 )
+
+from apgi_system.system import APGISystem
+from api.models.schemas import SessionCreateRequest
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +82,18 @@ class SimulationSession:
     Wraps APGISystem with thread-safe locking for concurrent access.
     """
 
-    def __init__(self, session_id: str, config: Dict[str, Any]):
+    def __init__(self, session_id: str, config: Dict[str, Any], user_id: Optional[str] = None):
         """
         Initialize simulation session.
 
         Args:
             session_id: Unique session identifier
             config: Session configuration dictionary
+            user_id: User identifier (optional)
         """
         self.session_id = session_id
         self.config = config
+        self.user_id = user_id
         self.state = SessionLifecycleState.CREATED
         self.created_at = datetime.utcnow()
         self.updated_at = datetime.utcnow()
@@ -284,10 +288,78 @@ class SimulationSession:
 
     def _restore_state(self, state: Dict[str, Any]) -> None:
         """Restore system state from snapshot."""
-        # This is a simplified restoration - in production, you'd need
-        # to carefully restore each subsystem's internal state
+        # Restore basic system state
         self.apgi_system.time = state.get("time", 0.0)
         self.apgi_system.history = state.get("history", {})
+
+        # Restore core subsystems
+        if "core" in state:
+            core_state = state["core"]
+            if "precision" in core_state:
+                self.apgi_system.precision.__dict__.update(core_state["precision"])
+            if "active_inference" in core_state:
+                ai_state = core_state["active_inference"]
+                self.apgi_system.active_inference.time = ai_state.get("time", 0.0)
+                # Restore beliefs if present
+                if "beliefs" in ai_state:
+                    for i, belief_data in enumerate(ai_state["beliefs"]):
+                        if i < len(self.apgi_system.active_inference.filter.beliefs):
+                            belief = self.apgi_system.active_inference.filter.beliefs[i]
+                            belief.mean = belief_data.get("mean", belief.mean)
+                            belief.covariance = belief_data.get("covariance", belief.covariance)
+                            belief.precision = belief_data.get("precision", belief.precision)
+                            belief.prediction = belief_data.get("prediction", belief.prediction)
+                            belief.prediction_error = belief_data.get(
+                                "prediction_error", belief.prediction_error
+                            )
+
+        # Restore ignition subsystem
+        if "ignition" in state:
+            ignition_state = state["ignition"]
+            if "threshold_stats" in ignition_state:
+                self.apgi_system.ignition_threshold.__dict__.update(
+                    ignition_state["threshold_stats"]
+                )
+
+        # Restore interoception subsystems
+        if "interoception" in state:
+            intero_state = state["interoception"]
+            if "body_state" in intero_state:
+                self.apgi_system.body_model.__dict__.update(intero_state["body_state"])
+            if "allostatic_load" in intero_state:
+                self.apgi_system.allostasis.__dict__.update(
+                    {"allostatic_load": intero_state["allostatic_load"]}
+                )
+            if "somatic_markers" in intero_state:
+                self.apgi_system.somatic_markers.__dict__.update(intero_state["somatic_markers"])
+
+        # Restore self-model subsystems
+        if "self_model" in state:
+            self_state = state["self_model"]
+            if "minimal_self" in self_state:
+                self.apgi_system.minimal_self.__dict__.update(self_state["minimal_self"])
+            if "narrative_self" in self_state:
+                self.apgi_system.narrative_self.__dict__.update(self_state["narrative_self"])
+            if "coherence" in self_state:
+                self.apgi_system.coherence.__dict__.update(self_state["coherence"])
+
+        # Restore thermodynamic subsystems
+        if "thermodynamic" in state:
+            thermo_state = state["thermodynamic"]
+            if "metabolic_reserves" in thermo_state:
+                self.apgi_system.metabolism.__dict__.update(
+                    {"current_reserves": thermo_state["metabolic_reserves"]}
+                )
+            if "entropy_stats" in thermo_state:
+                self.apgi_system.entropy.__dict__.update(thermo_state["entropy_stats"])
+
+        # Restore neural subsystems
+        if "neural" in state:
+            neural_state = state["neural"]
+            if "oscillations" in neural_state:
+                self.apgi_system.oscillations.__dict__.update(neural_state["oscillations"])
+            if "networks" in neural_state:
+                self.apgi_system.networks.__dict__.update(neural_state["networks"])
 
         logger.info(f"Session {self.session_id} state restored")
 
@@ -365,7 +437,7 @@ class SessionManager:
         }
 
         # Create simulation session
-        sim_session = SimulationSession(session_id, config)
+        sim_session = SimulationSession(session_id, config, user_id)
 
         # Atomic cache + database operation
         async with self.cache_lock:
@@ -461,7 +533,7 @@ class SessionManager:
         if cached_data:
             # Reconstruct session from cache
             metadata = json.loads(cached_data)
-            sim_session = SimulationSession(session_id, metadata["config"])
+            sim_session = SimulationSession(session_id, metadata["config"], metadata.get("user_id"))
             sim_session.state = SessionLifecycleState(metadata["state"])
             sim_session.created_at = datetime.fromisoformat(
                 metadata["created_at"].replace("Z", "+00:00")
@@ -487,7 +559,7 @@ class SessionManager:
                 raise ValueError(f"Session {session_id} not found")
 
             # Reconstruct session
-            sim_session = SimulationSession(session_id, db_model.config)
+            sim_session = SimulationSession(session_id, db_model.config, db_model.user_id)
             sim_session.state = SessionLifecycleState(db_model.state)
             sim_session.created_at = db_model.created_at
             sim_session.updated_at = db_model.updated_at
@@ -517,12 +589,19 @@ class SessionManager:
         # Validate session ID format
         validate_session_id(session_id)
 
-        # Check if session exists in cache first
-        async with self.cache_lock:
-            if session_id not in self.sessions:
-                raise ValueError(f"Session {session_id} not found")
+        # First check if session exists in database (even if not in cache)
+        db_session = self.db_session_factory()
+        try:
+            stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+            result = db_session.execute(stmt)
+            db_model = result.scalar_one_or_none()
 
-        # Remove from memory cache
+            if not db_model:
+                raise ValueError(f"Session {session_id} not found")
+        finally:
+            db_session.close()
+
+        # Remove from memory cache if present
         async with self.cache_lock:
             if session_id in self.sessions:
                 del self.sessions[session_id]
@@ -537,8 +616,9 @@ class SessionManager:
             result = db_session.execute(stmt)
             db_model = result.scalar_one_or_none()
 
-            if not db_model:
-                raise ValueError(f"Session {session_id} not found")
+            if db_model:
+                db_session.delete(db_model)
+                db_session.commit()
         except Exception as e:
             db_session.rollback()
             logger.error(f"Failed to delete session {session_id}: {e}")
@@ -591,6 +671,7 @@ class SessionManager:
             "session_id": session_id,
             "state": sim_session.state.value,
             "config": sim_session.config,
+            "user_id": sim_session.user_id,
             "created_at": sim_session.created_at.isoformat() + "Z",
             "updated_at": sim_session.updated_at.isoformat() + "Z",
         }
@@ -667,3 +748,35 @@ class SessionManager:
             }
         finally:
             db_session.close()
+
+
+# Redis client (will be initialized in main app)
+_redis_client: Optional[redis.Redis] = None
+_session_manager: Optional[SessionManager] = None
+
+
+def get_redis_client() -> redis.Redis:
+    """Get Redis client dependency."""
+    if _redis_client is None:
+        raise ServiceUnavailableError("Redis", "Redis client not initialized")
+    return _redis_client
+
+
+def get_session_manager() -> SessionManager:
+    """Get SessionManager dependency."""
+    if _session_manager is None:
+        raise ServiceUnavailableError("SessionManager", "Session manager not initialized")
+    return _session_manager
+
+
+def init_session_routes(redis_client: redis.Redis) -> None:
+    """
+    Initialize session routes with Redis client.
+
+    Args:
+        redis_client: Redis client for session caching
+    """
+    global _redis_client, _session_manager
+    _redis_client = redis_client
+    _session_manager = SessionManager(redis_client, SessionLocal)
+    logger.info("Session routes initialized")

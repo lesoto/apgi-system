@@ -74,8 +74,8 @@ async def list_tasks(executor: TaskExecutor = Depends(get_task_executor)) -> Tas
         tasks_info = await executor.list_available_tasks()
 
         return TaskListResponse(tasks=tasks_info["tasks"])
-    except Exception as e:
-        logger.error(f"Failed to list tasks: {e}")
+    except Exception:
+        logger.error("Failed to list tasks", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list tasks",
@@ -129,9 +129,11 @@ async def execute_task(
         )
     except ValueError as e:
         logger.warning(f"Invalid task submission: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to submit task: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task submission"
+        )
+    except Exception:
+        logger.error("Failed to submit task", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to submit task",
@@ -185,9 +187,11 @@ async def get_task_status(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
             )
         # Other value errors
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to get task status for {task_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task status request"
+        )
+    except Exception:
+        logger.error(f"Failed to get task status for {task_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get task status",
@@ -235,8 +239,8 @@ async def cancel_task(
     except HTTPException:
         # Re-raise HTTP exceptions (like 404) as-is
         raise
-    except Exception as e:
-        logger.error(f"Failed to cancel task {task_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to cancel task {task_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cancel task",

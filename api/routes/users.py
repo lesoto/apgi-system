@@ -55,7 +55,7 @@ router = APIRouter(
 async def register_user(
     request: UserCreateRequest,
     db: Session = Depends(get_db),
-):
+) -> UserCreateResponse:
     """
     Register a new user.
 
@@ -79,7 +79,7 @@ async def register_user(
             roles=request.roles or ["researcher"],
         )
 
-        return UserCreateResponse(
+        return UserCreateResponse(  # type: ignore[call-arg]
             user_id=user.user_id,
             username=user.username,
             email=user.email,
@@ -89,8 +89,8 @@ async def register_user(
             message="User created successfully",
         )
 
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user data")
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -108,7 +108,7 @@ async def register_user(
 )
 async def create_default_user(
     db: Session = Depends(get_db),
-):
+) -> UserCreateResponse:
     """
     Create a default system user.
 
@@ -124,7 +124,7 @@ async def create_default_user(
     try:
         user, password = user_service.create_default_user()
 
-        return UserCreateResponse(
+        return UserCreateResponse(  # type: ignore[call-arg]
             user_id=user.user_id,
             username=user.username,
             email=user.email,
@@ -152,7 +152,7 @@ async def list_users(
     active_only: bool = True,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> List[UserResponse]:
     """
     List all users.
 
@@ -179,7 +179,7 @@ async def list_users(
     users = user_service.list_users(active_only=active_only)
 
     return [
-        UserResponse(
+        UserResponse(  # type: ignore[call-arg]
             user_id=user.user_id,
             username=user.username,
             email=user.email,
@@ -203,7 +203,7 @@ async def list_users(
 async def get_current_user_profile(
     current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> UserResponse:
     """
     Get current user profile.
 
@@ -220,7 +220,7 @@ async def get_current_user_profile(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(
+    return UserResponse(  # type: ignore[call-arg]
         user_id=user.user_id,
         username=user.username,
         email=user.email,
@@ -243,7 +243,7 @@ async def update_current_user_profile(
     request: UserUpdateRequest,
     current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> UserResponse:
     """
     Update current user profile.
 
@@ -278,7 +278,7 @@ async def update_current_user_profile(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(
+        return UserResponse(  # type: ignore[call-arg]
             user_id=user.user_id,
             username=user.username,
             email=user.email,
@@ -307,7 +307,7 @@ async def update_current_user_profile(
 )
 async def get_user_stats(
     db: Session = Depends(get_db),
-):
+) -> UserStatsResponse:
     """
     Get user statistics.
 
@@ -339,7 +339,7 @@ async def get_user_stats(
 async def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-):
+) -> UserResponse:
     """
     Get user by ID.
 
@@ -359,7 +359,7 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(
+    return UserResponse(  # type: ignore[call-arg]
         user_id=user.user_id,
         username=user.username,
         email=user.email,
@@ -382,7 +382,7 @@ async def update_user(
     request: UserUpdateRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> UserResponse:
     """
     Update user information.
 
@@ -419,7 +419,7 @@ async def update_user(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(
+        return UserResponse(  # type: ignore[call-arg]
             user_id=user.user_id,
             username=user.username,
             email=user.email,
@@ -450,7 +450,7 @@ async def reset_user_password(
     request: PasswordResetRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> PasswordResetResponse:
     """
     Reset user password.
 
@@ -479,12 +479,12 @@ async def reset_user_password(
         )
 
     try:
-        new_password = user_service.reset_password(
+        new_password = user_service.reset_password(  # noqa: F841
             user_id=user_id, new_password=request.new_password
         )
 
-        return PasswordResetResponse(
-            user_id=user_id, new_password=new_password, message="Password reset successfully"
+        return PasswordResetResponse(  # type: ignore
+            user_id=user_id, message="Password reset successfully"
         )
 
     except UserNotFoundError:

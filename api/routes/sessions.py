@@ -7,11 +7,8 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 import logging
 from typing import Dict, Any, Optional
 
-import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy.orm import Session as SessionLocal
-
-from api.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
+from api.exceptions import SessionNotFoundError, SessionStateConflictError
 from api.models.schemas import (
     ErrorResponse,
     PaginationInfo,
@@ -30,7 +27,11 @@ from api.services.authorization import (
     has_any_role,
     TokenPayload,
 )
-from api.services.session_manager import SessionManager, SessionLifecycleState
+from api.services.session_manager import (
+    SessionManager,
+    get_session_manager,
+    SessionLifecycleState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,38 +45,6 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-
-
-# Redis client (will be initialized in main app)
-_redis_client: Optional[redis.Redis] = None
-_session_manager: Optional[SessionManager] = None
-
-
-def get_redis_client() -> redis.Redis:
-    """Get Redis client dependency."""
-    if _redis_client is None:
-        raise ServiceUnavailableError("Redis", "Redis client not initialized")
-    return _redis_client
-
-
-def get_session_manager() -> SessionManager:
-    """Get SessionManager dependency."""
-    if _session_manager is None:
-        raise ServiceUnavailableError("SessionManager", "Session manager not initialized")
-    return _session_manager
-
-
-def init_session_routes(redis_client: redis.Redis) -> None:
-    """
-    Initialize session routes with Redis client.
-
-    Args:
-        redis_client: Redis client for session caching
-    """
-    global _redis_client, _session_manager
-    _redis_client = redis_client
-    _session_manager = SessionManager(redis_client, SessionLocal)
-    logger.info("Session routes initialized")
 
 
 @router.get(
@@ -151,6 +120,7 @@ async def list_sessions(
 async def create_session(
     request: SessionCreateRequest,
     manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> SessionCreateResponse:
     """
     Create new simulation session.
@@ -158,6 +128,7 @@ async def create_session(
     Args:
         request: Session creation request with configuration
         manager: Session manager dependency
+        current_user: Current authenticated user
 
     Returns:
         SessionCreateResponse with session ID and details
@@ -166,7 +137,7 @@ async def create_session(
         HTTPException: If session creation fails
     """
     # Create session
-    session_id = await manager.create_session(request)
+    session_id = await manager.create_session(request, user_id=current_user.user_id)
 
     # Get session details
     sim_session = await manager.get_session(session_id)

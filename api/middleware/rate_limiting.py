@@ -11,6 +11,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from typing import List, Optional
 from api.middleware.logging import StructuredLogger
 from api.services.rate_limiter import RateLimiter
 
@@ -25,7 +26,13 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     headers to all responses.
     """
 
-    def __init__(self, app, redis_client=None, enabled: bool = True):
+    def __init__(
+        self,
+        app,
+        redis_client=None,
+        enabled: bool = True,
+        trusted_proxies: Optional[List[str]] = None,
+    ):
         """
         Initialize rate limiting middleware.
 
@@ -33,6 +40,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             app: FastAPI application
             redis_client: Redis client for rate limiting (optional)
             enabled: Whether rate limiting is enabled
+            trusted_proxies: List of trusted proxy IPs that can set X-Forwarded-For
         """
         super().__init__(app)
         self.redis_client = redis_client
@@ -40,6 +48,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         self.rate_limiter = RateLimiter(redis_client)
         # Fallback in-memory rate limiter for when Redis is unavailable
         self.fallback_rate_limiter = RateLimiter(redis_client=None)  # In-memory
+        self.trusted_proxies = trusted_proxies or []
 
     def set_redis_client(self, redis_client: redis.Redis):
         """
@@ -74,10 +83,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
     def _get_client_ip(self, request: Request) -> str:
         """
-        Get the real client IP address, checking proxy headers.
+        Get the real client IP address, checking proxy headers only from trusted proxies.
 
-        Checks X-Forwarded-For header first (taking the first IP in the chain),
-        then falls back to X-Real-IP, then request.client.host.
+        Only trusts X-Forwarded-For when the request comes from a trusted proxy IP.
 
         Args:
             request: HTTP request
@@ -85,14 +93,16 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         Returns:
             Client IP address string
         """
-        # Check X-Forwarded-For header (most common proxy header)
-        x_forwarded_for = request.headers.get("X-Forwarded-For")
-        if x_forwarded_for:
-            # X-Forwarded-For can contain multiple IPs separated by commas
-            # The first IP is the original client IP
-            first_ip = x_forwarded_for.split(",")[0].strip()
-            if first_ip:
-                return first_ip
+        # If the client is from a trusted proxy, use X-Forwarded-For
+        if request.client and request.client.host in self.trusted_proxies:
+            # Check X-Forwarded-For header (most common proxy header)
+            x_forwarded_for = request.headers.get("X-Forwarded-For")
+            if x_forwarded_for:
+                # X-Forwarded-For can contain multiple IPs separated by commas
+                # The first IP is the original client IP
+                first_ip = x_forwarded_for.split(",")[0].strip()
+                if first_ip:
+                    return first_ip
 
         # Check X-Real-IP header (used by some proxies)
         x_real_ip = request.headers.get("X-Real-IP")
@@ -255,7 +265,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
             # Try in-memory fallback rate limiting
             try:
-                result = self.fallback_rate_limiter.check_rate_limit(
+                result = await self.fallback_rate_limiter.check_rate_limit(
                     client_id=client_id, endpoint=endpoint
                 )
 

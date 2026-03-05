@@ -4,6 +4,8 @@ State Access Routes
 API endpoints for accessing APGI system state, ignition history, and subsystem data.
 """
 
+import base64
+import json
 import logging
 from typing import Optional
 
@@ -26,6 +28,7 @@ from api.models.schemas import (
     WorkspaceState,
     PredictionErrorsResponse,
     SomaticMarkersResponse,
+    SummaryStatistics,
 )
 from api.services.authorization import (
     require_permission,
@@ -63,7 +66,7 @@ async def get_system_state(
     request: Request,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> SystemStateResponse:
     """
     Get complete system state.
 
@@ -155,11 +158,11 @@ async def get_system_state(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
-    except Exception as e:
-        logger.error(f"Failed to get state for session {session_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to get state for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system state: {str(e)}",
+            detail="Failed to get system state",
         )
 
 
@@ -184,7 +187,7 @@ async def get_ignition_history(  # noqa: C901
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> IgnitionHistoryResponse:
     """
     Get ignition event history.
 
@@ -265,13 +268,7 @@ async def get_ignition_history(  # noqa: C901
         start_idx = 0
         if cursor:
             try:
-                import jwt
-                from api.config import settings
-
-                # Decode JWT cursor
-                cursor_data = jwt.decode(
-                    cursor, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
-                )
+                cursor_data = json.loads(base64.urlsafe_b64decode(cursor).decode())
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")
@@ -284,13 +281,8 @@ async def get_ignition_history(  # noqa: C901
         # Generate next cursor
         next_cursor = None
         if has_more:
-            import jwt
-            from api.config import settings
-
             cursor_data = {"offset": end_idx}
-            next_cursor = jwt.encode(
-                cursor_data, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
-            )
+            next_cursor = base64.urlsafe_b64encode(json.dumps(cursor_data).encode()).decode()
 
         response = IgnitionHistoryResponse(
             events=paginated_events,
@@ -309,8 +301,8 @@ async def get_ignition_history(  # noqa: C901
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
-    except Exception as e:
-        logger.error(f"Failed to get ignition history for session {session_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to get ignition history for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get ignition history",
@@ -329,7 +321,7 @@ async def get_interoceptive_state(
     request: Request,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> BodyState:
     """
     Get interoceptive body state.
 
@@ -377,8 +369,8 @@ async def get_interoceptive_state(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
-    except Exception as e:
-        logger.error(f"Failed to get interoceptive state for session {session_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to get interoceptive state for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get interoceptive state",
@@ -397,7 +389,7 @@ async def get_prediction_errors(
     request: Request,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> PredictionErrorsResponse:
     """
     Get prediction errors.
 
@@ -446,8 +438,8 @@ async def get_prediction_errors(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
-    except Exception as e:
-        logger.error(f"Failed to get prediction errors for session {session_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to get prediction errors for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get prediction errors",
@@ -519,9 +511,132 @@ async def get_somatic_markers(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
-    except Exception as e:
-        logger.error(f"Failed to get somatic markers for session {session_id}: {e}")
+    except Exception:
+        logger.error(f"Failed to get somatic markers for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get somatic markers",
+        )
+
+
+@router.get(
+    "/{session_id}/summary-statistics",
+    response_model=SummaryStatistics,
+    summary="Get summary statistics",
+    description="Retrieve computed summary statistics for simulation session",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
+)
+async def get_summary_statistics(
+    session_id: str,
+    request: Request,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SummaryStatistics:
+    """
+    Get summary statistics.
+
+    Returns computed metrics including:
+    - Duration and step count
+    - Ignition event statistics
+    - Energy consumption statistics
+    - Allostatic regulation statistics
+
+    Args:
+        session_id: Unique session identifier
+        request: HTTP request for authentication check
+        manager: Session manager dependency
+
+    Returns:
+        SummaryStatistics with computed metrics
+
+    Raises:
+        HTTPException: If session not found or computation fails
+    """
+    try:
+        # Get session
+        sim_session = await manager.get_session(session_id)
+
+        # Check ownership
+        if sim_session.user_id != current_user.user_id and not has_any_role(
+            current_user.roles, [Role.ADMIN]
+        ):
+            raise HTTPException(status_code=403, detail="Not authorized to access this session")
+
+        # Get complete state to access history
+        state = await sim_session.get_state()
+        history = state.get("history", {})
+
+        # Extract time series data
+        times = history.get("time", [])
+        ignitions = history.get("ignitions", [])
+        free_energy = history.get("free_energy", [])
+        allostatic_load = history.get("allostatic_load", [])
+
+        # Basic statistics
+        duration_ms = times[-1] if times else 0.0
+        num_steps = len(times)
+
+        # Ignition statistics
+        ignition_count = sum(1 for ig in ignitions if ig)
+        ignition_rate = ignition_count / num_steps if num_steps > 0 else 0.0
+
+        ignition_stats = {
+            "total_ignitions": ignition_count,
+            "ignition_rate": ignition_rate,
+            "average_ignition_interval_ms": duration_ms / ignition_count
+            if ignition_count > 0
+            else 0.0,
+        }
+
+        # Energy statistics
+        avg_free_energy = sum(free_energy) / len(free_energy) if free_energy else 0.0
+        min_free_energy = min(free_energy) if free_energy else 0.0
+        max_free_energy = max(free_energy) if free_energy else 0.0
+
+        energy_stats = {
+            "average_free_energy": avg_free_energy,
+            "min_free_energy": min_free_energy,
+            "max_free_energy": max_free_energy,
+            "energy_variance": sum((x - avg_free_energy) ** 2 for x in free_energy)
+            / len(free_energy)
+            if free_energy
+            else 0.0,
+        }
+
+        # Allostasis statistics
+        avg_allostatic_load = (
+            sum(allostatic_load) / len(allostatic_load) if allostatic_load else 0.0
+        )
+        min_allostatic_load = min(allostatic_load) if allostatic_load else 0.0
+        max_allostatic_load = max(allostatic_load) if allostatic_load else 0.0
+
+        allostasis_stats = {
+            "average_allostatic_load": avg_allostatic_load,
+            "min_allostatic_load": min_allostatic_load,
+            "max_allostatic_load": max_allostatic_load,
+            "final_allostatic_load": allostatic_load[-1] if allostatic_load else 0.0,
+        }
+
+        response = SummaryStatistics(
+            session_id=session_id,
+            duration_ms=duration_ms,
+            num_steps=num_steps,
+            ignition_stats=ignition_stats,
+            energy_stats=energy_stats,
+            allostasis_stats=allostasis_stats,
+        )
+
+        logger.info(f"Generated summary statistics for session {session_id}")
+        return response
+
+    except ValueError as e:
+        logger.warning(f"Summary statistics generation failed for session {session_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    except Exception:
+        logger.error(
+            f"Failed to generate summary statistics for session {session_id}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate summary statistics",
         )

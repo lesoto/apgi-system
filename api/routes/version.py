@@ -24,7 +24,7 @@ DEPRECATED_ENDPOINTS: Dict[str, Dict[str, str]] = {}
 
 
 @router.get("/version")
-async def get_version_info():
+async def get_version_info() -> JSONResponse:
     """
     Get API version information.
 
@@ -47,7 +47,7 @@ async def get_version_info():
     )
 
 
-def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]]):
+def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]]) -> None:
     """
     Configure deprecated endpoints.
 

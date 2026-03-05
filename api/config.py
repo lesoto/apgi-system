@@ -188,6 +188,22 @@ class Settings:
                     "Set CORS_ORIGINS environment variable to specific allowed origins for production."
                 )
 
+        # Check for localhost origins in production
+        localhost_origins = {
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+        }
+        if self.environment.lower() in ["production", "prod"]:
+            configured_localhost = set(self.cors_origins) & localhost_origins
+            if configured_localhost:
+                warnings.warn(
+                    f"PRODUCTION WARNING: CORS_ORIGINS contains localhost origins: {', '.join(configured_localhost)}. "
+                    "This may prevent legitimate production clients from accessing the API. "
+                    "Remove localhost origins from CORS_ORIGINS in production deployments."
+                )
+
 
 # Global settings instance
 settings = Settings()

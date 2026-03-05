@@ -7,8 +7,9 @@ Handles JWT token creation/verification and password hashing for user authentica
 import hashlib
 import hmac
 import logging
+import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import bcrypt
 import jwt
@@ -94,21 +95,68 @@ class AuthManager:
             logger.warning(f"Failed to connect to Redis for token blacklisting: {e}")
             self.redis_client = None
 
+        # In-memory fallback for failed login tracking when Redis unavailable
+        self.failed_login_attempts: Dict[
+            str, Tuple[int, float]
+        ] = {}  # user_id -> (count, timestamp)
+
     # ========================================================================
     # Password Hashing
     # ========================================================================
 
-    @staticmethod
-    def hash_password(password: str) -> str:
+    def _track_failed_login_attempt(self, user_id: str) -> None:
         """
-        Hash a password using bcrypt.
+        Track failed login attempts with Redis or in-memory fallback.
 
         Args:
-            password: Plain text password
-
-        Returns:
-            Hashed password string
+            user_id: User identifier
         """
+        current_time = time.time()
+
+        if self.redis_client:
+            # Redis tracking
+            failed_key = f"failed_login:{user_id}"
+            failed_count = self.redis_client.incr(failed_key)
+            self.redis_client.expire(failed_key, 3600)  # Expire in 1 hour
+            if failed_count >= 5:
+                # Lock the account - need to get user and update
+                user = self.db.query(User).filter(User.user_id == user_id).first()
+                if user:
+                    user.is_active = False  # type: ignore[assignment]
+                    self.db.commit()
+                    logger.warning(
+                        f"Account locked for user {user_id} due to too many failed login attempts"
+                    )
+        else:
+            # In-memory fallback
+            if user_id not in self.failed_login_attempts:
+                self.failed_login_attempts[user_id] = (0, current_time)
+
+            count, _ = self.failed_login_attempts[user_id]
+            count += 1
+            self.failed_login_attempts[user_id] = (count, current_time)
+
+            # Clean up old entries (older than 1 hour)
+            expired = [
+                uid
+                for uid, (_, ts) in self.failed_login_attempts.items()
+                if current_time - ts > 3600
+            ]
+            for uid in expired:
+                del self.failed_login_attempts[uid]
+
+            if count >= 5:
+                # Lock the account
+                user = self.db.query(User).filter(User.user_id == user_id).first()
+                if user:
+                    user.is_active = False  # type: ignore[assignment]
+                    self.db.commit()
+                    logger.warning(
+                        f"Account locked for user {user_id} due to too many failed login attempts (in-memory fallback)"
+                    )
+
+    @staticmethod
+    def hash_password(password: str) -> str:
         # Truncate password to 72 bytes (bcrypt limit)
         password_bytes = password.encode("utf-8")
         if len(password_bytes) > 72:
@@ -171,7 +219,7 @@ class AuthManager:
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)
+        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)  # type: ignore[arg-type]
 
         return token
 
@@ -193,7 +241,7 @@ class AuthManager:
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)
+        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)  # type: ignore[arg-type]
 
         return token
 
@@ -263,26 +311,26 @@ class AuthManager:
         # Look up user
         user = self.db.query(User).filter(User.username == username).first()
 
-        if not user:
-            return None
+        # Always perform password verification to prevent timing attacks
+        # Use dummy hash for non-existent users
+        dummy_hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeFKw1O8N6bO3QS6"  # bcrypt hash of empty string
+        password_hash = user.password_hash if user else dummy_hash
 
-        # Verify password
-        if not self.verify_password(password, user.password_hash):  # type: ignore[arg-type]
-            # Failed login - track attempts
-            if self.redis_client:
-                failed_key = f"failed_login:{user.user_id}"
-                failed_count = self.redis_client.incr(failed_key)
-                self.redis_client.expire(failed_key, 3600)  # Expire in 1 hour
-                if failed_count >= 5:
-                    # Lock the account
-                    user.is_active = False  # type: ignore[assignment]
-                    self.db.commit()
+        password_valid = self.verify_password(password, password_hash)  # type: ignore[arg-type]
+
+        if not user or not password_valid:
+            # Failed login - track attempts for existing users only
+            if user:
+                self._track_failed_login_attempt(user.user_id)  # type: ignore[arg-type]
             return None
 
         # Successful login - reset failed attempts
         if self.redis_client:
             failed_key = f"failed_login:{user.user_id}"
             self.redis_client.delete(failed_key)
+        else:
+            # Clear in-memory tracking
+            self.failed_login_attempts.pop(str(user.user_id), None)
 
         # Update last login
         try:
@@ -396,7 +444,7 @@ class AuthManager:
             raise AuthenticationError("Invalid or revoked refresh token")
 
         # Verify the token using bcrypt.checkpw
-        if not self.verify_password(refresh_token, db_token.token_hash):
+        if not self.verify_password(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
             raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
@@ -475,7 +523,7 @@ class AuthManager:
             try:
                 if db_token:
                     # Verify the token using bcrypt.checkpw before revoking
-                    if self.verify_password(refresh_token, db_token.token_hash):
+                    if self.verify_password(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
                         db_token.revoked = True  # type: ignore[assignment]
                         self.db.commit()
                         return True

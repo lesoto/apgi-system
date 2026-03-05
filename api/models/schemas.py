@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # ============================================================================
 # Enums
@@ -532,7 +532,7 @@ class UserCreateRequest(BaseModel):
     """Request to create a new user."""
 
     username: Optional[str] = Field(None, description="Username (auto-generated if not provided)")
-    email: Optional[str] = Field(None, description="Email address")
+    email: Optional[EmailStr] = Field(None, description="Email address")
     password: Optional[str] = Field(None, description="Password (auto-generated if not provided)")
     roles: Optional[List[str]] = Field(None, description="List of user roles")
 
@@ -555,7 +555,7 @@ class UserCreateResponse(BaseModel):
     username: str = Field(..., description="Username")
     email: str = Field(..., description="Email address")
     roles: List[str] = Field(..., description="User roles")
-    password: str = Field(..., description="Plain text password (only returned once)")
+    password: Optional[str] = Field(None, description="Generated password (only returned once)")
     created_at: datetime = Field(..., description="Creation timestamp")
     message: str = Field(..., description="Status message")
 
@@ -591,7 +591,7 @@ class UserResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     """Request to update user information."""
 
-    email: Optional[str] = Field(None, description="New email address")
+    email: Optional[EmailStr] = Field(None, description="New email address")
     roles: Optional[List[str]] = Field(None, description="New roles list (admin only)")
     is_active: Optional[bool] = Field(None, description="Active status (admin only)")
 
@@ -622,7 +622,6 @@ class PasswordResetResponse(BaseModel):
     """Response after password reset."""
 
     user_id: str = Field(..., description="User identifier")
-    new_password: str = Field(..., description="New plain text password")
     message: str = Field(..., description="Status message")
 
 

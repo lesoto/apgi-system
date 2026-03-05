@@ -123,6 +123,7 @@ class StroopTask:
         self.trials: List[StroopTrial] = []
         self.task_start_time: Optional[float] = None
         self.task_end_time: Optional[float] = None
+        self.results: List[Dict[str, Any]] = []
 
         # Generate trials
         self._generate_trials()
@@ -304,3 +305,106 @@ class StroopTask:
             random.seed(self.random_seed)
             np.random.seed(self.random_seed)
             self._generate_trials()
+
+    def run_all_trials(self, apgi_system: Any) -> Dict[str, Any]:
+        """
+        Run all trials and return comprehensive results.
+
+        Parameters
+        ----------
+        apgi_system : APGISystem
+            The APGI system instance to run trials on
+
+        Returns
+        -------
+        Dict[str, Any]
+            Comprehensive analysis of all results
+        """
+        self.results = []
+        self.current_trial = 0
+
+        print(f"\n{'=' * 70}")
+        print(f"Running Stroop Task: {len(self.trials)} trials")
+        print(f"{'=' * 70}\n")
+
+        for trial_idx, trial in enumerate(self.trials):
+            if trial_idx % 10 == 0:
+                progress = (trial_idx / len(self.trials)) * 100
+                print(f"Progress: {trial_idx}/{len(self.trials)} trials ({progress:.1f}%)...")
+
+            # For Stroop task, we need to simulate participant responses
+            # In a real experiment, this would come from user input
+            # For now, simulate with some accuracy
+            response_time = 0.8 + np.random.exponential(0.2)  # Simulate RT distribution
+
+            # Simulate participant accuracy (imperfect but above chance)
+            if trial.trial_type == TrialType.CONGRUENT:
+                correct_prob = 0.95  # High accuracy for congruent
+            elif trial.trial_type == TrialType.INCONGRUENT:
+                correct_prob = 0.75  # Lower accuracy for incongruent (Stroop effect)
+            else:  # NEUTRAL
+                correct_prob = 0.9  # Moderate accuracy for neutral
+
+            if np.random.random() < correct_prob:
+                response = trial.correct_response
+            else:
+                # Choose wrong color
+                wrong_colors = [c for c in self.colors if c != trial.correct_response]
+                response = random.choice(wrong_colors)
+
+            self.record_response(response, response_time)
+
+        print(f"Progress: {len(self.trials)}/{len(self.trials)} trials (100.0%)")
+        print("\nAll trials completed. Analyzing results...\n")
+
+        return self.analyze_results()
+
+    def analyze_results(self) -> Dict[str, Any]:
+        """
+        Analyze results and compute comprehensive metrics.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - Overall statistics
+            - Results by condition
+            - Task parameters
+        """
+        if not self.is_complete():
+            return {"error": "Task not complete", "total_trials": len(self.trials)}
+
+        results = self.get_results()
+
+        return {
+            "total_trials": results.total_trials,
+            "stroop_interference": results.stroop_interference,
+            "facilitation": results.facilitation,
+            "overall_accuracy": (
+                results.congruent_accuracy + results.incongruent_accuracy + results.neutral_accuracy
+            )
+            / 3,
+            "by_condition": {
+                "congruent": {
+                    "trials": results.congruent_trials,
+                    "mean_rt": results.congruent_rt,
+                    "accuracy": results.congruent_accuracy,
+                },
+                "incongruent": {
+                    "trials": results.incongruent_trials,
+                    "mean_rt": results.incongruent_rt,
+                    "accuracy": results.incongruent_accuracy,
+                },
+                "neutral": {
+                    "trials": results.neutral_trials,
+                    "mean_rt": results.neutral_rt,
+                    "accuracy": results.neutral_accuracy,
+                },
+            },
+            "task_parameters": {
+                "num_trials": self.num_trials,
+                "congruent_ratio": self.congruent_ratio,
+                "incongruent_ratio": self.incongruent_ratio,
+                "neutral_ratio": self.neutral_ratio,
+            },
+        }

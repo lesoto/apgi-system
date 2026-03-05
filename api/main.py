@@ -7,7 +7,7 @@ FastAPI application providing RESTful access to the APGI System.
 import socket
 import sys
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import AsyncGenerator, Dict, Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -44,7 +44,19 @@ from api.middleware.rate_limiting import RateLimitingMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from api.middleware.https_redirect import HTTPSRedirectMiddleware
 from .middleware.security_headers import SecurityHeadersMiddleware
-from api.routes import auth, export, health, metrics, sessions, state, tasks, users, version
+from api.routes import (
+    auth,
+    export,
+    health,
+    metrics,
+    sessions,
+    state,
+    tasks,
+    users,
+    version,
+    webhooks,
+    admin,
+)
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -70,9 +82,9 @@ def is_port_available(host: str, port: int) -> bool:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
-    global redis_client  # type: ignore # noqa: F824
+    global redis_client
 
     # Startup
     logger.info("Application starting up", component="lifecycle")
@@ -97,23 +109,24 @@ async def lifespan(app: FastAPI):
 
     # Initialize Redis client
     try:
-        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
-        await redis_client.ping()
-        logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
+        if redis_client:
+            await redis_client.ping()  # type: ignore[misc]
+            logger.info("Redis client initialized", component="redis", url=settings.redis_url)
 
-        # Update rate limiting middleware with Redis client
-        if rate_limiting_middleware:
-            rate_limiting_middleware.set_redis_client(redis_client)
-            logger.info(
-                "Rate limiting middleware updated with Redis client", component="middleware"
-            )
+            # Update rate limiting middleware with Redis client
+            if rate_limiting_middleware:
+                rate_limiting_middleware.set_redis_client(redis_client)
+                logger.info(
+                    "Rate limiting middleware updated with Redis client", component="middleware"
+                )
 
     except Exception as e:
         logger.error("Failed to initialize Redis", component="redis", error=str(e))
         raise
 
     # Initialize session routes with Redis client
-    sessions.init_session_routes(redis_client)
+    sessions.init_session_routes(redis_client)  # type: ignore[attr-defined]
     logger.info("Session routes initialized", component="routes")
 
     # Initialize task routes
@@ -237,7 +250,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
 
     # Root endpoint
     @app.get("/", tags=["Root"])
-    async def root():
+    async def root() -> Dict[str, str]:
         """API root endpoint with basic information."""
         return {
             "name": "APGI System API",
@@ -257,6 +270,8 @@ def create_app(test_mode: bool = False) -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(health.router)
     app.include_router(version.router)
+    app.include_router(webhooks.router)
+    app.include_router(admin.router)
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})
@@ -312,4 +327,4 @@ if __name__ == "__main__":
                 f"✓ HTTPS enabled with cert: {settings.ssl_certfile}, key: {settings.ssl_keyfile}"
             )
 
-    uvicorn.run("api.main:app", **uvicorn_kwargs)
+    uvicorn.run("api.main:app", **uvicorn_kwargs)  # type: ignore[arg-type]

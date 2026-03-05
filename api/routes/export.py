@@ -7,12 +7,12 @@ API endpoints for exporting simulation data, summary statistics, and event analy
 import io
 import logging
 import re
-from typing import Optional, Any
+from typing import Dict, Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
-from api.models.schemas import ErrorResponse, SummaryStatistics
+from api.models.schemas import ErrorResponse
 from api.services.authorization import require_permission, Permission
 from api.services.data_export import DataExportService
 
@@ -127,18 +127,17 @@ async def export_session_data(
 
     except ValueError as e:
         logger.warning(f"Export failed for session {session_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to export data for session {session_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    except Exception:
+        logger.error(f"Failed to export data for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to export data: {str(e)}",
+            detail="Failed to export data",
         )
 
 
 @router.get(
     "/{session_id}/summary",
-    response_model=SummaryStatistics,
     summary="Get summary statistics",
     description="Retrieve computed summary statistics for simulation session",
     dependencies=[Depends(require_permission(Permission.DATA_READ))],
@@ -146,7 +145,7 @@ async def export_session_data(
 async def get_summary_statistics(
     session_id: str,
     service: DataExportService = Depends(get_data_export_service),
-) -> SummaryStatistics:
+) -> Dict[str, Any]:
     """
     Get summary statistics.
 
@@ -175,9 +174,9 @@ async def get_summary_statistics(
 
     except ValueError as e:
         logger.warning(f"Summary generation failed for session {session_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to generate summary for session {session_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    except Exception:
+        logger.error(f"Failed to generate summary for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate summary statistics",
@@ -203,7 +202,7 @@ async def get_time_series_data(
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     service: DataExportService = Depends(get_data_export_service),
-) -> dict:
+) -> Dict[str, Any]:
     """
     Get time series data.
 
@@ -250,9 +249,9 @@ async def get_time_series_data(
 
     except ValueError as e:
         logger.warning(f"Time series retrieval failed for session {session_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to get time series for session {session_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    except Exception:
+        logger.error(f"Failed to get time series for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get time series data",
@@ -269,7 +268,7 @@ async def get_event_analysis(
     session_id: str,
     event_type: str = Query("ignition", description="Type of event to analyze"),
     service: DataExportService = Depends(get_data_export_service),
-) -> dict:
+) -> Dict[str, Any]:
     """
     Get event analysis.
 
@@ -298,9 +297,9 @@ async def get_event_analysis(
 
     except ValueError as e:
         logger.warning(f"Event analysis failed for session {session_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to analyze events for session {session_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    except Exception:
+        logger.error(f"Failed to analyze events for session {session_id}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to analyze events",

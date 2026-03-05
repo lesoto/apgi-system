@@ -4,7 +4,7 @@ Authentication Routes
 Endpoints for user authentication, token management, and logout.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db
@@ -153,6 +153,7 @@ async def refresh_token(
     },
 )
 async def logout(
+    http_request: Request,
     request: TokenRefreshRequest,
     current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -161,6 +162,7 @@ async def logout(
     Logout user by revoking refresh token and blacklisting access token.
 
     Args:
+        http_request: HTTP request object to access Authorization header
         request: Refresh token to revoke
         current_user: Current authenticated user (from access token)
         db: Database session
@@ -174,7 +176,7 @@ async def logout(
     auth_manager.revoke_refresh_token(request.refresh_token)
 
     # Extract access token from Authorization header and blacklist it
-    auth_header = request.headers.get("Authorization")
+    auth_header = http_request.headers.get("Authorization")
     if auth_header:
         parts = auth_header.split()
         if len(parts) == 2 and parts[0].lower() == "bearer":
