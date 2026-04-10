@@ -142,6 +142,13 @@ class CircuitBreaker:
                 return result
 
             except Exception as e:
+                # Log failure details before raising
+                import logging
+
+                logging.getLogger("utils.circuit_breaker").error(
+                    f"Circuit breaker '{self.config.name}' failure: {type(e).__name__}: {str(e)}",
+                    exc_info=True,
+                )
                 self._on_failure(e)
                 raise
 
@@ -213,25 +220,23 @@ class CircuitBreaker:
         return False  # type: ignore[unreachable]
 
     def _execute_with_timeout(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-        """Execute function with timeout."""
-        import signal
+        """
+        Execute function with timeout using a thread pool.
+        This is safer than signal.alarm() in multi-threaded/async environments.
+        """
+        import concurrent.futures
 
-        def timeout_handler(signum: int, frame: Any) -> None:
-            raise CircuitBreakerTimeoutException(
-                f"Request timed out after {self.config.timeout} seconds"
-            )
-
-        # Set up timeout handler
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(int(self.config.timeout))
-
-        try:
-            result = func(*args, **kwargs)
-            return result
-        finally:
-            # Restore original handler
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(func, *args, **kwargs)
+            try:
+                return future.result(timeout=self.config.timeout)
+            except concurrent.futures.TimeoutError:
+                raise CircuitBreakerTimeoutException(
+                    f"Request timed out after {self.config.timeout} seconds"
+                )
+            except Exception as e:
+                # Re-raise the original exception from the function
+                raise e
 
     async def _execute_async_with_timeout(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
@@ -350,6 +355,7 @@ class CircuitBreaker:
             ),
             "uptime_percentage": self._calculate_uptime_percentage(),
             "created_at": self.metrics.created_at,
+            "recovery_timeout": self.config.recovery_timeout,
         }
 
     def _calculate_uptime_percentage(self) -> float:
@@ -403,6 +409,17 @@ class CircuitBreaker:
                 "Circuit breaker force closed",
                 extra={"circuit_name": self.config.name, "old_state": old_state.value},
             )
+
+    def _sanitize_headers(self, headers: dict[str, str]) -> dict[str, str]:
+        """Mask sensitive headers before logging."""
+        sanitized = {}
+        sensitive = {"authorization", "cookie", "x-csrf-token", "proxy-authorization", "set-cookie"}
+        for k, v in headers.items():
+            if k.lower() in sensitive:
+                sanitized[k] = "[REDACTED]"
+            else:
+                sanitized[k] = v
+        return sanitized
 
 
 class CircuitBreakerRegistry:
@@ -509,8 +526,7 @@ def circuit_breaker(  # noqa: E704
     success_threshold: int = 3,
     timeout: float = 10.0,
     monitor_failures: bool = True,
-) -> Callable[P, R]:
-    ...
+) -> Callable[P, R]: ...
 
 
 @overload
@@ -522,8 +538,7 @@ def circuit_breaker(  # noqa: E704
     success_threshold: int = 3,
     timeout: float = 10.0,
     monitor_failures: bool = True,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    ...
+) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
 
 def circuit_breaker(

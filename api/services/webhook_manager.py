@@ -156,29 +156,13 @@ class WebhookManager:
         if len(url) > 500:
             raise ValueError("Webhook URL exceeds maximum length of 500 characters")
 
-        # Parse URL to extract hostname
-        parsed = urlparse(url)
-        hostname = parsed.hostname
+        # Use centralized security utility for SSRF protection
+        from api.utils.security import is_safe_url
 
-        if not hostname:
-            raise ValueError("Invalid URL: no hostname")
-
-        # Check if hostname is an IP address
-        try:
-            ip = ipaddress.ip_address(hostname)
-            if self._is_private_ip(ip):
-                raise ValueError("Webhook URL points to private or blocked IP address")
-        except ValueError:
-            # Hostname is not an IP, resolve it
-            try:
-                resolved_ip = socket.gethostbyname(hostname)
-                ip = ipaddress.ip_address(resolved_ip)
-                if self._is_private_ip(ip):
-                    raise ValueError("Webhook URL resolves to private or blocked IP address")
-            except socket.gaierror as e:
-                raise ValueError(f"Cannot resolve hostname '{hostname}': {e}")
-            except ValueError as e:
-                raise ValueError(f"Resolved IP address is invalid: {e}")
+        if not is_safe_url(url):
+            raise ValueError(
+                "Webhook URL points to an unsafe destination (private, reserved, or non-HTTPS)"
+            )
 
         # Optionally perform a HEAD request to verify accessibility
         # (commented out to avoid blocking during validation)

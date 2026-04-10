@@ -10,8 +10,9 @@ Requirements tested:
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 import redis.asyncio as redis
-from typing import Dict, Any
-from api.routes import sessions, state, export, tasks
+from typing import Dict, Any, Generator, List, Optional, Callable
+from fastapi.testclient import TestClient
+from api.routes import export, tasks
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 from api.services.task_executor import TaskExecutor
 from api.services.data_export import DataExportService
@@ -39,7 +40,7 @@ def mock_apgi_system() -> Mock:
     mock_system.time = 0.0
     mock_system.timestep_ms = 10.0
 
-    def mock_get_state():
+    def mock_get_state() -> Dict[str, Any]:
         return {
             "time": mock_system.time,
             "timestep_ms": 10.0,
@@ -88,7 +89,7 @@ def mock_session_manager(mock_apgi_system: Mock) -> Mock:
         session_id = "test-session-123"
         return session_id
 
-    async def mock_get_session(session_id: str):
+    async def mock_get_session(session_id: str) -> Any:
         if session_id == "test-session-123":
             mock_sim = Mock(spec=SimulationSession)
             mock_sim.session_id = session_id
@@ -97,6 +98,7 @@ def mock_session_manager(mock_apgi_system: Mock) -> Mock:
             mock_sim.updated_at = "2025-12-03T10:30:00"
             mock_sim.config = {"config_path": "config/default.yaml"}
             mock_sim.apgi_system = mock_apgi_system
+            mock_sim.user_id = "test-user-123"
 
             async def mock_start() -> Dict[str, Any]:
                 return {"session_id": session_id, "status": "running"}
@@ -118,13 +120,17 @@ def mock_session_manager(mock_apgi_system: Mock) -> Mock:
 
 
 @pytest.fixture
-def mock_data_export_service():
+def mock_data_export_service() -> Mock:
     """Create a mock DataExportService."""
     service = Mock(spec=DataExportService)
 
     async def mock_export_session_data(
-        session_id, format="json", variables=None, start_time=None, end_time=None
-    ):
+        session_id: str,
+        format: str = "json",
+        variables: Optional[List[str]] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+    ) -> tuple[bytes, str]:
         import json
 
         data = {
@@ -146,11 +152,11 @@ def mock_data_export_service():
 
 
 @pytest.fixture
-def mock_task_executor():
+def mock_task_executor() -> Mock:
     """Create a mock TaskExecutor."""
     executor = Mock(spec=TaskExecutor)
 
-    async def mock_list_available_tasks():
+    async def mock_list_available_tasks() -> Dict[str, Any]:
         return {
             "tasks": [
                 {
@@ -172,12 +178,18 @@ def mock_task_executor():
 
 
 @pytest.fixture
-def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor):
+def client(
+    mock_redis: AsyncMock,
+    mock_session_manager: Mock,
+    mock_data_export_service: Mock,
+    mock_task_executor: Mock,
+) -> Generator[TestClient, None, None]:
     """Create a test client with mocked dependencies."""
     from api.main import create_app
     from fastapi.testclient import TestClient
     from api.services.authorization import get_current_user, require_permission
     from api.services.auth_manager import TokenPayload
+    from api.services.session_manager import get_session_manager, get_redis_client
     from datetime import datetime, timedelta
 
     # Create app in test mode (disables auth and CSRF middleware)
@@ -193,39 +205,53 @@ def client(mock_redis, mock_session_manager, mock_data_export_service, mock_task
     )
 
     # Override get_current_user to return mock user
-    async def mock_get_current_user():
+    async def mock_get_current_user() -> TokenPayload:
         return mock_token_payload
 
     # Override require_permission to always pass
-    def mock_require_permission(permission):
-        def dummy_dependency():
+    def mock_require_permission(permission: str) -> Callable[[], None]:
+        def dummy_dependency() -> None:
             return None
 
         return dummy_dependency
 
+    # Override session manager and redis client dependencies
+    def mock_get_session_manager() -> Mock:
+        return mock_session_manager
+
+    def mock_get_redis_client() -> AsyncMock:
+        return mock_redis
+
     # Apply overrides
     app.dependency_overrides[get_current_user] = mock_get_current_user
     app.dependency_overrides[require_permission] = mock_require_permission
+    app.dependency_overrides[get_session_manager] = mock_get_session_manager
+    app.dependency_overrides[get_redis_client] = mock_get_redis_client
 
-    # Override dependencies
-    sessions._session_manager = mock_session_manager
-    sessions._redis_client = mock_redis
-    state._session_manager = mock_session_manager
+    # Override data export service and task executor
     export._data_export_service = mock_data_export_service
-    export._session_manager = mock_session_manager
+    export._session_manager = mock_session_manager  # type: ignore[attr-defined]
     tasks._task_executor = mock_task_executor
+    tasks._session_manager = mock_session_manager  # type: ignore[attr-defined]
 
     # Skip startup/shutdown events
     app.router.on_startup = []
     app.router.on_shutdown = []
 
-    # Use patch to mock is_authenticated in state routes
-    with patch("api.routes.state.is_authenticated", return_value=True):
-        yield TestClient(app)
+    # Use patch to mock get_current_user in state routes and skip session ownership checks
+    mock_user = Mock()
+    mock_user.user_id = "test-user-id"
+    mock_user.roles = ["user"]
+    with patch("api.routes.state.get_current_user", return_value=mock_user):
+        with patch(
+            "api.services.session_manager.get_session_manager",
+            return_value=mock_session_manager,
+        ):
+            yield TestClient(app)
 
 
 @pytest.fixture
-def openapi_schema(client):
+def openapi_schema(client: Any) -> Dict[str, Any]:
     """Get the OpenAPI schema from the API."""
     response = client.get("/openapi.json")
     assert response.status_code == 200
@@ -306,7 +332,9 @@ class TestSessionEndpointContracts:
     Validates: Requirements 12.3
     """
 
-    def test_create_session_response_schema(self, client, openapi_schema):
+    def test_create_session_response_schema(
+        self, client: Any, openapi_schema: Dict[str, Any]
+    ) -> None:
         """
         Test that POST /v1/sessions response matches OpenAPI schema.
 
@@ -329,7 +357,7 @@ class TestSessionEndpointContracts:
         assert isinstance(data["created_at"], str)
         assert isinstance(data["config"], dict)
 
-    def test_get_session_response_schema(self, client, openapi_schema):
+    def test_get_session_response_schema(self, client: Any, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that GET /v1/sessions/{session_id} response matches OpenAPI schema.
 
@@ -354,7 +382,9 @@ class TestSessionEndpointContracts:
         assert isinstance(data["updated_at"], str)
         assert isinstance(data["config"], dict)
 
-    def test_session_action_response_schema(self, client, openapi_schema):
+    def test_session_action_response_schema(
+        self, client: Any, openapi_schema: Dict[str, Any]
+    ) -> None:
         """
         Test that session action endpoints return correct schema.
 
@@ -387,7 +417,7 @@ class TestStateEndpointContracts:
     Validates: Requirements 12.3
     """
 
-    def test_get_state_response_schema(self, client, openapi_schema):
+    def test_get_state_response_schema(self, client: Any, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that GET /v1/sessions/{session_id}/state response matches schema.
 
@@ -455,7 +485,7 @@ class TestExportEndpointContracts:
     Validates: Requirements 12.3
     """
 
-    def test_export_data_response_schema(self, client, openapi_schema):
+    def test_export_data_response_schema(self, client: Any, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that GET /v1/sessions/{session_id}/export response matches schema.
 
@@ -487,7 +517,7 @@ class TestTaskEndpointContracts:
     Validates: Requirements 12.3
     """
 
-    def test_list_tasks_response_schema(self, client, openapi_schema):
+    def test_list_tasks_response_schema(self, client: Any, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that GET /v1/tasks response matches schema.
 
@@ -518,7 +548,7 @@ class TestErrorResponseContracts:
     Validates: Requirements 12.3, 1.3
     """
 
-    def test_404_error_response_schema(self, client, openapi_schema):
+    def test_404_error_response_schema(self, client: Any, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that 404 error responses match ErrorResponse schema.
 
@@ -549,7 +579,9 @@ class TestErrorResponseContracts:
         if "details" in error:
             assert isinstance(error["details"], dict)
 
-    def test_validation_error_response_schema(self, client, openapi_schema):
+    def test_validation_error_response_schema(
+        self, client: Any, openapi_schema: Dict[str, Any]
+    ) -> None:
         """
         Test that validation error responses match schema.
 
@@ -572,7 +604,7 @@ class TestOpenAPISchemaCompleteness:
     Validates: Requirements 12.3
     """
 
-    def test_openapi_schema_structure(self, openapi_schema):
+    def test_openapi_schema_structure(self, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that OpenAPI schema has required structure.
 
@@ -589,7 +621,7 @@ class TestOpenAPISchemaCompleteness:
         assert "version" in info
         assert info["title"] == "APGI System API"
 
-    def test_all_endpoints_have_schemas(self, openapi_schema):
+    def test_all_endpoints_have_schemas(self, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that all endpoints have response schemas defined.
 
@@ -610,7 +642,7 @@ class TestOpenAPISchemaCompleteness:
                         len(success_codes) > 0
                     ), f"{method.upper()} {path} has no success responses"
 
-    def test_components_schemas_defined(self, openapi_schema):
+    def test_components_schemas_defined(self, openapi_schema: Dict[str, Any]) -> None:
         """
         Test that component schemas are properly defined.
 

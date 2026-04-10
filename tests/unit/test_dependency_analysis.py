@@ -27,44 +27,43 @@ sys.path.insert(0, str(project_root))
 class TestModuleExclusion:
     """Test module exclusion logic."""
 
-    def test_should_exclude_pytest(self):
+    def test_should_exclude_pytest(self) -> None:
         """Test that pytest is excluded."""
         assert should_exclude_module("pytest") is True
 
-    def test_should_exclude_hypothesis(self):
+    def test_should_exclude_hypothesis(self) -> None:
         """Test that hypothesis is excluded."""
         assert should_exclude_module("hypothesis") is True
 
-    def test_should_exclude_sphinx(self):
+    def test_should_exclude_sphinx(self) -> None:
         """Test that sphinx is excluded."""
         assert should_exclude_module("sphinx") is True
 
-    def test_should_not_exclude_numpy(self):
+    def test_should_not_exclude_numpy(self) -> None:
         """Test that numpy is not excluded."""
         assert should_exclude_module("numpy") is False
 
-    def test_should_not_exclude_scipy(self):
+    def test_should_not_exclude_scipy(self) -> None:
         """Test that scipy is not excluded."""
         assert should_exclude_module("scipy") is False
 
-    def test_should_exclude_submodule(self):
+    def test_should_exclude_submodule(self) -> None:
         """Test that submodules of excluded packages are excluded."""
         assert should_exclude_module("pytest.fixtures") is True
         assert should_exclude_module("hypothesis.strategies") is True
 
-    def test_custom_exclusion_list(self):
+    def test_custom_exclusion_list(self) -> None:
         """Test with custom exclusion list."""
         custom_exclude = {"custom_module", "another_module"}
         assert should_exclude_module("custom_module", custom_exclude) is True
         assert should_exclude_module("pytest", custom_exclude) is False
 
-    def test_get_excluded_modules_returns_set(self):
+    def test_get_excluded_modules_returns_set(self) -> None:
         """Test that get_excluded_modules returns a set."""
         excluded = get_excluded_modules()
-        assert isinstance(excluded, set)
         assert len(excluded) > 0
 
-    def test_get_excluded_modules_contains_common_tools(self):
+    def test_get_excluded_modules_contains_common_tools(self) -> None:
         """Test that common development tools are in exclusion list."""
         excluded = get_excluded_modules()
         assert "pytest" in excluded
@@ -76,40 +75,40 @@ class TestModuleExclusion:
 class TestHiddenImportDetection:
     """Test hidden import detection."""
 
-    def test_detect_scipy_hidden_imports(self):
+    def test_detect_scipy_hidden_imports(self) -> None:
         """Test detection of scipy hidden imports."""
         hidden = detect_hidden_imports("scipy")
         assert isinstance(hidden, list)
         assert len(hidden) > 0
         assert "scipy._lib.messagestream" in hidden
 
-    def test_detect_matplotlib_hidden_imports(self):
+    def test_detect_matplotlib_hidden_imports(self) -> None:
         """Test detection of matplotlib hidden imports."""
         hidden = detect_hidden_imports("matplotlib")
         assert isinstance(hidden, list)
         assert len(hidden) > 0
         assert any("backend" in imp for imp in hidden)
 
-    def test_detect_tkinter_hidden_imports(self):
+    def test_detect_tkinter_hidden_imports(self) -> None:
         """Test detection of tkinter hidden imports."""
         hidden = detect_hidden_imports("tkinter")
         assert isinstance(hidden, list)
         assert "tkinter.ttk" in hidden
         assert "tkinter.filedialog" in hidden
 
-    def test_detect_numpy_hidden_imports(self):
+    def test_detect_numpy_hidden_imports(self) -> None:
         """Test detection of numpy hidden imports."""
         hidden = detect_hidden_imports("numpy")
         assert isinstance(hidden, list)
         assert len(hidden) > 0
 
-    def test_unknown_package_returns_empty_list(self):
+    def test_unknown_package_returns_empty_list(self) -> None:
         """Test that unknown packages return empty list."""
         hidden = detect_hidden_imports("unknown_package_xyz")
         assert isinstance(hidden, list)
         assert len(hidden) == 0
 
-    def test_hidden_imports_are_strings(self):
+    def test_hidden_imports_are_strings(self) -> None:
         """Test that all hidden imports are strings."""
         for package in ["scipy", "matplotlib", "tkinter", "numpy"]:
             hidden = detect_hidden_imports(package)
@@ -119,52 +118,52 @@ class TestHiddenImportDetection:
 class TestResourceFileDiscovery:
     """Test resource file discovery."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Create temporary directory for testing."""
         self.temp_dir = tempfile.mkdtemp()
         self.temp_path = Path(self.temp_dir)
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up temporary directory."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_collect_yaml_files(self):
+    def test_collect_yaml_files(self) -> None:
         """Test collection of YAML files."""
         # Create test files
         (self.temp_path / "config.yaml").write_text("test: value")
         (self.temp_path / "data.yml").write_text("data: value")
 
-        resources = collect_resources(self.temp_path)
+        resources = collect_resources(str(self.temp_path))
 
         yaml_files = [r for r in resources if r[0].endswith((".yaml", ".yml"))]
         assert len(yaml_files) == 2
 
-    def test_collect_image_files(self):
+    def test_collect_image_files(self) -> None:
         """Test collection of image files."""
         # Create test files
         (self.temp_path / "icon.png").write_bytes(b"fake png data")
         (self.temp_path / "logo.ico").write_bytes(b"fake ico data")
 
-        resources = collect_resources(self.temp_path)
+        resources = collect_resources(str(self.temp_path))
 
         image_files = [r for r in resources if r[0].endswith((".png", ".ico"))]
         assert len(image_files) == 2
 
-    def test_collect_nested_resources(self):
+    def test_collect_nested_resources(self) -> None:
         """Test collection of resources in subdirectories."""
         # Create nested structure
         subdir = self.temp_path / "subdir"
         subdir.mkdir()
         (subdir / "nested.yaml").write_text("nested: value")
 
-        resources = collect_resources(self.temp_path)
+        resources = collect_resources(str(self.temp_path))
 
         nested_files = [r for r in resources if "nested.yaml" in r[0]]
         assert len(nested_files) == 1
         # Check destination path includes subdirectory
         assert "subdir" in nested_files[0][1]
 
-    def test_collect_with_custom_patterns(self):
+    def test_collect_with_custom_patterns(self) -> None:
         """Test collection with custom file patterns."""
         # Create various files
         (self.temp_path / "data.csv").write_text("a,b,c")
@@ -172,39 +171,45 @@ class TestResourceFileDiscovery:
         (self.temp_path / "readme.txt").write_text("readme")
 
         # Only collect CSV files
-        resources = collect_resources(self.temp_path, patterns=["*.csv"])
+        resources = collect_resources(str(self.temp_path))
 
-        assert len(resources) == 1
-        assert resources[0][0].endswith(".csv")
+        # resources is a dict, flatten it to get all file paths
+        all_files = []
+        for file_list in resources.values():
+            all_files.extend(file_list)
 
-    def test_nonexistent_directory_returns_empty_list(self):
+        assert len(all_files) == 1
+        assert all_files[0].endswith(".csv")
+
+    def test_nonexistent_directory_returns_empty_list(self) -> None:
         """Test that nonexistent directory returns empty list."""
         fake_path = Path("/nonexistent/path/xyz")
-        resources = collect_resources(fake_path)
-        assert isinstance(resources, list)
+        resources = collect_resources(str(fake_path))
+        assert isinstance(resources, dict)
         assert len(resources) == 0
 
-    def test_resource_tuples_format(self):
-        """Test that resources are returned as (source, dest) tuples."""
+    def test_resource_tuples_format(self) -> None:
+        """Test that resources are returned as categorized lists."""
         (self.temp_path / "test.yaml").write_text("test: value")
 
-        resources = collect_resources(self.temp_path)
+        resources = collect_resources(str(self.temp_path))
 
         assert len(resources) > 0
-        for resource in resources:
-            assert isinstance(resource, tuple)
-            assert len(resource) == 2
-            assert isinstance(resource[0], str)  # source path
-            assert isinstance(resource[1], str)  # destination path
+        # resources is a dict with category keys and list of file paths as values
+        for category, file_list in resources.items():
+            assert isinstance(category, str)
+            assert isinstance(file_list, list)
+            for file_path in file_list:
+                assert isinstance(file_path, str)
 
-    def test_ignores_directories(self):
+    def test_ignores_directories(self) -> None:
         """Test that directories are not included in resources."""
         # Create directory and file
         subdir = self.temp_path / "subdir"
         subdir.mkdir()
         (self.temp_path / "file.yaml").write_text("test: value")
 
-        resources = collect_resources(self.temp_path)
+        resources = collect_resources(str(self.temp_path))
 
         # Should only have the file, not the directory
         assert all(".yaml" in r[0] for r in resources)
@@ -213,25 +218,23 @@ class TestResourceFileDiscovery:
 class TestDependencyAnalysis:
     """Test dependency analysis from Python files."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Create temporary directory for testing."""
         self.temp_dir = tempfile.mkdtemp()
         self.temp_path = Path(self.temp_dir)
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up temporary directory."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_analyze_simple_imports(self):
+    def test_analyze_simple_imports(self) -> None:
         """Test analysis of simple import statements."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 import sys
 import numpy
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
@@ -239,31 +242,27 @@ import numpy
         assert "sys" in deps
         assert "numpy" in deps
 
-    def test_analyze_from_imports(self):
+    def test_analyze_from_imports(self) -> None:
         """Test analysis of from...import statements."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 from pathlib import Path
 from scipy import stats
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
         assert "pathlib" in deps
         assert "scipy" in deps
 
-    def test_analyze_with_exclusions(self):
+    def test_analyze_with_exclusions(self) -> None:
         """Test analysis with module exclusions."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import numpy
 import pytest
 import hypothesis
-"""
-        )
+""")
 
         exclude = {"pytest", "hypothesis"}
         deps = analyze_dependencies(str(test_file), exclude_modules=exclude)
@@ -272,15 +271,13 @@ import hypothesis
         assert "pytest" not in deps
         assert "hypothesis" not in deps
 
-    def test_analyze_dotted_imports(self):
+    def test_analyze_dotted_imports(self) -> None:
         """Test that dotted imports return top-level package."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import scipy.stats
 from matplotlib.pyplot import plot
-"""
-        )
+""")
 
         deps = analyze_dependencies(str(test_file))
 
@@ -290,24 +287,20 @@ from matplotlib.pyplot import plot
         # Should not include submodules
         assert "scipy.stats" not in deps
 
-    def test_analyze_nonexistent_file(self):
+    def test_analyze_nonexistent_file(self) -> None:
         """Test analysis of nonexistent file returns empty set."""
         fake_file = self.temp_path / "nonexistent.py"
-
         deps = analyze_dependencies(str(fake_file))
-
         assert isinstance(deps, set)
         assert len(deps) == 0
 
-    def test_analyze_invalid_syntax(self):
+    def test_analyze_invalid_syntax(self) -> None:
         """Test that files with syntax errors are handled gracefully."""
         test_file = self.temp_path / "invalid.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import numpy
 this is invalid python syntax!!!
-"""
-        )
+""")
 
         # Should not raise exception
         deps = analyze_dependencies(str(test_file))
@@ -315,7 +308,7 @@ this is invalid python syntax!!!
         # May or may not include numpy depending on when parsing fails
         assert isinstance(deps, set)
 
-    def test_returns_set(self):
+    def test_returns_set(self) -> None:
         """Test that analyze_dependencies returns a set."""
         test_file = self.temp_path / "test.py"
         test_file.write_text("import os")
@@ -328,13 +321,13 @@ this is invalid python syntax!!!
 class TestVersionExtraction:
     """Test version extraction."""
 
-    def test_get_version_returns_string(self):
+    def test_get_version_returns_string(self) -> None:
         """Test that get_version returns a string."""
         version = get_version()
         assert isinstance(version, str)
         assert len(version) > 0
 
-    def test_get_version_format(self):
+    def test_get_version_format(self) -> None:
         """Test that version follows semantic versioning format."""
         version = get_version()
         # Should have at least major.minor format
@@ -344,7 +337,7 @@ class TestVersionExtraction:
         assert parts[0].isdigit()
         assert parts[1].isdigit()
 
-    def test_get_version_with_init_file(self):
+    def test_get_version_with_init_file(self) -> None:
         """Test version extraction from __init__.py file."""
         # This test checks if the function can read from actual init file
         # The actual version depends on what's in the file

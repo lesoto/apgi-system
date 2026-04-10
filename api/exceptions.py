@@ -152,7 +152,7 @@ class InvalidTaskTypeError(APIError):
     HTTP Status: 400 Bad Request
     """
 
-    def __init__(self, task_type: str, valid_types: list):
+    def __init__(self, task_type: str, valid_types: list[str]):
         """
         Initialize invalid task type error.
 
@@ -180,7 +180,7 @@ class ValidationError(APIError):
     HTTP Status: 422 Unprocessable Entity
     """
 
-    def __init__(self, message: str, validation_errors: Optional[list] = None):
+    def __init__(self, message: str, validation_errors: Optional[list[str]] = None):
         """
         Initialize validation error.
 
@@ -373,15 +373,17 @@ class ServiceUnavailableError(APIError):
     HTTP Status: 503 Service Unavailable
     """
 
-    def __init__(self, service: str, reason: Optional[str] = None):
+    def __init__(self, service: str, reason: Optional[str] = None, is_degraded: bool = False):
         """
         Initialize service unavailable error.
 
         Args:
             service: Name of the unavailable service
             reason: Optional reason for unavailability
+            is_degraded: Whether the service is partially available but degraded
         """
-        message = f"Service '{service}' is currently unavailable"
+        status_text = "degraded" if is_degraded else "unavailable"
+        message = f"Service '{service}' is currently {status_text}"
         if reason:
             message += f": {reason}"
 
@@ -389,7 +391,7 @@ class ServiceUnavailableError(APIError):
             code="SERVICE_UNAVAILABLE",
             message=message,
             status_code=503,
-            details={"service": service, "reason": reason},
+            details={"service": service, "reason": reason, "status": status_text},
         )
 
 
@@ -420,6 +422,72 @@ class DatabaseError(APIError):
         )
 
 
+class DatabaseConnectionError(ServiceUnavailableError):
+    """
+    Exception raised when connection to the database fails.
+
+    HTTP Status: 503 Service Unavailable
+    """
+
+    def __init__(self, reason: Optional[str] = None):
+        """
+        Initialize database connection error.
+
+        Args:
+            reason: Optional reason for failure
+        """
+        super().__init__(service="Database", reason=reason)
+
+
+class ConcurrencyLimitExceededError(APIError):
+    """
+    Exception raised when too many concurrent requests are being processed.
+
+    HTTP Status: 503 Service Unavailable
+    """
+
+    def __init__(self, limit: int):
+        """
+        Initialize concurrency limit exceeded error.
+
+        Args:
+            limit: The concurrency limit that was reached
+        """
+        super().__init__(
+            code="CONCURRENCY_LIMIT_EXCEEDED",
+            message=f"Concurrency limit of {limit} reached. Please try again later.",
+            status_code=503,
+            details={"limit": limit},
+        )
+
+
+class BadGatewayError(APIError):
+    """
+    Exception raised when an upstream service returns an invalid response.
+
+    HTTP Status: 502 Bad Gateway
+    """
+
+    def __init__(self, service: str, reason: Optional[str] = None):
+        """
+        Initialize bad gateway error.
+
+        Args:
+            service: Name of the upstream service
+            reason: Optional reason for failure
+        """
+        message = f"Invalid response from upstream service '{service}'"
+        if reason:
+            message += f": {reason}"
+
+        super().__init__(
+            code="BAD_GATEWAY",
+            message=message,
+            status_code=502,
+            details={"service": service, "reason": reason},
+        )
+
+
 # ============================================================================
 # Data Export Exceptions (400, 404)
 # ============================================================================
@@ -432,7 +500,7 @@ class ExportFormatError(APIError):
     HTTP Status: 400 Bad Request
     """
 
-    def __init__(self, format: str, supported_formats: list):
+    def __init__(self, format: str, supported_formats: list[str]):
         """
         Initialize export format error.
 

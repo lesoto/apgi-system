@@ -20,27 +20,29 @@ class SensitiveDataFilter(logging.Filter):
 
     # Patterns for sensitive data (regex patterns)
     SENSITIVE_PATTERNS: List[Tuple[str, str]] = [
-        # Passwords
-        (r'password["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'password":"***MASKED***'),
-        (r"'password'\s*:\s*'[^']+'", "'password':'***MASKED***'"),
-        (r"password\s*=\s*[^\s]+", "password=***MASKED***"),
+        # Passwords and secrets — match all common key names and separators
+        (
+            r'(password|passwd|pwd|pass|secret|passphrase)["\s]*[:=]["\s]*["\s]*[^"\\\s;]+',
+            r'\1":"***MASKED***',
+        ),
+        (r"'(password|passwd|pwd|pass|secret|passphrase)'\s*:\s*'[^']+'", r"'\1':'***MASKED***'"),
+        (r"(password|passwd|pwd|pass|secret|passphrase)\s*=\s*[^\s;]+", r"\1=***MASKED***"),
+        # "Password: <value>" log-line style (e.g. from database drivers)
+        (r"(Password|Passwd|Pwd|Pass)\s*:\s*\S+", r"\1: ***MASKED***"),
         # Tokens and API keys
-        (r'token["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'token":"***MASKED***'),
-        (r"'token'\s*:\s*'[^']+'", "'token':'***MASKED***'"),
-        (r'api_key["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'api_key":"***MASKED***'),
-        (r"'api_key'\s*:\s*'[^']+'", "'api_key':'***MASKED***'"),
+        (
+            r'(token|api_key|access_token|refresh_token)["\s]*[:=]["\s]*["\s]*[^"\\\s;]+',
+            r'\1":"***MASKED***',
+        ),
+        (r"'(token|api_key|access_token|refresh_token)'\s*:\s*'[^']+'", r"'\1':'***MASKED***'"),
         # Authorization headers
-        (r'authorization["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'authorization":"***MASKED***'),
+        (r'authorization["\s]*[:=]["\s]*["\s]*[^"\\\s;]+', 'authorization":"***MASKED***'),
         (r"'authorization'\s*:\s*'[^']+'", "'authorization':'***MASKED***'"),
         (r"Bearer\s+[A-Za-z0-9\-_\.]+", "Bearer ***MASKED***"),
         # Secrets and keys
-        (r'secret["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'secret":"***MASKED***'),
-        (r"'secret'\s*:\s*'[^']+'", "'secret':'***MASKED***'"),
-        (r'private_key["\s]*[:=]["\s]*["\s]*[^"\\s]+', 'private_key":"***MASKED***'),
+        (r'private_key["\s]*[:=]["\s]*["\s]*[^"\\\s;]+', 'private_key":"***MASKED***'),
         # Database connection strings (basic pattern)
-        (r"mysql://[^:]+:[^@]+@", "mysql://***:***@"),
-        (r"postgresql://[^:]+:[^@]+@", "postgresql://***:***@"),
-        (r"mongodb://[^:]+:[^@]+@", "mongodb://***:***@"),
+        (r"(mysql|postgresql|mongodb|redis)://[^:]+:[^@]+@", r"\1://***:***@"),
     ]
 
     def __init__(self, name: str = ""):

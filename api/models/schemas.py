@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ============================================================================
 # Enums
@@ -52,10 +52,16 @@ class SessionCreateRequest(BaseModel):
 
     @field_validator("config_path")
     @classmethod
-    def validate_config_path(cls, v):
+    def validate_config_path(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        if ".." in v or v.startswith("/"):
+
+        # Unquote URL-encoded variants (like %2e%2e for ..)
+        from urllib.parse import unquote
+
+        decoded_v = unquote(v)
+
+        if ".." in decoded_v or decoded_v.startswith("/") or "\\" in decoded_v:
             raise ValueError("Invalid config_path: path traversal not allowed")
         return v
 
@@ -287,6 +293,17 @@ class TaskExecuteRequest(BaseModel):
         None, description="URL for webhook notification on completion"
     )
 
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        from api.utils.security import is_safe_url
+
+        if not is_safe_url(v):
+            raise ValueError("Invalid webhook_url: must be a public HTTPS URL")
+        return v
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {"task_type": "iowa_gambling", "parameters": {"num_trials": 100}}
@@ -329,6 +346,17 @@ class TaskSubmitRequest(BaseModel):
     webhook_url: Optional[str] = Field(
         None, description="URL for webhook notification on task completion"
     )
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        from api.utils.security import is_safe_url
+
+        if not is_safe_url(v):
+            raise ValueError("Invalid webhook_url: must be a public HTTPS URL")
+        return v
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -532,7 +560,7 @@ class UserCreateRequest(BaseModel):
     """Request to create a new user."""
 
     username: Optional[str] = Field(None, description="Username (auto-generated if not provided)")
-    email: Optional[EmailStr] = Field(None, description="Email address")
+    email: Optional[str] = Field(None, description="Email address")
     password: Optional[str] = Field(None, description="Password (auto-generated if not provided)")
     roles: Optional[List[str]] = Field(None, description="List of user roles")
 
@@ -591,7 +619,7 @@ class UserResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     """Request to update user information."""
 
-    email: Optional[EmailStr] = Field(None, description="New email address")
+    email: Optional[str] = Field(None, description="New email address")
     roles: Optional[List[str]] = Field(None, description="New roles list (admin only)")
     is_active: Optional[bool] = Field(None, description="Active status (admin only)")
 

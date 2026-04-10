@@ -31,7 +31,6 @@ from tests.strategies import (  # noqa: E402
     somatic_marker_gain_strategy,
 )
 
-
 # ============================================================================
 # Tests for Core Strategies (as specified in design document)
 # ============================================================================
@@ -81,7 +80,7 @@ def test_precision_values_generates_bounded_weights(precision: float) -> None:
 
 @given(observations())
 @settings(max_examples=10)
-def test_observations_generates_valid_sensor_data(obs: list) -> None:
+def test_observations_generates_valid_sensor_data(obs: list[float]) -> None:
     """Test that observations() generates valid sensor data.
 
     Validates Requirements 13.1, 13.2, 13.3, 13.5
@@ -102,7 +101,7 @@ def test_observations_generates_valid_sensor_data(obs: list) -> None:
 
 @given(configurations())
 @settings(max_examples=10)
-def test_configurations_generates_valid_system_configs(config: dict) -> None:
+def test_configurations_generates_valid_system_configs(config: dict[str, Any]) -> None:
     """Test that configurations() generates valid system configs.
 
     Validates Requirements 13.1, 13.2, 13.3, 13.5

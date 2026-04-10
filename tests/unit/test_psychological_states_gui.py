@@ -8,6 +8,8 @@ adjustments without launching the full GUI.
 Tests focus on the backend logic that powers the Psychological States GUI functionality.
 """
 
+from typing import Any
+
 import pytest
 import tkinter as tk
 from unittest.mock import patch
@@ -17,13 +19,13 @@ from pathlib import Path
 
 # Import the GUI class with error handling
 try:
-    from Psychological_States_GUI import APGIVisualizerGUI, APGIVisualizer  # type: ignore
+    from Psychological_States_GUI import APGIVisualizerGUI, APGIVisualizer
 
     HAS_PSYCHOLOGICAL_GUI = True
 except ImportError as e:
     HAS_PSYCHOLOGICAL_GUI = False
-    APGIVisualizerGUI = None
-    APGIVisualizer = None
+    APGIVisualizerGUI: Any = None
+    APGIVisualizer: Any = None
     print(f"Warning: Could not import APGIVisualizerGUI: {e}")
 
 try:

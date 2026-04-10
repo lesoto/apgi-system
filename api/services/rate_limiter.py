@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import redis.asyncio as redis
 
@@ -45,7 +45,7 @@ class RateLimiter:
 
         if self.in_memory:
             # In-memory storage: key -> list of timestamps
-            self._memory_store: Dict[str, list] = defaultdict(list)
+            self._memory_store: Dict[str, List[float]] = defaultdict(list)
 
         # Default rate limits (requests per window)
         self.default_limits = {
@@ -55,6 +55,7 @@ class RateLimiter:
             "task:execute": (20, 60),
             "data:export": (10, 60),
             "auth:login": (5, 900),  # 5 login attempts per 15 minutes
+            "auth:refresh": (10, 3600),  # 10 refresh attempts per hour
         }
 
         # Operation weights (how many "credits" each operation costs)
@@ -219,6 +220,7 @@ class RateLimiter:
 
             # Execute Lua script atomically
             try:
+                assert self.redis is not None
                 result = await self.redis.eval(  # type: ignore[misc]
                     lua_script,
                     1,  # number of keys
@@ -342,7 +344,8 @@ class RateLimiter:
             # Redis implementation
             try:
                 # Get current count without modifying
-                current_count = await self.redis.zcount(key, window_start, now)  # type: ignore[misc]
+                assert self.redis is not None
+                current_count = await self.redis.zcount(key, window_start, now)
 
                 remaining = max(0, limit - current_count)
                 reset_at = datetime.utcnow() + timedelta(seconds=window_seconds)
@@ -360,7 +363,7 @@ class RateLimiter:
                     allowed=True, limit=limit, remaining=limit, reset_at=reset_at
                 )
 
-    async def reset_rate_limit(self, client_id: str, endpoint: str):
+    async def reset_rate_limit(self, client_id: str, endpoint: str) -> None:
         """
         Reset rate limit for a client/endpoint combination.
 
@@ -371,9 +374,10 @@ class RateLimiter:
             endpoint: Endpoint identifier
         """
         key = self._get_redis_key(client_id, endpoint)
-        await self.redis.delete(key)
+        if self.redis is not None:
+            await self.redis.delete(key)
 
-    def configure_limit(self, endpoint: str, limit: int, window_seconds: int):
+    def configure_limit(self, endpoint: str, limit: int, window_seconds: int) -> None:
         """
         Configure custom rate limit for an endpoint.
 
@@ -384,7 +388,7 @@ class RateLimiter:
         """
         self.default_limits[endpoint] = (limit, window_seconds)
 
-    def configure_weight(self, endpoint: str, weight: int):
+    def configure_weight(self, endpoint: str, weight: int) -> None:
         """
         Configure operation weight for an endpoint.
 

@@ -45,7 +45,8 @@ class HealthCheckService:
         """
         try:
             with get_db_context() as db:
-                # Execute simple query to verify connection
+                # Execute simple query to verify connection with 5s timeout
+                db.execute(text("SET statement_timeout = 5000"))
                 result = db.execute(text("SELECT 1"))
                 result.fetchone()
             return "healthy", "Database connection successful"
@@ -64,9 +65,14 @@ class HealthCheckService:
             return "unhealthy", "Redis client not initialized"
 
         try:
-            # Ping Redis to verify connection
-            await self.redis_client.ping()  # type: ignore[misc]
+            # Ping Redis to verify connection with 5s timeout
+            import asyncio
+
+            await asyncio.wait_for(self.redis_client.ping(), timeout=5.0)  # type: ignore[misc]
             return "healthy", "Redis connection successful"
+        except asyncio.TimeoutError:
+            logger.error("Redis health check timed out")
+            return "unhealthy", "Redis connection timed out"
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")
             return "unhealthy", f"Redis connection failed: {str(e)}"

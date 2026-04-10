@@ -73,8 +73,8 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> Generator[TestC
     app = create_app(test_mode=True)
 
     # Override the session manager dependency
-    sessions._session_manager = mock_session_manager
-    sessions._redis_client = mock_redis
+    sessions._session_manager = mock_session_manager  # type: ignore[attr-defined]
+    sessions._redis_client = mock_redis  # type: ignore[attr-defined]
 
     # Initialize export service with mock session manager
     export._data_export_service = DataExportService(mock_session_manager)

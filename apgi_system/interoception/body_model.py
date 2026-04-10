@@ -591,7 +591,7 @@ class BodyModel:
             "interoceptive_vector": self.get_interoceptive_vector(),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset to baseline physiological state.
 

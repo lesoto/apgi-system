@@ -122,13 +122,13 @@ class TestTaskExecutorUnit:
 
     def test_task_executor_initialization(self) -> None:
         """Test TaskExecutor initializes correctly."""
-        executor = TaskExecutor()  # type: ignore
+        executor = TaskExecutor()
         assert executor.celery is not None
 
     @pytest.mark.asyncio
     async def test_list_available_tasks(self) -> None:
         """Test listing available tasks."""
-        executor = TaskExecutor()  # type: ignore
+        executor = TaskExecutor()
         tasks = await executor.list_available_tasks()
 
         assert "tasks" in tasks
@@ -142,7 +142,7 @@ class TestTaskExecutorUnit:
     @pytest.mark.asyncio
     async def test_submit_task_invalid_type(self) -> None:
         """Test submitting task with invalid type raises error."""
-        executor = TaskExecutor()  # type: ignore
+        executor = TaskExecutor()
 
         with pytest.raises(ValueError, match="Unknown task type"):
             await executor.submit_task(

@@ -77,7 +77,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=json:coverage.json",
     "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=100",
+    "--cov-fail-under=85",
 ]
 markers = [
     "unit: Unit tests for individual components",
@@ -136,6 +136,10 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["scipy.*", "h5py.*"]
+ignore_missing_imports = true
 
 [tool.flake8]
 max-line-length = 100

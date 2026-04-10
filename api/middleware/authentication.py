@@ -40,6 +40,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/v1/auth/login",
         "/v1/auth/refresh",
+        "/v1/health/live",
+        "/v1/health/ready",
     }
 
     def __init__(self, app):
@@ -97,10 +99,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 status_code=401, code="INVALID_TOKEN", message=str(e)
             )
         except Exception as e:
-            # Unexpected error during token verification
-            logger.error(f"Unexpected error during token verification: {str(e)}")
+            # Unexpected error (e.g., database failure) - log and return 500
+            # instead of masking it as an authentication failure
+            logger.error(f"Internal error during token verification: {str(e)}", exc_info=True)
             return self._create_error_response(
-                status_code=401, code="AUTHENTICATION_ERROR", message="Authentication failed"
+                status_code=500,
+                code="INTERNAL_SERVER_ERROR",
+                message="An unexpected error occurred",
             )
 
     def _is_public_path(self, path: str) -> bool:

@@ -10,7 +10,7 @@ import sys
 import subprocess
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 def run_tests_with_coverage() -> int:
@@ -43,7 +43,7 @@ def run_tests_with_coverage() -> int:
     return result.returncode
 
 
-def analyze_coverage_gaps() -> Tuple[List[Dict], float]:
+def analyze_coverage_gaps() -> Tuple[List[Dict[str, Any]], float]:
     """
     Analyze coverage.json to identify gaps.
 
@@ -90,7 +90,7 @@ def analyze_coverage_gaps() -> Tuple[List[Dict], float]:
     return gaps, overall_coverage
 
 
-def print_coverage_report(gaps: List[Dict], overall_coverage: float):
+def print_coverage_report(gaps: List[Dict[str, Any]], overall_coverage: float) -> None:
     """
     Print a formatted coverage gap report.
 
@@ -133,7 +133,7 @@ def print_coverage_report(gaps: List[Dict], overall_coverage: float):
         print()
 
 
-def generate_html_report():
+def generate_html_report() -> None:
     """Generate and open HTML coverage report."""
     print("=" * 80)
     print("Generating HTML coverage report...")
@@ -147,7 +147,7 @@ def generate_html_report():
         print("\n✗ HTML report not found.")
 
 
-def main():
+def main() -> int:
     """Main entry point for coverage analysis."""
     print("\n" + "=" * 80)
     print("APGI SYSTEM - COMPREHENSIVE COVERAGE ANALYSIS")

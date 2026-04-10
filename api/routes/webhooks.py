@@ -4,7 +4,7 @@ Webhook Management Routes
 Endpoints for managing webhook deliveries and retry logic.
 """
 
-from typing import List, Optional
+from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,6 @@ from api.database.models import WebhookDelivery
 from api.services.authorization import has_any_role, Role
 from api.services.webhook_manager import WebhookManager
 from pydantic import BaseModel
-
 
 router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 
@@ -81,15 +80,15 @@ async def list_webhook_deliveries(
 
     return [
         WebhookDeliveryResponse(
-            delivery_id=d.delivery_id,
-            task_id=d.task_id,
-            webhook_url=d.webhook_url,
-            status=d.status,
-            attempts=d.attempts,
+            delivery_id=cast(str, d.delivery_id),
+            task_id=cast(str, d.task_id),
+            webhook_url=cast(str, d.webhook_url),
+            status=cast(str, d.status),
+            attempts=cast(int, d.attempts),
             last_attempt_at=d.last_attempt_at.isoformat() + "Z" if d.last_attempt_at else None,
             next_retry_at=d.next_retry_at.isoformat() + "Z" if d.next_retry_at else None,
-            response_status=d.response_status,
-            error_message=d.error_message,
+            response_status=cast(int | None, d.response_status),
+            error_message=cast(str | None, d.error_message),
             created_at=d.created_at.isoformat() + "Z",
         )
         for d in deliveries
@@ -128,17 +127,17 @@ async def get_webhook_delivery(
         raise HTTPException(status_code=404, detail="Webhook delivery not found")
 
     return WebhookDeliveryResponse(
-        delivery_id=delivery.delivery_id,
-        task_id=delivery.task_id,
-        webhook_url=delivery.webhook_url,
-        status=delivery.status,
-        attempts=delivery.attempts,
-        last_attempt_at=delivery.last_attempt_at.isoformat() + "Z"
-        if delivery.last_attempt_at
-        else None,
+        delivery_id=cast(str, delivery.delivery_id),
+        task_id=cast(str, delivery.task_id),
+        webhook_url=cast(str, delivery.webhook_url),
+        status=cast(str, delivery.status),
+        attempts=cast(int, delivery.attempts),
+        last_attempt_at=(
+            delivery.last_attempt_at.isoformat() + "Z" if delivery.last_attempt_at else None
+        ),
         next_retry_at=delivery.next_retry_at.isoformat() + "Z" if delivery.next_retry_at else None,
-        response_status=delivery.response_status,
-        error_message=delivery.error_message,
+        response_status=cast(int | None, delivery.response_status),
+        error_message=cast(str | None, delivery.error_message),
         created_at=delivery.created_at.isoformat() + "Z",
     )
 

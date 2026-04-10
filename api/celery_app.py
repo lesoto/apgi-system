@@ -4,7 +4,7 @@ Celery Application Configuration
 Configures Celery for asynchronous task execution with Redis broker.
 """
 
-from celery import Celery
+from celery import Celery  # type: ignore[import-untyped]
 
 from api.config import settings
 

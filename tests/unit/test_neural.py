@@ -453,7 +453,7 @@ class TestSpikingNetwork:
         assert len(network.neurons) > 0
 
     @pytest.mark.skipif(not HAS_MICROSCALE, reason="Microscale modules not available")
-    def test_spiking_simulation_step(self, spiking_config):
+    def test_spiking_simulation_step(self, spiking_config: dict) -> None:
         """Test spiking simulation step."""
         network = SpikingNetwork(spiking_config)
 
@@ -467,7 +467,7 @@ class TestSpikingNetwork:
         assert "population_rate" in result
 
     @pytest.mark.skipif(not HAS_MICROSCALE, reason="Microscale modules not available")
-    def test_spike_generation(self, spiking_config):
+    def test_spike_generation(self, spiking_config: dict) -> None:
         """Test spike generation mechanisms."""
         network = SpikingNetwork(spiking_config)
 
@@ -483,7 +483,7 @@ class TestSpikingNetwork:
         assert total_spikes >= 0  # Allow for no spikes in some configurations
 
     @pytest.mark.skipif(not HAS_MICROSCALE, reason="Microscale modules not available")
-    def test_synaptic_dynamics(self, spiking_config):
+    def test_synaptic_dynamics(self, spiking_config: dict) -> None:
         """Test synaptic dynamics."""
         network = SpikingNetwork(spiking_config)
 
@@ -501,7 +501,7 @@ class TestNeuralIntegration:
     @pytest.mark.skipif(
         not (HAS_OSCILLATIONS and HAS_MACROSCALE), reason="Required modules not available"
     )
-    def test_oscillation_network_integration(self):
+    def test_oscillation_network_integration(self) -> None:
         """Test integration between oscillation engine and large-scale network."""
         # This would test how oscillations drive network dynamics
         # Implementation depends on specific integration patterns
@@ -510,7 +510,7 @@ class TestNeuralIntegration:
     @pytest.mark.skipif(
         not (HAS_MESOSCALE and HAS_MICROSCALE), reason="Required modules not available"
     )
-    def test_column_microscale_integration(self):
+    def test_column_microscale_integration(self) -> None:
         """Test integration between neural columns and spiking networks."""
         # This would test how columnar processing emerges from spiking dynamics
         pass

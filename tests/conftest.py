@@ -17,6 +17,12 @@ from apgi_system.system import APGISystem
 from apgi_system.interoception.body_model import BodyModel
 from sqlalchemy.orm import Session
 
+# Set environment variables for testing
+os.environ["ENVIRONMENT"] = "testing"
+os.environ["JWT_SECRET_KEY"] = (
+    "testing-secret-key-at-least-64-characters-long-for-production-compliance-verification"
+)
+
 # Configure Hypothesis profiles
 settings.register_profile(
     "ci",
@@ -158,7 +164,7 @@ def db() -> Generator[Session, None, None]:
     """
     Provide a test database session.
 
-    Creates an in-memory SQLite database for testing.
+    Creates an in-memory SQLite database for testing with thread-safety enabled.
 
     Yields
     ------
@@ -167,10 +173,16 @@ def db() -> Generator[Session, None, None]:
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
     from api.database.models import Base
 
-    # Create in-memory SQLite database for testing
-    engine = create_engine("sqlite:///:memory:")
+    # Create in-memory SQLite database for testing with thread-safety
+    # check_same_thread=False allows the connection to be used across threads
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
 
     # Create session

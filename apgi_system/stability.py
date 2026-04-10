@@ -227,6 +227,11 @@ class NumericalStabilityMonitor:
         # Raises NumericalInstabilityError
         """
         if not self.check_enabled:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Numerical stability checks are disabled for context: {context}"
+            )
             return {
                 "stable": True,
                 "has_nan": False,

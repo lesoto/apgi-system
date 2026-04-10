@@ -33,7 +33,7 @@ class Settings:
         self.reload: bool = os.getenv("UVICORN_RELOAD", "true").lower() == "true"
 
         # HTTPS/TLS Settings
-        self.https_enabled: bool = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
+        self.https_enabled: bool = os.getenv("HTTPS_ENABLED", "true").lower() == "true"
         self.ssl_keyfile: Optional[str] = os.getenv("SSL_KEYFILE")
         self.ssl_certfile: Optional[str] = os.getenv("SSL_CERTFILE")
 
@@ -41,6 +41,9 @@ class Settings:
         self.database_url: str = os.getenv(
             "DATABASE_URL", "postgresql://localhost/apgi_api?sslmode=require"
         )
+        self.db_pool_size: int = int(os.getenv("DB_POOL_SIZE", "10"))
+        self.db_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+        self.db_echo_sql: bool = os.getenv("DB_ECHO_SQL", "false").lower() == "true"
 
         # Redis Settings
         self.redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -53,7 +56,7 @@ class Settings:
 
         # Authentication Settings
         self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
-        self.environment: str = os.getenv("ENVIRONMENT", "development")
+        self.environment: str = os.getenv("ENVIRONMENT", "production")
         self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
         self.jwt_access_token_expire_minutes: int = 30
         self.jwt_refresh_token_expire_days: int = 7
@@ -77,14 +80,14 @@ class Settings:
             os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
         )
         self.cors_allow_methods: List[str] = (
-            os.getenv("CORS_ALLOW_METHODS", "*").split(",")
+            os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
             if os.getenv("CORS_ALLOW_METHODS")
-            else ["*"]
+            else ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
         )
         self.cors_allow_headers: List[str] = (
-            os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
+            os.getenv("CORS_ALLOW_HEADERS", "Content-Type,Authorization,X-CSRF-Token").split(",")
             if os.getenv("CORS_ALLOW_HEADERS")
-            else ["*"]
+            else ["Content-Type", "Authorization", "X-CSRF-Token"]
         )
 
         # Logging Settings
@@ -157,19 +160,27 @@ class Settings:
                     UserWarning,
                 )
 
-        # Validate minimum key length
-        if len(self.jwt_secret_key) < 32:
+        # Validate minimum key length and entropy
+        min_key_length = 64 if self.environment.lower() in ["production", "prod"] else 32
+
+        # Diversity check: must use multiple character classes
+        has_upper = any(c.isupper() for c in self.jwt_secret_key)
+        has_lower = any(c.islower() for c in self.jwt_secret_key)
+        has_digit = any(c.isdigit() for c in self.jwt_secret_key)
+        has_special = any(not c.isalnum() for c in self.jwt_secret_key)
+        classes_used = sum([has_upper, has_lower, has_digit, has_special])
+
+        if len(self.jwt_secret_key) < min_key_length or classes_used < 3:
             if self.environment.lower() in ["production", "prod"]:
                 raise ValueError(
-                    "CRITICAL: JWT_SECRET_KEY is shorter than 32 characters in production. "
-                    "Short keys are vulnerable to brute force attacks. "
-                    "Use a secure, random key with at least 32 characters."
+                    f"CRITICAL: JWT_SECRET_KEY is too weak for production. "
+                    f"It must be at least {min_key_length} characters long and use "
+                    f"at least 3 character classes (uppercase, lowercase, digits, symbols)."
                 )
             else:
                 warnings.warn(
-                    "DEVELOPMENT WARNING: JWT_SECRET_KEY is shorter than 32 characters. "
-                    "This should be fixed before production deployment. "
-                    "Use a secure, random key with at least 32 characters.",
+                    f"DEVELOPMENT WARNING: JWT_SECRET_KEY is weak. "
+                    f"It should be at least {min_key_length} characters and use 3+ character classes.",
                     UserWarning,
                 )
 

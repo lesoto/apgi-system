@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 # Create SQLAlchemy engine
 engine = create_engine(
     settings.database_url,
-    echo=False,  # Set to True for SQL query logging
+    echo=settings.db_echo_sql,
     pool_pre_ping=True,  # Verify connections before using
-    pool_size=10,
-    max_overflow=20,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
 )
 
 
@@ -113,10 +113,14 @@ def create_default_user() -> None:
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Log credentials with warning to rotate immediately
-        logger.warning(
-            f"Default admin credentials generated - ROTATE IMMEDIATELY AFTER FIRST LOGIN: "
-            f"username={secure_username}, password={secure_password}"
+        # Print credentials to stdout only (never logger) to avoid leak in log files
+        import sys
+
+        sys.stdout.write(
+            f"\n! SECURITY ALERT: Default admin credentials generated !\n"
+            f"ROTATE IMMEDIATELY AFTER FIRST LOGIN\n"
+            f"Username: {secure_username}\n"
+            f"Password: {secure_password}\n\n"
         )
 
         # Import here to avoid circular import

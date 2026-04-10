@@ -14,11 +14,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-# Check dependencies before starting
+# Check dependencies before starting (skip in testing)
 try:
+    import os
     from utils.dependency_checker import check_dependencies_on_startup
 
-    if not check_dependencies_on_startup():
+    if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies_on_startup():
         print("Dependency check failed. Exiting...")
         sys.exit(1)
 except ImportError:
@@ -31,6 +32,7 @@ from api.database.connection import close_db, init_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.alerting import configure_alerting
 from api.middleware.authentication import AuthenticationMiddleware
+from api.middleware.body_cache import RequestBodyCachingMiddleware
 from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
 from api.middleware.request_size_limit import RequestSizeLimitMiddleware
@@ -171,11 +173,14 @@ def create_app(test_mode: bool = False) -> FastAPI:
         title="APGI System API",
         version="1.0.0",
         description="REST API for Allostatic Precision-Gated Ignition consciousness modeling",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.environment.lower() != "production" else None,
+        redoc_url="/redoc" if settings.environment.lower() != "production" else None,
+        openapi_url="/openapi.json" if settings.environment.lower() != "production" else None,
         lifespan=lifespan if not test_mode else None,
     )
+
+    # Add request body caching middleware (very early, to capture body before consumption)
+    app.add_middleware(RequestBodyCachingMiddleware)
 
     # Add request size limiting middleware (first, to catch large requests early)
     app.add_middleware(
@@ -184,8 +189,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=getattr(settings, "request_size_limit_enabled", True),
     )
 
-    # Add HTTPS redirect middleware
-    app.add_middleware(HTTPSRedirectMiddleware, https_enabled=settings.https_enabled)
+    # Add HTTPS redirect middleware - skip in test mode
+    if not test_mode:
+        app.add_middleware(HTTPSRedirectMiddleware, https_enabled=settings.https_enabled)
 
     # Add GZip compression middleware
     app.add_middleware(GZipMiddleware, minimum_size=1000)

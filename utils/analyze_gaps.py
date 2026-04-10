@@ -8,7 +8,7 @@ uncovered code, categorized by module and gap type.
 
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 from collections import defaultdict
 
 
@@ -25,10 +25,10 @@ class GapAnalyzer:
             Path to coverage.json file.
         """
         self.coverage_file = Path(coverage_file)
-        self.gaps_by_module = defaultdict(list)
-        self.gaps_by_type = defaultdict(list)
+        self.gaps_by_module: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self.gaps_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
-    def load_coverage_data(self) -> Dict:
+    def load_coverage_data(self) -> Dict[str, Any]:
         """
         Load coverage data from JSON file.
 
@@ -81,7 +81,7 @@ class GapAnalyzer:
         except Exception:
             return "unknown"
 
-    def analyze(self) -> Dict:
+    def analyze(self) -> Dict[str, Any]:
         """
         Perform comprehensive gap analysis.
 
@@ -156,7 +156,7 @@ class GapAnalyzer:
             ),
         }
 
-    def print_report(self, analysis: Dict):
+    def print_report(self, analysis: Dict[str, Any]) -> None:
         """
         Print formatted analysis report.
 
@@ -201,7 +201,7 @@ class GapAnalyzer:
             print(f"\n{gap_type.upper()}: {len(gaps)} lines")
 
             # Group by module
-            by_module = defaultdict(int)
+            by_module: defaultdict[str, int] = defaultdict(int)
             for gap in gaps:
                 by_module[gap["module"]] += 1
 
@@ -211,7 +211,7 @@ class GapAnalyzer:
         print("\n" + "=" * 80)
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     try:
         analyzer = GapAnalyzer()

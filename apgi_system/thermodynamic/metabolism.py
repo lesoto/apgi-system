@@ -134,6 +134,6 @@ class MetabolicBudget:
             "reserve_fraction": float(self.current_reserves / self.total_budget),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self.current_reserves = self.total_budget
         self.total_consumed = 0.0

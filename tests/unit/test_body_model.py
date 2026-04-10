@@ -5,6 +5,8 @@ Tests specific physiological scenarios and edge cases for the body model
 that simulates physiological states and generates interoceptive predictions.
 """
 
+from typing import Any, Dict
+
 import pytest
 import numpy as np
 from apgi_system.interoception.body_model import BodyModel, PhysiologicalState
@@ -13,7 +15,7 @@ from apgi_system.interoception.body_model import BodyModel, PhysiologicalState
 class TestBodyModel:
     """Test suite for BodyModel component."""
 
-    def test_initialization_with_default_config(self, config):
+    def test_initialization_with_default_config(self, config: Dict[str, Any]) -> None:
         """Test body model initializes correctly with default configuration."""
         body_model = BodyModel(config)
 
@@ -33,7 +35,7 @@ class TestBodyModel:
         assert body_model.activity_level == 0.0
         assert body_model.stress_level == 0.0
 
-    def test_initialization_with_custom_config(self):
+    def test_initialization_with_custom_config(self) -> None:
         """Test body model initializes with custom configuration values."""
         custom_config = {
             "interoception": {
@@ -51,7 +53,7 @@ class TestBodyModel:
         assert body_model.current_state.temperature == 36.8
         assert body_model.prediction_lead_ms == 150
 
-    def test_update_basic_functionality(self, config):
+    def test_update_basic_functionality(self, config: Dict[str, Any]) -> None:
         """Test basic update functionality returns expected structure."""
         body_model = BodyModel(config)
 
@@ -83,7 +85,7 @@ class TestBodyModel:
         assert isinstance(result["prediction_error"], np.ndarray)
         assert result["prediction_error"].shape == (5,)
 
-    def test_arousal_effects_on_heart_rate(self, config):
+    def test_arousal_effects_on_heart_rate(self, config: Dict[str, Any]) -> None:
         """Test that arousal level affects heart rate appropriately."""
         body_model = BodyModel(config)
 
@@ -99,7 +101,7 @@ class TestBodyModel:
         # After 5 time constants, should be close to target
         assert body_model.current_state.heart_rate > 85
 
-    def test_activity_effects_on_multiple_variables(self, config):
+    def test_activity_effects_on_multiple_variables(self, config: Dict[str, Any]) -> None:
         """Test that activity level affects multiple physiological variables."""
         body_model = BodyModel(config)
 
@@ -115,7 +117,7 @@ class TestBodyModel:
         assert body_model.current_state.respiration > 22  # 15 + 10*0.9 = 24
         assert body_model.current_state.glucose < 4.6  # 5.0 - 1.0*0.9 = 4.1
 
-    def test_stress_effects_on_cortisol(self, config):
+    def test_stress_effects_on_cortisol(self, config: Dict[str, Any]) -> None:
         """Test that stress level affects cortisol appropriately."""
         body_model = BodyModel(config)
 
@@ -131,7 +133,7 @@ class TestBodyModel:
         # After 3+ time constants, should be close to target
         assert body_model.current_state.cortisol > 19
 
-    def test_physiological_bounds_maintained(self, config):
+    def test_physiological_bounds_maintained(self, config: Dict[str, Any]) -> None:
         """Test that physiological variables stay within configured bounds."""
         body_model = BodyModel(config)
 
@@ -151,7 +153,7 @@ class TestBodyModel:
         assert 3.0 <= body_model.current_state.glucose <= 8.0
         assert 5 <= body_model.current_state.cortisol <= 30
 
-    def test_get_interoceptive_vector(self, config):
+    def test_get_interoceptive_vector(self, config: Dict[str, Any]) -> None:
         """Test interoceptive vector generation."""
         body_model = BodyModel(config)
 
@@ -168,7 +170,7 @@ class TestBodyModel:
         assert vector[4] == body_model.current_state.cortisol
         assert vector[5] == body_model.current_state.blood_pressure
 
-    def test_get_current_state(self, config):
+    def test_get_current_state(self, config: Dict[str, Any]) -> None:
         """Test current state retrieval."""
         body_model = BodyModel(config)
         body_model.set_arousal(0.5)
@@ -185,7 +187,7 @@ class TestBodyModel:
         assert state["arousal"] == 0.5
         assert isinstance(state["interoceptive_vector"], np.ndarray)
 
-    def test_reset_functionality(self, config):
+    def test_reset_functionality(self, config: Dict[str, Any]) -> None:
         """Test that reset restores baseline state."""
         body_model = BodyModel(config)
 
@@ -219,7 +221,7 @@ class TestBodyModel:
         # Verify state actually changed before reset
         assert modified_hr != 70
 
-    def test_influence_level_clamping(self, config):
+    def test_influence_level_clamping(self, config: Dict[str, Any]) -> None:
         """Test that influence levels are properly clamped to [0, 1]."""
         body_model = BodyModel(config)
 
@@ -241,7 +243,7 @@ class TestBodyModel:
         assert body_model.activity_level == 0.0
         assert body_model.stress_level == 0.0
 
-    def test_update_with_different_timesteps(self, config):
+    def test_update_with_different_timesteps(self, config: Dict[str, Any]) -> None:
         """Test update behavior with different timestep values."""
         body_model = BodyModel(config)
         body_model.set_arousal(0.5)
@@ -260,7 +262,7 @@ class TestBodyModel:
         # Larger timestep should produce larger change from baseline
         assert abs(hr_large - 70) > abs(hr_small - 70)
 
-    def test_input_validation(self, config):
+    def test_input_validation(self, config: Dict[str, Any]) -> None:
         """Test input validation for update method."""
         body_model = BodyModel(config)
 
@@ -277,7 +279,7 @@ class TestBodyModel:
         with pytest.raises(ValueError):
             body_model.update(dt=float("nan"))  # NaN dt
 
-    def test_physiological_state_dataclass(self):
+    def test_physiological_state_dataclass(self) -> None:
         """Test PhysiologicalState dataclass functionality."""
         state = PhysiologicalState(
             heart_rate=75.0,
@@ -295,7 +297,7 @@ class TestBodyModel:
         assert state.cortisol == 12.0
         assert state.blood_pressure == 125.0
 
-    def test_state_to_dict_conversion(self, config):
+    def test_state_to_dict_conversion(self, config: Dict[str, Any]) -> None:
         """Test conversion of physiological state to dictionary."""
         body_model = BodyModel(config)
 
@@ -313,7 +315,7 @@ class TestBodyModel:
             assert key in state_dict
             assert isinstance(state_dict[key], float)
 
-    def test_prediction_generation(self, config):
+    def test_prediction_generation(self, config: Dict[str, Any]) -> None:
         """Test that predictions are generated correctly."""
         body_model = BodyModel(config)
 
@@ -330,7 +332,7 @@ class TestBodyModel:
         for key in current.keys():
             assert predicted[key] == current[key]
 
-    def test_multiple_updates_consistency(self, config):
+    def test_multiple_updates_consistency(self, config: Dict[str, Any]) -> None:
         """Test that multiple updates maintain consistency."""
         body_model = BodyModel(config)
 

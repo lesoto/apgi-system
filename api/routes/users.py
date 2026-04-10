@@ -5,7 +5,8 @@ API endpoints for user management including registration,
 password reset, and user administration.
 """
 
-from typing import List
+from datetime import datetime
+from typing import Any, List, cast
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -79,13 +80,13 @@ async def register_user(
             roles=request.roles or ["researcher"],
         )
 
-        return UserCreateResponse(  # type: ignore[call-arg]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
+        return UserCreateResponse(
+            user_id=cast(str, user.user_id),
+            username=cast(str, user.username),
+            email=cast(str, user.email),
+            roles=cast(list[str], user.roles),
             password=password,  # Only returned once during creation
-            created_at=user.created_at,
+            created_at=cast(datetime, user.created_at),
             message="User created successfully",
         )
 
@@ -124,13 +125,13 @@ async def create_default_user(
     try:
         user, password = user_service.create_default_user()
 
-        return UserCreateResponse(  # type: ignore[call-arg]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
+        return UserCreateResponse(
+            user_id=cast(str, user.user_id),
+            username=cast(str, user.username),
+            email=cast(str, user.email),
+            roles=cast(list[str], user.roles),
             password=password,
-            created_at=user.created_at,
+            created_at=cast(datetime, user.created_at),
             message="Default user created successfully",
         )
 
@@ -179,15 +180,15 @@ async def list_users(
     users = user_service.list_users(active_only=active_only)
 
     return [
-        UserResponse(  # type: ignore[call-arg]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+        UserResponse(
+            user_id=cast(str, user.user_id),
+            username=cast(str, user.username),
+            email=cast(str, user.email),
+            roles=cast(list[str], user.roles),
+            is_active=cast(bool, user.is_active),
+            created_at=cast(datetime, cast(Any, user.created_at)),
+            updated_at=cast(datetime, cast(Any, user.updated_at)),
+            last_login=cast(datetime | None, cast(Any, user.last_login)),
         )
         for user in users
     ]
@@ -220,15 +221,15 @@ async def get_current_user_profile(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(  # type: ignore[call-arg]
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+    return UserResponse(
+        user_id=cast(str, user.user_id),
+        username=cast(str, user.username),
+        email=cast(str, user.email),
+        roles=cast(list[str], user.roles),
+        is_active=cast(bool, user.is_active),
+        created_at=cast(datetime, cast(Any, user.created_at)),
+        updated_at=cast(datetime, cast(Any, user.updated_at)),
+        last_login=cast(datetime | None, cast(Any, user.last_login)),
     )
 
 
@@ -278,15 +279,15 @@ async def update_current_user_profile(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(  # type: ignore[call-arg]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+        return UserResponse(
+            user_id=cast(str, user.user_id),
+            username=cast(str, user.username),
+            email=cast(str, user.email),
+            roles=cast(list[str], user.roles),
+            is_active=cast(bool, user.is_active),
+            created_at=cast(datetime, cast(Any, user.created_at)),
+            updated_at=cast(datetime, cast(Any, user.updated_at)),
+            last_login=cast(datetime | None, cast(Any, user.last_login)),
         )
 
     except UserNotFoundError:
@@ -325,7 +326,7 @@ async def get_user_stats(
         total_users=stats["total_users"],
         active_users=stats["active_users"],
         inactive_users=stats["inactive_users"],
-        role_counts=stats["role_counts"],
+        role_counts=cast(dict[str, int], stats["role_counts"]),
     )
 
 
@@ -359,15 +360,15 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(  # type: ignore[call-arg]
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+    return UserResponse(
+        user_id=cast(str, user.user_id),
+        username=cast(str, user.username),
+        email=cast(str, user.email),
+        roles=cast(list[str], user.roles),
+        is_active=cast(bool, user.is_active),
+        created_at=cast(datetime, cast(Any, user.created_at)),
+        updated_at=cast(datetime, cast(Any, user.updated_at)),
+        last_login=cast(datetime | None, cast(Any, user.last_login)),
     )
 
 
@@ -419,15 +420,15 @@ async def update_user(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(  # type: ignore[call-arg]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+        return UserResponse(
+            user_id=cast(str, user.user_id),
+            username=cast(str, user.username),
+            email=cast(str, user.email),
+            roles=cast(list[str], user.roles),
+            is_active=cast(bool, user.is_active),
+            created_at=cast(datetime, cast(Any, user.created_at)),
+            updated_at=cast(datetime, cast(Any, user.updated_at)),
+            last_login=cast(datetime | None, cast(Any, user.last_login)),
         )
 
     except UserNotFoundError:
@@ -483,9 +484,7 @@ async def reset_user_password(
             user_id=user_id, new_password=request.new_password
         )
 
-        return PasswordResetResponse(  # type: ignore
-            user_id=user_id, message="Password reset successfully"
-        )
+        return PasswordResetResponse(user_id=user_id, message="Password reset successfully")
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -506,7 +505,7 @@ async def reset_user_password(
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Delete user.
 

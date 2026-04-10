@@ -4,6 +4,7 @@ Security Headers Middleware
 Middleware to add security headers to all HTTP responses.
 """
 
+from typing import Any
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
@@ -14,7 +15,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     Adds OWASP recommended security headers to protect against common web vulnerabilities.
     """
 
-    def __init__(self, app, https_enabled: bool = False):
+    def __init__(self, app: Any, https_enabled: bool = False) -> None:
         """
         Initialize security headers middleware.
 
@@ -25,7 +26,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.https_enabled = https_enabled
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(self, request: Any, call_next: Any) -> Any:
         """
         Add security headers to the response.
 
@@ -51,11 +52,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if self.https_enabled:
             security_headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
+        import secrets
+
+        nonce = secrets.token_urlsafe(16)
+        # Store nonce in request state so it can be used by template renderers
+        request.state.csp_nonce = nonce
+
         # Add CSP header (restrictive default)
         security_headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
+            f"script-src 'self'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
             "img-src 'self' data: https:; "
             "font-src 'self'; "
             "connect-src 'self'; "

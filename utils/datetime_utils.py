@@ -350,7 +350,7 @@ def get_current_timestamp_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
-def timestamp_to_datetime_str(timestamp_ms: int) -> str:
+def timestamp_to_datetime_str(timestamp_ms: int) -> Optional[str]:
     """
     Convert timestamp milliseconds to ISO string.
 
@@ -358,7 +358,9 @@ def timestamp_to_datetime_str(timestamp_ms: int) -> str:
         timestamp_ms: Unix timestamp in milliseconds
 
     Returns:
-        ISO formatted timestamp string
+        ISO formatted timestamp string or None if invalid
     """
     dt = from_timestamp_ms(timestamp_ms)
+    if dt is None:
+        return None  # type: ignore[unreachable]
     return format_timestamp(dt)

@@ -15,7 +15,12 @@ from typing import List, Dict, Tuple, Optional
 class DependencyChecker:
     """Checks for required dependencies and provides installation guidance."""
 
-    def __init__(self):
+    errors: List[str]
+    warnings: List[str]
+    python_version: sys.version_info
+    platform: str
+
+    def __init__(self) -> None:
         self.python_version = sys.version_info
         self.platform = platform.system()
         self.errors = []
@@ -186,7 +191,7 @@ class DependencyChecker:
 
         return "\n".join(instructions)
 
-    def _print_python_version(self, results: Dict[str, bool]):
+    def _print_python_version(self, results: Dict[str, bool]) -> None:
         """Print Python version information."""
         print(f"\n[PYTHON] Python Version: {'.'.join(map(str, self.python_version[:2]))}")
         if results["python_version"]:
@@ -194,7 +199,9 @@ class DependencyChecker:
         else:
             print("   [FAIL] Does not meet minimum requirements")
 
-    def _print_package_group(self, title: str, packages: List[str], results: Dict[str, bool]):
+    def _print_package_group(
+        self, title: str, packages: List[str], results: Dict[str, bool]
+    ) -> None:
         """Print a group of packages with their status."""
         print(f"\n{title}")
         for package in packages:
@@ -204,7 +211,7 @@ class DependencyChecker:
             else:
                 print(f"   [FAIL] {package}")
 
-    def _print_services(self, results: Dict[str, bool]):
+    def _print_services(self, results: Dict[str, bool]) -> None:
         """Print system services status."""
         print("\n[TOOLS] System Services:")
 
@@ -218,7 +225,7 @@ class DependencyChecker:
             note = "" if results["service_postgresql"] else " (may not be running)"
             print(f"   {status} PostgreSQL{note}")
 
-    def print_dependency_report(self):
+    def print_dependency_report(self) -> None:
         """Print a comprehensive dependency report."""
         print("\n[SEARCH] APGI System Dependency Check")
         print("=" * 50)
@@ -256,7 +263,7 @@ class DependencyChecker:
         print(self.get_installation_instructions())
 
 
-def check_dependencies_on_startup(silent: bool = True):
+def check_dependencies_on_startup(silent: bool = True) -> bool:
     """Check dependencies at application startup and provide guidance.
 
     Args:

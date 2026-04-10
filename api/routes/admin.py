@@ -4,15 +4,15 @@ System Administration Routes
 Admin-only endpoints for system monitoring and maintenance.
 """
 
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db
-from api.services.authorization import has_any_role, Role
+from api.services.authorization import require_role, Role
 from pydantic import BaseModel
-
 
 router = APIRouter(prefix="/v1/admin", tags=["Administration"])
 
@@ -71,7 +71,7 @@ class RateLimitStats(BaseModel):
     response_model=List[CeleryWorkerResponse],
     summary="List Celery workers",
     description="Retrieve status of active Celery workers",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def list_celery_workers() -> List[CeleryWorkerResponse]:
     """
@@ -83,7 +83,7 @@ async def list_celery_workers() -> List[CeleryWorkerResponse]:
         List of Celery worker status information
     """
     try:
-        from celery.app.control import Control
+        from celery.app.control import Control  # type: ignore[import-untyped]
 
         # Create Celery app instance
         from api.celery_app import celery_app
@@ -122,7 +122,7 @@ async def list_celery_workers() -> List[CeleryWorkerResponse]:
     response_model=RedisStatsResponse,
     summary="Get Redis statistics",
     description="Retrieve Redis cache statistics and memory usage",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def get_redis_stats() -> RedisStatsResponse:
     """
@@ -172,7 +172,7 @@ async def get_redis_stats() -> RedisStatsResponse:
     status_code=status.HTTP_200_OK,
     summary="Clear Redis cache",
     description="Clear all cached data in Redis (use with caution)",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def clear_redis_cache() -> Dict[str, str]:
     """
@@ -206,7 +206,7 @@ async def clear_redis_cache() -> Dict[str, str]:
     response_model=List[CircuitBreakerState],
     summary="Get circuit breaker states",
     description="Retrieve current state of circuit breakers for external services",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def get_circuit_breaker_states() -> List[CircuitBreakerState]:
     """
@@ -217,16 +217,29 @@ async def get_circuit_breaker_states() -> List[CircuitBreakerState]:
     Returns:
         List of circuit breaker state information
     """
-    # For now, return mock data since circuit breakers aren't implemented yet
-    # In a real implementation, this would query actual circuit breaker states
+    # Retrieve metrics from the global circuit breaker registry
+    from utils.circuit_breaker_utils import circuit_breaker_registry
+    from datetime import datetime
+
+    metrics = circuit_breaker_registry.get_metrics()
+
     return [
         CircuitBreakerState(
-            service="webhook_delivery",
-            state="closed",
-            failure_count=0,
-            last_failure_time=None,
-            next_retry_time=None,
+            service=name,
+            state=m["state"],
+            failure_count=m["failed_requests"],
+            last_failure_time=(
+                datetime.fromtimestamp(m["last_failure_time"]).isoformat()
+                if m["last_failure_time"]
+                else None
+            ),
+            next_retry_time=(
+                datetime.fromtimestamp(m["last_failure_time"] + m["recovery_timeout"]).isoformat()
+                if m["state"] == "open" and m["last_failure_time"]
+                else None
+            ),
         )
+        for name, m in metrics.items()
     ]
 
 
@@ -235,7 +248,7 @@ async def get_circuit_breaker_states() -> List[CircuitBreakerState]:
     response_model=DatabaseMaintenanceResponse,
     summary="Run database maintenance",
     description="Execute database maintenance operations like vacuum and analyze",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def run_database_maintenance(
     operation: str = "vacuum_analyze",
@@ -294,7 +307,7 @@ async def run_database_maintenance(
     response_model=List[RateLimitStats],
     summary="Get rate limiting statistics",
     description="Retrieve current rate limiting statistics for users and IPs",
-    dependencies=[Depends(lambda current_user: has_any_role(current_user.roles, [Role.ADMIN]))],
+    dependencies=[Depends(require_role(Role.ADMIN))],
 )
 async def get_rate_limit_stats(
     limit: int = 50,
@@ -310,13 +323,35 @@ async def get_rate_limit_stats(
     Returns:
         List of rate limiting statistics
     """
-    # For now, return mock data since rate limiting stats aren't easily queryable
-    # In a real implementation, this would query Redis for rate limit counters
-    return [
-        RateLimitStats(
-            identifier="example_user",
-            requests_this_minute=15,
-            requests_this_hour=45,
-            blocked_until=None,
-        )
-    ]
+    from api.config import settings
+    import redis.asyncio as redis
+
+    redis_client = redis.Redis.from_url(settings.redis_url)
+    keys = await redis_client.keys("rate_limit:*")
+
+    stats = []
+    for key in keys[:limit]:
+        key_str = key if isinstance(key, str) else key.decode("utf-8")
+        parts = key_str.split(":")
+        if len(parts) >= 3:
+            identifier = f"{parts[1]} ({parts[2]})"
+
+            # Get current count from Redis sorted set
+            count = await redis_client.zcard(key)
+
+            # Get TTL to estimate blocked_until
+            ttl = await redis_client.ttl(key)
+            blocked_until = None
+            if ttl > 0:
+                blocked_until = (datetime.utcnow() + timedelta(seconds=ttl)).isoformat() + "Z"
+
+            stats.append(
+                RateLimitStats(
+                    identifier=identifier,
+                    requests_this_minute=count,
+                    requests_this_hour=count if "hour" in parts[2] or "3600" in parts[2] else 0,
+                    blocked_until=blocked_until,
+                )
+            )
+
+    return stats

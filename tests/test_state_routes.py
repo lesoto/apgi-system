@@ -104,13 +104,13 @@ def mock_session_manager() -> Mock:
 
 
 @pytest.fixture
-def client(mock_redis, mock_session_manager) -> TestClient:
+def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     """Create a test client with mocked dependencies."""
     app = create_app()
 
     # Override the session manager dependency
-    sessions._session_manager = mock_session_manager
-    sessions._redis_client = mock_redis
+    sessions._session_manager = mock_session_manager  # type: ignore[attr-defined]
+    sessions._redis_client = mock_redis  # type: ignore[attr-defined]
 
     # Skip startup/shutdown events for testing
     app.router.on_startup = []

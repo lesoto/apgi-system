@@ -109,6 +109,6 @@ class EntropyTracker:
             "landauer_cost": float(self.bits_erased * self.landauer_constant),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self.total_entropy = 0.0
         self.bits_erased = 0.0

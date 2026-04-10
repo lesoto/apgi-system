@@ -8,12 +8,12 @@ from api.main import create_app
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create a test client for the API."""
     return TestClient(create_app(test_mode=True))
 
 
-def test_cors_headers_present_on_root(client):
+def test_cors_headers_present_on_root(client: TestClient) -> None:
     """Test that CORS headers are present on root endpoint."""
     response = client.get("/", headers={"Origin": "http://localhost:3000"})
 
@@ -22,7 +22,7 @@ def test_cors_headers_present_on_root(client):
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_cors_headers_present_on_health(client):
+def test_cors_headers_present_on_health(client: TestClient) -> None:
     """Test that CORS headers are present on health endpoint."""
     response = client.get("/health", headers={"Origin": "http://localhost:8000"})
 
@@ -31,7 +31,7 @@ def test_cors_headers_present_on_health(client):
     assert response.headers["access-control-allow-origin"] == "http://localhost:8000"
 
 
-def test_cors_headers_present_on_version(client):
+def test_cors_headers_present_on_version(client: TestClient) -> None:
     """Test that CORS headers are present on version endpoint."""
     response = client.get("/v1/version", headers={"Origin": "http://localhost:3000"})
 
@@ -40,7 +40,7 @@ def test_cors_headers_present_on_version(client):
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_cors_credentials_header_present(client):
+def test_cors_credentials_header_present(client: TestClient) -> None:
     """Test that CORS credentials header is present."""
     response = client.get("/", headers={"Origin": "http://localhost:3000"})
 
@@ -49,7 +49,7 @@ def test_cors_credentials_header_present(client):
     assert response.headers["access-control-allow-credentials"] == "true"
 
 
-def test_cors_headers_without_origin(client):
+def test_cors_headers_without_origin(client: TestClient) -> None:
     """Test that API works without Origin header (non-browser clients)."""
     response = client.get("/health")
 

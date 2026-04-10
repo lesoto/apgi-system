@@ -59,7 +59,7 @@ class ReleaseManager:
                 except ImportError:
                     # Fall back to tomli
                     try:
-                        import tomli
+                        import tomli  # type: ignore[import-not-found]
 
                         with open(pyproject_file, "rb") as f:
                             config = tomli.load(f)

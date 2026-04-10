@@ -100,13 +100,13 @@ class WebMonitor:
         """Setup Flask routes."""
         assert self.app is not None
 
-        @self.app.route("/")  # type: ignore
-        def index() -> str:  # type: ignore
+        @self.app.route("/")
+        def index() -> str:
             """Main dashboard page."""
             return render_template("dashboard.html")
 
-        @self.app.route("/api/status")  # type: ignore
-        def get_status() -> Any:  # type: ignore
+        @self.app.route("/api/status")
+        def get_status() -> Any:
             """Get current system status."""
             return jsonify(
                 {
@@ -118,8 +118,8 @@ class WebMonitor:
                 }
             )
 
-        @self.app.route("/api/data")  # type: ignore
-        def get_data() -> Any:  # type: ignore
+        @self.app.route("/api/data")
+        def get_data() -> Any:
             """Get current data for plotting."""
             return jsonify(
                 {
@@ -132,8 +132,8 @@ class WebMonitor:
                 }
             )
 
-        @self.app.route("/api/export")  # type: ignore
-        def export_data() -> Any:  # type: ignore
+        @self.app.route("/api/export")
+        def export_data() -> Any:
             """Export current data as JSON."""
             data = {
                 "export_timestamp": datetime.now().isoformat(),
@@ -157,8 +157,8 @@ class WebMonitor:
         """Setup WebSocket event handlers."""
         assert self.socketio is not None
 
-        @self.socketio.on("connect")  # type: ignore
-        def handle_connect() -> None:  # type: ignore
+        @self.socketio.on("connect")
+        def handle_connect() -> None:
             """Handle client connection."""
             print(f"Client connected: {request.sid}")  # type: ignore
             emit(
@@ -166,13 +166,13 @@ class WebMonitor:
                 {"is_monitoring": self.is_monitoring, "system_status": self.system_status},
             )
 
-        @self.socketio.on("disconnect")  # type: ignore
-        def handle_disconnect() -> None:  # type: ignore
+        @self.socketio.on("disconnect")
+        def handle_disconnect() -> None:
             """Handle client disconnection."""
             print(f"Client disconnected: {request.sid}")  # type: ignore
 
-        @self.socketio.on("start_monitoring")  # type: ignore
-        def handle_start_monitoring() -> None:  # type: ignore
+        @self.socketio.on("start_monitoring")
+        def handle_start_monitoring() -> None:
             """Handle start monitoring request."""
             self.start_monitoring()
             emit(
@@ -181,8 +181,8 @@ class WebMonitor:
                 broadcast=True,
             )
 
-        @self.socketio.on("stop_monitoring")  # type: ignore
-        def handle_stop_monitoring() -> None:  # type: ignore
+        @self.socketio.on("stop_monitoring")
+        def handle_stop_monitoring() -> None:
             """Handle stop monitoring request."""
             self.stop_monitoring()
             emit(
@@ -191,8 +191,8 @@ class WebMonitor:
                 broadcast=True,
             )
 
-        @self.socketio.on("clear_data")  # type: ignore
-        def handle_clear_data() -> None:  # type: ignore
+        @self.socketio.on("clear_data")
+        def handle_clear_data() -> None:
             """Handle clear data request."""
             self.clear_buffers()
             emit("data_cleared", broadcast=True)
@@ -274,7 +274,7 @@ class WebMonitor:
 
         # Emit data update via WebSocket
         if self.is_monitoring:
-            self.socketio.emit(  # type: ignore
+            self.socketio.emit(
                 "data_update",
                 {
                     "time": current_time,
@@ -333,7 +333,7 @@ class WebMonitor:
         while not self.stop_event.is_set():
             try:
                 # Emit periodic status updates
-                self.socketio.emit(  # type: ignore
+                self.socketio.emit(
                     "heartbeat",
                     {
                         "timestamp": datetime.now().isoformat(),
@@ -613,7 +613,7 @@ class WebMonitor:
         except Exception as e:
             print(f"Error running web monitor: {e}")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup when monitor is destroyed."""
         self.stop_monitoring()
 
@@ -633,7 +633,7 @@ class MonitoringIntegration:
         self.monitor = monitor
         self.is_connected = False
 
-    def connect_system(self, apgi_system) -> None:
+    def connect_system(self, apgi_system: Any) -> None:
         """
         Connect APGI system to web monitor.
 
@@ -648,7 +648,7 @@ class MonitoringIntegration:
         else:
             print("Warning: APGI system does not support monitoring callbacks")
 
-    def disconnect_system(self, apgi_system) -> None:
+    def disconnect_system(self, apgi_system: Any) -> None:
         """
         Disconnect APGI system from web monitor.
 

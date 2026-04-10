@@ -397,7 +397,12 @@ def collect_resources(
     from pathlib import Path
 
     project_path_obj = Path(project_path)
-    resources = {"config_files": [], "data_files": [], "resource_files": [], "icon_files": []}
+    resources: dict[str, list[str]] = {
+        "config_files": [],
+        "data_files": [],
+        "resource_files": [],
+        "icon_files": [],
+    }
 
     if not project_path_obj.exists() or not project_path_obj.is_dir():
         return resources

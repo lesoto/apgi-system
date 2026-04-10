@@ -4,7 +4,7 @@ Task Registry Module
 Registry for mapping task types to their corresponding Celery task functions.
 """
 
-from typing import Dict
+from typing import Any, Callable, Dict
 from enum import Enum
 
 from api.tasks.experimental_tasks import (
@@ -43,7 +43,7 @@ TASK_REGISTRY: Dict[TaskType, str] = {
 
 
 # Map task types to task functions (for direct execution)
-TASK_FUNCTIONS: Dict[TaskType, callable] = {
+TASK_FUNCTIONS: Dict[TaskType, Callable[..., Any]] = {
     TaskType.IOWA_GAMBLING: execute_iowa_gambling_task,
     TaskType.MASKING_PARADIGM: execute_masking_paradigm_task,
     TaskType.ATTENTIONAL_BLINK: execute_attentional_blink_task,
@@ -54,7 +54,7 @@ TASK_FUNCTIONS: Dict[TaskType, callable] = {
 }
 
 
-def get_task_function(task_type: TaskType) -> callable:
+def get_task_function(task_type: TaskType) -> Callable[..., Any]:
     """
     Get the task function for a given task type.
 

@@ -583,9 +583,9 @@ async def get_summary_statistics(
         ignition_stats = {
             "total_ignitions": ignition_count,
             "ignition_rate": ignition_rate,
-            "average_ignition_interval_ms": duration_ms / ignition_count
-            if ignition_count > 0
-            else 0.0,
+            "average_ignition_interval_ms": (
+                duration_ms / ignition_count if ignition_count > 0 else 0.0
+            ),
         }
 
         # Energy statistics
@@ -597,10 +597,11 @@ async def get_summary_statistics(
             "average_free_energy": avg_free_energy,
             "min_free_energy": min_free_energy,
             "max_free_energy": max_free_energy,
-            "energy_variance": sum((x - avg_free_energy) ** 2 for x in free_energy)
-            / len(free_energy)
-            if free_energy
-            else 0.0,
+            "energy_variance": (
+                sum((x - avg_free_energy) ** 2 for x in free_energy) / len(free_energy)
+                if free_energy
+                else 0.0
+            ),
         }
 
         # Allostasis statistics

@@ -5,11 +5,12 @@ Monitors critical errors and triggers alerts through configured notification cha
 """
 
 import asyncio
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import json
 import smtplib
 from email.mime.text import MIMEText
@@ -175,10 +176,10 @@ class EmailNotificationChannel(NotificationChannel):
         self,
         smtp_server: str,
         smtp_port: int = 587,
-        username: str = None,
-        password: str = None,
-        from_email: str = None,
-        to_emails: List[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        from_email: Optional[str] = None,
+        to_emails: Optional[List[str]] = None,
         use_tls: bool = True,
     ):
         """
@@ -288,8 +289,8 @@ class SMSNotificationChannel(NotificationChannel):
         self,
         api_url: str,
         api_key: str,
-        from_number: str = None,
-        to_numbers: List[str] = None,
+        from_number: Optional[str] = None,
+        to_numbers: Optional[List[str]] = None,
         timeout: float = 10.0,
     ):
         """
@@ -381,7 +382,7 @@ class SlackNotificationChannel(NotificationChannel):
     def __init__(
         self,
         webhook_url: str,
-        channel: str = None,
+        channel: Optional[str] = None,
         username: str = "APGI Alert Bot",
         timeout: float = 10.0,
     ):
@@ -412,7 +413,7 @@ class SlackNotificationChannel(NotificationChannel):
         try:
             # Create Slack message payload
             color = self._get_severity_color(alert.severity)
-            payload = {
+            payload: Dict[str, Any] = {
                 "username": self.username,
                 "attachments": [
                     {
@@ -699,36 +700,44 @@ class DatabaseNotificationChannel(NotificationChannel):
                 logger.warning("Database session factory not configured", alert_title=alert.title)
                 return False
 
-            # This would integrate with the database models
-            # For now, we'll just log that we'd store it
-            alert_data = {
-                "title": alert.title,
-                "message": alert.message,
-                "severity": alert.severity.value,
-                "timestamp": alert.timestamp.isoformat() + "Z",
-                "metadata": json.dumps(alert.metadata) if alert.metadata else None,
-            }
+            import asyncio
 
-            logger.info(
-                "Alert logged to database",
-                alert_title=alert.title,
-                severity=alert.severity.value,
-                alert_data=alert_data,
-            )
+            # Run synchronous database operation in executor to avoid blocking the event loop
+            loop = asyncio.get_event_loop()
 
-            # TODO: Implement actual database storage
-            # session = self.db_session_factory()
-            # try:
-            #     alert_record = AlertLog(**alert_data)
-            #     session.add(alert_record)
-            #     session.commit()
-            # except Exception as db_error:
-            #     session.rollback()
-            #     raise db_error
-            # finally:
-            #     session.close()
+            def _log_to_db():
+                # Import here to avoid circular imports
+                from api.database.models import AlertLog
 
-            return True
+                session = self.db_session_factory()
+                try:
+                    alert_record = AlertLog(
+                        title=alert.title,
+                        message=alert.message,
+                        severity=alert.severity.value,
+                        metadata_json=alert.metadata,
+                    )
+                    session.add(alert_record)
+                    session.commit()
+                    return alert_record.alert_id
+                except Exception as db_error:
+                    session.rollback()
+                    logger.error(f"Database error logging alert: {db_error}")
+                    return None
+                finally:
+                    session.close()
+
+            alert_id = await loop.run_in_executor(None, _log_to_db)
+
+            if alert_id:
+                logger.info(
+                    "Alert logged to database",
+                    alert_title=alert.title,
+                    severity=alert.severity.value,
+                    alert_id=alert_id,
+                )
+                return True
+            return False
 
         except Exception as e:
             logger.error(
@@ -750,7 +759,7 @@ class AlertManager:
         """Initialize alert manager."""
         self.channels: List[NotificationChannel] = []
         self.error_counts: Dict[str, List[datetime]] = {}
-        self.alert_cooldowns: Dict[str, datetime] = {}
+        self.alert_cooldowns: Dict[str, float] = {}
         self._lock = asyncio.Lock()
 
         # Alert thresholds
@@ -802,7 +811,8 @@ class AlertManager:
             # Check if we should trigger an alert
             error_count = len(self.error_counts[error_type])
 
-            if error_count >= self.error_rate_threshold:
+            # Atomic-like check: trigger only if we JUST crossed the threshold
+            if error_count == self.error_rate_threshold:
                 await self._trigger_high_error_rate_alert(
                     error_type, error_count, error_message, metadata
                 )
@@ -821,7 +831,7 @@ class AlertManager:
         """
         # Check cooldown to avoid alert spam
         alert_key = f"high_error_rate_{error_type}"
-        now = datetime.utcnow()
+        now = time.monotonic()
 
         if alert_key in self.alert_cooldowns:
             if now < self.alert_cooldowns[alert_key]:
@@ -829,7 +839,7 @@ class AlertManager:
                 return
 
         # Set cooldown
-        self.alert_cooldowns[alert_key] = now + self.alert_cooldown
+        self.alert_cooldowns[alert_key] = now + self.alert_cooldown.total_seconds()
 
         # Create alert
         alert = Alert(
@@ -885,6 +895,16 @@ class AlertManager:
 
         # Log results
         success_count = sum(1 for r in results if r is True)
+
+        if success_count == 0:
+            # Escalation: Log to stderr if all alert channels failed
+            import sys
+
+            print(
+                f"CRITICAL: All alert channels failed to send alert '{alert.title}'",
+                file=sys.stderr,
+            )
+
         logger.info(
             "Alert sent to channels",
             alert_title=alert.title,

@@ -342,11 +342,14 @@ class UserManagementService:
             for role in user.roles:
                 role_counts[role] = role_counts.get(role, 0) + 1
 
+        # Sort role_counts for consistent ordering (alphabetical by role name)
+        sorted_role_counts = dict(sorted(role_counts.items()))
+
         return {
             "total_users": total_users,
             "active_users": active_users,
             "inactive_users": total_users - active_users,
-            "role_counts": role_counts,
+            "role_counts": sorted_role_counts,
         }
 
 

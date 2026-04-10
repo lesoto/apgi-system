@@ -4,7 +4,7 @@ Deprecation Warning Middleware
 Adds deprecation headers to responses from deprecated endpoints.
 """
 
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -18,7 +18,9 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
     **Validates: Requirements 6.5**
     """
 
-    def __init__(self, app, deprecated_endpoints: Optional[Dict[str, Dict[str, str]]] = None):
+    def __init__(
+        self, app: Any, deprecated_endpoints: Optional[Dict[str, Dict[str, str]]] = None
+    ) -> None:
         """
         Initialize deprecation middleware.
 
@@ -29,8 +31,26 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
         self.deprecated_endpoints = deprecated_endpoints or {}
+        self._validate_sunset_dates()  # type: ignore[no-untyped-call]
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    def _validate_sunset_dates(self) -> None:
+        """Validate that all sunset dates are in a valid format."""
+        from datetime import datetime
+
+        for path, info in self.deprecated_endpoints.items():
+            if "sunset" in info:
+                try:
+                    # Expecting YYYY-MM-DD or RFC 1123 format (simple check for YYYY-MM-DD)
+                    datetime.strptime(info["sunset"], "%Y-%m-%d")
+                except ValueError:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        f"Invalid sunset date format for {path}: {info['sunset']}. Expected YYYY-MM-DD."
+                    )
+                    # We don't raise here to avoid breaking startup, but we log the error
+
+    async def dispatch(self, request: Request, call_next: Callable[..., Any]) -> Response:
         """
         Process request and add deprecation headers if endpoint is deprecated.
 
@@ -58,9 +78,9 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
 
             # Add Link header pointing to replacement if specified
             if "replacement" in deprecation_info:
-                response.headers[
-                    "Link"
-                ] = f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+                response.headers["Link"] = (
+                    f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+                )
 
             # Add custom warning header with deprecation message
             warning_msg = self._build_warning_message(path, deprecation_info)

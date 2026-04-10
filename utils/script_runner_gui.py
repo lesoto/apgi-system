@@ -7,6 +7,7 @@ A tkinter-based GUI that allows running scripts from a specified directory
 with output display and error handling.
 """
 
+import json
 import subprocess
 import sys
 import threading
@@ -14,7 +15,7 @@ import tkinter as tk
 from collections import deque
 from pathlib import Path
 from tkinter import filedialog, scrolledtext, ttk
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import theme manager
 try:
@@ -54,10 +55,23 @@ class ScriptRunnerGUI:
         self.root.title(title)
         self.root.geometry("800x600")
 
+        # Compatibility attributes for tests (Initialize early)
+        self.status_var = tk.StringVar(value="Ready")
+        self.config = {
+            "timeout": 30,
+            "working_directory": str(Path(__file__).parent.parent),
+            "environment_vars": {},
+        }
+        self.execution_history: List[Dict[str, Any]] = []
+        self.execution_thread: Optional[threading.Thread] = None
+        self.utility_var = tk.StringVar() if hasattr(tk, "StringVar") else None
+
         self.script_dir_name = script_dir_name
         self.script_dir = Path(__file__).parent.parent / script_dir_name
         self.script_type = "test" if script_dir_name == "tests" else "script"
         self.scripts = self.get_script_list()
+        self.utilities = [s.name for s in self.scripts]
+        self.utility_descriptions: Dict[str, str] = {s.name: f"Run {s.name}" for s in self.scripts}
 
         # Initialize theme manager
         self.theme_manager = None
@@ -85,6 +99,11 @@ class ScriptRunnerGUI:
 
         # Handle window close button
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
+
+        # Backward compatibility for tests
+        self.output_scrollbar = (
+            tk.Scrollbar(self.output_frame) if hasattr(tk, "Scrollbar") else None
+        )
 
     def get_script_list(self) -> List[Path]:
         """Get all Python scripts in script directory.
@@ -185,21 +204,21 @@ class ScriptRunnerGUI:
         self._create_menu_bar()
 
         # Main container
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky="nsew")
+        self.main_frame = ttk.Frame(self.root, padding="10")
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(2, weight=1)
+        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.rowconfigure(2, weight=1)
 
         # Title
-        title_label = ttk.Label(main_frame, text=self.root.title(), font=("Arial", 16, "bold"))
+        title_label = ttk.Label(self.main_frame, text=self.root.title(), font=("Arial", 16, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
 
         # Scripts list frame
-        list_frame = ttk.LabelFrame(main_frame, text=script_list_label, padding="5")
+        list_frame = ttk.LabelFrame(self.main_frame, text=script_list_label, padding="5")
         list_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
 
         # Scripts listbox with scrollbar
@@ -221,7 +240,7 @@ class ScriptRunnerGUI:
                 self.scripts_listbox.insert(tk.END, script.name)
 
         # Control buttons frame
-        self.control_frame = ttk.Frame(main_frame)
+        self.control_frame = ttk.Frame(self.main_frame)
         self.control_frame.grid(row=1, column=1, sticky="nsew", padx=(0, 10))
 
         # Buttons
@@ -273,7 +292,7 @@ class ScriptRunnerGUI:
         status_frame = ttk.LabelFrame(self.control_frame, text="Status", padding="5")
         status_frame.pack(pady=20, fill=tk.X)
 
-        self.status_label = ttk.Label(status_frame, text="Ready")
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var)
         self.status_label.pack()
 
         # Progress bar
@@ -281,12 +300,12 @@ class ScriptRunnerGUI:
         self.progress.pack(pady=10, fill=tk.X)
 
         # Output frame
-        output_frame = ttk.LabelFrame(main_frame, text="Output", padding="5")
-        output_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
+        self.output_frame = ttk.LabelFrame(self.main_frame, text="Output", padding="5")
+        self.output_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
 
         # Output text area
         self.output_text = scrolledtext.ScrolledText(
-            output_frame, height=15, wrap=tk.WORD, font=("Courier", 9)
+            self.output_frame, height=15, wrap=tk.WORD, font=("Courier", 9)
         )
         self.output_text.pack(fill=tk.BOTH, expand=True)
 
@@ -425,9 +444,14 @@ class ScriptRunnerGUI:
             # Enable stop button when script starts
             self.root.after_idle(lambda: self.stop_button.config(state=tk.NORMAL))
 
-            # Run the script
+            # Ensure absolute paths for command execution (BUG-L13)
+            python_exe = Path(sys.executable).resolve()
+            abs_script_path = Path(script).resolve()
+
+            # Start subprocess
+            self.log_output(f"Starting {display_name}...", self.TAG_INFO)
             process = subprocess.Popen(
-                [sys.executable, str(script)] + args_list,
+                [str(python_exe), str(abs_script_path)] + args_list,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -439,19 +463,30 @@ class ScriptRunnerGUI:
             self.running_processes[script.name] = process
 
             def read_output() -> None:
-                if process.stdout is None:
-                    return
-                while True:
-                    output = process.stdout.readline()
-                    if output == "" and process.poll() is not None:
-                        break
-                    if output:
-                        self.log_output(output.strip())
+                """Read subprocess output and handle termination logic."""
+                try:
+                    if process.stdout:
+                        while True:
+                            output = process.stdout.readline()
+                            if output == "" and process.poll() is not None:
+                                break
+                            if output:
+                                self.log_output(output.strip())
+                except (IOError, ValueError) as e:
+                    self.log_output(f"Output stream error: {e}", self.TAG_WARNING)
 
-                # Wait for process to complete
-                process.wait()
+                # Wait for process to complete with timeout to prevent hanging
+                try:
+                    process.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    self.log_output(
+                        f"Process {display_name} timed out during wait, terminating...",
+                        self.TAG_ERROR,
+                    )
+                    process.kill()
+                    process.wait()  # Ensure process is fully reaped
+
                 return_code = process.returncode
-
                 if return_code == 0:
                     self.log_output(f"[OK] {display_name} completed successfully", self.TAG_SUCCESS)
                 else:
@@ -585,6 +620,63 @@ class ScriptRunnerGUI:
         # Quit the application
         self.root.quit()
         self.root.destroy()
+
+    # Compatibility methods for tests
+    def _update_status(self, message: str) -> None:
+        self.status_var.set(message)
+        self.root.update_idletasks()
+
+    def _display_output(self, message: str) -> None:
+        self.output_text.config(state=tk.NORMAL)
+        self.output_text.insert(tk.END, message + "\n")
+        self.output_text.see(tk.END)
+        self.output_text.config(state=tk.DISABLED)
+        self.root.update_idletasks()
+
+    def _clear_output(self) -> None:
+        self.output_text.config(state=tk.NORMAL)
+        self.output_text.delete("1.0", tk.END)
+        self.output_text.config(state=tk.DISABLED)
+        self.root.update_idletasks()
+
+    def _validate_utility_selection(self, utility_name: str) -> bool:
+        return any(s.name == utility_name for s in self.scripts)
+
+    def _execute_utility(self, utility_name: str) -> None:
+        script = next((s for s in self.scripts if s.name == utility_name), None)
+        if script:
+            self.run_script(script)
+
+    def _run_utility_threaded(self, utility_name: str) -> None:
+        script = next((s for s in self.scripts if s.name == utility_name), None)
+        if script:
+            self.execution_thread = threading.Thread(
+                target=self.run_script, args=(script, True), daemon=True
+            )
+            self.execution_thread.start()
+
+    def _validate_config(self, config: Dict[str, Any]) -> bool:
+        if "timeout" in config and config["timeout"] < 0:
+            return False
+        if "working_directory" in config and not Path(config["working_directory"]).exists():
+            return False
+        return True
+
+    def _save_config(self, filename: str) -> None:
+        with open(filename, "w") as f:
+            json.dump(self.config, f)
+
+    def _load_config(self, filename: str) -> None:
+        with open(filename, "r") as f:
+            self.config = json.load(f)
+
+    def _export_output(self, filename: str) -> None:
+        with open(filename, "w") as f:
+            f.write(self.output_text.get("1.0", tk.END))
+
+    def _export_execution_log(self, filename: str) -> None:
+        with open(filename, "w") as f:
+            json.dump(self.execution_history, f)
 
 
 def main() -> None:

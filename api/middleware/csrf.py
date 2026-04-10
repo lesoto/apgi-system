@@ -89,10 +89,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method in ["GET", "HEAD", "OPTIONS"]:
             return False
 
-        # Skip CSRF for API endpoints that use JWT authentication
-        # (CSRF is primarily for browser-based form submissions)
-        if request.headers.get("authorization", "").startswith("Bearer "):
-            return False
+        # Note: Bearer token requests are inherently protected against standard CSRF
+        # (the browser won't automatically send the Authorization header across domains).
+        # However, for consistency and defense-in-depth, we don't skip CSRF just because
+        # of the presence of a Bearer token. The content-type check below already
+        # allows standard API clients (JSON/XML) while protecting form-based submissions.
+        pass
 
         # Skip CSRF for content-type that's not form-based
         content_type = request.headers.get("content-type", "").lower()

@@ -25,11 +25,11 @@ class DataExporter:
     allowing us to test export functionality in isolation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize data exporter."""
         self.log_data = []
 
-    def record_state(self, state):
+    def record_state(self, state: dict) -> None:
         """
         Record state data from simulation step.
 
@@ -59,7 +59,7 @@ class DataExporter:
 
         self.log_data.append(data_entry)
 
-    def export_to_csv(self, filename):
+    def export_to_csv(self, filename: str) -> bool:
         """
         Export data to CSV format.
 
@@ -82,7 +82,7 @@ class DataExporter:
             writer.writerows(self.log_data)
         return True
 
-    def export_to_json(self, filename):
+    def export_to_json(self, filename: str) -> bool:
         """
         Export data to JSON format.
 
@@ -103,7 +103,7 @@ class DataExporter:
             json.dump(self.log_data, f, indent=2)
         return True
 
-    def generate_analysis_report(self):
+    def generate_analysis_report(self) -> dict:
         """
         Generate analysis report with summary statistics.
 
@@ -168,7 +168,7 @@ class DataExporter:
 class TestCSVExport:
     """Test CSV export functionality with specific data scenarios."""
 
-    def test_csv_export_with_specific_data(self):
+    def test_csv_export_with_specific_data(self) -> None:
         """
         Test CSV export with specific known data values.
 
@@ -231,7 +231,7 @@ class TestCSVExport:
         finally:
             os.unlink(csv_filename)
 
-    def test_csv_export_empty_data(self):
+    def test_csv_export_empty_data(self) -> None:
         """
         Test CSV export with no data returns False.
 
@@ -249,7 +249,7 @@ class TestCSVExport:
             if os.path.exists(csv_filename):
                 os.unlink(csv_filename)
 
-    def test_csv_column_ordering_consistency(self):
+    def test_csv_column_ordering_consistency(self) -> None:
         """
         Test that CSV columns maintain consistent ordering across exports.
 
@@ -283,7 +283,7 @@ class TestCSVExport:
         finally:
             os.unlink(csv_filename)
 
-    def test_csv_export_with_edge_case_values(self):
+    def test_csv_export_with_edge_case_values(self) -> None:
         """
         Test CSV export handles edge case values correctly.
 
@@ -333,7 +333,7 @@ class TestCSVExport:
 class TestJSONExport:
     """Test JSON export functionality with nested structures."""
 
-    def test_json_export_with_specific_data(self):
+    def test_json_export_with_specific_data(self) -> None:
         """
         Test JSON export with specific known data values.
 
@@ -374,7 +374,7 @@ class TestJSONExport:
         finally:
             os.unlink(json_filename)
 
-    def test_json_export_preserves_data_types(self):
+    def test_json_export_preserves_data_types(self) -> None:
         """
         Test that JSON export preserves data types correctly.
 
@@ -415,7 +415,7 @@ class TestJSONExport:
         finally:
             os.unlink(json_filename)
 
-    def test_json_export_empty_data(self):
+    def test_json_export_empty_data(self) -> None:
         """
         Test JSON export with no data returns False.
 
@@ -433,7 +433,7 @@ class TestJSONExport:
             if os.path.exists(json_filename):
                 os.unlink(json_filename)
 
-    def test_json_round_trip_preservation(self):
+    def test_json_round_trip_preservation(self) -> None:
         """
         Test that JSON export and import preserves data structure.
 
@@ -479,7 +479,7 @@ class TestJSONExport:
         finally:
             os.unlink(json_filename)
 
-    def test_json_export_with_nested_structures(self):
+    def test_json_export_with_nested_structures(self) -> None:
         """
         Test JSON export handles nested data structures correctly.
 
@@ -519,7 +519,7 @@ class TestJSONExport:
 class TestAnalysisReportGeneration:
     """Test analysis report generation functionality."""
 
-    def test_analysis_report_with_specific_data(self):
+    def test_analysis_report_with_specific_data(self) -> None:
         """
         Test analysis report generation with specific known data.
 
@@ -555,7 +555,7 @@ class TestAnalysisReportGeneration:
         assert ignition_stats["mean_interval"] >= 0, "Mean interval should be non-negative"
         assert ignition_stats["std_interval"] >= 0, "Std interval should be non-negative"
 
-    def test_analysis_report_free_energy_statistics(self):
+    def test_analysis_report_free_energy_statistics(self) -> None:
         """
         Test that analysis report includes correct free energy statistics.
 
@@ -592,7 +592,7 @@ class TestAnalysisReportGeneration:
         assert abs(fe_stats["min"] - np.min(free_energies)) < 1e-6, "Min should match"
         assert abs(fe_stats["max"] - np.max(free_energies)) < 1e-6, "Max should match"
 
-    def test_analysis_report_metabolic_cost_statistics(self):
+    def test_analysis_report_metabolic_cost_statistics(self) -> None:
         """
         Test that analysis report includes correct metabolic cost statistics.
 
@@ -633,7 +633,7 @@ class TestAnalysisReportGeneration:
             abs(metabolic_stats["final_reserves"] - final_reserves) < 1e-6
         ), "Final reserves should match"
 
-    def test_analysis_report_empty_data(self):
+    def test_analysis_report_empty_data(self) -> None:
         """
         Test analysis report generation with no data returns empty dict.
 
@@ -646,7 +646,7 @@ class TestAnalysisReportGeneration:
 
         assert report == {}, "Report should be empty dict with no data"
 
-    def test_analysis_report_single_step(self):
+    def test_analysis_report_single_step(self) -> None:
         """
         Test analysis report generation with single step handles edge case.
 
@@ -671,7 +671,7 @@ class TestAnalysisReportGeneration:
         # With single step, rate should be 0 (no duration)
         assert report["ignition_events"]["rate_hz"] == 0, "Rate should be 0 with single step"
 
-    def test_analysis_report_ignition_intervals(self):
+    def test_analysis_report_ignition_intervals(self) -> None:
         """
         Test that analysis report correctly computes ignition intervals.
 
@@ -700,7 +700,7 @@ class TestAnalysisReportGeneration:
             assert ignition_stats["mean_interval"] == 0, "Mean interval should be 0"
             assert ignition_stats["std_interval"] == 0, "Std interval should be 0"
 
-    def test_analysis_report_consistency_across_runs(self):
+    def test_analysis_report_consistency_across_runs(self) -> None:
         """
         Test that analysis report is consistent for same data.
 

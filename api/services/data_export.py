@@ -269,8 +269,8 @@ class DataExportService:
             raise ValueError(f"Unsupported event type: {event_type}")
 
     def _filter_history_by_time(
-        self, history: Dict[str, List], start_time: Optional[float], end_time: Optional[float]
-    ) -> Dict[str, List]:
+        self, history: Dict[str, List[Any]], start_time: Optional[float], end_time: Optional[float]
+    ) -> Dict[str, List[Any]]:
         """Filter history data by time range."""
         if not start_time and not end_time:
             return history
@@ -300,8 +300,8 @@ class DataExportService:
         return filtered
 
     def _filter_history_by_variables(
-        self, history: Dict[str, List], variables: List[str]
-    ) -> Dict[str, List]:
+        self, history: Dict[str, List[Any]], variables: List[str]
+    ) -> Dict[str, List[Any]]:
         """Filter history to include only specified variables."""
         # Always include time
         filtered = {"time": history.get("time", [])}
@@ -312,7 +312,7 @@ class DataExportService:
 
         return filtered
 
-    def _export_as_json(self, session_id: str, history: Dict[str, List]) -> Tuple[bytes, str]:
+    def _export_as_json(self, session_id: str, history: Dict[str, List[Any]]) -> Tuple[bytes, str]:
         """Export history as JSON."""
         export_data = {
             "session_id": session_id,
@@ -323,7 +323,7 @@ class DataExportService:
         json_str = json.dumps(export_data, indent=2)
         return json_str.encode("utf-8"), "application/json"
 
-    def _export_as_csv(self, session_id: str, history: Dict[str, List]) -> Tuple[bytes, str]:
+    def _export_as_csv(self, session_id: str, history: Dict[str, List[Any]]) -> Tuple[bytes, str]:
         """Export history as CSV."""
         output = io.StringIO()
 
@@ -360,7 +360,7 @@ class DataExportService:
         csv_bytes = output.getvalue().encode("utf-8")
         return csv_bytes, "text/csv"
 
-    def _compute_ignition_stats(self, history: Dict[str, List]) -> Dict[str, Any]:
+    def _compute_ignition_stats(self, history: Dict[str, List[Any]]) -> Dict[str, Any]:
         """Compute ignition event statistics."""
         ignitions = history.get("ignitions", [])
         times = history.get("time", [])
@@ -392,7 +392,7 @@ class DataExportService:
             "mean_trigger_signal": mean_trigger_signal,
         }
 
-    def _compute_energy_stats(self, history: Dict[str, List]) -> Dict[str, Any]:
+    def _compute_energy_stats(self, history: Dict[str, List[Any]]) -> Dict[str, Any]:
         """Compute energy-related statistics."""
         free_energy = history.get("free_energy", [])
         metabolic_reserves = history.get("metabolic_reserves", [])
@@ -410,7 +410,7 @@ class DataExportService:
 
         return stats
 
-    def _compute_allostasis_stats(self, history: Dict[str, List]) -> Dict[str, Any]:
+    def _compute_allostasis_stats(self, history: Dict[str, List[Any]]) -> Dict[str, Any]:
         """Compute allostatic load statistics."""
         allostatic_load = history.get("allostatic_load", [])
 
@@ -423,7 +423,9 @@ class DataExportService:
             "min_allostatic_load": round(min(allostatic_load), 3),
         }
 
-    def _analyze_ignition_events(self, session_id: str, history: Dict[str, List]) -> Dict[str, Any]:
+    def _analyze_ignition_events(
+        self, session_id: str, history: Dict[str, List[Any]]
+    ) -> Dict[str, Any]:
         """Analyze ignition event patterns."""
         ignitions = history.get("ignitions", [])
         times = history.get("time", [])

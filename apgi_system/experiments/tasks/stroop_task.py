@@ -408,3 +408,68 @@ class StroopTask:
                 "neutral_ratio": self.neutral_ratio,
             },
         }
+
+    def save_results(self, filename: str) -> None:
+        """
+        Save results to JSON file.
+
+        Parameters
+        ----------
+        filename : str
+            Output filename (e.g., 'stroop_task_results.json')
+        """
+        import json
+        from datetime import datetime
+
+        analysis = self.analyze_results()
+
+        # Helper function to convert numpy types to Python native types
+        def convert_to_native(obj: Any) -> Any:
+            """Convert numpy types to Python native types for JSON serialization."""
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_to_native(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_native(item) for item in obj]
+            return obj
+
+        # Prepare detailed trial data
+        trial_data = []
+        for trial in self.trials:
+            trial_data.append(
+                {
+                    "trial_number": trial.trial_number,
+                    "trial_type": trial.trial_type.value,
+                    "word": trial.word,
+                    "ink_color": trial.ink_color.value,
+                    "correct_response": trial.correct_response.value,
+                    "response": trial.response.value if trial.response else None,
+                    "response_time": trial.response_time,
+                    "is_correct": trial.is_correct,
+                }
+            )
+
+        # Build output structure
+        output = {
+            "task_type": "stroop_task",
+            "timestamp": datetime.now().isoformat(),
+            "summary": convert_to_native(analysis),
+            "trials": trial_data,
+            "task_parameters": {
+                "num_trials": self.num_trials,
+                "congruent_ratio": self.congruent_ratio,
+                "incongruent_ratio": self.incongruent_ratio,
+                "neutral_ratio": self.neutral_ratio,
+                "colors": [c.value for c in self.colors],
+            },
+        }
+
+        with open(filename, "w") as f:
+            json.dump(output, f, indent=2)
+
+        print(f"\nResults saved to: {filename}")

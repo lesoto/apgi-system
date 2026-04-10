@@ -9,7 +9,7 @@ import logging
 import logging.config
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 
 import yaml
 
@@ -199,7 +199,7 @@ class ProductionLogger:
             },
         }
 
-    def configure_production_logging(self, log_level: str = "INFO"):
+    def configure_production_logging(self, log_level: str = "INFO") -> None:
         """
         Configure production logging.
 
@@ -220,7 +220,7 @@ class ProductionLogger:
             },
         )
 
-    def configure_development_logging(self, log_level: str = "DEBUG"):
+    def configure_development_logging(self, log_level: str = "DEBUG") -> None:
         """
         Configure development logging with more verbosity.
 
@@ -251,7 +251,7 @@ class SensitiveDataFilter(logging.Filter):
         ("authorization", "***MASKED***"),
     ]
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         """Filter sensitive data from log records."""
         if hasattr(record, "msg") and isinstance(record.msg, str):
             msg = record.msg.lower()
@@ -266,7 +266,7 @@ class SensitiveDataFilter(logging.Filter):
 class PerformanceFilter(logging.Filter):
     """Filter for performance-related logs."""
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         """Add performance context to log records."""
         if hasattr(record, "msg") and isinstance(record.msg, str):
             msg_lower = record.msg.lower()
@@ -282,7 +282,7 @@ class PerformanceFilter(logging.Filter):
 
 def setup_logging(
     environment: str = "production", log_level: str = "INFO", config_file: Optional[str] = None
-):
+) -> None:
     """
     Setup logging based on environment.
 
@@ -301,7 +301,9 @@ def setup_logging(
         logger_config = ProductionLogger(config_file)
 
         if environment.lower() == "production":
-            logger_config.configure_production_logging(log_level)
+            # Guard against DEBUG level in production to prevent data leaks
+            managed_log_level = "INFO" if log_level.upper() == "DEBUG" else log_level
+            logger_config.configure_production_logging(managed_log_level)
         else:
             logger_config.configure_development_logging(log_level)
 
@@ -327,7 +329,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 # Performance monitoring decorator
-def log_performance(func_name: str = None):
+def log_performance(func_name: Optional[str] = None) -> Callable[..., Any]:
     """
     Decorator to log function performance.
 
@@ -335,12 +337,12 @@ def log_performance(func_name: str = None):
         func_name: Optional custom function name
     """
 
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         import time
         import functools
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.time()
             name = func_name or f"{func.__module__}.{func.__name__}"
 

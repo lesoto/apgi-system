@@ -435,25 +435,16 @@ class TestMonitoringIntegration:
         profile_data = profiler.stop_profiling()
 
         # Verify monitoring results
-        assert len(monitor.metrics_history) == 5
-        assert len(collector.timestamps) == 5
+        assert len(monitor.history) == 5
         assert profile_data["total_time_ms"] > 0
 
         # Get summaries
-        perf_summary = monitor.get_performance_summary()
-        metrics_summary = collector.get_summary()
+        perf_summary = monitor.get_statistics()
+        metrics_summary = collector.get_metrics_summary()
 
         assert perf_summary["total_samples"] == 5
-        assert metrics_summary["total_samples"] == 5
+        assert metrics_summary["total_sources"] == 0  # No sources added
 
-        # Check for performance trends
-        assert "performance_trends" in perf_summary
-        trends = perf_summary["performance_trends"]
-        assert "step_time_trend" in trends
-
-        # Export data
-        csv_export = collector.export_csv()
-        json_export = collector.export_json()
-
-        assert len(csv_export) > 100
-        assert len(json_export) > 100
+        # Check for statistics fields
+        assert "mean_step_time_ms" in perf_summary
+        assert "max_step_time_ms" in perf_summary

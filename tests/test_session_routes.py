@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock
 import redis.asyncio as redis
+from typing import Any
 
 from api.main import create_app
 from api.routes import sessions
@@ -38,7 +39,7 @@ def mock_session_manager():
     manager.create_session = AsyncMock(side_effect=mock_create_session)
 
     # Mock get_session
-    async def mock_get_session(session_id):
+    async def mock_get_session(session_id: str) -> Mock | None:
         if session_id == "test-session-id-123":
             mock_sim = Mock(spec=SimulationSession)
             mock_sim.session_id = session_id
@@ -48,25 +49,25 @@ def mock_session_manager():
             mock_sim.config = {"config_path": "config/default.yaml"}
 
             # Mock session methods
-            async def mock_start():
+            async def mock_start() -> dict[str, str]:
                 mock_sim.state = SessionLifecycleState.RUNNING
                 return {"session_id": session_id, "status": "running"}
 
             mock_sim.start = AsyncMock(side_effect=mock_start)
 
-            async def mock_pause():
+            async def mock_pause() -> dict[str, str]:
                 mock_sim.state = SessionLifecycleState.PAUSED
                 return {"session_id": session_id, "status": "paused"}
 
             mock_sim.pause = AsyncMock(side_effect=mock_pause)
 
-            async def mock_stop():
+            async def mock_stop() -> dict[str, str]:
                 mock_sim.state = SessionLifecycleState.STOPPED
                 return {"session_id": session_id, "status": "stopped"}
 
             mock_sim.stop = AsyncMock(side_effect=mock_stop)
 
-            async def mock_reset():
+            async def mock_reset() -> dict[str, str]:
                 mock_sim.state = SessionLifecycleState.CREATED
                 return {"session_id": session_id, "status": "created"}
 
@@ -79,7 +80,7 @@ def mock_session_manager():
     manager.get_session = AsyncMock(side_effect=mock_get_session)
 
     # Mock delete_session
-    async def mock_delete_session(session_id):
+    async def mock_delete_session(session_id: str) -> None:
         if session_id != "test-session-id-123":
             raise ValueError(f"Session {session_id} not found")
 
@@ -92,13 +93,13 @@ def mock_session_manager():
 
 
 @pytest.fixture
-def client(mock_redis, mock_session_manager):
+def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     """Create a test client with mocked dependencies."""
     app = create_app()
 
     # Override the session manager dependency
-    sessions._session_manager = mock_session_manager
-    sessions._redis_client = mock_redis
+    sessions._session_manager = mock_session_manager  # type: ignore[attr-defined]
+    sessions._redis_client = mock_redis  # type: ignore[attr-defined]
 
     # Skip startup/shutdown events for testing
     app.router.on_startup = []
@@ -107,7 +108,7 @@ def client(mock_redis, mock_session_manager):
     return TestClient(app)
 
 
-def test_create_session(client):
+def test_create_session(client: Any) -> None:
     """Test creating a new session."""
     response = client.post(
         "/v1/sessions", json={"config_path": "config/default.yaml", "description": "Test session"}
@@ -121,7 +122,7 @@ def test_create_session(client):
     assert "config" in data
 
 
-def test_get_session(client):
+def test_get_session(client: Any) -> None:
     """Test retrieving session details."""
     response = client.get("/v1/sessions/test-session-id-123")
 
@@ -134,7 +135,7 @@ def test_get_session(client):
     assert "config" in data
 
 
-def test_get_session_not_found(client):
+def test_get_session_not_found(client: Any) -> None:
     """Test retrieving non-existent session."""
     response = client.get("/v1/sessions/nonexistent-id")
 
@@ -145,7 +146,7 @@ def test_get_session_not_found(client):
     assert "does not exist" in error_data["error"]["message"].lower()
 
 
-def test_start_session(client):
+def test_start_session(client: Any) -> None:
     """Test starting a session."""
     response = client.post("/v1/sessions/test-session-id-123/start")
 
@@ -156,7 +157,7 @@ def test_start_session(client):
     assert "timestamp" in data
 
 
-def test_pause_session(client):
+def test_pause_session(client: TestClient) -> None:
     """Test pausing a session."""
     # First start the session
     client.post("/v1/sessions/test-session-id-123/start")
@@ -171,7 +172,7 @@ def test_pause_session(client):
     assert "timestamp" in data
 
 
-def test_stop_session(client):
+def test_stop_session(client: TestClient) -> None:
     """Test stopping a session."""
     response = client.post("/v1/sessions/test-session-id-123/stop")
 
@@ -182,7 +183,7 @@ def test_stop_session(client):
     assert "timestamp" in data
 
 
-def test_reset_session(client):
+def test_reset_session(client: TestClient) -> None:
     """Test resetting a session."""
     response = client.post("/v1/sessions/test-session-id-123/reset")
 
@@ -193,7 +194,7 @@ def test_reset_session(client):
     assert "timestamp" in data
 
 
-def test_delete_session(client):
+def test_delete_session(client: TestClient) -> None:
     """Test deleting a session."""
     response = client.delete("/v1/sessions/test-session-id-123")
 
@@ -201,7 +202,7 @@ def test_delete_session(client):
     assert response.content == b""
 
 
-def test_delete_session_not_found(client):
+def test_delete_session_not_found(client: TestClient) -> None:
     """Test deleting non-existent session."""
     response = client.delete("/v1/sessions/nonexistent-id")
 
@@ -212,7 +213,7 @@ def test_delete_session_not_found(client):
     assert "does not exist" in error_data["error"]["message"].lower()
 
 
-def test_session_lifecycle_workflow(client):
+def test_session_lifecycle_workflow(client: TestClient) -> None:
     """Test complete session lifecycle."""
     # Create session
     create_response = client.post("/v1/sessions", json={"config_path": "config/default.yaml"})

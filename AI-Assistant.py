@@ -462,9 +462,9 @@ class DynamicThreshold(nn.Module):
         self.register_buffer("theta_t", torch.tensor(theta_0))
         self.theta_t: torch.Tensor
         self.ignition_history: List[float] = []
-        self.threshold_history: List[
-            float
-        ] = []  # Track threshold changes for adaptation measurement
+        self.threshold_history: List[float] = (
+            []
+        )  # Track threshold changes for adaptation measurement
         self.last_dS_dt = 0.0
 
     def update(self, S_t: torch.Tensor, dt: float = 0.01) -> torch.Tensor:
@@ -1351,7 +1351,7 @@ class APGIAssistant:
         self.physiology_history: deque[Dict[str, Any]] = deque(maxlen=100)
 
         # Cognitive state
-        self.cognitive_state = {
+        self.cognitive_state: dict[str, Any] = {
             "current": None,
             "previous": None,
             "trend": "stable",
@@ -1368,7 +1368,7 @@ class APGIAssistant:
         }
 
         # Performance metrics
-        self.performance_metrics = {
+        self.performance_metrics: Dict[str, Any] = {
             "total_queries": 0,
             "average_response_time": 0,
             "state_accuracy": {},
@@ -1376,6 +1376,9 @@ class APGIAssistant:
             "surprise_history": [],
             "ignition_history": [],
         }
+
+        # Auto metric update flag
+        self._auto_update_metrics = True
 
         # Initialize explanation templates
         self.explanation_templates = self._initialize_explanation_templates()
@@ -1416,7 +1419,8 @@ class APGIAssistant:
         # Track transitions
         if self.cognitive_state["current"] is not None:
             if self.cognitive_state["current"] != state["primary"]:
-                self.cognitive_state["transitions"] += 1
+                transitions: int = cast(int, self.cognitive_state["transitions"])
+                self.cognitive_state["transitions"] = transitions + 1
                 self.cognitive_state["previous"] = self.cognitive_state["current"]
                 self.cognitive_state["current"] = state["primary"]
 
@@ -1448,9 +1452,13 @@ class APGIAssistant:
 
         # Update performance metrics for state accuracy
         state_name = state["primary"]
-        if state_name not in self.performance_metrics["state_accuracy"]:
-            self.performance_metrics["state_accuracy"][state_name] = 0
-        self.performance_metrics["state_accuracy"][state_name] += 1
+        state_accuracy: dict[str, int] = cast(
+            dict[str, int], self.performance_metrics.get("state_accuracy", {})
+        )
+        if state_name not in state_accuracy:
+            state_accuracy[state_name] = 0
+        state_accuracy[state_name] += 1
+        self.performance_metrics["state_accuracy"] = state_accuracy
 
     def _update_performance_metrics(self, response_time: float) -> None:
         """
@@ -1460,22 +1468,27 @@ class APGIAssistant:
             response_time: Time taken to generate response in seconds
         """
         # Update total queries
-        self.performance_metrics["total_queries"] += 1
+        total_queries: int = cast(int, self.performance_metrics.get("total_queries", 0))
+        self.performance_metrics["total_queries"] = total_queries + 1
 
         # Update average response time
-        current_avg = self.performance_metrics["average_response_time"]
-        total_queries = self.performance_metrics["total_queries"]
+        current_avg: float = cast(float, self.performance_metrics.get("average_response_time", 0.0))
+        new_total: int = cast(int, self.performance_metrics["total_queries"])
         self.performance_metrics["average_response_time"] = (
-            current_avg * (total_queries - 1) + response_time
-        ) / total_queries
+            current_avg * (new_total - 1) + response_time
+        ) / new_total
 
         # Track response time history (keep last 50)
+        response_times: list[float] = cast(
+            list[float], self.performance_metrics.get("response_times", [])
+        )
         if "response_times" not in self.performance_metrics:
-            self.performance_metrics["response_times"] = []
+            self.performance_metrics["response_times"] = response_times = []
 
-        self.performance_metrics["response_times"].append(response_time)
-        if len(self.performance_metrics["response_times"]) > 50:
-            self.performance_metrics["response_times"].pop(0)
+        response_times.append(response_time)
+        if len(response_times) > 50:
+            response_times.pop(0)
+        self.performance_metrics["response_times"] = response_times
 
     def _detect_state_transition(self, current_state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1699,7 +1712,7 @@ class APGIAssistant:
 
         # Adaptive preprocessing
         if self.enable_adaptive_processing and self.cognitive_state["current"]:
-            user_input = self._adapt_input_processing(user_input, self.cognitive_state["current"])  # type: ignore
+            user_input = self._adapt_input_processing(user_input, self.cognitive_state["current"])
 
         # Encode physiology
         interoceptive_signals = None
@@ -1707,7 +1720,7 @@ class APGIAssistant:
             interoceptive_signals = self.encode_physiology(physiological_data)
 
         # Prepare model input
-        model_input = self._prepare_model_input(user_input, context, metadata)  # type: ignore
+        model_input = self._prepare_model_input(user_input, context, metadata)
 
         # Energy-aware inference
         if self.enable_energy_aware and current_battery is not None:
@@ -1728,8 +1741,8 @@ class APGIAssistant:
         surprise_value = float(model_output.get("surprise", torch.tensor(0.0)).item())
         ignition_value = float(model_output.get("ignition_probability", torch.tensor(0.0)).item())
 
-        self.performance_metrics["surprise_history"].append(surprise_value)  # type: ignore
-        self.performance_metrics["ignition_history"].append(ignition_value)  # type: ignore
+        self.performance_metrics["surprise_history"].append(surprise_value)
+        self.performance_metrics["ignition_history"].append(ignition_value)
 
         # Interpret state
         state = self.interpret_state(model_output, physiological_data)
@@ -1738,7 +1751,7 @@ class APGIAssistant:
         if current_battery is not None:
             state["energy_context"] = {"battery_level": current_battery, "energy_cost": energy_cost}
 
-        self._update_state_history(state)  # type: ignore
+        self._update_state_history(state)
 
         # Generate response
         response_depth = int(self.processing_modes[state["primary"]]["depth"])
@@ -1747,7 +1760,7 @@ class APGIAssistant:
 
         # Compile response
         response_time = time.time() - processing_start
-        self._update_performance_metrics(response_time)  # type: ignore
+        self._update_performance_metrics(response_time)
 
         # Get detailed oscillatory metrics for display
         detailed_oscillatory = self.interpret_state(
@@ -1764,11 +1777,11 @@ class APGIAssistant:
             "explanation": self.explain_reasoning(user_input, state),
             "processing_metadata": {
                 "time_elapsed": response_time,
-                "state_transition": self._detect_state_transition(state),  # type: ignore
+                "state_transition": self._detect_state_transition(state),
                 "processing_mode": self.processing_modes.get(
                     state.get("primary", "idle"), {"depth": 1}
                 ),
-                "attention_profile": self._compute_attention_profile(model_output),  # type: ignore
+                "attention_profile": self._compute_attention_profile(model_output),
                 "oscillatory_profile": {
                     **state.get("oscillatory_profile", {}),
                     **power_spectrum_values,  # Include actual power spectrum values
@@ -1991,7 +2004,7 @@ class APGIAssistant:
 
         # Analyze state patterns
         cognitive_states = [
-            s.get("cognitive_state", "unknown") for s in recent_states if isinstance(s, dict)
+            s.get("primary", "unknown") for s in recent_states if isinstance(s, dict)
         ]
         surprise_levels = [s.get("surprise", 0.0) for s in recent_states if isinstance(s, dict)]
 
@@ -2028,20 +2041,22 @@ class APGIAssistant:
         if not hasattr(self, "energy_history"):
             return {"error": "Energy monitoring not available"}
 
+        avg_level = (
+            float(sum(d["level"] for d in self.energy_history) / len(self.energy_history))
+            if self.energy_history
+            else 0.0
+        )
+        current_level = float(self.energy_history[-1]["level"]) if self.energy_history else 0.0
+
         return {
-            "current_energy_level": (
-                float(self.energy_history[-1]["level"]) if self.energy_history else 0.0
-            ),
-            "average_energy_consumption": (
-                float(sum(d["level"] for d in self.energy_history) / len(self.energy_history))
-                if self.energy_history
-                else 0.0
-            ),
+            "current_energy_level": current_level,
+            "current_battery": current_level,  # Alias for reporting
+            "avg_battery": avg_level,  # Alias for reporting
+            "average_energy_consumption": avg_level,
             "total_energy_consumed": float(sum(d["level"] for d in self.energy_history)),
             "energy_efficiency_score": max(
                 0.0,
-                1.0
-                - (sum(d["level"] for d in self.energy_history) / max(1, len(self.energy_history))),
+                1.0 - (avg_level if len(self.energy_history) > 0 else 0.0),
             ),
             "energy_history_length": len(self.energy_history),
         }
@@ -2051,12 +2066,14 @@ class APGIAssistant:
         metrics = self.performance_metrics.copy()
 
         # Calculate additional derived metrics
-        if "response_times" in metrics and metrics["response_times"]:
-            metrics["average_response_time_calculated"] = sum(metrics["response_times"]) / len(
-                metrics["response_times"]
+        response_times = metrics.get("response_times")
+        if response_times and isinstance(response_times, list):
+            response_times_list: list[float] = cast(list[float], response_times)
+            metrics["average_response_time_calculated"] = sum(response_times_list) / len(
+                response_times_list
             )
-            metrics["min_response_time"] = min(metrics["response_times"])
-            metrics["max_response_time"] = max(metrics["response_times"])
+            metrics["min_response_time"] = min(response_times_list)
+            metrics["max_response_time"] = max(response_times_list)
 
         # Calculate state transition rate
         if hasattr(self, "transition_history"):
@@ -2064,8 +2081,9 @@ class APGIAssistant:
                 [t for t in self.transition_history if t.get("transition_occurred", False)]
             )
             metrics["state_transitions"] = total_transitions
-            if metrics["total_queries"] > 0:
-                metrics["transition_rate"] = total_transitions / metrics["total_queries"]
+            total_queries = metrics.get("total_queries", 0)
+            if isinstance(total_queries, (int, float)) and total_queries > 0:
+                metrics["transition_rate"] = total_transitions / total_queries
 
         return metrics
 
@@ -2352,7 +2370,21 @@ def run_unit_tests() -> None:
     assert osc_state["amplitudes"].shape == (1, 64)
     print("✓ LinOSS decomposition working")
 
-    # Test 6: Full APGI forward pass
+    # Test 5: Precision estimation
+    print("\n[Test 5] Precision Estimation")
+    precision_net = PrecisionNetwork(hidden_dim=128)
+
+    # Low error precision
+    p1 = precision_net(torch.randn(1, 128), context=torch.randn(1, 128))
+
+    # High error precision (after update)
+    precision_net.update_statistics(torch.ones(10) * 10.0)
+    p2 = precision_net(torch.randn(1, 128), context=torch.randn(1, 128))
+
+    assert p1 > 0 and p2 > 0, "Precision values must be positive"
+    print("✓ Precision network functional")
+
+    # Test 6: Full APGI Forward Pass
     print("\n[Test 6] Full APGI Forward Pass")
     model = APGI_LFM2(config)
 
@@ -3499,7 +3531,7 @@ class LLMAssistant:
 
             # Move to GPU if available
             if torch.cuda.is_available() and self.model is not None:
-                self.model = self.model.cuda()  # type: ignore
+                self.model = self.model.cuda()  # type: ignore[call-arg]
                 LOGGER.info("LLM model moved to GPU")
             else:
                 LOGGER.info("LLM model running on CPU")

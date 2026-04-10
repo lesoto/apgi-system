@@ -15,21 +15,17 @@ import logging
 from logging.handlers import RotatingFileHandler
 from collections import deque
 from pathlib import Path
+from typing import Any, Callable, Optional, cast
 import sys
 import importlib.util
 import gc
 
-# Import APGI Assistant components
-try:
-    from AI_Assistant import APGIAssistant  # type: ignore
-
-    HAS_APGI_ASSISTANT = True
-except ImportError:
-    HAS_APGI_ASSISTANT = False
-    logging.warning("APGI Assistant not available")
+# APGIAssistant will be loaded dynamically via load_apgi_module()
+HAS_APGI_ASSISTANT = False
+APGIAssistant: Any = None
 import os
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Callable, TypeVar, Tuple, Deque
+from typing import Dict, List, TypeVar, Tuple, Deque
 import importlib
 from functools import wraps
 import numpy as np
@@ -47,7 +43,10 @@ except ImportError:
 # Import ToolTip from components
 try:
     from apgi_gui.components.core import ToolTip
+
+    TOOLTIP_AVAILABLE = True
 except ImportError:
+    TOOLTIP_AVAILABLE = False
     print("Warning: ToolTip component not available.")
 
 # Import core APGI Assistant - will be loaded by load_apgi_module() function
@@ -80,8 +79,8 @@ except ImportError:
 
 # Check for PDF export dependencies
 try:
-    from reportlab.lib.pagesizes import A4  # type: ignore
-    from reportlab.platypus import (  # type: ignore
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import (
         SimpleDocTemplate,
         Paragraph,
         Spacer,
@@ -89,15 +88,30 @@ try:
         TableStyle,
         PageBreak,
     )
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
-    from reportlab.lib.units import inch  # type: ignore
-    from reportlab.lib.enums import TA_CENTER  # type: ignore
-    from reportlab.lib import colors  # type: ignore
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib import colors
 
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
     colors = None
+
+# Check for additional simulation dependencies
+try:
+    import torchdiffeq  # noqa: F401
+
+    HAS_TORCHDIFFEQ = True
+except ImportError:
+    HAS_TORCHDIFFEQ = False
+
+try:
+    import transformers  # noqa: F401
+
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
 
 # Type variable for decorator
 F = TypeVar("F", bound=Callable[..., Any])
@@ -120,48 +134,50 @@ def safe_widget_method(widget_attr: str) -> Callable[[F], F]:
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(self, *args: Any, **kwargs: Any) -> Optional[Any]:
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Optional[Any]:
             try:
                 # Check if application is shutting down
                 if hasattr(self, "is_shutting_down") and self.is_shutting_down:
-                    return None  # type: ignore[return-value]
+                    return None
 
                 # Check if root window exists
                 if hasattr(self, "root") and not self.root.winfo_exists():
-                    return None  # type: ignore[return-value]
+                    return None
 
                 # Get widget with comprehensive validation
                 widget = getattr(self, widget_attr, None)
                 if widget is None:
-                    return None  # type: ignore[return-value]
+                    return None
 
                 # Check widget has winfo_exists method and widget exists
                 if not hasattr(widget, "winfo_exists"):
-                    return None  # type: ignore[return-value]
+                    return None
 
                 if not widget.winfo_exists():
-                    return None  # type: ignore[return-value]
+                    return None
 
                 # Additional validation for certain widget types
                 if hasattr(widget, "master") and widget.master:
                     if not widget.master.winfo_exists():
-                        return None  # type: ignore[return-value]
+                        return None
 
                 # All checks passed, execute the function
-                return func(self, *args, **kwargs)  # type: ignore[return-value]
+                return func(self, *args, **kwargs)
 
             except Exception as e:
-                # Enhanced error logging with context
+                # Enhanced error logging with context - use exception to capture stack trace
                 logger = getattr(self, "logger", None)
                 if logger:
-                    logger.debug(f"Safe widget method error for {widget_attr}: {e}")
+                    logger.exception(f"Safe widget method error for {widget_attr}: {e}")
                 else:
-                    print(f"Safe widget method error for {widget_attr}: {e}")
-                return None  # type: ignore[return-value]
+                    import sys
+
+                    sys.stderr.write(f"Safe widget method error for {widget_attr}: {e}\n")
+                return None
 
         return wrapper  # type: ignore[return-value]
 
-    return decorator  # type: ignore[return-value]
+    return decorator
 
 
 try:
@@ -182,20 +198,21 @@ class HistoryManager:
             max_memory_mb: Maximum memory usage in MB for all history
             auto_prune: Whether to automatically prune when memory limits exceeded
         """
-        self.max_memory_mb = max_memory_mb
+        # Get memory limit from environment or use default (1GB as per BUG-M09)
+        self.max_memory_mb = int(os.environ.get("APGI_MAX_MEMORY_MB", max_memory_mb))
         self.auto_prune = auto_prune
         self.pruning_strategies = {
-            "state": {"maxlen": 100, "prune_ratio": 0.7},
-            "energy": {"maxlen": 50, "prune_ratio": 0.6},
-            "query": {"maxlen": 20, "prune_ratio": 0.5},
-            "transition": {"maxlen": 100, "prune_ratio": 0.6},
-            "physiology": {"maxlen": 100, "prune_ratio": 0.6},
+            "state": {"maxlen": 1000, "prune_ratio": 0.5},
+            "energy": {"maxlen": 500, "prune_ratio": 0.5},
+            "query": {"maxlen": 200, "prune_ratio": 0.5},
+            "transition": {"maxlen": 1000, "prune_ratio": 0.5},
+            "physiology": {"maxlen": 1000, "prune_ratio": 0.5},
         }
 
         # Track memory usage
         self.memory_usage: Dict[str, float] = {}
         self.last_prune_time = time.time()
-        self.prune_interval = 300  # Prune at most every 5 minutes
+        self.prune_interval = 60  # Prune at most every minute
 
     def create_managed_deque(self, history_type: str, maxlen: Optional[int] = None) -> Deque[Any]:
         """Create a managed deque with automatic pruning
@@ -211,7 +228,7 @@ class HistoryManager:
         maxlen_final: int = int(maxlen or strategy["maxlen"])
 
         managed_deque = ManagedDeque(maxlen=maxlen_final, history_type=history_type, manager=self)
-        return managed_deque  # type: ignore[return-value]
+        return managed_deque
 
     def check_memory_usage(self) -> Dict[str, float]:
         """Check current memory usage of all managed deques
@@ -223,7 +240,7 @@ class HistoryManager:
 
         # Only check memory usage periodically to avoid overhead
         if current_time - self.last_prune_time < 30:  # Check every 30 seconds
-            return self.memory_usage  # type: ignore[return-value]
+            return self.memory_usage
 
         total_memory: float = 0
         usage = {}
@@ -234,10 +251,10 @@ class HistoryManager:
             if hasattr(self, f"_{history_type}_deque"):
                 deque_obj = getattr(self, f"_{history_type}_deque")
                 if hasattr(deque_obj, "__len__"):
-                    # Rough estimate: each item ~1KB average
-                    estimated_mb = len(deque_obj) * 0.001
+                    # More realistic estimate: each item ~5KB average
+                    estimated_mb = len(deque_obj) * 0.005
                     usage[history_type] = estimated_mb
-                    total_memory: int = int(total_memory + estimated_mb)
+                    total_memory += estimated_mb
 
         usage["total"] = total_memory
         self.memory_usage = usage
@@ -246,13 +263,13 @@ class HistoryManager:
         if self.auto_prune and total_memory > self.max_memory_mb:
             self._perform_auto_prune()
 
-        return usage  # type: ignore[return-value]
+        return usage
 
     def _perform_auto_prune(self) -> None:
         """Perform automatic pruning based on strategies"""
         current_time = time.time()
         if current_time - self.last_prune_time < self.prune_interval:
-            return  # type: ignore[return-value]
+            return
 
         pruned = False
         for history_type, strategy in self.pruning_strategies.items():
@@ -273,7 +290,7 @@ class HistoryManager:
             Dictionary with memory statistics
         """
         usage = self.check_memory_usage()
-        return {  # type: ignore[return-value]
+        return {
             "memory_usage_mb": usage,
             "max_memory_mb": self.max_memory_mb,
             "memory_utilization": (
@@ -283,7 +300,7 @@ class HistoryManager:
             "auto_prune_enabled": self.auto_prune,
         }
 
-    def clear_all_history(self):
+    def clear_all_history(self) -> int:
         """Clear all managed history deques with enhanced cleanup"""
         import gc
 
@@ -309,7 +326,7 @@ class HistoryManager:
         # Update last prune time
         self.last_prune_time = time.time()
 
-        return cleared_count  # type: ignore[return-value]
+        return cleared_count
 
 
 class ManagedDeque(deque[Any]):
@@ -327,12 +344,12 @@ class ManagedDeque(deque[Any]):
         self.history_type = history_type
         self.manager = manager
         self._last_prune = time.time()
-        self._prune_threshold = 1000  # Prune every 1000 operations
+        self._prune_threshold = 100  # Prune every 100 operations to prevent memory spikes
 
         # Store reference in manager for memory tracking
         setattr(manager, f"_{history_type}_deque", self)
 
-    def append(self, item):
+    def append(self, item: Any) -> None:
         """Append item with automatic memory management"""
         super().append(item)
 
@@ -346,7 +363,7 @@ class ManagedDeque(deque[Any]):
 
         # Only prune if enough time has passed
         if current_time - self._last_prune < 60:  # At most once per minute
-            return  # type: ignore[return-value]
+            return
 
         # Check if we're approaching memory limits
         if hasattr(self.manager, "check_memory_usage"):
@@ -365,7 +382,7 @@ class ManagedDeque(deque[Any]):
             ratio: Fraction of entries to remove (0.0 to 1.0)
         """
         if not self or ratio <= 0:
-            return  # type: ignore[return-value]
+            return
 
         # Calculate how many items to remove
         items_to_remove = max(1, int(len(self) * ratio))
@@ -380,7 +397,7 @@ class ManagedDeque(deque[Any]):
         """Smart pruning to reach target size"""
         current_size = len(self)
         if current_size <= target_size:
-            return  # type: ignore[return-value]
+            return
 
         # Calculate removal ratio
         ratio = (current_size - target_size) / current_size
@@ -406,14 +423,14 @@ class ManagedDeque(deque[Any]):
 class DependencyNotifier:
     """Manages user-facing notifications for optional dependency limitations"""
 
-    def __init__(self, parent_widget=None):
+    def __init__(self, parent_widget: Any = None) -> None:
         """Initialize dependency notifier
 
         Args:
             parent_widget: Parent widget for showing notifications
         """
         self.parent_widget = parent_widget
-        self.notified_features = set()  # Track which features have been notified
+        self.notified_features: set[str] = set()  # Track which features have been notified
 
     def check_and_notify_limitations(self) -> None:
         """Check for missing dependencies and show user-friendly notifications"""
@@ -544,18 +561,18 @@ class Debouncer:
         else:
             # Fallback for non-GUI contexts - execute immediately
             func(*args, **kwargs)
-            return  # type: ignore[return-value]
+            return
 
         self.pending_calls[key] = call_id
 
-    def _execute_call(self, key: str, func: Callable, *args, **kwargs):
+    def _execute_call(self, key: str, func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         """Execute the debounced function and clean up"""
         try:
             func(*args, **kwargs)
         finally:
             self.pending_calls.pop(key, None)
 
-    def set_root(self, root):
+    def set_root(self, root: Any) -> None:
         """Set tkinter root reference for scheduling"""
         self.root = root
 
@@ -582,12 +599,12 @@ class ErrorContext:
         self.start_time = time.time()
         self.logger = logger or logging.getLogger("APGIGUI")
 
-    def __enter__(self):
-        return self  # type: ignore[return-value]
+    def __enter__(self) -> "ErrorContext":
+        return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         if exc_type is None:
-            return False  # type: ignore[return-value]
+            return False
 
         elapsed = time.time() - self.start_time
 
@@ -601,13 +618,13 @@ class ErrorContext:
         # Show user-friendly message if needed
         if self.user_facing:
             try:
-                error_msg = str(exc_val)
-                if len(error_msg) > 200:
-                    error_msg = error_msg[:200] + "..."
-
-                messagebox.showerror(
-                    f"{self.operation} Error", f"Failed to {self.operation.lower()}:\n{error_msg}"
+                # Provide a generic message instead of internal exception details (BUG-M08)
+                friendly_msg = (
+                    f"An error occurred during {self.operation.lower()}.\n\n"
+                    "The system encountered an unexpected issue. More details have "
+                    "been recorded in the application log."
                 )
+                messagebox.showerror(f"{self.operation} Error", friendly_msg)
             except Exception:
                 self.logger.warning("Failed to show error message")
 
@@ -624,11 +641,11 @@ class ErrorContext:
         )
 
         if isinstance(exc_val, critical_exceptions):
-            return False  # Re-raise critical exceptions  # type: ignore[return-value]
+            return False  # Re-raise critical exceptions
 
         # For user-facing operations, suppress the exception since we showed it to the user
         # For non-user-facing operations, re-raise to allow proper handling
-        return self.user_facing  # type: ignore[return-value]
+        return self.user_facing
 
 
 class StatusManager:
@@ -647,7 +664,7 @@ class StatusManager:
         "info": "ℹ",
     }
 
-    def __init__(self, status_label, assistant_status):
+    def __init__(self, status_label: Any, assistant_status: Any) -> None:
         """Initialize status manager with UI components
 
         Args:
@@ -661,8 +678,8 @@ class StatusManager:
         # Timing management to prevent overlap
         self.last_update_time: float = 0
         self.min_update_interval = 0.5  # Minimum 500ms between updates
-        self.pending_update = None
-        self.update_timer = None
+        self.pending_update: tuple[str, str, str | None] | None = None
+        self.update_timer: str | None = None
 
     def set_status(
         self, message: str, status_type: str = "ready", assistant_state: Optional[str] = None
@@ -689,7 +706,7 @@ class StatusManager:
                     (self.min_update_interval - (current_time - self.last_update_time)) * 1000
                 )
                 self.update_timer = self.status_label.after(delay_ms, self._process_pending_update)
-            return  # type: ignore[return-value]
+            return
 
         # Process the update immediately
         self._process_status_update(message, status_type, assistant_state)
@@ -701,7 +718,7 @@ class StatusManager:
             self.update_timer = None
             self.pending_update = None
 
-    def _process_pending_update(self):
+    def _process_pending_update(self) -> None:
         """Process any pending status update"""
         if self.pending_update:
             message, status_type, assistant_state = self.pending_update
@@ -712,7 +729,7 @@ class StatusManager:
 
     def _process_status_update(
         self, message: str, status_type: str, assistant_state: Optional[str] = None
-    ):
+    ) -> None:
         """Actually process and display the status update"""
         icon = self.ICONS.get(status_type, "")
         full_message = f"{icon} {message}" if icon else message
@@ -747,7 +764,7 @@ class StatusManager:
         Returns:
             List of status entries with timestamps
         """
-        return list(self.status_history)  # type: ignore[return-value]
+        return list(self.status_history)
 
     def clear_history(self) -> None:
         """Clear status history"""
@@ -761,7 +778,7 @@ class DisplayUpdateManager:
     widget existence checks and error handling to prevent crashes.
     """
 
-    def __init__(self, gui):
+    def __init__(self, gui: Any) -> None:
         """Initialize the update manager.
 
         Args:
@@ -770,7 +787,9 @@ class DisplayUpdateManager:
         self.gui = gui
         self.logger = getattr(gui, "logger", logging.getLogger("APGIGUI"))
 
-    def update_display(self, display_name: str, update_func: Callable, *args, **kwargs) -> None:
+    def update_display(
+        self, display_name: str, update_func: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> None:
         """Generic display updater with safety checks.
 
         Args:
@@ -790,14 +809,14 @@ class DisplayUpdateManager:
             if not skip_check:
                 # Check if the GUI is shutting down
                 if hasattr(self.gui, "is_shutting_down") and self.gui.is_shutting_down:
-                    return  # type: ignore[return-value]
+                    return
 
             # Check required widgets exist
             for widget_name in required_widgets:
                 widget = getattr(self.gui, widget_name, None)
                 if not widget:
                     self.logger.debug(f"{display_name}: Widget {widget_name} not found")
-                    return  # type: ignore[return-value]
+                    return
 
                 # FigureCanvasTkAgg doesn't have winfo_exists, check differently
                 if hasattr(widget, "get_tk_widget"):
@@ -805,16 +824,18 @@ class DisplayUpdateManager:
                     tk_widget = widget.get_tk_widget()
                     if not tk_widget or not tk_widget.winfo_exists():
                         self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
-                        return  # type: ignore[return-value]
+                        return
                 elif hasattr(widget, "winfo_exists"):
                     if not widget.winfo_exists():
                         self.logger.debug(f"{display_name}: Widget {widget_name} not ready")
-                        return  # type: ignore[return-value]
+                        return
 
             # Execute the update function
             update_func(*args, **kwargs)
 
-    def safe_call(self, display_name: str, func: Callable, *args, **kwargs):
+    def safe_call(
+        self, display_name: str, func: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
         """Safely call a function with error handling.
 
         Args:
@@ -827,8 +848,8 @@ class DisplayUpdateManager:
             The result of func(*args, **kwargs) or None if an error occurred
         """
         with ErrorContext(display_name, user_facing=False, logger=self.logger):
-            return func(*args, **kwargs)  # type: ignore[return-value]
-        return None  # type: ignore[return-value]
+            return func(*args, **kwargs)
+        return None
 
 
 class GUIConfig:
@@ -1006,7 +1027,7 @@ class GUIConfig:
             "medium": cls.FONT_SIZE_MEDIUM,
             "large": cls.FONT_SIZE_LARGE,
         }
-        return (cls.FONT_FAMILY, size_map.get(size, cls.FONT_SIZE_MEDIUM), weight)  # type: ignore[return-value]
+        return (cls.FONT_FAMILY, size_map.get(size, cls.FONT_SIZE_MEDIUM), weight)
 
     @classmethod
     def get_padding(cls, x: bool = True, y: bool = True) -> Dict[str, int]:
@@ -1026,10 +1047,10 @@ class GUIConfig:
         if y:
             padding["pady"] = cls.PAD_Y
 
-        return padding  # type: ignore[return-value]
+        return padding
 
 
-def setup_logging() -> None:
+def setup_logging() -> logging.Logger:
     """Setup comprehensive logging system"""
     logger = logging.getLogger("APGIGUI")
     logger.setLevel(logging.DEBUG)
@@ -1047,10 +1068,15 @@ def setup_logging() -> None:
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
 
+    # Avoid duplicate handlers
+    if logger.handlers:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-    return logger  # type: ignore[return-value]
+    return logger
 
 
 # Initialize logger
@@ -1058,7 +1084,7 @@ LOGGER = setup_logging()
 
 
 # Optional dependencies - check directly rather than relying on APGI module
-def check_pil():
+def check_pil() -> tuple[bool, dict[str, Any]]:
     """Check if PIL/Pillow is available and working"""
     try:
         from PIL import Image, ImageTk
@@ -1068,16 +1094,16 @@ def check_pil():
         img.close()  # Explicit cleanup
 
         LOGGER.info("PIL/Pillow is available and working")
-        return True, {"Image": Image, "ImageTk": ImageTk}  # type: ignore[return-value]
+        return True, {"Image": Image, "ImageTk": ImageTk}
     except ImportError as e:
         LOGGER.warning(f"PIL/Pillow not available: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
     except Exception as e:
         LOGGER.error(f"PIL/Pillow import failed: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
 
 
-def check_psutil():
+def check_psutil() -> tuple[bool, dict[str, Any]]:
     """Check if psutil is available"""
     try:
         import psutil
@@ -1086,31 +1112,32 @@ def check_psutil():
         psutil.cpu_percent()
 
         LOGGER.info("psutil is available and working")
-        return True, {"psutil": psutil}  # type: ignore[return-value]
+        return True, {"psutil": psutil}
     except ImportError as e:
         LOGGER.info(f"psutil not available: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
     except Exception as e:
         LOGGER.error(f"psutil import failed: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
 
 
-def check_transformers():
+def check_transformers() -> tuple[bool, dict[str, Any]]:
     """Check if transformers is available and working"""
     try:
-        import transformers
+        # Check if already imported
+        import transformers as tf_check  # noqa: F401
 
         # Test basic functionality
         transformers.__version__
 
         LOGGER.info("transformers is available and working")
-        return True, {"transformers": transformers}  # type: ignore[return-value]
+        return True, {"transformers": transformers}
     except ImportError as e:
         LOGGER.info(f"transformers not available: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
     except Exception as e:
         LOGGER.error(f"transformers import failed: {e}")
-        return False, {}  # type: ignore[return-value]
+        return False, {}
 
 
 # Check all optional dependencies
@@ -1135,7 +1162,7 @@ HAS_TORCHDIFFEQ = False  # Will be updated after APGI module loads
 
 
 # Robust module import system
-def load_apgi_module():
+def load_apgi_module() -> Any:
     """
     Robustly load APGI Assistant module from various possible locations.
 
@@ -1149,7 +1176,7 @@ def load_apgi_module():
         import apgi_assistant
 
         LOGGER.info("Successfully loaded via direct import")
-        return apgi_assistant  # type: ignore[return-value]
+        return apgi_assistant
     except ImportError as e:
         LOGGER.debug(f"Direct import failed: {e}")
 
@@ -1172,7 +1199,7 @@ def load_apgi_module():
                     sys.modules["apgi_assistant"] = module
                     spec.loader.exec_module(module)
                     LOGGER.info(f"Successfully loaded from {filename}")
-                    return module  # type: ignore[return-value]
+                    return module
 
     # Last resort: try parent directory
     parent_dir = current_dir.parent
@@ -1188,7 +1215,7 @@ def load_apgi_module():
                     sys.modules["apgi_assistant"] = module
                     spec.loader.exec_module(module)
                     LOGGER.info(f"Successfully loaded from parent/{filename}")
-                    return module  # type: ignore[return-value]
+                    return module
 
     raise ImportError(
         "Could not find APGI Assistant module. Please ensure the module file "
@@ -1199,9 +1226,10 @@ def load_apgi_module():
 # Load APGI module
 try:
     _APGI_MODULE = load_apgi_module()
-    #    APGIAssistant = _APGI_MODULE.APGIAssistant  # type: ignore[no-redef]
-    APGIVisualizer = _APGI_MODULE.APGIVisualizer
-    HAS_ASSISTANT = True  # Update flag to indicate successful loading
+    APGIAssistant = getattr(_APGI_MODULE, "APGIAssistant", None)
+    APGIVisualizer = getattr(_APGI_MODULE, "APGIVisualizer", None)
+    HAS_ASSISTANT = True
+    HAS_APGI_ASSISTANT = APGIAssistant is not None
 
     # Merge dependency flags from APGI module with our own checks
     APGI_HAS_MATPLOTLIB = getattr(_APGI_MODULE, "HAS_MATPLOTLIB", False)
@@ -1247,9 +1275,9 @@ if HAS_TRANSFORMERS:
 class DebouncedUpdater:
     """Enhanced debouncing system with operation-specific timing"""
 
-    def __init__(self, delay_ms=100):
+    def __init__(self, delay_ms: int = 100) -> None:
         self.delay_ms = delay_ms
-        self.pending_updates = {}
+        self.pending_updates: dict[str, str] = {}
         self.update_lock = threading.Lock()
 
         # Operation-specific delays
@@ -1265,7 +1293,9 @@ class DebouncedUpdater:
         self.rapid_operation_threshold = 3  # Operations within this time are "rapid"
         self.operation_history: Deque[Any] = deque(maxlen=10)
 
-    def schedule_update(self, root, update_id, callback, operation_type="default"):
+    def schedule_update(
+        self, root: Any, update_id: str, callback: Any, operation_type: str = "default"
+    ) -> None:
         """Schedule debounced update with operation-specific timing
 
         Args:
@@ -1303,7 +1333,7 @@ class DebouncedUpdater:
             # Schedule new update
             self.pending_updates[update_id] = root.after(delay, callback)
 
-    def _detect_rapid_operation(self, update_id, current_time):
+    def _detect_rapid_operation(self, update_id: str, current_time: float) -> bool:
         """Detect if this is a rapid operation
 
         Args:
@@ -1323,9 +1353,9 @@ class DebouncedUpdater:
             ):  # Within 500ms
                 recent_count += 1
 
-        return recent_count >= self.rapid_operation_threshold  # type: ignore[return-value]
+        return recent_count >= self.rapid_operation_threshold
 
-    def cancel_update(self, root, update_id):
+    def cancel_update(self, root: tk.Misc, update_id: str) -> None:
         """Cancel a pending update
 
         Args:
@@ -1341,7 +1371,7 @@ class DebouncedUpdater:
                     # Log the error but don't crash - timer might already be cancelled
                     LOGGER.debug(f"Failed to cancel timer {update_id}: {e}")
 
-    def cancel_all_updates(self, root):
+    def cancel_all_updates(self, root: tk.Misc) -> None:
         """Cancel all pending updates
 
         Args:
@@ -1356,14 +1386,14 @@ class DebouncedUpdater:
                     LOGGER.debug(f"Failed to cancel timer {update_id}: {e}")
             self.pending_updates.clear()
 
-    def get_operation_stats(self):
+    def get_operation_stats(self) -> dict[str, Any]:
         """Get statistics about recent operations
 
         Returns:
             Dictionary with operation statistics
         """
         if not self.operation_history:
-            return {"total_operations": 0, "rapid_sequences": 0}  # type: ignore[return-value]
+            return {"total_operations": 0, "rapid_sequences": 0}
 
         total_ops = len(self.operation_history)
         rapid_sequences = 0
@@ -1375,13 +1405,13 @@ class DebouncedUpdater:
             if time_span < 0.5:  # 500ms
                 rapid_sequences += 1
 
-        return {  # type: ignore[return-value]
+        return {
             "total_operations": total_ops,
             "rapid_sequences": rapid_sequences,
             "rapid_percentage": (rapid_sequences / max(1, total_ops - 2)) * 100,
         }
 
-    def cancel_all(self, root):
+    def cancel_all(self, root: Any) -> None:
         """Cancel all pending updates"""
         with self.update_lock:
             for after_id in self.pending_updates.values():
@@ -1397,16 +1427,20 @@ class DebouncedUpdater:
 class PermissionValidator:
     """Enhanced permission validation with user guidance"""
 
-    def __init__(self, logger=None):
+    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
         """Initialize permission validator
 
         Args:
             logger: Logger instance for reporting
         """
         self.logger = logger or logging.getLogger("APGIGUI")
-        self.permission_cache = {}  # Cache permission checks
+        self.permission_cache: dict[tuple[str, str], tuple[bool, str | None, str | None]] = (
+            {}
+        )  # Cache permission checks
 
-    def validate_file_access(self, file_path, operation="read"):
+    def validate_file_access(
+        self, file_path: str, operation: str = "read"
+    ) -> tuple[bool, str | None, str | None]:
         """Validate file access permissions with detailed error reporting
 
         Args:
@@ -1424,7 +1458,7 @@ class PermissionValidator:
         # Check cache first
         cache_key = (str(path_obj.absolute()), operation)
         if cache_key in self.permission_cache:
-            return self.permission_cache[cache_key]  # type: ignore[return-value]
+            return self.permission_cache[cache_key]
 
         try:
             # Check if path exists
@@ -1433,19 +1467,19 @@ class PermissionValidator:
                     # Check if parent directory exists and is writable
                     parent = path_obj.parent
                     if not parent.exists():
-                        return (  # type: ignore[return-value]
+                        return (
                             False,
                             f"Directory '{parent}' does not exist",
                             f"Create the directory first: mkdir -p '{parent}'",
                         )
                     if not os.access(parent, os.W_OK):
-                        return (  # type: ignore[return-value]
+                        return (
                             False,
                             f"No write permission for directory '{parent}'",
                             f"Check directory permissions or run: chmod u+w '{parent}'",
                         )
                 else:
-                    return (  # type: ignore[return-value]
+                    return (
                         False,
                         f"File '{file_path}' does not exist",
                         "Choose an existing file or create it first",
@@ -1454,7 +1488,7 @@ class PermissionValidator:
             # Check read permissions
             if operation in ["read", "write"]:
                 if not os.access(path_obj if path_obj.exists() else path_obj.parent, os.R_OK):
-                    return (  # type: ignore[return-value]
+                    return (
                         False,
                         f"No read permission for '{file_path}'",
                         f"Fix permissions: chmod u+r '{file_path}' or run as appropriate user",
@@ -1465,7 +1499,7 @@ class PermissionValidator:
                 if path_obj.exists():
                     # Check if we can write to existing file
                     if not os.access(path_obj, os.W_OK):
-                        return (  # type: ignore[return-value]
+                        return (
                             False,
                             f"No write permission for '{file_path}'",
                             f"Fix permissions: chmod u+w '{file_path}' or choose different location",
@@ -1473,7 +1507,7 @@ class PermissionValidator:
                 else:
                     # Check if we can write to parent directory
                     if not os.access(path_obj.parent, os.W_OK):
-                        return (  # type: ignore[return-value]
+                        return (
                             False,
                             f"No write permission for directory '{path_obj.parent}'",
                             f"Fix permissions: chmod u+w '{path_obj.parent}' or choose different location",
@@ -1482,7 +1516,7 @@ class PermissionValidator:
             # Check directory permissions
             if path_obj.is_dir():
                 if not os.access(path_obj, os.X_OK):
-                    return (  # type: ignore[return-value]
+                    return (
                         False,
                         f"No execute permission for directory '{file_path}'",
                         f"Fix permissions: chmod u+x '{file_path}' or run: chmod -R u+x '{file_path}'",
@@ -1496,7 +1530,7 @@ class PermissionValidator:
                     stat = shutil.disk_usage(path_obj.parent if path_obj.exists() else path_obj)
                     free_space_gb = stat.free / (1024**3)
                     if free_space_gb < 0.1:  # Less than 100MB
-                        return (  # type: ignore[return-value]
+                        return (
                             False,
                             f"Insufficient disk space ({free_space_gb:.1f}GB available)",
                             "Free up disk space or choose different location",
@@ -1506,7 +1540,7 @@ class PermissionValidator:
                     LOGGER.info(f"Disk space check failed: {e}")
 
             # All checks passed
-            result = (True, None, None)
+            result: tuple[bool, Optional[str], Optional[str]] = (True, None, None)
 
         except PermissionError as e:
             result = (
@@ -1525,9 +1559,9 @@ class PermissionValidator:
 
         # Cache result
         self.permission_cache[cache_key] = result
-        return result  # type: ignore[return-value]
+        return result
 
-    def validate_config_directory(self):
+    def validate_config_directory(self) -> tuple[bool, str, str]:
         """Validate the configuration directory (home directory)
 
         Returns:
@@ -1541,7 +1575,7 @@ class PermissionValidator:
 
             # Check if home directory is accessible
             if not config_dir.exists():
-                return (  # type: ignore[return-value]
+                return (
                     False,
                     f"Home directory '{config_dir}' not found",
                     "Check user account and system configuration",
@@ -1549,7 +1583,7 @@ class PermissionValidator:
 
             # Check basic permissions
             if not os.access(config_dir, os.R_OK | os.W_OK | os.X_OK):
-                return (  # type: ignore[return-value]
+                return (
                     False,
                     "Insufficient permissions for home directory",
                     f"Fix permissions or run: chmod u+rwx '{config_dir}'",
@@ -1561,32 +1595,32 @@ class PermissionValidator:
                 test_file.write_text("test")
                 test_file.unlink()
             except PermissionError:
-                return (  # type: ignore[return-value]
+                return (
                     False,
                     "Cannot write to home directory",
                     f"Check permissions or run: chmod u+w '{config_dir}'",
                 )
             except Exception as e:
-                return (  # type: ignore[return-value]
+                return (
                     False,
                     f"Error testing write access: {e}",
                     "Check file system and available storage",
                 )
 
-            return (True, None, None)  # type: ignore[return-value]
+            return (True, "", "")
 
         except Exception as e:
-            return (  # type: ignore[return-value]
+            return (
                 False,
                 f"Error validating config directory: {e}",
                 "Check system configuration and user permissions",
             )
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear permission check cache"""
         self.permission_cache.clear()
 
-    def get_permission_help(self, error_type):
+    def get_permission_help(self, error_type: str) -> str:
         """Get user-friendly help for permission errors
 
         Args:
@@ -1638,9 +1672,11 @@ Use the file dialog's browser to navigate to existing files.
             """,
         }
 
-        return help_texts.get(error_type, "Unknown error. Please check the logs for details.")  # type: ignore[return-value]
+        return help_texts.get(error_type, "Unknown error. Please check the logs for details.")
 
-    def show_permission_error(self, parent, title, error_msg, suggestion):
+    def show_permission_error(
+        self, parent: tk.Misc, title: str, error_msg: str, suggestion: str
+    ) -> None:
         """Show user-friendly permission error dialog
 
         Args:
@@ -1656,7 +1692,7 @@ Use the file dialog's browser to navigate to existing files.
             dialog.resizable(True, True)
 
             # Make dialog modal
-            dialog.transient(parent)
+            dialog.transient(parent if isinstance(parent, (tk.Tk, tk.Toplevel)) else None)
             dialog.grab_set()
 
             # Error message
@@ -1682,7 +1718,7 @@ Use the file dialog's browser to navigate to existing files.
             button_frame = ttk.Frame(dialog)
             button_frame.pack(pady=10)
 
-            def show_help():
+            def show_help() -> None:
                 help_type = (
                     "permission_denied" if "permission" in error_msg.lower() else "disk_space"
                 )
@@ -1708,11 +1744,13 @@ Use the file dialog's browser to navigate to existing files.
 class CancellableProgress:
     """Enhanced progress indicator with aggressive cancellation support"""
 
-    def __init__(self, parent, timeout_seconds=60):
+    def __init__(self, parent: tk.Misc, timeout_seconds: int = 60) -> None:
         self.cancelled = False
         self.timeout_seconds = timeout_seconds
-        self.start_time = None
-        self.cancellation_callbacks = []  # Callbacks to notify on cancellation
+        self.start_time: Optional[float] = None
+        self.cancellation_callbacks: list[Callable[[str], None]] = (
+            []
+        )  # Callbacks to notify on cancellation
         self.frame = ttk.Frame(parent, relief="raised", borderwidth=2)
 
         ttk.Label(self.frame, text="Processing...", font=("Arial", 12)).pack(pady=10)
@@ -1728,9 +1766,9 @@ class CancellableProgress:
         self.cancel_button.pack(pady=5)
 
         # Timeout tracking
-        self.timeout_timer_id = None
+        self.timeout_timer_id: Optional[str] = None
 
-    def add_cancellation_callback(self, callback):
+    def add_cancellation_callback(self, callback: Callable[[str], None]) -> None:
         """Add callback to be called when operation is cancelled
 
         Args:
@@ -1738,14 +1776,14 @@ class CancellableProgress:
         """
         self.cancellation_callbacks.append(callback)
 
-    def cancel(self, reason="user_cancelled"):
+    def cancel(self, reason: str = "user_cancelled") -> None:
         """Mark operation as cancelled with aggressive propagation
 
         Args:
             reason: Reason for cancellation
         """
         if self.cancelled:
-            return  # Already cancelled  # type: ignore[return-value]
+            return  # Already cancelled
 
         self.cancelled = True
         self.cancel_reason = reason
@@ -1778,15 +1816,15 @@ class CancellableProgress:
 
         gc.collect()
 
-    def is_cancelled(self):
+    def is_cancelled(self) -> bool:
         """Check if cancelled"""
-        return self.cancelled  # type: ignore[return-value]
+        return self.cancelled
 
-    def get_cancel_reason(self):
+    def get_cancel_reason(self) -> Optional[str]:
         """Get cancellation reason"""
-        return getattr(self, "cancel_reason", None)  # type: ignore[return-value]
+        return getattr(self, "cancel_reason", None)
 
-    def show(self, message="Processing...", timeout=None):
+    def show(self, message: str = "Processing...", timeout: Optional[int] = None) -> None:
         """Show progress dialog with optional timeout
 
         Args:
@@ -1808,7 +1846,7 @@ class CancellableProgress:
         # Center the dialog
         self.frame.place(relx=0.5, rely=0.5, anchor="center")
 
-    def hide(self):
+    def hide(self) -> None:
         """Hide progress dialog with enhanced cleanup"""
         try:
             # Stop progress bar if it exists
@@ -1837,7 +1875,7 @@ class CancellableProgress:
                 # If after scheduling fails, try immediate destruction
                 self._safe_destroy_frame()
 
-    def _safe_destroy_frame(self):
+    def _safe_destroy_frame(self) -> None:
         """Safely destroy the progress frame"""
         try:
             if hasattr(self, "frame") and self.frame:
@@ -1850,10 +1888,10 @@ class CancellableProgress:
             pass  # Log error but don't crash - frame might already be destroyed
         finally:
             # Clear references to help garbage collection
-            self.frame = None
-            self.progress_bar = None
-            self.message_label = None
-            self.cancel_button = None
+            self.frame = None  # type: ignore[assignment]
+            self.progress_bar = None  # type: ignore[assignment]
+            self.message_label = None  # type: ignore[assignment]
+            self.cancel_button = None  # type: ignore[assignment]
 
         # Force UI update to ensure dialog disappears
         try:
@@ -1873,21 +1911,21 @@ class CancellableProgress:
             finally:
                 self.timeout_timer_id = None
 
-    def update_message(self, message):
+    def update_message(self, message: str) -> None:
         """Update progress message"""
         if not self.cancelled:
             self.message_label.config(text=message)
 
-    def check_timeout(self):
+    def check_timeout(self) -> bool:
         """Check if operation has timed out"""
         if self.start_time and not self.cancelled:
             elapsed = time.time() - self.start_time
             if elapsed > self.timeout_seconds:
                 self.cancel("timeout")
-                return True  # type: ignore[return-value]
-        return False  # type: ignore[return-value]
+                return True
+        return False
 
-    def set_timeout(self, seconds):
+    def set_timeout(self, seconds: int) -> None:
         """Update timeout duration
 
         Args:
@@ -1912,12 +1950,12 @@ class CancellableProgress:
 class ActionHistory:
     """Command pattern for undo/redo"""
 
-    def __init__(self, max_history=50):
-        self.undo_stack = []
-        self.redo_stack = []
+    def __init__(self, max_history: int = 50):
+        self.undo_stack: list[Any] = []
+        self.redo_stack: list[Any] = []
         self.max_history = max_history
 
-    def execute(self, action):
+    def execute(self, action: Any) -> None:
         """Execute action and add to history"""
         action.execute()
         self.undo_stack.append(action)
@@ -1925,44 +1963,44 @@ class ActionHistory:
             self.undo_stack.pop(0)
         self.redo_stack.clear()
 
-    def undo(self):
+    def undo(self) -> None:
         """Undo last action"""
         if self.undo_stack:
             action = self.undo_stack.pop()
             action.undo()
             self.redo_stack.append(action)
 
-    def redo(self):
+    def redo(self) -> None:
         """Redo last undone action"""
         if self.redo_stack:
             action = self.redo_stack.pop()
             action.execute()
             self.undo_stack.append(action)
 
-    def can_undo(self):
+    def can_undo(self) -> bool:
         """Check if undo is available"""
-        return len(self.undo_stack) > 0  # type: ignore[return-value]
+        return len(self.undo_stack) > 0
 
-    def can_redo(self):
+    def can_redo(self) -> bool:
         """Check if redo is available"""
-        return len(self.redo_stack) > 0  # type: ignore[return-value]
+        return len(self.redo_stack) > 0
 
 
 class SetPhysiologyAction:
     """Action for setting physiological state"""
 
-    def __init__(self, gui, old_state, new_state):
+    def __init__(self, gui: Any, old_state: Dict[str, Any], new_state: Dict[str, Any]):
         self.gui = gui
         self.old_state = old_state
         self.new_state = new_state
 
-    def execute(self):
+    def execute(self) -> None:
         self._apply_state(self.new_state)
 
-    def undo(self):
+    def undo(self) -> None:
         self._apply_state(self.old_state)
 
-    def _apply_state(self, state):
+    def _apply_state(self, state: Dict[str, Any]) -> None:
         self.gui.hr_var.set(state["hr"])
         self.gui.hrv_var.set(state["hrv"])
         self.gui.resp_var.set(state["resp"])
@@ -1972,18 +2010,18 @@ class SetPhysiologyAction:
 class QueryTextAction:
     """Action for query text changes"""
 
-    def __init__(self, gui, old_text, new_text):
+    def __init__(self, gui: Any, old_text: str, new_text: str) -> None:
         self.gui = gui
         self.old_text = old_text
         self.new_text = new_text
 
-    def execute(self):
+    def execute(self) -> None:
         self._apply_text(self.new_text)
 
-    def undo(self):
+    def undo(self) -> None:
         self._apply_text(self.old_text)
 
-    def _apply_text(self, text):
+    def _apply_text(self, text: str) -> None:
         if hasattr(self.gui, "query_input"):
             self.gui.query_input.delete(1.0, tk.END)
             self.gui.query_input.insert(1.0, text)
@@ -1993,19 +2031,19 @@ class QueryTextAction:
 class ClearQueryAction:
     """Action for clearing query text"""
 
-    def __init__(self, gui, old_text):
+    def __init__(self, gui: Any, old_text: str):
         self.gui = gui
         self.old_text = old_text
 
-    def execute(self):
+    def execute(self) -> None:
         if hasattr(self.gui, "query_input"):
             self.gui.query_input.delete(1.0, tk.END)
             self.gui.update_char_count()
 
-    def undo(self):
+    def undo(self) -> None:
         self._apply_text(self.old_text)
 
-    def _apply_text(self, text):
+    def _apply_text(self, text: str) -> None:
         if hasattr(self.gui, "query_input"):
             self.gui.query_input.delete(1.0, tk.END)
             self.gui.query_input.insert(1.0, text)
@@ -2016,7 +2054,9 @@ class InputValidator:
     """Input validation utilities with comprehensive error checking"""
 
     @staticmethod
-    def validate_physiological(hr: int, hrv: int, resp: int, eda: float) -> Tuple[bool, List[str]]:
+    def validate_physiological(
+        hr: float, hrv: float, resp: float, eda: float
+    ) -> Tuple[bool, List[str]]:
         """
         Validate physiological parameters.
 
@@ -2027,13 +2067,13 @@ class InputValidator:
 
         # Validate heart rate
         if not isinstance(hr, (int, float)):
-            errors.append("Heart rate must be a number")
+            errors.append("Heart rate must be a number")  # type: ignore[unreachable]
         elif not (40 <= hr <= 200):  # Use hardcoded range as fallback
             errors.append("Heart rate must be between 40-200 bpm")
 
         # Validate HRV
         if not isinstance(hrv, (int, float)):
-            errors.append("HRV must be a number")
+            errors.append("HRV must be a number")  # type: ignore[unreachable]
         elif not GUIConfig.HRV_RANGE[0] <= hrv <= GUIConfig.HRV_RANGE[1]:
             errors.append(
                 f"HRV must be between {GUIConfig.HRV_RANGE[0]}-{GUIConfig.HRV_RANGE[1]} ms"
@@ -2041,7 +2081,7 @@ class InputValidator:
 
         # Validate respiration
         if not isinstance(resp, (int, float)):
-            errors.append("Respiration must be a number")
+            errors.append("Respiration must be a number")  # type: ignore[unreachable]
         elif not GUIConfig.RESP_RANGE[0] <= resp <= GUIConfig.RESP_RANGE[1]:
             errors.append(
                 f"Respiration must be between {GUIConfig.RESP_RANGE[0]}-{GUIConfig.RESP_RANGE[1]} bpm"
@@ -2049,13 +2089,13 @@ class InputValidator:
 
         # Validate EDA
         if not isinstance(eda, (int, float)):
-            errors.append("Skin conductance must be a number")
+            errors.append("Skin conductance must be a number")  # type: ignore[unreachable]
         elif not GUIConfig.EDA_RANGE[0] <= eda <= GUIConfig.EDA_RANGE[1]:
             errors.append(
                 f"Skin conductance must be between {GUIConfig.EDA_RANGE[0]}-{GUIConfig.EDA_RANGE[1]} µS"
             )
 
-        return len(errors) == 0, errors  # type: ignore[return-value]
+        return len(errors) == 0, errors
 
     @staticmethod
     def validate_query(query: str) -> Tuple[bool, str]:
@@ -2066,18 +2106,18 @@ class InputValidator:
             (is_valid, error_message)
         """
         if query is None:
-            return False, "Query cannot be None"  # type: ignore[return-value]
+            return False, "Query cannot be None"  # type: ignore[unreachable]
 
         if not isinstance(query, str):
-            return False, "Query must be a string"  # type: ignore[return-value]
+            return False, "Query must be a string"  # type: ignore[unreachable]
 
         if not query or not query.strip():
-            return False, "Query cannot be empty"  # type: ignore[return-value]
+            return False, "Query cannot be empty"
 
         if len(query) > GUIConfig.MAX_QUERY_LENGTH:
-            return False, f"Query too long (max {GUIConfig.MAX_QUERY_LENGTH} characters)"  # type: ignore[return-value]
+            return False, f"Query too long (max {GUIConfig.MAX_QUERY_LENGTH} characters)"
 
-        return True, ""  # type: ignore[return-value]
+        return True, ""
 
     @staticmethod
     def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -2091,7 +2131,7 @@ class InputValidator:
 
         if not isinstance(config, dict):
             errors.append("Configuration must be a dictionary")
-            return False, errors  # type: ignore[return-value]
+            return False, errors
 
         if "input_dim" in config:
             if not isinstance(config["input_dim"], (int, float)):
@@ -2111,7 +2151,7 @@ class InputValidator:
                     f"Hidden dimension must be between {GUIConfig.MODEL_HIDDEN_MIN}-{GUIConfig.MODEL_HIDDEN_MAX}"
                 )
 
-        return len(errors) == 0, errors  # type: ignore[return-value]
+        return len(errors) == 0, errors
 
 
 class UsageTracker:
@@ -2150,13 +2190,13 @@ class UsageTracker:
             average response time, and last activity timestamp
         """
         if not self.metrics_log:
-            return {}  # type: ignore[return-value]
+            return {}
 
         total_queries = len(self.metrics_log)
         avg_query_length = sum(m["query_length"] for m in self.metrics_log) / total_queries
         avg_response_time = sum(m["response_time_ms"] for m in self.metrics_log) / total_queries
 
-        return {  # type: ignore[return-value]
+        return {
             "total_queries": total_queries,
             "avg_query_length": avg_query_length,
             "avg_response_time_ms": avg_response_time,
@@ -2189,7 +2229,7 @@ class InitializationState:
 class APGIGUI:
     """Main GUI application for APGI Assistant - Production Ready"""
 
-    def __init__(self, root):
+    def __init__(self, root: tk.Tk) -> None:
         # Validate dependencies first
         if not HAS_ASSISTANT:
             messagebox.showwarning(
@@ -2211,7 +2251,7 @@ class APGIGUI:
 
         # Setup logger
         # Log event method
-        def _log_event(self, message: str) -> None:
+        def _log_event(self: Any, message: str) -> None:
             """Log an event message."""
             self.logger.info(message)
 
@@ -2220,8 +2260,8 @@ class APGIGUI:
 
         # Thread safety
         self.assistant_lock = threading.Lock()
-        self.processing_queue = queue.Queue()
-        self.init_queue = queue.Queue()
+        self.processing_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
+        self.init_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.init_thread: Optional[threading.Thread] = None
         self.init_cancel_event = threading.Event()  # Cancellation event for init thread
         self.update_flags_lock = threading.Lock()
@@ -2273,16 +2313,22 @@ class APGIGUI:
         self.skin_conductance_var = tk.DoubleVar(value=4.5)
 
         # Export settings
-        self.export_settings = {"dpi": 300, "format": "png", "quality": "high"}  # low, medium, high
+        self.export_settings: dict[str, Any] = {
+            "dpi": 300,
+            "format": "png",
+            "quality": "high",
+        }  # low, medium, high
 
         # Initialization state tracking
         self.init_state = InitializationState.IDLE
-        self.init_start_time = None
+        self.init_start_time: float | None = None
         self.init_timeout_seconds = 60  # Increased from 45 to 60 seconds
-        self.init_check_timer_id = None
-        self.init_safety_timer_id = None  # Safety timer to force hide progress
+        self.init_check_timer_id: str | None = None
+        self.init_safety_timer_id: str | None = None  # Safety timer to force hide progress
         self.init_progress = 0.0  # Track initialization progress (0.0 to 1.0)
+        self._last_query_text: str = ""  # Track last query text for undo/redo
         self.init_message = ""  # Current initialization status message
+        self._handling_init: bool = False  # Flag to prevent multiple init handlers
 
         # Font size management for accessibility
         self.font_size_var = tk.IntVar(value=10)  # Default font size
@@ -2292,12 +2338,13 @@ class APGIGUI:
         # Auto-save functionality
         self.auto_save_enabled = True
         self.auto_save_interval = 300000  # 5 minutes in milliseconds
-        self.auto_save_timer_id = None
+        self.auto_save_timer_id: Optional[str] = None
         self.auto_save_file = "apgi_auto_save.json"
-        self.last_auto_save = None
+        self.last_auto_save: Optional[datetime] = None
 
         # Data storage with automatic history management
-        self.history_manager = HistoryManager(max_memory_mb=100, auto_prune=True)
+        # Initialize history manager with 1GB default (configurable via env var)
+        self.history_manager = HistoryManager(max_memory_mb=1024, auto_prune=True)
         self.state_history = self.history_manager.create_managed_deque("state", maxlen=100)
         self.energy_history = self.history_manager.create_managed_deque("energy", maxlen=50)
         self.query_history = self.history_manager.create_managed_deque("query", maxlen=20)
@@ -2322,7 +2369,7 @@ class APGIGUI:
         self.usage_tracker = UsageTracker()
 
         # Lazy-loaded tabs
-        self.tabs_created = set()
+        self.tabs_created: set[str] = set()
 
         # Configuration
         self.config_file = Path.home() / ".apgi_gui_config.json"
@@ -2332,7 +2379,6 @@ class APGIGUI:
         self.create_menu()
         self.create_widgets()
         self.create_status_bar()
-        self.create_progress_overlay()
 
         # Check for dependency limitations and notify user
         self.root.after(500, self.dependency_notifier.check_and_notify_limitations)
@@ -2370,7 +2416,7 @@ class APGIGUI:
             timestamp = datetime.now().strftime("%H:%M:%S")
             log_message = f"[{timestamp}] {message}\n"
             # Schedule GUI update on main thread
-            self.root.after(0, lambda msg=log_message: self._safe_log_to_gui(msg))
+            self.root.after(0, lambda msg=log_message: self._safe_log_to_gui(msg))  # type: ignore[misc]
 
     def _safe_log_to_gui(self, message: str) -> None:
         """Safely log message to GUI with existence check."""
@@ -2382,7 +2428,7 @@ class APGIGUI:
             # Ignore errors during shutdown
             pass
 
-    def create_menu(self):
+    def create_menu(self) -> None:
         """Create menu bar"""
         menubar = Menu(self.root)
         self.root.config(menu=menubar)
@@ -2506,7 +2552,7 @@ class APGIGUI:
             for theme_name in self.theme_manager.get_available_themes():
                 theme_menu.add_radiobutton(
                     label=theme_name.capitalize(),
-                    command=lambda t=theme_name: self._set_theme(t),
+                    command=lambda t=theme_name: self._set_theme(t),  # type: ignore[misc]
                     variable=tk.StringVar(value=self.theme_manager.current_theme),
                     value=theme_name,
                 )
@@ -2519,25 +2565,25 @@ class APGIGUI:
         help_menu.add_command(label="About", command=self.show_about)
         help_menu.add_command(label="View Logs", command=self.view_logs)
 
-    def _set_theme(self, theme_name: str):
+    def _set_theme(self, theme_name: str) -> None:
         """Set the current theme.
 
         Args:
             theme_name: Name of the theme to apply
         """
         if not self.theme_manager:
-            return  # type: ignore[return-value]
+            return
 
         if self.theme_manager.set_theme(theme_name):
             self._apply_theme_to_widgets()
 
-    def _apply_theme_to_widgets(self):
+    def _apply_theme_to_widgets(self) -> None:
         """Apply current theme to all widgets."""
         if not self.theme_manager:
-            return  # type: ignore[return-value]
+            return
 
         # Helper function to safely apply theme to text widget
-        def apply_to_text_widget(widget, bg_color, fg_color):
+        def apply_to_text_widget(widget: Any, bg_color: str, fg_color: str) -> None:
             if widget and widget.winfo_exists():
                 try:
                     widget.config(bg=bg_color, fg=fg_color, insertbackground=fg_color)
@@ -2554,7 +2600,7 @@ class APGIGUI:
         # Apply theme to status label
         if hasattr(self, "status_label") and self.status_label.winfo_exists():
             try:
-                self.status_label.config(fg=fg_color)
+                self.status_label.config(foreground=fg_color)
             except tk.TclError:
                 pass
 
@@ -2566,17 +2612,17 @@ class APGIGUI:
             status_type: Type of status ('info', 'success', 'error', 'warning', 'processing')
         """
         if not self.display_manager:
-            return  # type: ignore[return-value]
+            return
         self.display_manager.update_display(
             "Status Update",
             lambda: self._do_status_update(message, status_type),
             required_widgets=["status_label"],
         )
 
-    def _do_status_update(self, message: str, status_type: str):
+    def _do_status_update(self, message: str, status_type: str) -> None:
         """Internal method to update status label with proper styling."""
         if not hasattr(self, "status_label") or not self.status_label.winfo_exists():
-            return  # type: ignore[return-value]
+            return
 
         # Set status text
         self.status_label.config(text=message)
@@ -2603,7 +2649,7 @@ class APGIGUI:
         else:
             self.logger.debug(f"Status: {message}")
 
-    def create_widgets(self):
+    def create_widgets(self) -> None:
         """Create and arrange all GUI widgets with lazy loading"""
         # Create notebook for tabs
         self.notebook = ttk.Notebook(self.root)
@@ -2636,10 +2682,10 @@ class APGIGUI:
         self.create_main_tab()
         self.tabs_created.add("Main Interface")
 
-    def on_tab_changed(self, event):
+    def on_tab_changed(self, event: Any) -> None:
         """Handle tab change - lazy load content"""
-        current_tab = self.notebook.select()
-        tab_name = self.notebook.tab(current_tab, "text")
+        current_tab = self.notebook.select()  # type: ignore[no-untyped-call]
+        tab_name = self.notebook.tab(current_tab, "text")  # type: ignore[no-untyped-call]
 
         if tab_name not in self.tabs_created:
             self.logger.info(f"Creating tab: {tab_name}")
@@ -2661,7 +2707,7 @@ class APGIGUI:
 
             self.tabs_created.add(tab_name)
 
-    def create_main_tab(self):
+    def create_main_tab(self) -> None:
         """Create main interaction tab"""
         # Left panel - Input
         left_frame = ttk.LabelFrame(self.main_frame, text="Query Input", padding=10)
@@ -2680,7 +2726,8 @@ class APGIGUI:
         self.query_input.bind("<KeyRelease>", self.update_char_count)
 
         # Add tooltip to query input
-        ToolTip(self.query_input, "Enter your query here. Press Ctrl+Enter to process.")
+        if TOOLTIP_AVAILABLE:
+            ToolTip(self.query_input, "Enter your query here. Press Ctrl+Enter to process.")
 
         self.char_count_label = ttk.Label(
             query_container, text=""  # Initially blank until first keystroke
@@ -2781,7 +2828,8 @@ class APGIGUI:
         self.process_button.pack()
 
         # Add tooltip to process button
-        ToolTip(self.process_button, "Process your query and generate AI response (Ctrl+Enter)")
+        if TOOLTIP_AVAILABLE:
+            ToolTip(self.process_button, "Process your query and generate AI response (Ctrl+Enter)")
 
         # Right panel - Output
         right_frame = ttk.LabelFrame(self.main_frame, text="Assistant Response", padding=10)
@@ -2794,9 +2842,10 @@ class APGIGUI:
         self.response_display.pack(fill="both", expand=True)
 
         # Add tooltip to response display
-        ToolTip(
-            self.response_display, "AI assistant response will appear here with formatted output"
-        )
+        if TOOLTIP_AVAILABLE:
+            ToolTip(
+                self.response_display, "AI assistant response will appear here with formatted output"
+            )
 
         # Configure text tags for formatting
         self.response_display.tag_configure("heading", font=("Arial", 10, "bold"))
@@ -2830,7 +2879,7 @@ class APGIGUI:
         self.main_frame.grid_columnconfigure(1, weight=1)
         self.main_frame.grid_rowconfigure(0, weight=1)
 
-    def create_cognitive_monitoring_tab(self):
+    def create_cognitive_monitoring_tab(self) -> None:
         """Create cognitive state monitoring tab"""
         # Current state panel
         current_frame = ttk.LabelFrame(self.cognitive_frame, text="Real-time State", padding=10)
@@ -2887,7 +2936,7 @@ class APGIGUI:
         self.cognitive_frame.grid_rowconfigure(0, weight=1)
         self.cognitive_frame.grid_rowconfigure(1, weight=1)
 
-    def create_oscillatory_tab(self):
+    def create_oscillatory_tab(self) -> None:
         """Create oscillatory spectrum analysis tab"""
         # Show loading indicator for heavy tab creation
         self.root.update_idletasks()
@@ -2901,7 +2950,7 @@ class APGIGUI:
             loading_label.config(
                 text="Matplotlib not available. Install with: pip install matplotlib"
             )
-            return  # type: ignore[return-value]
+            return
 
         # Create tab content after loading
         loading_label.destroy()
@@ -2913,12 +2962,13 @@ class APGIGUI:
         self.spectrum_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
         self.spectrum_ax = self.spectrum_fig.add_subplot(111) if self.spectrum_fig else None
         self.spectrum_canvas = (
-            FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame) if HAS_MATPLOTLIB else None
+            FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
         )
         self.spectrum_canvas_widget = (
-            self.spectrum_canvas.get_tk_widget() if self.spectrum_canvas else None
+            self.spectrum_canvas.get_tk_widget() if self.spectrum_canvas else None  # type: ignore[no-untyped-call]
         )
-        self.spectrum_canvas_widget.pack(fill="both", expand=True)
+        if self.spectrum_canvas_widget:
+            self.spectrum_canvas_widget.pack(fill="both", expand=True)
 
         # Disable scroll events to prevent conflicts
         self.spectrum_canvas.mpl_connect("scroll_event", lambda e: None)
@@ -2931,9 +2981,10 @@ class APGIGUI:
 
         self.freq_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
         self.freq_ax = self.freq_fig.add_subplot(111) if self.freq_fig else None
-        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame) if HAS_MATPLOTLIB else None
-        self.freq_canvas_widget = self.freq_canvas.get_tk_widget() if self.freq_canvas else None
-        self.freq_canvas_widget.pack(fill="both", expand=True)
+        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
+        self.freq_canvas_widget = self.freq_canvas.get_tk_widget() if self.freq_canvas else None  # type: ignore[no-untyped-call]
+        if self.freq_canvas_widget:
+            self.freq_canvas_widget.pack(fill="both", expand=True)
 
         # Disable scroll events to prevent conflicts
         self.freq_canvas.mpl_connect("scroll_event", lambda e: None)
@@ -2955,7 +3006,7 @@ class APGIGUI:
         self.oscillatory_frame.grid_rowconfigure(0, weight=1)
         self.oscillatory_frame.grid_rowconfigure(1, weight=1)
 
-    def create_biofeedback_tab(self):
+    def create_biofeedback_tab(self) -> None:
         """Create biofeedback monitoring tab"""
         # Calibration panel
         calib_frame = ttk.LabelFrame(
@@ -3005,7 +3056,7 @@ class APGIGUI:
         self.biofeedback_frame.grid_rowconfigure(1, weight=1)
         self.biofeedback_frame.grid_rowconfigure(2, weight=1)
 
-    def create_energy_tab(self):
+    def create_energy_tab(self) -> None:
         """Create energy monitoring tab"""
         # Battery display
         battery_frame = ttk.LabelFrame(self.energy_frame, text="Battery Status", padding=10)
@@ -3022,12 +3073,13 @@ class APGIGUI:
             self.energy_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
             self.energy_ax = self.energy_fig.add_subplot(111) if self.energy_fig else None
             self.energy_canvas = (
-                FigureCanvasTkAgg(self.energy_fig, usage_frame) if HAS_MATPLOTLIB else None
+                FigureCanvasTkAgg(self.energy_fig, usage_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
             )
             self.energy_canvas_widget = (
-                self.energy_canvas.get_tk_widget() if self.energy_canvas else None
+                self.energy_canvas.get_tk_widget() if self.energy_canvas else None  # type: ignore[no-untyped-call]
             )
-            self.energy_canvas_widget.pack(fill="both", expand=True)
+            if self.energy_canvas_widget:
+                self.energy_canvas_widget.pack(fill="both", expand=True)
 
             # Disable scroll events to prevent conflicts
             self.energy_canvas.mpl_connect("scroll_event", lambda e: None)
@@ -3047,7 +3099,7 @@ class APGIGUI:
         self.energy_frame.grid_rowconfigure(0, weight=1)
         self.energy_frame.grid_rowconfigure(1, weight=1)
 
-    def create_performance_tab(self):
+    def create_performance_tab(self) -> None:
         """Create performance metrics tab"""
         # Performance metrics
         metrics_frame = ttk.LabelFrame(
@@ -3100,7 +3152,7 @@ class APGIGUI:
         # Initial update of performance metrics
         self.safe_update_performance_metrics()
 
-    def create_visualization_tab(self):
+    def create_visualization_tab(self) -> None:
         """Create visualization tools tab"""
         # Control panel
         control_frame = ttk.LabelFrame(self.viz_frame, text="Visualization Controls", padding=10)
@@ -3124,13 +3176,14 @@ class APGIGUI:
         viz_display_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
         self.viz_canvas = tk.Canvas(viz_display_frame, bg="white") if HAS_MATPLOTLIB else None
-        self.viz_canvas.pack(fill="both", expand=True)
+        if self.viz_canvas:
+            self.viz_canvas.pack(fill="both", expand=True)
 
         # Configure grid weights
         self.viz_frame.grid_columnconfigure(0, weight=1)
         self.viz_frame.grid_rowconfigure(1, weight=1)
 
-    def create_settings_tab(self):
+    def create_settings_tab(self) -> None:
         """Create settings and configuration tab"""
         # Model configuration
         model_frame = ttk.LabelFrame(self.settings_frame, text="Model Configuration", padding=10)
@@ -3138,7 +3191,8 @@ class APGIGUI:
 
         # Input dimension
         ttk.Label(model_frame, text="Input Dimension:").grid(row=0, column=0, sticky="w", pady=5)
-        self.input_dim_var = tk.IntVar(value=128)
+        if not hasattr(self, 'input_dim_var'):
+            self.input_dim_var = tk.IntVar(value=128)
         ttk.Spinbox(
             model_frame,
             from_=GUIConfig.MODEL_INPUT_MIN,
@@ -3149,7 +3203,8 @@ class APGIGUI:
 
         # Hidden dimension
         ttk.Label(model_frame, text="Hidden Dimension:").grid(row=1, column=0, sticky="w", pady=5)
-        self.hidden_dim_var = tk.IntVar(value=256)
+        if not hasattr(self, 'hidden_dim_var'):
+            self.hidden_dim_var = tk.IntVar(value=256)
         ttk.Spinbox(
             model_frame,
             from_=GUIConfig.MODEL_HIDDEN_MIN,
@@ -3162,17 +3217,20 @@ class APGIGUI:
         proc_frame = ttk.LabelFrame(self.settings_frame, text="Processing Options", padding=10)
         proc_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
-        self.adaptive_proc_var = tk.BooleanVar(value=True)
+        if not hasattr(self, 'adaptive_proc_var'):
+            self.adaptive_proc_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             proc_frame, text="Adaptive Processing", variable=self.adaptive_proc_var
         ).pack(anchor="w", pady=2)
 
-        self.energy_aware_var = tk.BooleanVar(value=True)
+        if not hasattr(self, 'energy_aware_var'):
+            self.energy_aware_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             proc_frame, text="Energy-Aware Computation", variable=self.energy_aware_var
         ).pack(anchor="w", pady=2)
 
-        self.language_model_var = tk.BooleanVar(value=HAS_TRANSFORMERS)
+        if not hasattr(self, 'language_model_var'):
+            self.language_model_var = tk.BooleanVar(value=HAS_TRANSFORMERS)
         ttk.Checkbutton(
             proc_frame, text="Language Model Integration", variable=self.language_model_var
         ).pack(anchor="w", pady=2)
@@ -3206,7 +3264,7 @@ class APGIGUI:
         self.settings_frame.grid_rowconfigure(2, weight=0)
         self.settings_frame.grid_rowconfigure(3, weight=1)
 
-    def create_status_bar(self):
+    def create_status_bar(self) -> None:
         """Create status bar"""
         self.status_bar = ttk.Frame(self.root)
         self.status_bar.pack(fill="x", side="bottom")
@@ -3219,80 +3277,34 @@ class APGIGUI:
         )
         self.assistant_status.pack(side="right")
 
-        # Initialize status manager after UI components are created
-        self.status_mgr = StatusManager(self.status_label, self.assistant_status)
-        self.status_mgr.set_status("Ready", "ready", "Not Initialized")
+        self.status_mgr = StatusManager(self.status_label, self.assistant_status)  # type: ignore
+        if self.status_mgr:
+            self.status_mgr.set_status("ready", "Not Initialized")  # type: ignore
 
-    def create_progress_overlay(self):
-        """Create progress indicator overlay"""
-        self.progress_frame = ttk.Frame(self.root, relief="raised", borderwidth=2)
-
-        ttk.Label(self.progress_frame, text="Processing...", font=("Arial", 12)).pack(pady=10)
-
-        self.progress_bar = ttk.Progressbar(self.progress_frame, mode="indeterminate", length=300)
-        self.progress_bar.pack(pady=10, padx=20)
-
-        self.progress_message = ttk.Label(self.progress_frame, text="Please wait...")
-        self.progress_message.pack(pady=5)
-
-        # Hide initially
-        self.progress_frame.place_forget()
-
-    @safe_widget_method("progress_frame")
-    @safe_widget_method("progress_message")
-    def show_progress(self, message: str = "Processing...") -> None:
-        """Show progress indicator with message"""
-        self.progress_message.config(text=message)
-        self.progress_frame.place(relx=0.5, rely=0.5, anchor="center")
-        self.progress_bar.start(10)
-        self.progress_frame.lift()
-        if hasattr(self, "root") and self.root.winfo_exists():
-            self.root.update_idletasks()
-
-    @safe_widget_method("progress_bar")
-    @safe_widget_method("progress_frame")
-    def hide_progress(self) -> None:
-        """Hide progress indicator"""
-        try:
-            if hasattr(self, "progress_bar") and self.progress_bar:
-                self.progress_bar.stop()
-            if hasattr(self, "progress_frame") and self.progress_frame:
-                self.progress_frame.place_forget()
-            if hasattr(self, "root") and self.root and self.root.winfo_exists():
-                self.root.update_idletasks()
-                self.root.focus_set()  # Return focus to main window
-                # Force immediate UI update to ensure dialog disappears
-                self.root.update()
-        except Exception as e:
-            self.logger.debug(f"Error hiding progress: {e}")
-
-    def _force_hide_progress(self):
+    def _force_hide_progress(self) -> None:
         """Force hide progress dialog (safety fallback)"""
+        if hasattr(self, "progress"):
+            try:
+                self.progress.hide()
+                if hasattr(self.progress, "frame") and self.progress.frame:
+                    self.progress.frame.destroy()
+            except Exception as e:
+                self.logger.debug(f"Error hiding progress: {e}")
+            finally:
+                if hasattr(self, "progress"):
+                    delattr(self, "progress")
+
         if (
             self.init_state != InitializationState.SUCCESS
             and self.init_state != InitializationState.FAILED
+            and self.init_state != InitializationState.TIMEOUT
         ):
-            self.logger.warning("Forcing progress dialog hide due to timeout")
-            try:
-                # Check if the root window still exists before trying to hide progress
-                if hasattr(self, "root") and self.root and self.root.winfo_exists():
-                    self.hide_progress()
-                    self.init_state = InitializationState.TIMEOUT
-                    self.is_initialized = False
-                    if self.status_mgr:
-                        self.status_mgr.set_status("Initialization timed out", "error", "Timeout ⏱")
-                else:
-                    self.logger.debug("Root window no longer exists, skipping progress hide")
-            except Exception as e:
-                # Don't crash if the application is being destroyed
-                if "application has been destroyed" in str(e).lower():
-                    self.logger.debug(
-                        "Application is being destroyed, ignoring progress hide error"
-                    )
-                else:
-                    self.logger.error(f"Error in force hide progress: {e}")
+            self.logger.warning("Force hiding progress while still initializing")
+            self.init_state = InitializationState.FAILED
+            if self.status_mgr:
+                self.status_mgr.set_status("Initialization forced hide", "error", "Error ✗")
 
-    def _emergency_progress_cleanup(self):
+    def _emergency_progress_cleanup(self) -> None:
         """Emergency cleanup for any stuck progress dialogs"""
         try:
             # Clean up CancellableProgress if it exists
@@ -3320,7 +3332,7 @@ class APGIGUI:
         except Exception as e:
             self.logger.error(f"Emergency progress cleanup failed: {e}")
 
-    def show_shortcut_overlay(self, event=None):
+    def show_shortcut_overlay(self, event: Optional[Any] = None) -> None:
         """Show visual keyboard shortcut overlay (like VSCode)"""
         overlay = tk.Toplevel(self.root)
         overlay.title("Keyboard Shortcuts")
@@ -3432,10 +3444,10 @@ class APGIGUI:
         search_entry.focus_set()
 
         # Function to filter shortcuts
-        def filter_shortcuts(*args):
+        def filter_shortcuts(*args: Any) -> None:
             search_term = search_var.get().lower()
 
-            for tab_id in notebook.tabs():
+            for tab_id in notebook.tabs():  # type: ignore[no-untyped-call]
                 tab = notebook.nametowidget(tab_id)
                 tab_visible = False
 
@@ -3462,14 +3474,14 @@ class APGIGUI:
 
                 # Show/hide tab based on visibility of its contents
                 if tab_visible:
-                    notebook.tab(tab_id, state="normal")
+                    notebook.tab(tab_id, state="normal")  # type: ignore[no-untyped-call]
                 else:
-                    notebook.tab(tab_id, state="hidden")
+                    notebook.tab(tab_id, state="hidden")  # type: ignore[no-untyped-call]
 
             # Show first visible tab
-            for tab_id in notebook.tabs():
-                if notebook.tab(tab_id, "state") == "normal":
-                    notebook.select(tab_id)
+            for tab_id in notebook.tabs():  # type: ignore[no-untyped-call]
+                if notebook.tab(tab_id, "state") == "normal":  # type: ignore[no-untyped-call]
+                    notebook.select(tab_id)  # type: ignore[no-untyped-call]
                     break
 
         # Bind search functionality
@@ -3478,7 +3490,7 @@ class APGIGUI:
         # Initial filter (in case of pre-filled search)
         filter_shortcuts()
 
-    def setup_keyboard_shortcuts(self):
+    def setup_keyboard_shortcuts(self) -> None:
         """Setup keyboard shortcuts"""
         # Help overlay
         self.root.bind("<F1>", self.show_shortcut_overlay)
@@ -3515,7 +3527,7 @@ class APGIGUI:
 
         self.logger.info("Keyboard shortcuts configured")
 
-    def setup_accessibility(self):
+    def setup_accessibility(self) -> None:
         """Configure accessibility features"""
         # Tab navigation
         self.notebook.bind("<Control-Tab>", self.next_tab)
@@ -3526,7 +3538,7 @@ class APGIGUI:
             insertbackground="black", highlightthickness=2  # Visible cursor  # Focus indicator
         )
 
-    def increase_font_size(self):
+    def increase_font_size(self) -> None:
         """Increase font size for better readability"""
         with ErrorContext("Increase Font Size", user_facing=False):
             current_index = self.font_sizes.index(self.current_font_size)
@@ -3535,7 +3547,7 @@ class APGIGUI:
                 self.font_size_var.set(self.current_font_size)
                 self._apply_font_size()
 
-    def decrease_font_size(self):
+    def decrease_font_size(self) -> None:
         """Decrease font size for compact display"""
         with ErrorContext("Decrease Font Size", user_facing=False):
             current_index = self.font_sizes.index(self.current_font_size)
@@ -3544,14 +3556,14 @@ class APGIGUI:
                 self.font_size_var.set(self.current_font_size)
                 self._apply_font_size()
 
-    def reset_font_size(self):
+    def reset_font_size(self) -> None:
         """Reset font size to default"""
         with ErrorContext("Reset Font Size", user_facing=False):
             self.current_font_size = 10
             self.font_size_var.set(self.current_font_size)
             self._apply_font_size()
 
-    def _apply_font_size(self):
+    def _apply_font_size(self) -> None:
         """Apply current font size to all text widgets across all tabs"""
         font = ("TkDefaultFont", self.current_font_size)
 
@@ -3608,7 +3620,7 @@ class APGIGUI:
             f"Font size updated to {self.current_font_size}pt for {updated_count} widgets"
         )
 
-    def _update_tab_fonts(self):
+    def _update_tab_fonts(self) -> None:
         """Update fonts for widgets in all currently created tabs"""
         tab_widgets = []
 
@@ -3638,21 +3650,21 @@ class APGIGUI:
             except tk.TclError:
                 pass
 
-    def next_tab(self, event):
+    def next_tab(self, event: Any) -> None:
         """Navigate to next tab with enhanced debouncing"""
         with ErrorContext("Next Tab Navigation", user_facing=False):
             # Check if application is shutting down or destroyed
             if (hasattr(self, "is_shutting_down") and self.is_shutting_down) or (
                 hasattr(self, "root") and not self.root.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             # Use enhanced debouncing for tab switching
             self.debouncer.schedule_update(
                 self.root, "tab_next", self._perform_next_tab, operation_type="tab_switch"
             )
 
-    def _perform_next_tab(self):
+    def _perform_next_tab(self) -> None:
         """Actually perform the tab navigation"""
         try:
             # Additional safety checks before navigation
@@ -3661,33 +3673,33 @@ class APGIGUI:
                 or not hasattr(self, "notebook")
                 or not self.notebook.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
-            current = self.notebook.select()
-            tabs = self.notebook.tabs()
+            current: str = self.notebook.select()  # type: ignore[no-untyped-call]
+            tabs: tuple[str, ...] = self.notebook.tabs()  # type: ignore[no-untyped-call]
             if not tabs:  # No tabs to navigate
-                return  # type: ignore[return-value]
+                return
             current_index = tabs.index(current)
             next_index = (current_index + 1) % len(tabs)
-            self.notebook.select(tabs[next_index])
+            self.notebook.select(tabs[next_index])  # type: ignore[no-untyped-call]
         except Exception as e:
             self.logger.warning(f"Tab navigation error: {e}")
 
-    def prev_tab(self, event):
+    def prev_tab(self, event: Any) -> None:
         """Navigate to previous tab with enhanced debouncing"""
         with ErrorContext("Previous Tab Navigation", user_facing=False):
             # Check if application is shutting down or destroyed
             if (hasattr(self, "is_shutting_down") and self.is_shutting_down) or (
                 hasattr(self, "root") and not self.root.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             # Use enhanced debouncing for tab switching
             self.debouncer.schedule_update(
                 self.root, "tab_prev", self._perform_prev_tab, operation_type="tab_switch"
             )
 
-    def _perform_prev_tab(self):
+    def _perform_prev_tab(self) -> None:
         """Actually perform the tab navigation"""
         try:
             # Additional safety checks before navigation
@@ -3696,19 +3708,19 @@ class APGIGUI:
                 or not hasattr(self, "notebook")
                 or not self.notebook.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
-            current = self.notebook.select()
-            tabs = self.notebook.tabs()
+            current = self.notebook.select()  # type: ignore[no-untyped-call]
+            tabs: tuple[str, ...] = self.notebook.tabs()  # type: ignore[no-untyped-call]
             if not tabs:  # No tabs to navigate
-                return  # type: ignore[return-value]
+                return
             current_index = tabs.index(current)
             prev_index = (current_index - 1) % len(tabs)
-            self.notebook.select(tabs[prev_index])
+            self.notebook.select(tabs[prev_index])  # type: ignore[no-untyped-call]
         except Exception as e:
             self.logger.warning(f"Tab navigation error: {e}")
 
-    def validate_configuration(self, config):
+    def validate_configuration(self, config: Dict[str, Any]) -> None:
         """Validate configuration before applying"""
         schema = {
             "input_dim": (32, 1024),
@@ -3720,13 +3732,13 @@ class APGIGUI:
                 if not min_val <= config[key] <= max_val:
                     raise ValueError(f"{key} must be between {min_val} and {max_val}")
 
-    def setup_event_handlers(self):
+    def setup_event_handlers(self) -> None:
         """Setup custom event handlers"""
         self.root.bind("<<ProcessComplete>>", self.handle_process_complete)
         self.root.bind("<<ProcessError>>", self.handle_process_error)
         self.root.bind("<<AssistantInitEvent>>", self.handle_assistant_init)
 
-    def handle_process_complete(self, event):
+    def handle_process_complete(self, event: Any) -> None:
         """Handle processing complete event"""
         try:
             event_type, data = self.processing_queue.get_nowait()
@@ -3738,7 +3750,7 @@ class APGIGUI:
         except queue.Empty:
             pass
 
-    def handle_process_error(self, event):
+    def handle_process_error(self, event: Any) -> None:
         """Handle processing error event"""
         try:
             _, error_msg = self.processing_queue.get_nowait()
@@ -3746,12 +3758,12 @@ class APGIGUI:
         except queue.Empty:
             pass
 
-    def handle_assistant_init(self, event):
+    def handle_assistant_init(self, event: Any) -> None:
         """Handle assistant initialization completion (success or failure)"""
         # Prevent multiple simultaneous handlers with thread-safe check
         if hasattr(self, "_handling_init") and self._handling_init:
             self.logger.debug("Initialization handler already running, skipping")
-            return  # type: ignore[return-value]
+            return
 
         # Use atomic check-and-set pattern
         if not hasattr(self, "_handling_init_lock"):
@@ -3762,12 +3774,14 @@ class APGIGUI:
         with self._handling_init_lock:
             if hasattr(self, "_handling_init") and self._handling_init:
                 self.logger.debug("Initialization handler already running, skipping")
-                return  # type: ignore[return-value]
+                return
 
             self._handling_init = True
 
         try:
             self.logger.debug("=== Handling Initialization Event ===")
+            status: str
+            payload: Any
 
             # Clean up timer
             self._cleanup_init_timer()
@@ -3792,40 +3806,19 @@ class APGIGUI:
                         delattr(self, "progress")
                 else:
                     self.hide_progress()
+                return
 
-                # Clean up safety timer
-                if self.init_safety_timer_id is not None:
-                    try:
-                        self.root.after_cancel(self.init_safety_timer_id)
-                    except Exception as e:
-                        self.logger.debug(f"Safety timer cleanup error: {e}")
-                    finally:
-                        self.init_safety_timer_id = None
-                return  # type: ignore[return-value]
-
-            # Hide progress dialog immediately and clean up
+            # Hide progress indicator immediately on any result
             if hasattr(self, "progress"):
                 try:
                     self.progress.hide()
-                    # Ensure the dialog is properly destroyed
                     if hasattr(self.progress, "frame") and self.progress.frame:
                         self.progress.frame.destroy()
                 except Exception as e:
                     self.logger.debug(f"Error hiding progress dialog: {e}")
                 finally:
-                    # Always remove the progress attribute
-                    delattr(self, "progress")
-            else:
-                self.hide_progress()
-
-            # Clean up safety timer
-            if self.init_safety_timer_id is not None:
-                try:
-                    self.root.after_cancel(self.init_safety_timer_id)
-                except Exception as e:
-                    self.logger.debug(f"Safety timer cleanup error: {e}")
-                finally:
-                    self.init_safety_timer_id = None
+                    if hasattr(self, "progress"):
+                        delattr(self, "progress")
 
             if status == "success":
                 # Success path
@@ -3836,6 +3829,7 @@ class APGIGUI:
 
                 self.init_state = InitializationState.SUCCESS
                 self.is_initialized = True
+                assert self.init_start_time is not None
                 elapsed = time.time() - self.init_start_time
 
                 self.logger.info(f"✓ Assistant initialized successfully in {elapsed:.2f}s")
@@ -3851,16 +3845,6 @@ class APGIGUI:
                         f"APGI Assistant ready ({elapsed:.1f}s)", "success", "Ready ✓"
                     )
 
-                # Ensure is_initialized is properly set (defense against race conditions)
-                if not self.is_initialized:
-                    self.logger.warning(
-                        "Correcting is_initialized state - was False but should be True"
-                    )
-                    self.is_initialized = True
-
-                # Emergency cleanup to ensure no progress dialogs remain stuck
-                self._emergency_progress_cleanup()
-
                 # Auto-calibrate after a short delay to ensure UI is responsive
                 self.root.after(100, self._delayed_auto_calibrate)
 
@@ -3871,12 +3855,7 @@ class APGIGUI:
                 self.is_initialized = False
 
                 # Update UI
-                if (
-                    self.status_mgr
-                    and hasattr(self, "root")
-                    and self.root
-                    and self.root.winfo_exists()
-                ):
+                if self.status_mgr:
                     self.status_mgr.set_status("Initialization cancelled", "error", "Cancelled ✗")
 
             else:
@@ -3891,12 +3870,7 @@ class APGIGUI:
                 self.logger.error(f"✗ Initialization failed: {error_msg}")
 
                 # Update UI
-                if (
-                    self.status_mgr
-                    and hasattr(self, "root")
-                    and self.root
-                    and self.root.winfo_exists()
-                ):
+                if self.status_mgr:
                     self.status_mgr.set_status("Initialization failed", "error", "Failed ✗")
 
                 # Show error to user
@@ -3906,33 +3880,25 @@ class APGIGUI:
                     "Check logs for details.",
                 )
 
-        except Exception as e:
-            self.logger.error(f"Error handling init event: {e}", exc_info=True)
-            # Fallback: ensure progress is hidden even if handler fails
-            try:
-                self.hide_progress()
-            except Exception as e:
-                # Log error but don't crash - progress might already be hidden
-                LOGGER.debug(f"Failed to hide progress: {e}")
-            self._handle_init_failure(f"Event handling error: {str(e)}")
-
         finally:
             # Reset handling flag
             self._handling_init = False
 
     def _get_init_config(self) -> Dict[str, Any]:
         """Get initialization configuration with safe defaults"""
-        return {  # type: ignore[return-value]
-            "input_dim": getattr(self, "input_dim_var", tk.IntVar(value=128)).get(),
-            "hidden_dim": getattr(self, "hidden_dim_var", tk.IntVar(value=256)).get(),
+        input_var = getattr(self, "input_dim_var", tk.IntVar(value=128))
+        hidden_var = getattr(self, "hidden_dim_var", tk.IntVar(value=256))
+        return {
+            "input_dim": input_var.get(),
+            "hidden_dim": hidden_var.get(),
             "output_dim": 64,
         }
 
-    def _start_init_monitoring(self):
+    def _start_init_monitoring(self) -> None:
         """Start monitoring initialization progress with timeout"""
         self._check_init_progress()
 
-    def _check_init_progress(self):
+    def _check_init_progress(self) -> None:
         """Periodically check initialization progress and handle timeout"""
 
         # Check if initialization is still active
@@ -3943,16 +3909,18 @@ class APGIGUI:
         ]:
             # Initialization finished (success or failure)
             self._cleanup_init_timer()
-            return  # type: ignore[return-value]
+            return
 
         # Check for timeout
+        if self.init_start_time is None:
+            return
         elapsed = time.time() - self.init_start_time
 
         if elapsed > self.init_timeout_seconds:
             self.logger.error(f"Initialization timeout after {elapsed:.1f}s")
             self.init_state = InitializationState.TIMEOUT
             self._handle_init_timeout()
-            return  # type: ignore[return-value]
+            return
 
         # Update progress message with time remaining
         if hasattr(self, "progress") and hasattr(self.progress, "update_message"):
@@ -3963,12 +3931,12 @@ class APGIGUI:
         # Check if result is available in queue
         if not self.init_queue.empty():
             self.root.event_generate("<<AssistantInitEvent>>", when="tail")
-            return  # type: ignore[return-value]
+            return
 
         # Schedule next check (every 100ms)
         self.init_check_timer_id = self.root.after(100, self._check_init_progress)
 
-    def _cleanup_init_timer(self):
+    def _cleanup_init_timer(self) -> None:
         """Clean up initialization timer"""
         if self.init_check_timer_id is not None:
             try:
@@ -3986,7 +3954,7 @@ class APGIGUI:
             finally:
                 self.init_safety_timer_id = None
 
-    def _handle_init_timeout(self):
+    def _handle_init_timeout(self) -> None:
         """Handle initialization timeout"""
         self.logger.error("=== Initialization Timeout ===")
 
@@ -4023,7 +3991,7 @@ class APGIGUI:
             "• Disabling language model integration in Settings",
         )
 
-    def _handle_init_failure(self, error_msg: str):
+    def _handle_init_failure(self, error_msg: str) -> None:
         """Handle initialization failure"""
         self.logger.error(f"=== Initialization Failed: {error_msg} ===")
 
@@ -4046,17 +4014,17 @@ class APGIGUI:
             "Initialization Error", f"{error_msg}\n\n" "Please check the logs for more details."
         )
 
-    def initialize_assistant(self):
+    def initialize_assistant(self) -> None:
         """Start assistant initialization with unified timeout and progress tracking"""
 
         # Prevent duplicate initialization
         if self.init_state in [InitializationState.STARTING, InitializationState.IN_PROGRESS]:
             self.logger.debug("Initialization already in progress")
-            return  # type: ignore[return-value]
+            return
 
         if self.init_state == InitializationState.SUCCESS:
             self.logger.debug("Assistant already initialized")
-            return  # type: ignore[return-value]
+            return
 
         self.logger.info("=== Starting Assistant Initialization ===")
 
@@ -4110,7 +4078,7 @@ class APGIGUI:
         except Exception as e:
             self._handle_init_failure(f"Failed to start initialization: {str(e)}")
 
-    def _cancel_initialization(self, reason: str):
+    def _cancel_initialization(self, reason: str) -> None:
         """Handle initialization cancellation"""
         self.logger.info(f"Initialization cancelled: {reason}")
 
@@ -4130,15 +4098,33 @@ class APGIGUI:
 
         # Clean up
         self._cleanup_init_timer()
+        return
 
-    def _run_initialization(self, config: Dict[str, Any]):
+    def _run_initialization(self, config: Dict[str, Any]) -> None:
         """Background thread: Initialize the assistant
 
         This runs in a separate thread and puts results in the init_queue.
         The GUI thread monitors the queue and updates the UI.
         """
         try:
-            from AI_Assistant import APGIAssistant
+            # The module was already loaded by load_apgi_module() and registered as 'apgi_assistant'
+            try:
+                import apgi_assistant
+            except ImportError:
+                # Fallback: try to get it from globals if it failed to register in sys.modules
+                apgi_assistant = globals().get("_APGI_MODULE")
+
+            if not apgi_assistant:
+                self.logger.error("APGI module (apgi_assistant) not found")
+                self.init_queue.put(("error", "APGI module not loaded - Check logs"))
+                return
+
+            if not hasattr(apgi_assistant, "APGIAssistant"):
+                self.logger.error("APGIAssistant class not found in loaded module")
+                self.init_queue.put(("error", "Assistant class not found in module"))
+                return
+
+            APGIAssistantClass = apgi_assistant.APGIAssistant
 
             self.logger.info("Background initialization started")
 
@@ -4146,17 +4132,18 @@ class APGIGUI:
             self.init_state = InitializationState.IN_PROGRESS
 
             # Periodic progress updates
-            def update_progress(message: str):
+            def update_progress(message: str) -> None:
                 try:
                     if not self.init_cancel_event.is_set():
-                        self.root.after(0, lambda msg=message: self.show_progress(msg))
+                        if hasattr(self, "progress") and self.progress:
+                            self.root.after(0, lambda: self.progress.update_message(message))
                 except Exception as e:
                     self.logger.debug(f"Progress update failed: {e}")
 
             # Check for cancellation at start
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return  # type: ignore[return-value]
+                return
 
             # Step 1: Create assistant instance
             update_progress("Creating APGI Assistant instance (this may take a moment)...")
@@ -4165,9 +4152,9 @@ class APGIGUI:
             # Check for cancellation before heavy operations
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return  # type: ignore[return-value]
+                return
 
-            assistant = APGIAssistant(
+            assistant = APGIAssistantClass(
                 config={
                     "input_dim": config["input_dim"],
                     "hidden_dim": config["hidden_dim"],
@@ -4185,7 +4172,7 @@ class APGIGUI:
             # Check for cancellation
             if self.init_cancel_event.is_set():
                 self.init_queue.put(("cancelled", "Initialization cancelled by user"))
-                return  # type: ignore[return-value]
+                return
 
             # Step 2: Initialize components
             update_progress("Initializing neural networks (this may take 30+ seconds)...")
@@ -4217,11 +4204,12 @@ class APGIGUI:
             self.init_queue.put(("success", {"assistant": assistant}))
             self.init_state = InitializationState.COMPLETING
 
-            elapsed = time.time() - self.init_start_time
-            self.logger.info(f"=== Initialization Complete in {elapsed:.2f}s ===")
+            if self.init_start_time is not None:
+                elapsed = time.time() - self.init_start_time
+                self.logger.info(f"=== Initialization Complete in {elapsed:.2f}s ===")
 
-            if elapsed > 30:
-                self.logger.warning(f"Initialization took {elapsed:.1f}s (threshold: 30s)")
+                if elapsed > 30:
+                    self.logger.warning(f"Initialization took {elapsed:.1f}s (threshold: 30s)")
 
         except Exception as e:
             self.logger.error(f"Initialization failed: {e}", exc_info=True)
@@ -4232,11 +4220,11 @@ class APGIGUI:
             # Set initialization complete flag to stop checking
             self.is_initializing = False
 
-    def _check_init_status(self):
+    def _check_init_status(self) -> None:
         """Periodically check initialization status"""
         with ErrorContext("Check Initialization Status", user_facing=False):
             if not self.is_initializing:
-                return  # type: ignore[return-value]
+                return
 
             if not self.init_queue.empty():
                 # Trigger the event handler immediately
@@ -4245,7 +4233,7 @@ class APGIGUI:
                 # Continue checking
                 self.root.after(100, self._check_init_status)
 
-    def _handle_initialization_error(self, error_msg):
+    def _handle_initialization_error(self, error_msg: str) -> None:
         """Handle initialization errors consistently"""
         self.logger.error(error_msg, exc_info=True)
         self.is_initializing = False
@@ -4273,12 +4261,12 @@ class APGIGUI:
                 self.assistant = None
             self.init_thread = None
 
-    def _delayed_auto_calibrate(self):
+    def _delayed_auto_calibrate(self) -> None:
         """Delayed auto-calibration to ensure UI responsiveness"""
         with ErrorContext("Auto-calibration", user_facing=False):
             self.auto_calibrate()
 
-    def auto_calibrate(self):
+    def auto_calibrate(self) -> None:
         """Auto-calibrate with sample resting data"""
         with ErrorContext("Auto-calibration", user_facing=False):
             if self.assistant:
@@ -4295,7 +4283,7 @@ class APGIGUI:
                     self.calib_status.config(text="Calibrated (auto) ✓")
                 self.logger.info("Auto-calibration complete")
 
-    def process_query(self):
+    def process_query(self) -> None:
         """Process user query with validation and error handling"""
         if not self.is_initialized:
             # Add debugging information to identify the root cause
@@ -4307,18 +4295,18 @@ class APGIGUI:
             }
             self.logger.warning(f"Initialization check failed: {debug_info}")
             messagebox.showwarning("Not Ready", "Please wait for assistant initialization")
-            return  # type: ignore[return-value]
+            return
 
         if self.is_processing:
             messagebox.showinfo("Processing", "Already processing a query. Please wait.")
-            return  # type: ignore[return-value]
+            return
 
         # Get and validate query
         query = self.query_input.get(1.0, tk.END).strip()
         is_valid, error_msg = InputValidator.validate_query(query)
         if not is_valid:
             messagebox.showwarning("Invalid Query", error_msg)
-            return  # type: ignore[return-value]
+            return
 
         # Get and validate physiological data
         physio_data = {
@@ -4331,7 +4319,7 @@ class APGIGUI:
         is_valid, errors = InputValidator.validate_physiological(**physio_data)
         if not is_valid:
             messagebox.showwarning("Invalid Physiological Data", "\n".join(errors))
-            return  # type: ignore[return-value]
+            return
 
         # Start processing
         self.is_processing = True
@@ -4352,11 +4340,11 @@ class APGIGUI:
 
         self.logger.info(f"Processing query: {query[:50]}...")
 
-    def _process_query_thread(self, query, physio_data):
+    def _process_query_thread(self, query: str, physio_data: dict[str, float]) -> None:
         """Thread function for processing query with aggressive cancellation"""
         with ErrorContext("Process Query Thread", user_facing=False):
             # Set up cancellation callbacks
-            def on_cancellation(reason):
+            def on_cancellation(reason: str) -> None:
                 self.logger.info(f"Query processing cancelled: {reason}")
 
             if hasattr(self, "progress"):
@@ -4366,12 +4354,12 @@ class APGIGUI:
             for i in range(100):  # Check 100 times during processing
                 if hasattr(self, "progress") and self.progress.is_cancelled():
                     self.logger.info(f"Query processing cancelled at check {i}")
-                    return  # type: ignore[return-value]
+                    return
 
                 # Process in small chunks to allow cancellation
                 if i == 0:
                     # Initial setup
-                    pass  # Removed break to allow proper cancellation checking
+                    pass
 
                 time.sleep(0.01)  # Small delay to allow cancellation
 
@@ -4384,12 +4372,15 @@ class APGIGUI:
                 # Check cancellation before processing
                 if hasattr(self, "progress") and self.progress.is_cancelled():
                     self.logger.info("Query processing cancelled before assistant processing")
-                    return  # type: ignore[return-value]
+                    return
 
                 try:
                     # Set shorter timeout for assistant processing
                     if hasattr(self, "progress"):
                         self.progress.set_timeout(30)  # 30 second timeout for processing
+
+                    if self.assistant is None:
+                        raise ValueError("Assistant not initialized")
 
                     response = self.assistant.process_with_introspection(
                         user_input=query,
@@ -4401,7 +4392,7 @@ class APGIGUI:
                     # Check if this is a cancellation-related error
                     if hasattr(self, "progress") and self.progress.is_cancelled():
                         self.logger.info(f"Processing interrupted by cancellation: {e}")
-                        return  # type: ignore[return-value]
+                        return
                     else:
                         # Re-raise non-cancellation errors
                         raise
@@ -4409,7 +4400,7 @@ class APGIGUI:
             # Check cancellation after processing
             if hasattr(self, "progress") and self.progress.is_cancelled():
                 self.logger.info("Query processing cancelled after assistant processing")
-                return  # type: ignore[return-value]
+                return
 
             # Queue response for main thread only if not cancelled
             if not (hasattr(self, "progress") and self.progress.is_cancelled()):
@@ -4417,7 +4408,7 @@ class APGIGUI:
                 self.root.event_generate("<<ProcessComplete>>", when="tail")
                 self.logger.info("Query processed successfully")
 
-    def _update_response(self, response):
+    def _update_response(self, response: dict[str, Any]) -> None:
         """Update GUI with response (called in main thread)"""
         with ErrorContext("Update Response Display", user_facing=False):
             # Hide progress dialog
@@ -4427,7 +4418,7 @@ class APGIGUI:
 
             # Check if main response widget still exists
             if not hasattr(self, "response_display") or not self.response_display.winfo_exists():
-                return  # type: ignore[return-value]
+                return
 
             # Display response with formatting
             self.response_display.delete(1.0, tk.END)
@@ -4507,7 +4498,7 @@ class APGIGUI:
             self.process_button.config(state="normal")
         self.hide_progress()
 
-    def _show_error(self, error_msg):
+    def _show_error(self, error_msg: str) -> None:
         """Show error message (called in main thread)"""
         self.error_count += 1
 
@@ -4540,7 +4531,7 @@ class APGIGUI:
             except Exception as e:
                 self.logger.warning(f"Failed to show reset dialog: {e}")
 
-    def add_to_history(self, user_query, user_response):
+    def add_to_history(self, user_query: str, user_response: dict[str, Any]) -> None:
         """Add query to history"""
         timestamp = time.strftime("%H:%M:%S")
         state = user_response["cognitive_state"]["primary"]
@@ -4565,8 +4556,14 @@ class APGIGUI:
                 )
 
     def _update_cognitive_history(
-        self, timestamp, state, confidence, surprise, user_query=None, user_response=None
-    ):
+        self,
+        timestamp: str,
+        state: str,
+        confidence: str,
+        surprise: str,
+        user_query: str | None = None,
+        user_response: dict[str, Any] | None = None,
+    ) -> None:
         """Internal method to update cognitive history tree"""
         self.history_tree.insert("", 0, values=(timestamp, state, confidence, surprise))
         # Limit history
@@ -4599,7 +4596,7 @@ class APGIGUI:
         if len(children) > 50:
             self.query_tree.delete(children[-1])
 
-    def update_visualizations(self, response):
+    def update_visualizations(self, response: dict[str, Any]) -> None:
         """Update visualization displays"""
         with ErrorContext("Update Visualizations", user_facing=False):
             # Update oscillatory spectrum
@@ -4626,17 +4623,18 @@ class APGIGUI:
                 if response and "biofeedback" in response:
                     self.update_biofeedback_display(response)
 
-    def _do_oscillatory_update(self, response):
+    def _do_oscillatory_update(self, response: dict[str, Any]) -> None:
         """Internal method for oscillatory display update logic"""
         # Get power spectrum from metadata
         metadata = response.get("processing_metadata", {})
         osc_profile = metadata.get("oscillatory_profile", {})
 
         if not osc_profile:
-            return  # type: ignore[return-value]
+            return
 
         # Clear and redraw spectrum
-        self.spectrum_ax.clear()
+        if self.spectrum_ax is not None:
+            self.spectrum_ax.clear()
 
         # Extract band names and powers
         bands = []
@@ -4647,16 +4645,15 @@ class APGIGUI:
                 bands.append(key)
                 powers.append(float(value))
 
-        if bands and powers:
+        if bands and powers and self.spectrum_ax and self.spectrum_canvas:
             # Plot power spectrum with theme color
-            bars = self.spectrum_ax.bar(
-                bands, powers, color=self.get_theme_color("accent"), alpha=0.7
-            )
-            self.spectrum_ax.set_xlabel("Frequency Band")
-            self.spectrum_ax.set_ylabel("Power")
-            self.spectrum_ax.set_title("Oscillatory Power Spectrum")
-            self.spectrum_ax.tick_params(axis="x", rotation=45)
-            self.spectrum_ax.grid(True, alpha=0.3)
+            ax = self.spectrum_ax
+            bars = ax.bar(bands, powers, color=self.get_theme_color("accent"), alpha=0.7)
+            ax.set_xlabel("Frequency Band")
+            ax.set_ylabel("Power")
+            ax.set_title("Oscillatory Power Spectrum")
+            ax.tick_params(axis="x", rotation=45)
+            ax.grid(True, alpha=0.3)
 
             # Color bars by power level using theme colors
             max_power = max(powers) if powers else 1
@@ -4668,10 +4665,11 @@ class APGIGUI:
                 else:
                     bar.set_color(self.get_theme_color("success"))
 
-            self.spectrum_fig.tight_layout()
+            if self.spectrum_fig:
+                self.spectrum_fig.tight_layout()
             # Disable scroll events on matplotlib canvas to prevent conflicts
             self.spectrum_canvas.mpl_connect("scroll_event", lambda e: None)
-            self.spectrum_canvas.draw()
+            self.spectrum_canvas.draw()  # type: ignore[no-untyped-call]
 
         # Update metrics text
         self.osc_metrics_text.delete(1.0, tk.END)
@@ -4690,7 +4688,7 @@ class APGIGUI:
 
         self.osc_metrics_text.insert(tk.END, metrics_text)
 
-    def update_oscillatory_display(self, response):
+    def update_oscillatory_display(self, response: dict[str, Any]) -> None:
         """Update oscillatory spectrum display"""
         bands = []
         powers = []
@@ -4710,10 +4708,10 @@ class APGIGUI:
             required_widgets=["spectrum_canvas", "osc_metrics_text"],
         )
 
-    def _do_energy_update(self):
+    def _do_energy_update(self) -> None:
         """Internal method for energy display update logic"""
         if not self.assistant or not self.assistant.enable_energy_aware:
-            return  # type: ignore[return-value]
+            return
 
         # Get current battery level
         battery_level = self.assistant.energy_monitor.get_level()
@@ -4777,6 +4775,9 @@ class APGIGUI:
 
         # Update energy plot if we have enough data
         if HAS_MATPLOTLIB and len(self.energy_history) > 1:
+            if not self.energy_ax:
+                return
+
             self.energy_ax.clear()
 
             times = [e["time"] - self.energy_history[0]["time"] for e in self.energy_history]
@@ -4802,20 +4803,20 @@ class APGIGUI:
             self.energy_ax.set_xlabel("Time (seconds)")
             self.energy_ax.set_ylabel("Battery Level")
             self.energy_ax.set_title("Battery Level Over Time")
-            self.energy_ax.set_ylim([0, 1.05])
+            self.energy_ax.set_ylim(0, 1.05)
             self.energy_ax.legend(loc="best")
             self.energy_ax.grid(True, alpha=0.3)
 
             self.energy_fig.tight_layout()
             # Disable scroll events on matplotlib canvas to prevent conflicts
             self.energy_canvas.mpl_connect("scroll_event", lambda e: None)
-            self.energy_canvas.draw()
+            self.energy_canvas.draw()  # type: ignore[no-untyped-call]
 
         # Update statistics
         if hasattr(self, "energy_stats_text") and self.energy_stats_text.winfo_exists():
             self.update_energy_stats()
 
-    def update_energy_display(self):
+    def update_energy_display(self) -> None:
         """Update energy display"""
         self.display_manager.update_display(
             "Energy Display", self._do_energy_update, required_widgets=["battery_canvas"]
@@ -4865,13 +4866,17 @@ class APGIGUI:
 
             # Battery level fill - use theme colors
             fill_width = battery_width * battery_level
-            battery_colors = self.get_theme_color("battery_colors")
+            battery_colors: dict[str, str] = cast(
+                dict[str, str],
+                GUIConfig.THEMES[self.current_theme].get(
+                    "battery_colors", {"high": "green", "medium": "orange", "low": "red"}
+                )
+                or {"high": "green", "medium": "orange", "low": "red"},
+            )
             color = (
                 battery_colors["high"]
                 if battery_level > 0.5
-                else battery_colors["medium"]
-                if battery_level > 0.2
-                else battery_colors["low"]
+                else battery_colors["medium"] if battery_level > 0.2 else battery_colors["low"]
             )
 
             self.battery_canvas.create_rectangle(
@@ -4900,9 +4905,12 @@ class APGIGUI:
                 # Check if matplotlib widgets still exist
                 if (
                     not hasattr(self, "energy_canvas")
-                    or not self.energy_canvas.get_tk_widget().winfo_exists()
+                    or not self.energy_canvas.get_tk_widget().winfo_exists()  # type: ignore[no-untyped-call]
                 ):
-                    return  # type: ignore[return-value]
+                    return
+
+                if not self.energy_ax:
+                    return
 
                 self.energy_ax.clear()
 
@@ -4938,20 +4946,20 @@ class APGIGUI:
                 self.energy_ax.set_xlabel("Time (seconds)")
                 self.energy_ax.set_ylabel("Battery Level")
                 self.energy_ax.set_title("Battery Level Over Time")
-                self.energy_ax.set_ylim([0, 1.05])
+                self.energy_ax.set_ylim(0, 1.05)
                 self.energy_ax.legend(loc="best")
                 self.energy_ax.grid(True, alpha=0.3)
 
                 self.energy_fig.tight_layout()
                 # Disable scroll events on matplotlib canvas to prevent conflicts
                 self.energy_canvas.mpl_connect("scroll_event", lambda e: None)
-                self.energy_canvas.draw()
+                self.energy_canvas.draw()  # type: ignore[no-untyped-call]
 
             # Update statistics
             if hasattr(self, "energy_stats_text") and self.energy_stats_text.winfo_exists():
                 self.update_energy_stats()
 
-    def update_energy_stats(self):
+    def update_energy_stats(self) -> None:
         """Update energy statistics display"""
         try:
             # Get current battery level
@@ -5005,19 +5013,19 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
         except Exception as e:
             self.logger.error(f"Error updating energy stats: {e}", exc_info=True)
 
-    def update_cognitive_display(self, response):
+    def update_cognitive_display(self, response: dict[str, Any]) -> None:
         """Update cognitive monitoring display"""
         with ErrorContext("Update Cognitive Display", user_facing=False):
             # Check if widgets still exist
             if not hasattr(self, "state_canvas"):
-                return  # type: ignore[return-value]
+                return
             if hasattr(self.state_canvas, "winfo_exists") and not self.state_canvas.winfo_exists():
-                return  # type: ignore[return-value]
+                return
 
             if not hasattr(self, "metrics_text"):
-                return  # type: ignore[return-value]
+                return
             if hasattr(self.metrics_text, "winfo_exists") and not self.metrics_text.winfo_exists():
-                return  # type: ignore[return-value]
+                return
 
             # Update state canvas
             self.state_canvas.delete("all")
@@ -5026,10 +5034,14 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
 
             if canvas_width > 10 and canvas_height > 10:
                 # Get cognitive state with defaults
-                state = response.get("cognitive_state", {})
+                state: dict[str, Any] = (
+                    response.get("cognitive_state", {}) if isinstance(response, dict) else {}
+                )
 
                 # Use theme state colors
-                state_colors = self.get_theme_color("state_colors")
+                state_colors = cast(
+                    dict[str, str], GUIConfig.THEMES[self.current_theme].get("state_colors", {})
+                )
                 primary_state = state.get("primary", "idle")
                 color = state_colors.get(primary_state, "#888888")
                 intensity = state.get("intensity", 0.5)
@@ -5119,7 +5131,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
 
             self.metrics_text.insert(tk.END, metrics_text)
 
-    def update_biofeedback_display(self, response):
+    def update_biofeedback_display(self, response: dict[str, Any]) -> None:
         """Update biofeedback display"""
         try:
             # Update recommendations
@@ -5177,9 +5189,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 60 <= val <= 80
-                                else "orange"
-                                if 50 <= val <= 90
-                                else "red"
+                                else "orange" if 50 <= val <= 90 else "red"
                             )
                         elif label == "HRV":
                             color = "green" if val > 50 else "orange" if val > 30 else "red"
@@ -5187,9 +5197,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                             color = (
                                 "green"
                                 if 12 <= val <= 20
-                                else "orange"
-                                if 10 <= val <= 24
-                                else "red"
+                                else "orange" if 10 <= val <= 24 else "red"
                             )
                         else:  # EDA
                             color = "green" if val < 6 else "orange" if val < 8 else "red"
@@ -5222,43 +5230,43 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
         except Exception as e:
             self.logger.error(f"Biofeedback display error: {e}", exc_info=True)
 
-    def safe_update_energy_display(self):
+    def safe_update_energy_display(self) -> None:
         """Safely update energy display with widget validation"""
         try:
             if (
                 not hasattr(self, "energy_canvas")
-                or not self.energy_canvas.get_tk_widget().winfo_exists()
+                or not self.energy_canvas.get_tk_widget().winfo_exists()  # type: ignore[no-untyped-call]
             ):
-                return  # type: ignore[return-value]
+                return
 
             if not hasattr(self, "battery_canvas"):
-                return  # type: ignore[return-value]
+                return
             if (
                 hasattr(self.battery_canvas, "winfo_exists")
                 and not self.battery_canvas.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             self.update_energy_display()
         except Exception as e:
             self.logger.error(f"Safe energy display error: {e}", exc_info=True)
 
-    def safe_update_performance_metrics(self):
+    def safe_update_performance_metrics(self) -> None:
         """Safely update performance metrics with widget validation"""
         try:
             if not hasattr(self, "performance_text"):
-                return  # type: ignore[return-value]
+                return
             if (
                 hasattr(self.performance_text, "winfo_exists")
                 and not self.performance_text.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             self.update_performance_metrics()
         except Exception as e:
             self.logger.error(f"Safe performance metrics error: {e}", exc_info=True)
 
-    def update_performance_metrics(self):
+    def update_performance_metrics(self) -> None:
         """Update performance metrics display"""
         try:
             # Get performance statistics
@@ -5278,7 +5286,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
                 queries_per_minute = 0
 
             # Count cognitive states
-            cognitive_counts = {}
+            cognitive_counts: dict[str, int] = {}
             for entry in self.usage_tracker.metrics_log:
                 state = entry.get("cognitive_state", "Unknown")
                 cognitive_counts[state] = cognitive_counts.get(state, 0) + 1
@@ -5315,11 +5323,11 @@ Energy Usage:
         except Exception as e:
             self.logger.error(f"Error updating performance metrics: {e}", exc_info=True)
 
-    def safe_update_cognitive_display(self):
+    def safe_update_cognitive_display(self) -> None:
         """Safely update cognitive monitoring display with widget validation"""
         try:
             if not hasattr(self, "metrics_text") or not self.metrics_text.winfo_exists():
-                return  # type: ignore[return-value]
+                return
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5337,16 +5345,16 @@ Energy Usage:
         except Exception as e:
             self.logger.error(f"Safe cognitive display error: {e}", exc_info=True)
 
-    def safe_update_oscillatory_display(self):
+    def safe_update_oscillatory_display(self) -> None:
         """Safely update oscillatory analysis display with widget validation"""
         try:
             if not hasattr(self, "osc_metrics_text"):
-                return  # type: ignore[return-value]
+                return
             if (
                 hasattr(self.osc_metrics_text, "winfo_exists")
                 and not self.osc_metrics_text.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5365,16 +5373,16 @@ Energy Usage:
         except Exception as e:
             self.logger.error(f"Safe oscillatory display error: {e}", exc_info=True)
 
-    def safe_update_biofeedback_display(self):
+    def safe_update_biofeedback_display(self) -> None:
         """Safely update biofeedback display with widget validation"""
         try:
             if not hasattr(self, "biofeedback_text"):
-                return  # type: ignore[return-value]
+                return
             if (
                 hasattr(self.biofeedback_text, "winfo_exists")
                 and not self.biofeedback_text.winfo_exists()
             ):
-                return  # type: ignore[return-value]
+                return
 
             # Create a mock response if no last_response exists
             if not hasattr(self, "last_response"):
@@ -5393,7 +5401,7 @@ Energy Usage:
         except Exception as e:
             self.logger.error(f"Safe biofeedback display error: {e}", exc_info=True)
 
-    def update_displays(self):
+    def update_displays(self) -> None:
         """Update all displays periodically (optimized with debouncing)"""
         try:
             # Check if we're still initializing
@@ -5403,7 +5411,7 @@ Energy Usage:
                         f"Initializing... {int(self.init_progress * 100)}%"
                     )
                 self.root.after(100, self.update_displays)
-                return  # type: ignore[return-value]
+                return
 
             # Only update if fully initialized and assistant is available
             if self.is_initialized and hasattr(self, "assistant") and self.assistant:
@@ -5523,11 +5531,11 @@ Energy Usage:
             except Exception as e:
                 self.logger.debug(f"Failed to update assistant status: {e}")
 
-    def update_system_info(self):
+    def update_system_info(self) -> None:
         """Update system information display"""
         # Check if info_text widget exists
         if not hasattr(self, "info_text") or not self.info_text.winfo_exists():
-            return  # type: ignore[return-value]
+            return
 
         self.info_text.delete(1.0, tk.END)
         info_text = "System Information:\n" + "=" * 40 + "\n\n"
@@ -5565,10 +5573,10 @@ Energy Usage:
 
     @safe_widget_method("query_input")
     @safe_widget_method("char_count_label")
-    def update_char_count(self, event=None) -> None:
+    def update_char_count(self, event: Optional[Any] = None) -> None:
         """Update character count for query input with undo/redo tracking"""
         if not hasattr(self, "query_input"):
-            return  # type: ignore[return-value]
+            return
 
         text = self.query_input.get(1.0, tk.END)
         count = len(text.strip())
@@ -5593,45 +5601,45 @@ Energy Usage:
             # Initialize last text tracking
             self._last_query_text = text.rstrip()
 
-    def undo_action(self):
+    def undo_action(self) -> None:
         """Undo last action with keyboard shortcut support"""
         if self.action_history.can_undo():
             self.action_history.undo()
         else:
             # Show feedback if no undo available
-            self.show_status_message("Nothing to undo", "info")
+            self._log_event("Nothing to undo")
 
-    def redo_action(self):
+    def redo_action(self) -> None:
         """Redo last undone action with keyboard shortcut support"""
         if self.action_history.can_redo():
             self.action_history.redo()
         else:
             # Show feedback if no redo available
-            self.show_status_message("Nothing to redo", "info")
+            self._log_event("Nothing to redo")
 
     # Physiological preset methods
-    def set_relaxed_state(self):
+    def set_relaxed_state(self) -> None:
         """Set relaxed physiological state"""
         self.hr_var.set(60)
         self.hrv_var.set(65)
         self.resp_var.set(12)
         self.eda_var.set(3.0)
 
-    def set_normal_state(self):
+    def set_normal_state(self) -> None:
         """Set normal physiological state"""
         self.hr_var.set(70)
         self.hrv_var.set(50)
         self.resp_var.set(16)
         self.eda_var.set(5.0)
 
-    def set_stressed_state(self):
+    def set_stressed_state(self) -> None:
         """Set stressed physiological state"""
         self.hr_var.set(85)
         self.hrv_var.set(40)
         self.resp_var.set(20)
         self.eda_var.set(7.0)
 
-    def set_anxious_state(self):
+    def set_anxious_state(self) -> None:
         """Set anxious physiological state"""
         self.hr_var.set(95)
         self.hrv_var.set(30)
@@ -5639,7 +5647,7 @@ Energy Usage:
         self.eda_var.set(10.0)
 
     # Calibration methods
-    def calibrate_baseline(self):
+    def calibrate_baseline(self) -> None:
         """Calibrate baseline physiology"""
         if not self.assistant:
             # Add debugging information to identify the root cause
@@ -5651,7 +5659,7 @@ Energy Usage:
             }
             self.logger.warning(f"Assistant check failed in calibrate_baseline: {debug_info}")
             messagebox.showwarning("Not Ready", "Please wait for assistant initialization")
-            return  # type: ignore[return-value]
+            return
 
         # Use current physiology as baseline
         resting_data = [
@@ -5671,7 +5679,7 @@ Energy Usage:
             self.logger.info("Biofeedback calibrated")
 
     # Settings methods
-    def apply_settings(self):
+    def apply_settings(self) -> None:
         """Apply new settings"""
         response = messagebox.askyesno(
             "Apply Settings", "This will reset the assistant with new settings. Continue?"
@@ -5679,7 +5687,7 @@ Energy Usage:
         if response:
             self.reset_assistant()
 
-    def reset_to_defaults(self):
+    def reset_to_defaults(self) -> None:
         """Reset all settings to default values"""
         response = messagebox.askyesno(
             "Reset to Defaults", "This will reset all settings to their default values. Continue?"
@@ -5702,12 +5710,12 @@ Energy Usage:
 
             messagebox.showinfo("Reset Complete", "All settings have been reset to defaults.")
 
-    def reset_assistant(self):
+    def reset_assistant(self) -> None:
         """Reset the assistant with new settings"""
         if not messagebox.askyesno(
             "Reset Assistant", "This will reset the assistant and clear all history. Continue?"
         ):
-            return  # type: ignore[return-value]
+            return
 
         with ErrorContext("Reset Assistant", user_facing=True):
             self.show_progress("Resetting assistant...")
@@ -5722,20 +5730,20 @@ Energy Usage:
             self.logger.info("Assistant reset")
 
     # Session management
-    def new_session(self):
+    def new_session(self) -> None:
         """Start a new session"""
         if messagebox.askyesno("New Session", "Start a new session? Current session will be lost."):
             self.clear_history()
             self.clear_query()
             self.logger.info("New session started")
 
-    def save_session(self):
+    def save_session(self) -> None:
         """Save current session with enhanced permission validation"""
         with ErrorContext("Save Session", user_facing=False):
             session_data = {
                 "timestamp": datetime.now().isoformat(),
                 "query_history": list(self.query_history),
-                "settings": self.get_configuration(),
+                "settings": getattr(self, "export_settings", {}),
                 "physiology": {
                     "hr": self.hr_var.get(),
                     "hrv": self.hrv_var.get(),
@@ -5758,10 +5766,10 @@ Energy Usage:
 
                 if not is_valid:
                     self.permission_validator.show_permission_error(
-                        self.root, "Save Session Error", error_msg, suggestion
+                        self.root, "Save Session Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Permission error saving session: {error_msg}")
-                    return  # type: ignore[return-value]
+                    return
 
                 try:
                     with ErrorContext("Save Session File", user_facing=True):
@@ -5783,11 +5791,11 @@ Energy Usage:
                         suggestion = "Try again or contact support if issue persists"
 
                     self.permission_validator.show_permission_error(
-                        self.root, "Save Session Error", error_msg, suggestion
+                        self.root, "Save Session Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Failed to save session: {e}")
 
-    def load_session(self):
+    def load_session(self) -> None:
         """Load a saved session with enhanced permission validation"""
         with ErrorContext("Load Session", user_facing=False):
             filename = filedialog.askopenfilename(
@@ -5802,10 +5810,10 @@ Energy Usage:
 
                 if not is_valid:
                     self.permission_validator.show_permission_error(
-                        self.root, "Load Session Error", error_msg, suggestion
+                        self.root, "Load Session Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Permission error loading session: {error_msg}")
-                    return  # type: ignore[return-value]
+                    return
 
                 try:
                     with ErrorContext("Load Session File", user_facing=True):
@@ -5814,7 +5822,7 @@ Energy Usage:
 
                     # Restore settings
                     if "settings" in session_data:
-                        self.apply_configuration(session_data["settings"])
+                        self.load_configuration(session_data["settings"])
 
                     # Restore physiology
                     if "physiology" in session_data:
@@ -5839,7 +5847,7 @@ Energy Usage:
                     error_msg = f"Invalid JSON format in {filename}"
                     suggestion = "Choose a valid session file or check file integrity"
                     self.permission_validator.show_permission_error(
-                        self.root, "Load Session Error", error_msg, suggestion
+                        self.root, "Load Session Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"JSON decode error loading session: {e}")
 
@@ -5855,11 +5863,11 @@ Energy Usage:
                         suggestion = "Try again or contact support if issue persists"
 
                     self.permission_validator.show_permission_error(
-                        self.root, "Load Session Error", error_msg, suggestion
+                        self.root, "Load Session Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Failed to load session: {e}")
 
-    def export_config(self):
+    def export_config(self) -> None:
         """Export current configuration with enhanced permission validation"""
         with ErrorContext("Export Configuration", user_facing=False):
             config = {
@@ -5890,10 +5898,10 @@ Energy Usage:
 
                 if not is_valid:
                     self.permission_validator.show_permission_error(
-                        self.root, "Export Configuration Error", error_msg, suggestion
+                        self.root, "Export Configuration Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Permission error exporting config: {error_msg}")
-                    return  # type: ignore[return-value]
+                    return
 
                 try:
                     with ErrorContext("Export Configuration", user_facing=True):
@@ -5914,11 +5922,11 @@ Energy Usage:
                         suggestion = "Try again or contact support if issue persists"
 
                     self.permission_validator.show_permission_error(
-                        self.root, "Export Configuration Error", error_msg, suggestion
+                        self.root, "Export Configuration Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Failed to export configuration: {e}")
 
-    def import_config(self):
+    def import_config(self) -> None:
         """Import configuration from file with enhanced permission validation"""
         with ErrorContext("Import Configuration", user_facing=False):
             filename = filedialog.askopenfilename(
@@ -5933,17 +5941,17 @@ Energy Usage:
 
                 if not is_valid:
                     self.permission_validator.show_permission_error(
-                        self.root, "Import Configuration Error", error_msg, suggestion
+                        self.root, "Import Configuration Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Permission error importing config: {error_msg}")
-                    return  # type: ignore[return-value]
+                    return
 
                 try:
                     with ErrorContext("Import Configuration", user_facing=True):
                         with open(filename, "r") as f:
                             config = json.load(f)
 
-                    self.apply_configuration(config)
+                    self.load_configuration(config)
 
                     # Restore physiology if present
                     if "physiology" in config:
@@ -5960,7 +5968,7 @@ Energy Usage:
                     error_msg = f"Invalid JSON format in {filename}"
                     suggestion = "Choose a valid configuration file or check file integrity"
                     self.permission_validator.show_permission_error(
-                        self.root, "Import Configuration Error", error_msg, suggestion
+                        self.root, "Import Configuration Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"JSON decode error importing config: {e}")
 
@@ -5976,23 +5984,33 @@ Energy Usage:
                         suggestion = "Try again or contact support if issue persists"
 
                     self.permission_validator.show_permission_error(
-                        self.root, "Import Configuration Error", error_msg, suggestion
+                        self.root, "Import Configuration Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Failed to import configuration: {e}")
 
-    def load_configuration(self):
-        """Load saved configuration"""
+    def load_configuration(self, config: Optional[dict[str, Any]] = None) -> None:
+        """Load saved configuration from file or from provided dict"""
         if not hasattr(self, "input_dim_var") or not hasattr(self, "hidden_dim_var"):
             # Variables not initialized yet, skip loading config for now
             # It will be loaded again after UI is fully initialized
-            return  # type: ignore[return-value]
+            return
 
-        if self.config_file.exists():
+        # If config is not provided, load from file
+        if config is None:
+            if self.config_file.exists():
+                try:
+                    with ErrorContext("Load Configuration", user_facing=False):
+                        with open(self.config_file, "r") as f:
+                            config = json.load(f)
+                except Exception as e:
+                    self.logger.warning(f"Could not load configuration: {e}")
+                    return
+            else:
+                return  # No config file and no config provided
+
+        # Apply the configuration values
+        if config:
             try:
-                with ErrorContext("Load Configuration", user_facing=False):
-                    with open(self.config_file, "r") as f:
-                        config = json.load(f)
-
                 # Only set values if the variables exist
                 if hasattr(self, "input_dim_var"):
                     self.input_dim_var.set(config.get("input_dim", 128))
@@ -6006,11 +6024,10 @@ Energy Usage:
                     self.language_model_var.set(config.get("language_model", HAS_TRANSFORMERS))
 
                 self.logger.info("Configuration loaded")
-
             except Exception as e:
-                self.logger.warning(f"Could not load configuration: {e}")
+                self.logger.warning(f"Could not apply configuration: {e}")
 
-    def save_configuration(self):
+    def save_configuration(self) -> None:
         """Save current configuration"""
         try:
             config = {}
@@ -6036,12 +6053,12 @@ Energy Usage:
         except Exception as e:
             self.logger.warning(f"Could not save configuration: {e}")
 
-    def export_session_csv(self):
+    def export_session_csv(self) -> None:
         """Export session data to CSV format with enhanced permission validation"""
         with ErrorContext("Export Session CSV", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return  # type: ignore[return-value]
+                return
 
             filename = filedialog.asksaveasfilename(
                 title="Export Session Data as CSV",
@@ -6051,7 +6068,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled  # type: ignore[return-value]
+                return  # User cancelled
 
             # Validate file permissions before attempting export
             is_valid, error_msg, suggestion = self.permission_validator.validate_file_access(
@@ -6059,10 +6076,10 @@ Energy Usage:
             )
             if not is_valid:
                 self.permission_validator.show_permission_error(
-                    self.root, "Export CSV Error", error_msg, suggestion
+                    self.root, "Export CSV Error", error_msg or "", suggestion or ""
                 )
                 self.logger.error(f"Permission error exporting CSV: {error_msg}")
-                return  # type: ignore[return-value]
+                return
 
             try:
                 self.show_progress("Exporting session data to CSV...")
@@ -6200,12 +6217,12 @@ Energy Usage:
                 self.logger.error(error_msg, exc_info=True)
                 messagebox.showerror("Export Error", error_msg)
 
-    def export_metrics_csv(self):
+    def export_metrics_csv(self) -> None:
         """Export performance metrics to CSV format"""
         with ErrorContext("Export Metrics CSV", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No metrics data available to export")
-                return  # type: ignore[return-value]
+                return
 
             filename = filedialog.asksaveasfilename(
                 title="Export Performance Metrics as CSV",
@@ -6215,7 +6232,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled  # type: ignore[return-value]
+                return  # User cancelled
 
             try:
                 self.show_progress("Exporting performance metrics to CSV...")
@@ -6274,7 +6291,7 @@ Energy Usage:
                         writer.writerow(["State Distribution"])
                         writer.writerow(["State", "Count", "Percentage"])
 
-                        state_counts = {}
+                        state_counts: dict[str, int] = {}
                         for state_data in self.assistant.state_history:
                             state = state_data.get("state", "unknown")
                             state_counts[state] = state_counts.get(state, 0) + 1
@@ -6313,9 +6330,7 @@ Energy Usage:
                                 trend_direction = (
                                     "Increasing"
                                     if trend > 0
-                                    else "Decreasing"
-                                    if trend < 0
-                                    else "Stable"
+                                    else "Decreasing" if trend < 0 else "Stable"
                                 )
                                 writer.writerow(["Energy Trend", trend_direction, "qualitative"])
 
@@ -6363,12 +6378,12 @@ Energy Usage:
                 self.logger.error(error_msg, exc_info=True)
                 messagebox.showerror("Export Error", error_msg)
 
-    def export_session_json(self):
+    def export_session_json(self) -> None:
         """Export complete session data to comprehensive JSON format"""
         with ErrorContext("Export Session JSON", user_facing=True):
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return  # type: ignore[return-value]
+                return
 
             filename = filedialog.asksaveasfilename(
                 title="Export Complete Session as JSON",
@@ -6378,13 +6393,13 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled  # type: ignore[return-value]
+                return  # User cancelled
 
             try:
                 self.show_progress("Exporting complete session data to JSON...")
 
                 # Build comprehensive session data structure
-                session_data = {
+                session_data: dict[str, Any] = {
                     "metadata": {
                         "export_date": datetime.now().isoformat(),
                         "export_format": "JSON",
@@ -6513,10 +6528,10 @@ Energy Usage:
 
                 if not is_valid:
                     self.permission_validator.show_permission_error(
-                        self.root, "Export Session JSON Error", error_msg, suggestion
+                        self.root, "Export Session JSON Error", error_msg or "", suggestion or ""
                     )
                     self.logger.error(f"Permission error exporting session JSON: {error_msg}")
-                    return  # type: ignore[return-value]
+                    return
 
                 # Write JSON with pretty formatting
                 with open(filename, "w", encoding="utf-8") as f:
@@ -6532,16 +6547,18 @@ Energy Usage:
                 self.logger.error(error_msg, exc_info=True)
                 messagebox.showerror("Export Error", error_msg)
 
-    def _calculate_session_duration(self):
+    def _calculate_session_duration(self) -> str:
         """Calculate the duration of the current session"""
         try:
-            if hasattr(self.assistant, "query_history") and self.assistant.query_history:
+            if (
+                self.assistant
+                and hasattr(self.assistant, "query_history")
+                and self.assistant.query_history
+            ):
                 first_query = self.assistant.query_history[0]
                 last_query = self.assistant.query_history[-1]
 
                 # Parse timestamps (assuming ISO format)
-                from datetime import datetime
-
                 first_time = datetime.fromisoformat(
                     first_query.get("timestamp", datetime.now().isoformat())
                 )
@@ -6550,31 +6567,31 @@ Energy Usage:
                 )
 
                 duration = last_time - first_time
-                return str(duration)  # type: ignore[return-value]
-            return "00:00:00"  # type: ignore[return-value]
+                return str(duration)
+            return "00:00:00"
         except Exception:
-            return "00:00:00"  # type: ignore[return-value]
+            return "00:00:00"
 
-    def _classify_query_type(self, query):
+    def _classify_query_type(self, query: str) -> str:
         """Classify the type of query for analysis"""
         query_lower = query.lower()
 
         if any(word in query_lower for word in ["what is", "define", "explain", "tell me"]):
-            return "informational"  # type: ignore[return-value]
+            return "informational"
         elif any(word in query_lower for word in ["how to", "help", "guide", "instructions"]):
-            return "procedural"  # type: ignore[return-value]
+            return "procedural"
         elif any(word in query_lower for word in ["analyze", "compare", "evaluate", "assess"]):
-            return "analytical"  # type: ignore[return-value]
+            return "analytical"
         elif any(word in query_lower for word in ["create", "generate", "make", "produce"]):
-            return "creative"  # type: ignore[return-value]
+            return "creative"
         elif any(word in query_lower for word in ["why", "when", "where", "who"]):
-            return "interrogative"  # type: ignore[return-value]
+            return "interrogative"
         else:
-            return "general"  # type: ignore[return-value]
+            return "general"
 
-    def _calculate_performance_metrics(self):
+    def _calculate_performance_metrics(self) -> dict[str, Any]:
         """Calculate comprehensive performance metrics"""
-        metrics = {
+        metrics: dict[str, Any] = {
             "query_metrics": {},
             "state_metrics": {},
             "energy_metrics": {},
@@ -6582,7 +6599,11 @@ Energy Usage:
         }
 
         # Query metrics
-        if hasattr(self.assistant, "query_history") and self.assistant.query_history:
+        if (
+            self.assistant
+            and hasattr(self.assistant, "query_history")
+            and self.assistant.query_history
+        ):
             queries = self.assistant.query_history
             metrics["query_metrics"] = {
                 "total_queries": len(queries),
@@ -6612,9 +6633,13 @@ Energy Usage:
                 )
 
         # State metrics
-        if hasattr(self.assistant, "state_history") and self.assistant.state_history:
+        if (
+            self.assistant
+            and hasattr(self.assistant, "state_history")
+            and self.assistant.state_history
+        ):
             states = self.assistant.state_history
-            state_counts = {}
+            state_counts: dict[str, int] = {}
             for state in states:
                 state_name = state.get("state", "unknown")
                 state_counts[state_name] = state_counts.get(state_name, 0) + 1
@@ -6631,7 +6656,11 @@ Energy Usage:
             }
 
         # Energy metrics
-        if hasattr(self.assistant, "energy_history") and self.assistant.energy_history:
+        if (
+            self.assistant
+            and hasattr(self.assistant, "energy_history")
+            and self.assistant.energy_history
+        ):
             energy_levels = [
                 e.get("energy_level", 0)
                 for e in self.assistant.energy_history
@@ -6651,11 +6680,11 @@ Energy Usage:
                     ),
                 }
 
-        return metrics  # type: ignore[return-value]
+        return metrics
 
-    def _get_system_info(self):
+    def _get_system_info(self) -> dict[str, Any]:
         """Get system information for the export"""
-        system_info = {
+        system_info: dict[str, Any] = {
             "platform": sys.platform,
             "python_version": sys.version,
             "dependencies": {
@@ -6684,9 +6713,9 @@ Energy Usage:
             except Exception as e:
                 self.logger.warning(f"Could not get system info: {e}")
 
-        return system_info  # type: ignore[return-value]
+        return system_info
 
-    def export_session_pdf(self):
+    def export_session_pdf(self) -> None:
         """Export comprehensive session report to PDF format"""
         with ErrorContext("Export Session PDF", user_facing=True):
             if not HAS_REPORTLAB:
@@ -6696,11 +6725,11 @@ Energy Usage:
                     "Install with: pip install reportlab\n\n"
                     "Falling back to image export for visualizations.",
                 )
-                return  # type: ignore[return-value]
+                return
 
             if not self.assistant:
                 messagebox.showwarning("No Data", "No session data available to export")
-                return  # type: ignore[return-value]
+                return
 
             filename = filedialog.asksaveasfilename(
                 title="Export Session Report as PDF",
@@ -6710,7 +6739,7 @@ Energy Usage:
             )
 
             if not filename:
-                return  # User cancelled  # type: ignore[return-value]
+                return  # User cancelled
 
             try:
                 self.show_progress("Generating PDF report...")
@@ -7056,6 +7085,7 @@ Energy Usage:
                                 # Save figure to temporary file and add to PDF
                                 import io
                                 from reportlab.lib.utils import ImageReader
+                                from reportlab.platypus import Image as RLImage
 
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
@@ -7071,7 +7101,9 @@ Energy Usage:
 
                                 story.append(Paragraph("Neural State Timeline", styles["Heading3"]))
                                 story.append(Spacer(1, 6))
-                                story.append(Image(buf, width=display_width, height=display_height))
+                                story.append(
+                                    RLImage(buf, width=display_width, height=display_height)
+                                )
                                 story.append(Spacer(1, 20))
 
                                 if HAS_MATPLOTLIB:
@@ -7095,6 +7127,11 @@ Energy Usage:
                         try:
                             fig = APGIVisualizer.plot_energy_usage(self.assistant.energy_history)
                             if fig:
+                                # Save figure to temporary file and add to PDF
+                                import io
+                                from reportlab.lib.utils import ImageReader
+                                from reportlab.platypus import Image as RLImage
+
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
                                 buf.seek(0)
@@ -7103,12 +7140,16 @@ Energy Usage:
                                 img_width, img_height = img.getSize()
                                 aspect = img_height / float(img_width)
 
+                                # Scale image to fit page width
                                 display_width = 6 * inch
                                 display_height = display_width * aspect
 
                                 story.append(Paragraph("Energy Usage Timeline", styles["Heading3"]))
                                 story.append(Spacer(1, 6))
-                                story.append(Image(buf, width=display_width, height=display_height))
+                                story.append(
+                                    RLImage(buf, width=display_width, height=display_height)
+                                )
+                                story.append(Spacer(1, 20))
 
                                 if HAS_MATPLOTLIB:
                                     import matplotlib.pyplot as plt
@@ -7138,7 +7179,7 @@ Energy Usage:
                 self.logger.error(error_msg, exc_info=True)
                 messagebox.showerror("Export Error", error_msg)
 
-    def _generate_executive_summary(self, metrics):
+    def _generate_executive_summary(self, metrics: dict[str, Any]) -> str:
         """Generate executive summary text for PDF report"""
         summary_parts = []
 
@@ -7197,14 +7238,14 @@ Energy Usage:
                 "• Monitor energy consumption and consider energy-saving optimizations"
             )
 
-        return " ".join(summary_parts)  # type: ignore[return-value]
+        return " ".join(summary_parts)
 
     # Visualization methods
-    def generate_state_timeline(self):
+    def generate_state_timeline(self) -> None:
         """Generate state timeline visualization"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         fig = None
         try:
@@ -7254,11 +7295,11 @@ Energy Usage:
                 plt.close(fig)
                 fig = None
 
-    def generate_energy_plot(self):
+    def generate_energy_plot(self) -> None:
         """Generate energy usage plot"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         fig = None
         try:
@@ -7305,11 +7346,11 @@ Energy Usage:
                 plt.close(fig)
                 fig = None
 
-    def display_plot_in_viz_tab(self, fig):
+    def display_plot_in_viz_tab(self, fig: Any) -> None:
         """Display a matplotlib figure in the visualization tab"""
         if not HAS_PIL:
             messagebox.showwarning("PIL Required", "PIL/Pillow is required to display plots")
-            return  # type: ignore[return-value]
+            return
 
         try:
             # Save to temporary buffer
@@ -7324,67 +7365,75 @@ Energy Usage:
             photo = ImageTk.PhotoImage(img)
 
             # Clear canvas
-            self.viz_canvas.delete("all")
+            if self.viz_canvas:
+                self.viz_canvas.delete("all")
 
-            # Display image
-            self.viz_canvas.create_image(0, 0, anchor="nw", image=photo)
-            self.viz_canvas.image = photo  # Keep reference
+                # Display image
+                self.viz_canvas.create_image(0, 0, anchor="nw", image=photo)
+                setattr(self.viz_canvas, "image", photo)  # Keep reference
 
-            # Switch to visualization tab
-            self.notebook.select(self.viz_frame)
+                # Switch to visualization tab
+                self.notebook.select(self.viz_frame)  # type: ignore[no-untyped-call]
 
         except Exception as e:
             self.logger.error(f"Plot display error: {e}", exc_info=True)
             raise
 
-    def clear_viz_display(self):
+    def clear_viz_display(self) -> None:
         """Clear visualization display"""
-        self.viz_canvas.delete("all")
-        if hasattr(self.viz_canvas, "image"):
-            del self.viz_canvas.image
+        if self.viz_canvas:
+            self.viz_canvas.delete("all")
+            if hasattr(self.viz_canvas, "image"):
+                delattr(self.viz_canvas, "image")
 
-    def save_state_timeline(self):
+    def save_state_timeline(self) -> None:
         """Save state timeline plot to file"""
-        if not self.assistant or not self.assistant.state_history:
+        if not self.assistant:
+            messagebox.showwarning("No Data", "Assistant not available")
+            return
+        if not getattr(self.assistant, "state_history", None):
             messagebox.showwarning("No Data", "No state history available")
-            return  # type: ignore[return-value]
+            return
 
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         self._save_plot_with_dialog(
             plot_type="State Timeline",
-            plot_generator=lambda: APGIVisualizer.plot_state_timeline(self.assistant.state_history),
+            plot_generator=lambda: APGIVisualizer.plot_state_timeline(self.assistant.state_history),  # type: ignore[union-attr]
             default_filename="state_timeline",
         )
 
-    def save_energy_plot(self):
+    def save_energy_plot(self) -> None:
         """Save energy plot to file"""
-        if not self.assistant or not self.assistant.energy_history:
+        if not self.assistant:
+            messagebox.showwarning("No Data", "Assistant not available")
+            return
+        if not getattr(self.assistant, "energy_history", None):
             messagebox.showwarning("No Data", "No energy history available")
-            return  # type: ignore[return-value]
+            return
 
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         self._save_plot_with_dialog(
             plot_type="Energy Plot",
-            plot_generator=lambda: APGIVisualizer.plot_energy_usage(self.assistant.energy_history),
+            plot_generator=lambda: APGIVisualizer.plot_energy_usage(self.assistant.energy_history),  # type: ignore[union-attr]
             default_filename="energy_plot",
         )
 
-    def save_oscillatory_spectrum(self):
+    def save_oscillatory_spectrum(self) -> None:
         """Save oscillatory spectrum plot to file"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         # Check if we have oscillatory data
         if not hasattr(self, "spectrum_fig") or not self.spectrum_fig:
             messagebox.showwarning("No Data", "No oscillatory spectrum available")
-            return  # type: ignore[return-value]
+            return
 
         self._save_plot_with_dialog(
             plot_type="Oscillatory Spectrum",
@@ -7392,7 +7441,9 @@ Energy Usage:
             default_filename="oscillatory_spectrum",
         )
 
-    def _save_plot_with_dialog(self, plot_type: str, plot_generator, default_filename: str):
+    def _save_plot_with_dialog(
+        self, plot_type: str, plot_generator: Callable[[], Any], default_filename: str
+    ) -> None:
         """Generic method to save plots with file dialog and format options"""
         with ErrorContext(f"Save {plot_type}", user_facing=True):
             # Ask for file location with format options
@@ -7409,7 +7460,7 @@ Energy Usage:
             )
 
             if not file_path:
-                return  # User cancelled  # type: ignore[return-value]
+                return  # User cancelled
 
             try:
                 self.show_progress(f"Generating {plot_type.lower()}...")
@@ -7418,7 +7469,7 @@ Energy Usage:
                 fig = plot_generator()
                 if not fig:
                     messagebox.showwarning("Error", f"Failed to generate {plot_type.lower()}")
-                    return  # type: ignore[return-value]
+                    return
 
                 # Determine format from file extension or use default
                 file_ext = Path(file_path).suffix.lower()
@@ -7437,8 +7488,10 @@ Energy Usage:
                         file_path = str(Path(file_path).with_suffix(".svg"))
 
                 # Get DPI based on quality setting
-                quality_dpi = {"low": 150, "medium": 300, "high": 600}
-                dpi = quality_dpi.get(self.export_settings["quality"], self.export_settings["dpi"])
+                quality_dpi: dict[str, int] = {"low": 150, "medium": 300, "high": 600}
+                quality_key = str(self.export_settings["quality"])
+                default_dpi = int(self.export_settings["dpi"])
+                dpi = int(quality_dpi.get(quality_key, default_dpi))
 
                 # Save with appropriate settings
                 save_kwargs = {
@@ -7466,7 +7519,8 @@ Energy Usage:
                 fig.savefig(file_path, format=format_type, **save_kwargs)
 
                 # Clean up
-                if plot_generator.__name__ == "<lambda>":  # Generated plot, close it
+                plot_gen = cast(Any, plot_generator)
+                if plot_gen.__name__ == "<lambda>":  # Generated plot, close it
                     if HAS_MATPLOTLIB:
                         plt.close(fig)
 
@@ -7480,17 +7534,17 @@ Energy Usage:
                 self.logger.error(error_msg, exc_info=True)
                 messagebox.showerror("Export Error", error_msg)
 
-    def save_all_plots(self):
+    def save_all_plots(self) -> None:
         """Save all visualization plots"""
         if not HAS_MATPLOTLIB:
             messagebox.showwarning("No Matplotlib", "Matplotlib is required for visualizations")
-            return  # type: ignore[return-value]
+            return
 
         with ErrorContext("Save All Plots", user_facing=True):
             # Ask for directory
             directory = filedialog.askdirectory(title="Select Directory to Save Plots")
             if not directory:
-                return  # type: ignore[return-value]
+                return
 
             save_dir = Path(directory)
             plots_saved = []
@@ -7506,18 +7560,18 @@ Energy Usage:
                     or not self.assistant.state_history
                 ):
                     # Generate mock data
-                    import datetime
+                    import datetime as dt_module
                     import random
 
                     mock_history = []
                     states = ["WORKING", "IDLE", "PROCESSING", "REFLECTING"]
-                    base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
+                    base_time = dt_module.datetime.now() - dt_module.timedelta(minutes=30)
 
                     for i in range(20):
-                        timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
+                        entry_timestamp = base_time + dt_module.timedelta(minutes=i * 1.5)
                         mock_history.append(
                             {
-                                "timestamp": timestamp,
+                                "timestamp": entry_timestamp,
                                 "primary_state": random.choice(states),
                                 "confidence": random.uniform(0.6, 1.0),
                                 "surprise": random.uniform(0.0, 0.5),
@@ -7547,17 +7601,17 @@ Energy Usage:
                     or not self.assistant.energy_history
                 ):
                     # Generate mock energy data
-                    import datetime
+                    import datetime as dt_module
                     import random
 
                     mock_energy_history = []
-                    base_time = datetime.datetime.now() - datetime.timedelta(minutes=30)
+                    base_time = dt_module.datetime.now() - dt_module.timedelta(minutes=30)
 
                     for i in range(20):
-                        timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
+                        entry_timestamp = base_time + dt_module.timedelta(minutes=i * 1.5)
                         mock_energy_history.append(
                             {
-                                "timestamp": timestamp,
+                                "timestamp": entry_timestamp,
                                 "energy_cost": random.uniform(0.2, 0.8),
                                 "battery_level": max(0.2, 1.0 - (i * 0.02)),
                                 "processing_mode": random.choice(["conscious", "unconscious"]),
@@ -7594,7 +7648,7 @@ Energy Usage:
                 self.logger.error(error_msg)
 
     # Edit menu actions
-    def clear_query(self):
+    def clear_query(self) -> None:
         """Clear query input with undo/redo support"""
         if hasattr(self, "query_input"):
             old_text = self.query_input.get(1.0, tk.END).strip()
@@ -7602,11 +7656,11 @@ Energy Usage:
                 action = ClearQueryAction(self, old_text)
                 self.action_history.execute(action)
 
-    def show_memory_stats(self):
+    def show_memory_stats(self) -> None:
         """Show memory usage statistics"""
         if not hasattr(self, "history_manager"):
             messagebox.showinfo("Not Available", "History manager not initialized")
-            return  # type: ignore[return-value]
+            return
 
         stats = self.history_manager.get_memory_stats()
         usage = stats["memory_usage_mb"]
@@ -7626,23 +7680,23 @@ Energy Usage:
 
         messagebox.showinfo("Memory Statistics", message)
 
-    def clear_all_history(self):
+    def clear_all_history(self) -> None:
         """Clear all managed history"""
         if not messagebox.askyesno(
             "Clear History", "Clear all history data? This action cannot be undone."
         ):
-            return  # type: ignore[return-value]
+            return
 
         if hasattr(self, "history_manager"):
             self.history_manager.clear_all_history()
             self.logger.info("All history cleared by user")
             messagebox.showinfo("Success", "All history has been cleared")
 
-    def configure_history_limits(self):
+    def configure_history_limits(self) -> None:
         """Configure history limits dialog"""
         if not hasattr(self, "history_manager"):
             messagebox.showinfo("Not Available", "History manager not initialized")
-            return  # type: ignore[return-value]
+            return
 
         # Create configuration dialog
         dialog = tk.Toplevel(self.root)
@@ -7668,7 +7722,7 @@ Energy Usage:
         memory_label = ttk.Label(dialog, text=f"{current_max_memory} MB")
         memory_label.pack()
 
-        def update_memory_label(value):
+        def update_memory_label(value: str) -> None:
             memory_label.config(text=f"{int(float(value))} MB")
 
         memory_scale.config(command=update_memory_label)
@@ -7692,7 +7746,7 @@ Energy Usage:
             ttk.Label(limits_frame, text=f"{history_type.title()}:").grid(
                 row=i, column=0, sticky="w", padx=5, pady=2
             )
-            var = tk.IntVar(value=strategy["maxlen"])
+            var = tk.IntVar(value=int(strategy["maxlen"]))
             ttk.Spinbox(limits_frame, from_=5, to=500, textvariable=var, width=10).grid(
                 row=i, column=1, padx=5, pady=2
             )
@@ -7702,7 +7756,7 @@ Energy Usage:
         button_frame = ttk.Frame(dialog)
         button_frame.pack(pady=20)
 
-        def apply_settings():
+        def apply_settings() -> None:
             self.history_manager.max_memory_mb = memory_var.get()
             self.history_manager.auto_prune = auto_prune_var.get()
 
@@ -7714,7 +7768,7 @@ Energy Usage:
             messagebox.showinfo("Success", "History limits have been updated")
             dialog.destroy()
 
-        def reset_defaults():
+        def reset_defaults() -> None:
             memory_var.set(100)
             auto_prune_var.set(True)
             for history_type, var in limit_vars.items():
@@ -7733,7 +7787,7 @@ Energy Usage:
         )
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
-    def clear_history(self):
+    def clear_history(self) -> None:
         """Clear all history"""
         if messagebox.askyesno("Clear History", "Clear all history?"):
             if "Cognitive Monitoring" in self.tabs_created:
@@ -7747,11 +7801,11 @@ Energy Usage:
 
             self.logger.info("History cleared")
 
-    def show_settings(self):
+    def show_settings(self) -> None:
         """Show settings tab"""
-        self.notebook.select(self.settings_frame)
+        self.notebook.select(self.settings_frame)  # type: ignore[no-untyped-call]
 
-    def show_export_settings(self):
+    def show_export_settings(self) -> None:
         """Show export settings dialog"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Export Settings")
@@ -7782,7 +7836,7 @@ Energy Usage:
         dpi_frame = ttk.Frame(main_frame)
         dpi_frame.pack(fill="x", pady=(0, 15))
 
-        dpi_var = tk.IntVar(value=self.export_settings["dpi"])
+        dpi_var = tk.IntVar(value=int(self.export_settings["dpi"]))
         ttk.Radiobutton(dpi_frame, text="Standard (150 DPI)", variable=dpi_var, value=150).pack(
             anchor="w"
         )
@@ -7801,7 +7855,7 @@ Energy Usage:
         format_frame = ttk.Frame(main_frame)
         format_frame.pack(fill="x", pady=(0, 15))
 
-        format_var = tk.StringVar(value=self.export_settings["format"])
+        format_var = tk.StringVar(value=str(self.export_settings["format"]))
         ttk.Radiobutton(format_frame, text="PNG", variable=format_var, value="png").pack(anchor="w")
         ttk.Radiobutton(format_frame, text="PDF", variable=format_var, value="pdf").pack(anchor="w")
         ttk.Radiobutton(format_frame, text="SVG", variable=format_var, value="svg").pack(anchor="w")
@@ -7814,7 +7868,7 @@ Energy Usage:
         quality_frame = ttk.Frame(main_frame)
         quality_frame.pack(fill="x", pady=(0, 15))
 
-        quality_var = tk.StringVar(value=self.export_settings["quality"])
+        quality_var = tk.StringVar(value=str(self.export_settings["quality"]))
         ttk.Radiobutton(quality_frame, text="Low (Fast)", variable=quality_var, value="low").pack(
             anchor="w"
         )
@@ -7829,7 +7883,7 @@ Energy Usage:
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill="x", pady=(20, 0))
 
-        def save_settings():
+        def save_settings() -> None:
             self.export_settings["dpi"] = dpi_var.get()
             self.export_settings["format"] = format_var.get()
             self.export_settings["quality"] = quality_var.get()
@@ -7845,20 +7899,20 @@ Energy Usage:
         dialog.bind("<Escape>", lambda e: dialog.destroy())
 
     # View menu actions
-    def refresh_displays(self):
+    def refresh_displays(self) -> None:
         """Refresh all displays"""
         with self.update_flags_lock:
             self.update_flags = {key: True for key in self.update_flags}
         self.update_displays()
         self.update_status("Displays refreshed", "info")
 
-    def toggle_fullscreen(self):
+    def toggle_fullscreen(self) -> None:
         """Toggle fullscreen mode"""
         current_state = self.root.attributes("-fullscreen")
         self.root.attributes("-fullscreen", not current_state)
 
     # Help menu actions
-    def show_quick_start(self):
+    def show_quick_start(self) -> None:
         """Show quick start guide"""
         help_text = """
 APGI Assistant - Quick Start Guide
@@ -7911,7 +7965,7 @@ For more help, visit the documentation.
 
         ttk.Button(help_window, text="Close", command=help_window.destroy).pack(pady=5)
 
-    def show_shortcuts(self):
+    def show_shortcuts(self) -> None:
         """Show keyboard shortcuts"""
         shortcuts_text = """
 Keyboard Shortcuts
@@ -7956,7 +8010,7 @@ Help:
 
         ttk.Button(shortcuts_window, text="Close", command=shortcuts_window.destroy).pack(pady=5)
 
-    def show_about(self):
+    def show_about(self) -> None:
         """Show about dialog"""
         about_text = f"""
 APGI Assistant v1.0
@@ -7982,7 +8036,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
         messagebox.showinfo("About APGI Assistant", about_text)
 
-    def enable_memory_profiling(self, interval_sec=10):
+    def enable_memory_profiling(self, interval_sec: int = 10) -> None:
         """Enable periodic memory profiling (development/debugging)
 
         Args:
@@ -7995,13 +8049,17 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 "The psutil package is required for memory profiling.\n\n"
                 "Install it with: pip install psutil",
             )
-            return  # type: ignore[return-value]
+            return
 
-        if hasattr(self, "memory_profiling_enabled") and self.memory_profiling_enabled:
+        # Initialize memory_profiling_enabled if not exists
+        if not hasattr(self, "memory_profiling_enabled"):
+            self.memory_profiling_enabled: bool = False
+
+        if self.memory_profiling_enabled:
             self.logger.info("Memory profiling already enabled")
-            return  # type: ignore[return-value]
+            return
 
-        def profile_memory():
+        def profile_memory() -> None:
             try:
                 process = psutil.Process()
                 mem_info = process.memory_info()
@@ -8030,21 +8088,23 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         # Add a menu item to disable profiling
         if hasattr(self, "tools_menu"):
             # Find and update the menu item
-            for i in range(self.tools_menu.index("end") + 1):
-                try:
-                    label = self.tools_menu.entrycget(i, "label")
-                    if "Memory Profiling" in label:
-                        self.tools_menu.entryconfigure(
-                            i,
-                            label="Disable Memory Profiling",
-                            command=self.disable_memory_profiling,
-                        )
-                        break
-                except Exception as e:
-                    # Log error but continue with next menu item
-                    LOGGER.debug(f"Failed to modify menu item: {e}")
+            menu_end_index = self.tools_menu.index("end")
+            if menu_end_index is not None:
+                for i in range(menu_end_index + 1):
+                    try:
+                        label = self.tools_menu.entrycget(i, "label")
+                        if "Memory Profiling" in label:
+                            self.tools_menu.entryconfigure(
+                                i,
+                                label="Disable Memory Profiling",
+                                command=self.disable_memory_profiling,
+                            )
+                            break
+                    except Exception as e:
+                        # Log error but continue with next menu item
+                        LOGGER.debug(f"Failed to modify menu item: {e}")
 
-    def disable_memory_profiling(self):
+    def disable_memory_profiling(self) -> None:
         """Disable memory profiling"""
         if hasattr(self, "memory_profiling_enabled") and self.memory_profiling_enabled:
             self.memory_profiling_enabled = False
@@ -8052,27 +8112,29 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
             # Update the menu item
             if hasattr(self, "tools_menu"):
-                for i in range(self.tools_menu.index("end") + 1):
-                    try:
-                        label = self.tools_menu.entrycget(i, "label")
-                        if "Memory Profiling" in label:
-                            self.tools_menu.entryconfigure(
-                                i,
-                                label="Enable Memory Profiling",
-                                command=self.enable_memory_profiling,
-                            )
-                            break
-                    except Exception:
-                        # Continue if menu entry doesn't exist or can't be accessed
-                        continue
+                menu_end_index = self.tools_menu.index("end")
+                if menu_end_index is not None:
+                    for i in range(menu_end_index + 1):
+                        try:
+                            label = self.tools_menu.entrycget(i, "label")
+                            if "Memory Profiling" in label:
+                                self.tools_menu.entryconfigure(
+                                    i,
+                                    label="Enable Memory Profiling",
+                                    command=self.enable_memory_profiling,
+                                )
+                                break
+                        except Exception:
+                            # Continue if menu entry doesn't exist or can't be accessed
+                            continue
 
-    def view_logs(self):
+    def view_logs(self) -> None:
         """View application logs"""
         log_file = Path("apgi_gui.log")
 
         if not log_file.exists():
             messagebox.showinfo("No Logs", "No log file found")
-            return  # type: ignore[return-value]
+            return
 
         try:
             log_window = tk.Toplevel(self.root)
@@ -8105,7 +8167,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open logs:\n{str(e)}")
 
-    def refresh_logs(self, text_widget, log_file):
+    def refresh_logs(self, text_widget: Any, log_file: Path) -> None:
         """Refresh log display"""
         try:
             text_widget.delete("1.0", tk.END)
@@ -8115,7 +8177,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         except Exception as e:
             messagebox.showerror("Error", f"Failed to refresh logs:\n{str(e)}")
 
-    def clear_logs(self, log_file, window):
+    def clear_logs(self, log_file: Path, window: Any) -> None:
         """Clear log file"""
         if messagebox.askyesno("Clear Logs", "Clear all logs?"):
             try:
@@ -8126,7 +8188,11 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to clear logs:\n{str(e)}")
 
-    def _on_physio_change(self, param_type, value):
+    def _on_physio_change(self, param_type: str, value: float) -> None:
+        """Handle physiological parameter slider changes"""
+        self.set_physiology_action2(param_type, value)
+
+    def set_physiology_action2(self, param_type: str, value: float) -> None:
         """Handle physiological parameter changes with undo/redo support"""
         # Update label immediately for responsive UI
         if param_type == "hr":
@@ -8154,16 +8220,16 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         action = SetPhysiologyAction(self, old_state, new_state)
         self.action_history.execute(action)
 
-    def redo_action2(self):
+    def redo_action2(self) -> None:
         """Redo last undone action"""
         if self.action_history.can_redo():
             self.action_history.redo()
             self.logger.info("Action redone")
 
-    def auto_save_session(self):
+    def auto_save_session(self) -> None:
         """Auto-save session data for crash recovery"""
         if not self.auto_save_enabled:
-            return  # type: ignore[return-value]
+            return
 
         try:
             session_data = {
@@ -8195,10 +8261,10 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         except Exception as e:
             self.logger.error(f"Auto-save failed: {e}")
 
-    def check_auto_save_recovery(self):
+    def check_auto_save_recovery(self) -> None:
         """Check for auto-save file and offer recovery"""
         if not os.path.exists(self.auto_save_file):
-            return  # type: ignore[return-value]
+            return
 
         try:
             with open(self.auto_save_file, "r") as f:
@@ -8209,7 +8275,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             if datetime.now() - save_time > timedelta(hours=24):
                 # Old auto-save, remove it
                 os.remove(self.auto_save_file)
-                return  # type: ignore[return-value]
+                return
 
             # Offer recovery to user
             result = messagebox.askyesno(
@@ -8233,7 +8299,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 # File might not exist or be locked - log but continue
                 LOGGER.debug(f"Failed to remove auto-save file: {e}")
 
-    def recover_session(self, session_data):
+    def recover_session(self, session_data: Dict[str, Any]) -> None:
         """Recover session from auto-save data"""
         try:
             # Restore query text
@@ -8284,27 +8350,27 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             self.logger.error(f"Session recovery failed: {e}")
             messagebox.showerror("Recovery Failed", f"Failed to recover session: {e}")
 
-    def start_auto_save_timer(self):
+    def start_auto_save_timer(self) -> None:
         """Start the auto-save timer"""
         if self.auto_save_enabled and not self.auto_save_timer_id:
             self.auto_save_timer_id = self.root.after(
                 self.auto_save_interval, self.auto_save_timer_callback
             )
 
-    def auto_save_timer_callback(self):
+    def auto_save_timer_callback(self) -> None:
         """Auto-save timer callback"""
         self.auto_save_session()
         # Restart timer for next auto-save
         self.auto_save_timer_id = None
         self.start_auto_save_timer()
 
-    def stop_auto_save_timer(self):
+    def stop_auto_save_timer(self) -> None:
         """Stop the auto-save timer"""
         if self.auto_save_timer_id:
             self.root.after_cancel(self.auto_save_timer_id)
             self.auto_save_timer_id = None
 
-    def quit_application(self):
+    def quit_application(self) -> None:
         """Quit application with cleanup"""
         # Set shutdown flag immediately to prevent race conditions
         self.is_shutting_down = True
@@ -8326,12 +8392,12 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                     self.debouncer.cancel_all(self.root)
 
                 # Cancel any other pending timers
-                if hasattr(self, "init_check_timer_id") and self.init_check_timer_id:
-                    self.root.after_cancel(self.init_check_timer_id)
-                if hasattr(self, "init_safety_timer_id") and self.init_safety_timer_id:
-                    self.root.after_cancel(self.init_safety_timer_id)
+                # Cancel update timer if it exists
                 if hasattr(self, "update_timer_id") and self.update_timer_id:
-                    self.root.after_cancel(self.update_timer_id)
+                    try:
+                        self.root.after_cancel(self.update_timer_id)
+                    except Exception:
+                        pass
             except Exception as e:
                 self.logger.debug(f"Error cancelling timers: {e}")
 
@@ -8357,9 +8423,9 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                     # Clear widget references to help garbage collection
                     if hasattr(self, "query_input"):
-                        self.query_input = None
+                        self.query_input = None  # type: ignore[assignment]
                     if hasattr(self, "response_display"):
-                        self.response_display = None
+                        self.response_display = None  # type: ignore[assignment]
 
                     # Perform garbage collection
                     gc.collect()
@@ -8387,7 +8453,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                     sys.exit(1)
 
-    def _safe_destroy(self):
+    def _safe_destroy(self) -> None:
         """Safely destroy the root window with error handling"""
         try:
             if hasattr(self, "root") and self.root.winfo_exists():
@@ -8400,24 +8466,24 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             sys.exit(1)
 
     # Theme Management Methods
-    def toggle_high_contrast(self):
+    def toggle_high_contrast(self) -> None:
         """Toggle between normal and high contrast themes"""
         new_theme = "high_contrast" if self.high_contrast_var.get() else "normal"
         self.apply_theme(new_theme)
         self.logger.info(f"Theme switched to: {new_theme}")
 
-    def apply_theme(self, theme_name: str):
+    def apply_theme(self, theme_name: str) -> None:
         """Apply a theme to the entire GUI"""
         if theme_name not in GUIConfig.THEMES:
             self.logger.warning(f"Unknown theme: {theme_name}")
-            return  # type: ignore[return-value]
+            return
 
         self.current_theme = theme_name
         self._save_theme_preference()
         theme = GUIConfig.THEMES[theme_name]
 
         # Update main window
-        self.root.configure(bg=theme["bg"])
+        self.root.configure(bg=str(theme["bg"]))
 
         # Update all themed widgets
         self._update_canvas_themes()
@@ -8429,9 +8495,9 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
     def get_theme_color(self, color_type: str) -> str:
         """Get a color from the current theme"""
-        return GUIConfig.THEMES[self.current_theme].get(color_type, "black")  # type: ignore[return-value]
+        return str(GUIConfig.THEMES[self.current_theme].get(color_type, "black"))
 
-    def _update_canvas_themes(self):
+    def _update_canvas_themes(self) -> None:
         """Update all canvas backgrounds including matplotlib figures"""
         theme = GUIConfig.THEMES[self.current_theme]
         canvas_bg = theme["canvas_bg"]
@@ -8448,13 +8514,13 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         for canvas_name, has_canvas in canvases:
             if has_canvas:
                 canvas = getattr(self, canvas_name)
-                canvas.configure(bg=canvas_bg)
+                canvas.configure(bg=str(canvas_bg))
 
         # Update matplotlib figures with theme-aware styling
         if HAS_MATPLOTLIB:
             self._update_matplotlib_themes(theme)
 
-    def _update_matplotlib_themes(self, theme):
+    def _update_matplotlib_themes(self, theme: Dict[str, Any]) -> None:
         """Update matplotlib figures to match current theme"""
         try:
             # Update matplotlib figure colors
@@ -8478,7 +8544,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                 # Redraw the canvas
                 if hasattr(self, "spectrum_canvas") and self.spectrum_canvas:
-                    self.spectrum_canvas.draw()
+                    self.spectrum_canvas.draw()  # type: ignore[no-untyped-call]
 
             # Update energy figure
             if hasattr(self, "energy_fig") and self.energy_fig:
@@ -8496,7 +8562,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                 # Redraw the canvas
                 if hasattr(self, "energy_canvas") and self.energy_canvas:
-                    self.energy_canvas.draw()
+                    self.energy_canvas.draw()  # type: ignore[no-untyped-call]
 
             # Update any other matplotlib figures
             figure_attrs = ["timeline_fig", "performance_fig", "cognitive_fig"]
@@ -8527,17 +8593,19 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
         except Exception as e:
             self.logger.warning(f"Error updating matplotlib themes: {e}")
 
-    def _update_display_themes(self):
+    def _update_display_themes(self) -> None:
         """Update text displays and other UI elements"""
         theme = GUIConfig.THEMES[self.current_theme]
 
         # Update response display if it exists
         if hasattr(self, "response_display"):
-            self.response_display.configure(bg=theme["bg"], fg=theme["fg"])
+            self.response_display.configure(bg=str(theme["bg"]), fg=str(theme["fg"]))
 
         # Update query input if it exists
         if hasattr(self, "query_input"):
-            self.query_input.configure(bg=theme["bg"], fg=theme["fg"], insertbackground=theme["fg"])
+            self.query_input.configure(
+                bg=str(theme["bg"]), fg=str(theme["fg"]), insertbackground=str(theme["fg"])
+            )
             # Bind Enter key to send query
             self.query_input.bind("<Return>", self.send_query)
 
@@ -8576,20 +8644,20 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                     self.memory_length_var.set(config["buffer_size"])
         except Exception:
             pass
-        return "normal"  # Default theme  # type: ignore[return-value]
+        return "normal"  # Default theme
 
     def send_query(self, event: Optional[Any] = None) -> None:
         """Send user query to the APGI Assistant and display response."""
         if not hasattr(self, "query_input") or not hasattr(self, "response_display"):
-            return  # type: ignore[return-value]
+            return
 
-        # Get user input
-        user_input = self.query_input.get().strip()
+        # Get user input (ScrolledText widget uses Text widget get method)
+        user_input = self.query_input.get(1.0, tk.END).strip()
         if not user_input:
-            return  # type: ignore[return-value]
+            return
 
-        # Clear input
-        self.query_input.delete(0, tk.END)
+        # Clear input (ScrolledText widget uses Text widget delete method)
+        self.query_input.delete(1.0, tk.END)
 
         # Check if assistant is available
         if not HAS_APGI_ASSISTANT or not hasattr(self, "assistant") or self.assistant is None:
@@ -8597,22 +8665,24 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 tk.END, "APGI Assistant not available. Please check dependencies.\n"
             )
             self.response_display.see(tk.END)
-            return  # type: ignore[return-value]
+            return
 
         # Start conversation if not active
-        if not self.assistant.conversation_active:
+        if self.assistant is not None and not self.assistant.conversation_active:
             self.assistant.start_conversation()
 
         # Process query in thread to avoid blocking GUI
         def process_query_thread() -> None:
             try:
+                if self.assistant is None:
+                    raise RuntimeError("Assistant not available")
                 result = self.assistant.process_query(user_input)
 
                 # Display response on main thread
                 self.root.after(0, lambda: self._display_response(user_input, result))
 
             except Exception as e:
-                self.root.after(0, lambda exc=e: self._display_error(str(exc)))
+                self.root.after(0, lambda exc=e: self._display_error(str(exc)))  # type: ignore[misc]
 
         # Start processing thread
         import threading
@@ -8623,11 +8693,24 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
     def _display_response(self, user_input: str, result: Dict[str, Any]) -> None:
         """Display the assistant response in the GUI."""
         if not hasattr(self, "response_display"):
-            return  # type: ignore[return-value]
+            return
 
         # Display user input
         self.response_display.insert(tk.END, f"You: {user_input}\n", "user")
         self.response_display.insert(tk.END, f"Assistant: {result['response']}\n\n", "assistant")
+
+        # Prune display content if it exceeds limit (BUG-M10)
+        max_lines = 1000
+        content_lines = float(self.response_display.index("end-1c").split(".")[0])
+        if content_lines > max_lines:
+            # Remove top 20% of lines
+            remove_until = int(max_lines * 0.2)
+            self.response_display.delete("1.0", f"{remove_until}.0")
+            self.response_display.insert(
+                "1.0",
+                f"--- Older messages pruned for memory (Total lines removed: {remove_until}) ---\n\n",
+                "warning",
+            )
 
         # Display cognitive analysis if available
         cognitive = result.get("cognitive_analysis", {})
@@ -8651,7 +8734,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
             self.response_display.see(tk.END)
 
 
-def main():
+def main() -> None:
     """Main function to run the GUI"""
     # Validate dependencies before creating GUI
     try:

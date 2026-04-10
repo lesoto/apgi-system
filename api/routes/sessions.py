@@ -7,8 +7,8 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 import logging
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, Depends, status, HTTPException
-from api.exceptions import SessionNotFoundError, SessionStateConflictError
+from fastapi import APIRouter, Depends, status
+from api.exceptions import SessionStateConflictError
 from api.models.schemas import (
     ErrorResponse,
     PaginationInfo,
@@ -26,6 +26,7 @@ from api.services.authorization import (
     Role,
     has_any_role,
     TokenPayload,
+    verify_session_owner,
 )
 from api.services.session_manager import (
     SessionManager,
@@ -163,6 +164,7 @@ async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> SessionResponse:
     """
     Get session details.
@@ -177,16 +179,7 @@ async def get_session(
     Raises:
         HTTPException: If session not found
     """
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+    sim_session = await manager.get_session(session_id)
 
     return SessionResponse(
         session_id=session_id,
@@ -209,6 +202,7 @@ async def start_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> SessionActionResponse:
     """
     Start simulation.
@@ -224,16 +218,7 @@ async def start_session(
     Raises:
         HTTPException: If session not found or cannot be started
     """
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to control this session")
+    sim_session = await manager.get_session(session_id)
 
     try:
         result = await sim_session.start()
@@ -262,6 +247,7 @@ async def pause_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> SessionActionResponse:
     """
     Pause simulation.
@@ -277,16 +263,7 @@ async def pause_session(
     Raises:
         HTTPException: If session not found or cannot be paused
     """
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to control this session")
+    sim_session = await manager.get_session(session_id)
 
     try:
         result = await sim_session.pause()
@@ -315,6 +292,7 @@ async def stop_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> SessionActionResponse:
     """
     Stop simulation.
@@ -330,16 +308,7 @@ async def stop_session(
     Raises:
         HTTPException: If session not found
     """
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to control this session")
+    sim_session = await manager.get_session(session_id)
 
     result = await sim_session.stop()
 
@@ -364,6 +333,7 @@ async def reset_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> SessionActionResponse:
     """
     Reset simulation to initial state.
@@ -379,16 +349,7 @@ async def reset_session(
     Raises:
         HTTPException: If session not found
     """
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to control this session")
+    sim_session = await manager.get_session(session_id)
 
     result = await sim_session.reset()
 
@@ -413,6 +374,7 @@ async def delete_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user: TokenPayload = Depends(get_current_user),
+    _owner_check: None = Depends(verify_session_owner),
 ) -> None:
     """
     Delete session and clean up resources.
@@ -428,18 +390,6 @@ async def delete_session(
     Raises:
         HTTPException: If session not found or deletion fails
     """
-    # Verify session exists in manager (this will raise if not found)
-    try:
-        sim_session = await manager.get_session(session_id)
-    except ValueError:
-        raise SessionNotFoundError(session_id)
-
-    # Check ownership
-    if sim_session.user_id != current_user.user_id and not has_any_role(
-        current_user.roles, [Role.ADMIN]
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to delete this session")
-
     # Delete session
     await manager.delete_session(session_id)
 

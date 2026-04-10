@@ -34,16 +34,16 @@ def client_with_rate_limiting(redis_client: AsyncMock) -> TestClient:
             # Replace the middleware instance
             original_middleware = middleware.cls
 
-            def create_test_middleware(app):
+            def create_test_middleware(app: Any) -> Any:
                 return original_middleware(app, redis_client=redis_client, enabled=True)  # type: ignore[call-arg]
 
             # Create a new middleware object with the same interface
             from types import SimpleNamespace
 
             test_middleware = SimpleNamespace(
-                cls=create_test_middleware, options=middleware.options
+                cls=create_test_middleware, options=getattr(middleware, "options", {})
             )
-            app.user_middleware[i] = test_middleware
+            app.user_middleware[i] = test_middleware  # type: ignore[list-item]
             break
 
     return TestClient(app)
@@ -161,16 +161,16 @@ class TestRateLimitingWithRedis:
             if hasattr(middleware, "cls") and "RateLimitingMiddleware" in str(middleware.cls):
                 original_middleware = middleware.cls
 
-                def create_test_middleware(app):
+                def create_test_middleware(app: Any) -> Any:
                     return original_middleware(app, redis_client=redis_client, enabled=False)  # type: ignore[call-arg]
 
                 # Create a new middleware object with the same interface
                 from types import SimpleNamespace
 
                 test_middleware = SimpleNamespace(
-                    cls=create_test_middleware, options=middleware.options
+                    cls=create_test_middleware, options=getattr(middleware, "options", {})
                 )
-                app.user_middleware[i] = test_middleware
+                app.user_middleware[i] = test_middleware  # type: ignore[list-item]
                 break
 
         client = TestClient(app)

@@ -11,8 +11,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import asdict
-import h5py
-import scipy.io
+import h5py  # type: ignore[import-untyped]
+import scipy.io  # type: ignore[import-untyped]
 from datetime import datetime
 import matplotlib.pyplot as plt
 

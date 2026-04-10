@@ -7,7 +7,7 @@ Global exception handlers for consistent error responses across the API.
 import logging
 import uuid
 from datetime import datetime
-from typing import Union
+from typing import Any, Union
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -30,6 +30,26 @@ def generate_request_id() -> str:
         Unique request ID string
     """
     return f"req_{uuid.uuid4().hex[:12]}"
+
+
+def sanitize_for_json(obj: Any) -> Any:
+    """
+    Recursively sanitize objects to ensure they are JSON serializable.
+    Converts non-serializable objects to their string representation.
+    """
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    elif isinstance(obj, dict):
+        return {str(k): sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple, set)):
+        return [sanitize_for_json(i) for i in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat() + "Z"
+    else:
+        try:
+            return str(obj)
+        except Exception:
+            return "[UNSERIALIZABLE]"
 
 
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
@@ -78,9 +98,20 @@ async def validation_error_handler(
     # Extract validation errors
     errors = []
     for error in exc.errors():
+        # Better formatting for field locations (e.g., 'items[0].name' instead of 'items.0.name')
+        loc = error["loc"]
+        field_path = ""
+        for i, part in enumerate(loc):
+            if isinstance(part, int):
+                field_path += f"[{part}]"
+            else:
+                if i > 0:
+                    field_path += "."
+                field_path += str(part)
+
         errors.append(
             {
-                "field": ".".join(str(loc) for loc in error["loc"]),
+                "field": field_path,
                 "message": error["msg"],
                 "type": error["type"],
             }
@@ -107,6 +138,37 @@ async def validation_error_handler(
                 "request_id": request_id,
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "details": {"validation_errors": errors},
+            }
+        },
+    )
+
+
+async def circuit_breaker_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Handle circuit breaker exceptions and return appropriate status codes.
+    """
+    from utils.circuit_breaker_utils import CircuitBreakerOpenException
+
+    if isinstance(exc, CircuitBreakerOpenException):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        error_code = "SERVICE_UNAVAILABLE"
+        message = "Circuit breaker is currently open. Service is temporarily unavailable."
+    else:
+        status_code = status.HTTP_504_GATEWAY_TIMEOUT
+        error_code = "GATEWAY_TIMEOUT"
+        message = "Request timed out at the circuit breaker layer."
+
+    request_id = getattr(request.state, "request_id", generate_request_id())
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": {
+                "code": error_code,
+                "message": message,
+                "request_id": request_id,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "details": {"original_error": str(exc)},
             }
         },
     )
@@ -216,10 +278,17 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
     # Add request body for non-form/multipart requests (size limited)
     try:
+        import asyncio
+
         content_type = request.headers.get("content-type", "")
         if "application/json" in content_type:
-            body = await request.body()
-            if len(body) < 1000:  # Only log small bodies
+            # Try to use cached body if available
+            body = getattr(request.state, "cached_body", None)
+            if body is None:
+                # Fallback to direct read with timeout if not cached
+                body = await asyncio.wait_for(request.body(), timeout=5.0)
+
+            if body is not None and len(body) < 1000:  # Only log small bodies
                 try:
                     import json
 
@@ -233,7 +302,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     metadata["body"] = "[UNPARSEABLE]"
         elif "application/x-www-form-urlencoded" in content_type:
-            form_data = await request.form()
+            form_data = await asyncio.wait_for(request.form(), timeout=5.0)
             metadata["form"] = {
                 k: (
                     "[REDACTED]"
@@ -248,7 +317,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     await alert_manager.record_error(
         error_type=type(exc).__name__,
         error_message=str(exc),
-        metadata=metadata,
+        metadata=sanitize_for_json(metadata),
     )
 
     # Return generic error response (don't expose internal details)
@@ -277,14 +346,26 @@ def register_exception_handlers(app: FastAPI) -> None:
         app: The FastAPI application instance
     """
     # Custom API errors
-    app.add_exception_handler(APIError, api_error_handler)
+    app.add_exception_handler(APIError, api_error_handler)  # type: ignore[arg-type]
 
     # Validation errors
-    app.add_exception_handler(RequestValidationError, validation_error_handler)
-    app.add_exception_handler(PydanticValidationError, validation_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(PydanticValidationError, validation_error_handler)  # type: ignore[arg-type]
 
     # HTTP exceptions
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
+
+    # Circuit Breaker exceptions
+    try:
+        from utils.circuit_breaker_utils import (
+            CircuitBreakerOpenException,
+            CircuitBreakerTimeoutException,
+        )
+
+        app.add_exception_handler(CircuitBreakerOpenException, circuit_breaker_handler)
+        app.add_exception_handler(CircuitBreakerTimeoutException, circuit_breaker_handler)
+    except ImportError:
+        logger.warning("Circuit breaker utilities not found. Handlers not registered.")
 
     # Catch-all for unexpected exceptions
     app.add_exception_handler(Exception, unhandled_exception_handler)

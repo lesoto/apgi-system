@@ -17,10 +17,11 @@ Requirements tested:
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch
+from typing import Any, Generator
 import redis.asyncio as redis
 
 from api.main import create_app
-from api.routes import sessions, state, export, tasks
+from api.routes import export, tasks
 from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
 from api.services.task_executor import TaskExecutor
 from api.services.data_export import DataExportService
@@ -28,7 +29,7 @@ from api.database.models import User
 
 
 @pytest.fixture
-def mock_redis():
+def mock_redis() -> AsyncMock:
     """Create a mock Redis client."""
     mock_client = AsyncMock(spec=redis.Redis)
     mock_client.ping = AsyncMock()
@@ -43,7 +44,7 @@ def mock_redis():
 
 
 @pytest.fixture
-def mock_apgi_system():
+def mock_apgi_system() -> Mock:
     """Create a mock APGI system."""
     mock_system = Mock()
     mock_system.time = 0.0
@@ -51,7 +52,7 @@ def mock_apgi_system():
     mock_system.is_running = False
 
     # Mock step method
-    def mock_step(extero_input):
+    def mock_step(extero_input: Any) -> dict[str, Any]:
         mock_system.time += mock_system.timestep_ms
         return {
             "time": mock_system.time,
@@ -84,7 +85,7 @@ def mock_apgi_system():
     mock_system.step = Mock(side_effect=mock_step)
 
     # Mock get_state method
-    def mock_get_state():
+    def mock_get_state() -> dict[str, Any]:
         return {
             "time": mock_system.time,
             "timestep_ms": mock_system.timestep_ms,
@@ -114,12 +115,12 @@ def mock_apgi_system():
 
 
 @pytest.fixture
-def mock_session_manager(mock_apgi_system):
+def mock_session_manager(mock_apgi_system: Mock) -> Mock:
     """Create a mock SessionManager with realistic behavior."""
     manager = Mock(spec=SessionManager)
-    sessions_store = {}
+    sessions_store: dict[str, Mock] = {}
 
-    async def mock_create_session(request, user_id="default_user"):
+    async def mock_create_session(request: Any, user_id: str = "default_user") -> str:
         session_id = f"session-{len(sessions_store) + 1}"
 
         # Create mock simulation session
@@ -133,30 +134,31 @@ def mock_session_manager(mock_apgi_system):
             "description": request.description,
         }
         mock_sim.apgi_system = mock_apgi_system
+        mock_sim.user_id = "test-user-123"
 
         # Mock session methods
-        async def mock_start():
+        async def mock_start() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.RUNNING
             mock_apgi_system.is_running = True
             return {"session_id": session_id, "status": "running"}
 
-        async def mock_pause():
+        async def mock_pause() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.PAUSED
             mock_apgi_system.is_running = False
             return {"session_id": session_id, "status": "paused"}
 
-        async def mock_stop():
+        async def mock_stop() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.STOPPED
             mock_apgi_system.is_running = False
             return {"session_id": session_id, "status": "stopped"}
 
-        async def mock_reset():
+        async def mock_reset() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.CREATED
             mock_apgi_system.time = 0.0
             mock_apgi_system.reset()
             return {"session_id": session_id, "status": "created"}
 
-        async def mock_get_state():
+        async def mock_get_state() -> dict[str, Any]:
             return mock_apgi_system.get_state()
 
         mock_sim.start = AsyncMock(side_effect=mock_start)
@@ -168,12 +170,12 @@ def mock_session_manager(mock_apgi_system):
         sessions_store[session_id] = mock_sim
         return session_id
 
-    async def mock_get_session(session_id):
+    async def mock_get_session(session_id: str) -> Mock:
         if session_id in sessions_store:
             return sessions_store[session_id]
         raise ValueError(f"Session {session_id} not found")
 
-    async def mock_delete_session(session_id):
+    async def mock_delete_session(session_id: str) -> None:
         if session_id in sessions_store:
             del sessions_store[session_id]
         else:
@@ -188,13 +190,17 @@ def mock_session_manager(mock_apgi_system):
 
 
 @pytest.fixture
-def mock_data_export_service():
+def mock_data_export_service() -> Mock:
     """Create a mock DataExportService."""
     service = Mock(spec=DataExportService)
 
     async def mock_export_session_data(
-        session_id, format="json", variables=None, start_time=None, end_time=None
-    ):
+        session_id: str,
+        format: str = "json",
+        variables: Any = None,
+        start_time: Any = None,
+        end_time: Any = None,
+    ) -> tuple[bytes, str]:
         import json
 
         data = {
@@ -205,12 +211,13 @@ def mock_data_export_service():
                 "ignitions": [False, False, False],
                 "free_energy": [1.5, 1.6, 1.4],
             },
+            "config": {"config_path": "config/default.yaml"},
         }
         data_bytes = json.dumps(data).encode("utf-8")
         content_type = "application/json" if format == "json" else "text/csv"
         return data_bytes, content_type
 
-    async def mock_generate_summary_stats(session_id):
+    async def mock_generate_summary_stats(session_id: str) -> dict[str, Any]:
         return {
             "session_id": session_id,
             "duration_ms": 1000.0,
@@ -227,12 +234,18 @@ def mock_data_export_service():
 
 
 @pytest.fixture
-def mock_task_executor():
+def mock_task_executor() -> Mock:
     """Create a mock TaskExecutor."""
     executor = Mock(spec=TaskExecutor)
-    tasks_store = {}
+    tasks_store: dict[str, dict[str, Any]] = {}
 
-    async def mock_submit_task(session_id, task_type, parameters, webhook_url=None, db=None):
+    async def mock_submit_task(
+        session_id: str,
+        task_type: str,
+        parameters: dict[str, Any],
+        webhook_url: str | None = None,
+        db: Any = None,
+    ) -> str:
         task_id = f"task-{len(tasks_store) + 1}"
         tasks_store[task_id] = {
             "task_id": task_id,
@@ -243,17 +256,17 @@ def mock_task_executor():
         }
         return task_id
 
-    async def mock_get_task_status(task_id):
+    async def mock_get_task_status(task_id: str) -> dict[str, Any]:
         if task_id in tasks_store:
             return tasks_store[task_id]
         raise ValueError(f"Task {task_id} not found")
 
-    async def mock_get_task_result(task_id):
+    async def mock_get_task_result(task_id: str) -> dict[str, Any]:
         if task_id in tasks_store:
             return tasks_store[task_id]["result"]
         raise ValueError(f"Task {task_id} not found")
 
-    async def mock_list_available_tasks():
+    async def mock_list_available_tasks() -> dict[str, Any]:
         return {
             "tasks": [
                 {
@@ -278,7 +291,7 @@ def mock_task_executor():
 
 
 @pytest.fixture
-def mock_db_session():
+def mock_db_session() -> Mock:
     """Create a mock database session."""
     mock_db = Mock()
 
@@ -302,11 +315,16 @@ def mock_db_session():
 
 @pytest.fixture
 def client(
-    mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor, mock_db_session
-):
+    mock_redis: AsyncMock,
+    mock_session_manager: Mock,
+    mock_data_export_service: Mock,
+    mock_task_executor: Mock,
+    mock_db_session: Mock,
+) -> Generator[TestClient, None, None]:
     """Create a test client with all mocked dependencies."""
     from api.services.authorization import get_current_user, require_permission
     from api.services.auth_manager import TokenPayload
+    from api.services.session_manager import get_session_manager, get_redis_client
     from datetime import datetime, timedelta
 
     # Create app in test mode (disables auth and CSRF middleware)
@@ -322,42 +340,124 @@ def client(
     )
 
     # Override get_current_user to return mock user
-    async def mock_get_current_user():
+    async def mock_get_current_user() -> TokenPayload:
         return mock_token_payload
 
     # Override require_permission to always pass
-    def mock_require_permission(permission):
-        def dummy_dependency():
+    def mock_require_permission(permission: str) -> Any:
+        def dummy_dependency() -> None:
             return None
 
         return dummy_dependency
 
+    # Override session manager and redis client dependencies
+    def mock_get_session_manager() -> Any:
+        return mock_session_manager
+
+    def mock_get_redis_client() -> Any:
+        return mock_redis
+
     # Apply overrides
     app.dependency_overrides[get_current_user] = mock_get_current_user
     app.dependency_overrides[require_permission] = mock_require_permission
+    app.dependency_overrides[get_session_manager] = mock_get_session_manager
+    app.dependency_overrides[get_redis_client] = mock_get_redis_client
 
-    # Override dependencies
-    sessions._session_manager = mock_session_manager
-    sessions._redis_client = mock_redis
-
-    # Mock state routes
-    state._session_manager = mock_session_manager
-
-    # Mock export routes
+    # Override data export service and task executor
     export._data_export_service = mock_data_export_service
-    export._session_manager = mock_session_manager
-
-    # Mock task routes
     tasks._task_executor = mock_task_executor
-    tasks._session_manager = mock_session_manager
 
     # Skip startup/shutdown events
     app.router.on_startup = []
     app.router.on_shutdown = []
 
-    # Use patch to mock is_authenticated in state routes
-    with patch("api.routes.state.is_authenticated", return_value=True):
-        yield TestClient(app)
+    # Use patch to mock get_current_user in state routes and skip session ownership checks
+    mock_user = Mock()
+    mock_user.user_id = "test-user-id"
+    mock_user.roles = ["user"]
+    with patch("api.routes.state.get_current_user", return_value=mock_user):
+        with patch(
+            "api.services.session_manager.get_session_manager",
+            return_value=mock_session_manager,
+        ):
+            yield TestClient(app)
+
+
+@pytest.fixture
+def client_with_db(
+    db, mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor
+) -> Generator[TestClient, None, None]:
+    """Create a test client with real database and mocked dependencies.
+
+    This fixture ensures the API uses the same database session as the test,
+    allowing tests to create data that the API can access.
+    """
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.auth_manager import TokenPayload
+    from api.services.session_manager import get_session_manager, get_redis_client
+    from api.database.connection import get_db
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+
+    # Create app in test mode (disables auth and CSRF middleware)
+    app = create_app(test_mode=True)
+
+    # Create mock user token for dependency overrides
+    mock_token_payload = TokenPayload(
+        user_id="test-user-123",
+        username="testuser",
+        roles=["researcher"],
+        exp=datetime.utcnow() + timedelta(days=1),
+        token_type="access",
+    )
+
+    # Override get_current_user to return mock user
+    async def mock_get_current_user() -> TokenPayload:
+        return mock_token_payload
+
+    # Override require_permission to always pass
+    def mock_require_permission(permission: str) -> Any:
+        def dummy_dependency() -> None:
+            return None
+
+        return dummy_dependency
+
+    # Override session manager and redis client dependencies
+    def mock_get_session_manager() -> Any:
+        return mock_session_manager
+
+    def mock_get_redis_client() -> Any:
+        return mock_redis
+
+    # Override get_db to use the test's database session
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db
+
+    # Apply overrides
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[require_permission] = mock_require_permission
+    app.dependency_overrides[get_session_manager] = mock_get_session_manager
+    app.dependency_overrides[get_redis_client] = mock_get_redis_client
+    app.dependency_overrides[get_db] = override_get_db
+
+    # Override data export service and task executor
+    export._data_export_service = mock_data_export_service
+    tasks._task_executor = mock_task_executor
+
+    # Skip startup/shutdown events to prevent default user creation
+    app.router.on_startup = []
+    app.router.on_shutdown = []
+
+    # Use patch to mock get_current_user in state routes and skip session ownership checks
+    mock_user = Mock()
+    mock_user.user_id = "test-user-id"
+    mock_user.roles = ["user"]
+    with patch("api.routes.state.get_current_user", return_value=mock_user):
+        with patch(
+            "api.services.session_manager.get_session_manager",
+            return_value=mock_session_manager,
+        ):
+            yield TestClient(app)
 
 
 class TestCompleteSimulationWorkflow:
@@ -616,7 +716,7 @@ class TestFullAuthWorkflowWithRealDatabase:
     Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
     """
 
-    def test_complete_authenticated_workflow_with_real_db(self, client, db):
+    def test_complete_authenticated_workflow_with_real_db(self, client_with_db, db):
         """
         Test complete authenticated workflow using real database operations.
 
@@ -625,15 +725,11 @@ class TestFullAuthWorkflowWithRealDatabase:
 
         Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
         """
-        from api.database.models import User, Base
-        from api.database.connection import engine
+        from api.database.models import User
         from api.services.auth_manager import AuthManager
         import json
 
         # Step 1: Create a real user in the database
-        # Create database tables
-        Base.metadata.create_all(bind=engine)
-
         auth_manager = AuthManager(db)
         password_hash = auth_manager.hash_password("testpassword123")
         print(f"DEBUG: Created password hash: {password_hash}")
@@ -649,7 +745,7 @@ class TestFullAuthWorkflowWithRealDatabase:
 
         try:
             # Step 2: Authenticate with real credentials
-            login_response = client.post(
+            login_response = client_with_db.post(
                 "/v1/auth/login",
                 json={"username": "integration_test_user", "password": "testpassword123"},
             )
@@ -661,10 +757,10 @@ class TestFullAuthWorkflowWithRealDatabase:
             access_token = login_data["access_token"]
 
             # Set up authenticated client
-            client.headers.update({"Authorization": f"Bearer {access_token}"})
+            client_with_db.headers.update({"Authorization": f"Bearer {access_token}"})
 
             # Step 3: Create a session
-            create_response = client.post(
+            create_response = client_with_db.post(
                 "/v1/sessions",
                 json={
                     "config_path": "config/default.yaml",
@@ -677,13 +773,13 @@ class TestFullAuthWorkflowWithRealDatabase:
             session_id = session_data["session_id"]
 
             # Step 4: Start the session
-            start_response = client.post(f"/v1/sessions/{session_id}/start")
+            start_response = client_with_db.post(f"/v1/sessions/{session_id}/start")
             assert start_response.status_code == 200
             start_data = start_response.json()
             assert start_data["status"] in ["running", "started"]
 
             # Step 5: Get system state
-            state_response = client.get(f"/v1/sessions/{session_id}/state")
+            state_response = client_with_db.get(f"/v1/sessions/{session_id}/state")
             assert state_response.status_code == 200
             state_data = state_response.json()
 
@@ -702,13 +798,13 @@ class TestFullAuthWorkflowWithRealDatabase:
                 assert subsystem in state_data, f"Missing subsystem: {subsystem}"
 
             # Step 6: Stop the session
-            stop_response = client.post(f"/v1/sessions/{session_id}/stop")
+            stop_response = client_with_db.post(f"/v1/sessions/{session_id}/stop")
             assert stop_response.status_code == 200
             stop_data = stop_response.json()
             assert stop_data["status"] in ["stopped", "completed"]
 
             # Step 7: Export data
-            export_response = client.get(f"/v1/sessions/{session_id}/export?format=json")
+            export_response = client_with_db.get(f"/v1/sessions/{session_id}/export?format=json")
             assert export_response.status_code == 200
 
             # Parse export data (it's a file download)
@@ -722,11 +818,11 @@ class TestFullAuthWorkflowWithRealDatabase:
             assert export_data["session_id"] == session_id
 
             # Step 8: Clean up - delete session
-            delete_response = client.delete(f"/v1/sessions/{session_id}")
+            delete_response = client_with_db.delete(f"/v1/sessions/{session_id}")
             assert delete_response.status_code == 204
 
             # Verify session is deleted
-            get_response = client.get(f"/v1/sessions/{session_id}")
+            get_response = client_with_db.get(f"/v1/sessions/{session_id}")
             assert get_response.status_code == 404
 
         finally:
@@ -788,11 +884,11 @@ class TestUserStatsOrdering:
         role_keys = list(role_counts.keys())
         assert role_keys == ["admin", "user", "researcher"]
 
-    def test_user_stats_empty_database(self, client):
+    def test_user_stats_empty_database(self, client_with_db, db):
         """
         Test user stats with empty database.
         """
-        response = client.get("/v1/users/stats")
+        response = client_with_db.get("/v1/users/stats")
         assert response.status_code == 200
 
         stats_data = response.json()
@@ -801,7 +897,7 @@ class TestUserStatsOrdering:
         assert stats_data["inactive_users"] == 0
         assert stats_data["role_counts"] == {}
 
-    def test_user_stats_mixed_roles_ordering(self, client, db):
+    def test_user_stats_mixed_roles_ordering(self, client_with_db, db):
         """
         Test role_counts ordering with mixed role assignments.
         """
@@ -831,7 +927,7 @@ class TestUserStatsOrdering:
 
             db.commit()
 
-            response = client.get("/v1/users/stats")
+            response = client_with_db.get("/v1/users/stats")
             assert response.status_code == 200
 
             stats_data = response.json()
@@ -930,12 +1026,12 @@ class TestErrorHandling:
         assert "code" in error_data["error"]
         assert "message" in error_data["error"]
 
-    def test_404_for_nonexistent_task(self, client):
+    def test_404_for_nonexistent_task(self, client) -> None:
         """Test 404 error for non-existent task."""
         response = client.get("/v1/tasks/nonexistent-task-id")
         assert response.status_code == 404
 
-    def test_error_response_structure(self, client):
+    def test_error_response_structure(self, client) -> None:
         """
         Test that error responses follow consistent structure.
 

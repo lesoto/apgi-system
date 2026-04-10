@@ -8,7 +8,6 @@ property-based testing of the APGI system components.
 from hypothesis import strategies as st
 import numpy as np
 
-
 # ============================================================================
 # Core Strategies (as specified in design document)
 # ============================================================================

@@ -198,7 +198,7 @@ class TestFreeEnergyWrappers:
         assert isinstance(complexity, float)
         assert complexity >= 0
 
-    def test_compute_epistemic_value_wrapper(self):
+    def test_compute_epistemic_value_wrapper(self) -> None:
         """Test epistemic value wrapper."""
         policy = np.array([1.0])
         pred_states = np.random.randn(3, 10)
@@ -208,7 +208,7 @@ class TestFreeEnergyWrappers:
 
         assert isinstance(epistemic, float)
 
-    def test_compute_pragmatic_value_wrapper(self):
+    def test_compute_pragmatic_value_wrapper(self) -> None:
         """Test pragmatic value wrapper."""
         pred_obs = np.random.rand(3, 10)
         preferences = np.ones(10) / 10

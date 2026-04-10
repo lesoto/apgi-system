@@ -9,7 +9,7 @@ import hmac
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import bcrypt
 import jwt
@@ -96,9 +96,9 @@ class AuthManager:
             self.redis_client = None
 
         # In-memory fallback for failed login tracking when Redis unavailable
-        self.failed_login_attempts: Dict[
-            str, Tuple[int, float]
-        ] = {}  # user_id -> (count, timestamp)
+        self.failed_login_attempts: Dict[str, Tuple[int, float]] = (
+            {}
+        )  # user_id -> (count, timestamp)
 
     # ========================================================================
     # Password Hashing
@@ -266,6 +266,7 @@ class AuthManager:
         """
         try:
             # Decode token
+            assert self.secret_key is not None, "JWT secret key not configured"
             payload_dict = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
 
             # Parse payload
@@ -312,11 +313,17 @@ class AuthManager:
         user = self.db.query(User).filter(User.username == username).first()
 
         # Always perform password verification to prevent timing attacks
-        # Use dummy hash for non-existent users
-        dummy_hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeFKw1O8N6bO3QS6"  # bcrypt hash of empty string
-        password_hash = user.password_hash if user else dummy_hash
+        # Use dummy hash for non-existent users that depends on the password to match timing
+        if not user:
+            # Generate a new salt and hash the password to ensure it takes real time
+            import bcrypt
 
-        password_valid = self.verify_password(password, password_hash)  # type: ignore[arg-type]
+            dummy_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(12)).decode()
+            password_hash = dummy_hash
+        else:
+            password_hash = cast(str, user.password_hash)
+
+        password_valid = self.verify_password(password, str(password_hash))
 
         if not user or not password_valid:
             # Failed login - track attempts for existing users only
@@ -466,11 +473,15 @@ class AuthManager:
 
         # Store new refresh token in database
         new_token_hash = self.hash_password(new_refresh_token)
+        new_lookup_hash = self.create_lookup_hash(new_refresh_token)
         expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
 
         try:
             new_db_token = RefreshToken(
-                user_id=payload.user_id, token_hash=new_token_hash, expires_at=expires_at
+                user_id=payload.user_id,
+                lookup_hash=new_lookup_hash,
+                token_hash=new_token_hash,
+                expires_at=expires_at,
             )
             self.db.add(new_db_token)
             self.db.commit()

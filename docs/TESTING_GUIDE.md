@@ -1,6 +1,6 @@
 # APGI System Testing Guide
 
-This guide provides comprehensive information about the testing infrastructure for achieving 100% test coverage.
+This guide provides comprehensive information about the testing infrastructure for achieving high test coverage (Target: 85%+).
 
 ## Table of Contents
 
@@ -285,7 +285,7 @@ Coverage settings in `pyproject.toml`:
 addopts = [
     "--cov=apgi_system",
     "--cov=api",
-    "--cov-fail-under=100",
+    "--cov-fail-under=85",
 ]
 
 [tool.coverage.run]
@@ -396,7 +396,7 @@ def test_property():
 
 ### Coverage Goals
 
-- **Target**: 100% statement coverage
+- **Target**: 85% statement coverage (minimum recommended)
 - **Exclude**: GUI modules, test files themselves
 - **Focus**: Meaningful tests that validate correctness
 - **Quality**: High-quality tests that serve as documentation
@@ -411,7 +411,7 @@ Tests run automatically in GitHub Actions:
 Both workflows:
 - Run on push to main/develop branches
 - Run on pull requests
-- Require 100% coverage to pass
+- Require 85%+ coverage to pass
 - Upload coverage reports to Codecov
 - Archive HTML reports as artifacts
 

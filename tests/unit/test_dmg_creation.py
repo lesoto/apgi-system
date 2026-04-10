@@ -17,18 +17,18 @@ from pathlib import Path
 class TestDMGStructureValidation(unittest.TestCase):
     """Test DMG structure validation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.test_dmg_mount = Path(self.temp_dir) / "dmg_mount"
         self.test_dmg_mount.mkdir()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up test fixtures."""
         if Path(self.temp_dir).exists():
             shutil.rmtree(self.temp_dir)
 
-    def test_validate_dmg_contains_app_bundle(self):
+    def test_validate_dmg_contains_app_bundle(self) -> None:
         """Test that DMG validation checks for .app bundle."""
         # Create a mock .app bundle
         app_bundle = self.test_dmg_mount / "APGI System.app"
@@ -42,7 +42,7 @@ class TestDMGStructureValidation(unittest.TestCase):
         self.assertTrue(app_bundle.exists())
         self.assertTrue(contents.exists())
 
-    def test_validate_dmg_missing_app_bundle(self):
+    def test_validate_dmg_missing_app_bundle(self) -> None:
         """Test that DMG validation fails when .app bundle is missing."""
         # Empty mount point
         app_bundles = list(self.test_dmg_mount.glob("*.app"))
@@ -50,7 +50,7 @@ class TestDMGStructureValidation(unittest.TestCase):
         # Should be empty
         self.assertEqual(len(app_bundles), 0)
 
-    def test_validate_dmg_has_applications_symlink(self):
+    def test_validate_dmg_has_applications_symlink(self) -> None:
         """Test that DMG validation checks for Applications symlink."""
         # Create Applications symlink
         applications_link = self.test_dmg_mount / "Applications"
@@ -66,7 +66,7 @@ class TestDMGStructureValidation(unittest.TestCase):
                 # Skip if we can't create symlinks (e.g., Windows)
                 self.skipTest("Cannot create symlinks on this platform")
 
-    def test_validate_dmg_structure_complete(self):
+    def test_validate_dmg_structure_complete(self) -> None:
         """Test complete DMG structure validation."""
         # Create app bundle
         app_bundle = self.test_dmg_mount / "APGI System.app"
@@ -93,18 +93,18 @@ class TestDMGStructureValidation(unittest.TestCase):
 class TestSymlinkCreation(unittest.TestCase):
     """Test symlink creation for DMG."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.dmg_staging = Path(self.temp_dir) / "dmg_staging"
         self.dmg_staging.mkdir()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up test fixtures."""
         if Path(self.temp_dir).exists():
             shutil.rmtree(self.temp_dir)
 
-    def test_create_applications_symlink(self):
+    def test_create_applications_symlink(self) -> None:
         """Test creating Applications symlink."""
         applications_link = self.dmg_staging / "Applications"
 
@@ -123,7 +123,7 @@ class TestSymlinkCreation(unittest.TestCase):
         else:
             self.skipTest("Symlink test only applicable on POSIX systems")
 
-    def test_symlink_already_exists(self):
+    def test_symlink_already_exists(self) -> None:
         """Test handling when symlink already exists."""
         applications_link = self.dmg_staging / "Applications"
 
@@ -144,7 +144,7 @@ class TestSymlinkCreation(unittest.TestCase):
         else:
             self.skipTest("Symlink test only applicable on POSIX systems")
 
-    def test_symlink_points_to_correct_target(self):
+    def test_symlink_points_to_correct_target(self) -> None:
         """Test that symlink points to correct target."""
         applications_link = self.dmg_staging / "Applications"
 
@@ -167,18 +167,18 @@ class TestSymlinkCreation(unittest.TestCase):
 class TestFilePermissions(unittest.TestCase):
     """Test file permissions in DMG."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.dmg_staging = Path(self.temp_dir) / "dmg_staging"
         self.dmg_staging.mkdir()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up test fixtures."""
         if Path(self.temp_dir).exists():
             shutil.rmtree(self.temp_dir)
 
-    def test_app_bundle_readable(self):
+    def test_app_bundle_readable(self) -> None:
         """Test that app bundle is readable."""
         app_bundle = self.dmg_staging / "APGI System.app"
         app_bundle.mkdir()
@@ -189,7 +189,7 @@ class TestFilePermissions(unittest.TestCase):
         # Should be readable by owner
         self.assertTrue(mode & stat.S_IRUSR)
 
-    def test_app_bundle_executable(self):
+    def test_app_bundle_executable(self) -> None:
         """Test that app bundle directory is executable."""
         app_bundle = self.dmg_staging / "APGI System.app"
         app_bundle.mkdir()
@@ -200,7 +200,7 @@ class TestFilePermissions(unittest.TestCase):
         # Directory should be executable (searchable)
         self.assertTrue(mode & stat.S_IXUSR)
 
-    def test_executable_has_execute_permission(self):
+    def test_executable_has_execute_permission(self) -> None:
         """Test that executable file has execute permission."""
         if os.name != "posix":
             self.skipTest("Execute permission test only applicable on POSIX systems")
@@ -223,7 +223,7 @@ class TestFilePermissions(unittest.TestCase):
         self.assertTrue(mode & stat.S_IXGRP)
         self.assertTrue(mode & stat.S_IXOTH)
 
-    def test_resources_readable_by_all(self):
+    def test_resources_readable_by_all(self) -> None:
         """Test that resource files are readable by all users."""
         # Create mock resource file
         app_bundle = self.dmg_staging / "APGI System.app"
@@ -242,7 +242,7 @@ class TestFilePermissions(unittest.TestCase):
         self.assertTrue(mode & stat.S_IRGRP)
         self.assertTrue(mode & stat.S_IROTH)
 
-    def test_symlink_permissions(self):
+    def test_symlink_permissions(self) -> None:
         """Test that symlink has appropriate permissions."""
         applications_link = self.dmg_staging / "Applications"
 
@@ -263,7 +263,7 @@ class TestFilePermissions(unittest.TestCase):
 class TestDMGCreationHelpers(unittest.TestCase):
     """Test helper functions for DMG creation."""
 
-    def test_get_dmg_filename(self):
+    def test_get_dmg_filename(self) -> None:
         """Test DMG filename generation."""
         app_name = "APGI System"
         version = "1.0.0"
@@ -274,7 +274,7 @@ class TestDMGCreationHelpers(unittest.TestCase):
 
         self.assertEqual(actual, expected)
 
-    def test_get_dmg_volume_name(self):
+    def test_get_dmg_volume_name(self) -> None:
         """Test DMG volume name generation."""
         app_name = "APGI System"
         version = "1.0.0"
@@ -284,7 +284,7 @@ class TestDMGCreationHelpers(unittest.TestCase):
 
         self.assertEqual(expected, "APGI System 1.0.0")
 
-    def test_calculate_dmg_size(self):
+    def test_calculate_dmg_size(self) -> None:
         """Test DMG size calculation."""
         # Mock app bundle size
         app_size_mb = 250

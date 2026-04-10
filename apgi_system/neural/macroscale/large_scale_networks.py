@@ -376,9 +376,9 @@ class SalienceNetwork:
         # ACC processes conflict and prediction errors
         # Pad interoceptive input for ACC processing
         intero_acc_padded = np.zeros(self.acc_nodes // 2)
-        intero_acc_padded[
-            : min(len(interoceptive_input), self.acc_nodes // 2)
-        ] = interoceptive_input[: min(len(interoceptive_input), self.acc_nodes // 2)]
+        intero_acc_padded[: min(len(interoceptive_input), self.acc_nodes // 2)] = (
+            interoceptive_input[: min(len(interoceptive_input), self.acc_nodes // 2)]
+        )
 
         combined_signal = np.concatenate(
             [exteroceptive_input[: self.acc_nodes // 2], intero_acc_padded]

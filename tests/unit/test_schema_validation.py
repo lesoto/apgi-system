@@ -22,7 +22,7 @@ def app_with_validation() -> FastAPI:
 
     # Define test endpoints
     @app.get("/test/valid", response_model=dict)
-    async def valid_endpoint() -> dict:
+    async def valid_endpoint() -> dict[str, any]:
         """Endpoint that returns valid response."""
         return {"status": "ok", "data": {"value": 123}}
 
@@ -73,7 +73,7 @@ def test_middleware_disabled() -> None:
     app.add_middleware(ResponseSchemaValidationMiddleware, enabled=False)
 
     @app.get("/test")
-    async def test_endpoint() -> dict:
+    async def test_endpoint() -> dict[str, str]:
         return {"status": "ok"}
 
     client = TestClient(app)
@@ -113,7 +113,7 @@ def test_get_response_schema() -> None:
     app = FastAPI()
 
     @app.get("/test/{item_id}")
-    async def test_endpoint(item_id: str) -> dict:
+    async def test_endpoint(item_id: str) -> dict[str, str]:
         return {"id": item_id}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)
@@ -132,7 +132,7 @@ def test_find_matching_path() -> None:
     app = FastAPI()
 
     @app.get("/sessions/{session_id}")
-    async def get_session(session_id: str) -> dict:
+    async def get_session(session_id: str) -> dict[str, str]:
         return {"session_id": session_id}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)
@@ -241,7 +241,7 @@ def test_schema_cache() -> None:
     app = FastAPI()
 
     @app.get("/test")
-    async def test_endpoint() -> dict:
+    async def test_endpoint() -> dict[str, str]:
         return {"status": "ok"}
 
     middleware = ResponseSchemaValidationMiddleware(app=app, enabled=True)

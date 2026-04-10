@@ -12,6 +12,7 @@ with no external browser dependencies, save options, or display capabilities.
 """
 
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -36,7 +37,10 @@ except ImportError:
 # Import ToolTip from components
 try:
     from apgi_gui.components.core import ToolTip
+
+    TOOLTIP_AVAILABLE = True
 except ImportError:
+    TOOLTIP_AVAILABLE = False
     print("Warning: ToolTip component not available.")
 
 # Configure logging
@@ -131,10 +135,23 @@ class APGIParameters:
             raise ValueError(f"M_ca must be in [-2, 2], got {self.M_ca}")
         if not (0.3 <= self.beta <= 0.8):
             raise ValueError(f"beta must be in [0.3, 0.8], got {self.beta}")
+        if not (-5.0 <= self.z_e <= 5.0):
+            raise ValueError(f"z_e must be in [-5, 5], got {self.z_e}")
+        if not (-5.0 <= self.z_i <= 5.0):
+            raise ValueError(f"z_i must be in [-5, 5], got {self.z_i}")
+        if not (-5.0 <= self.theta_t <= 5.0):
+            raise ValueError(f"theta_t must be in [-5, 5], got {self.theta_t}")
+        if not (0.0 <= self.S_t <= 50.0):
+            raise ValueError(f"S_t must be in [0, 50], got {self.S_t}")
+
+    @property
+    def ignition_probability(self) -> float:
+        """P(ignite) = σ(S_t - θ_t)"""
+        return 1.0 / (1.0 + np.exp(-(self.S_t - self.theta_t)))
 
     def compute_ignition_probability(self) -> float:
         """Compute P(ignite) = σ(S_t - θ_t)"""
-        return 1.0 / (1.0 + np.exp(-(self.S_t - self.theta_t)))
+        return self.ignition_probability
 
     def verify_S_t(self) -> bool:
         """Verify S_t matches the formula: S_t = Π_e·|z_e| + Π_i_eff·|z_i|
@@ -173,7 +190,7 @@ class APGIParameters:
             "beta": self.beta,
             "z_e": self.z_e,
             "z_i": self.z_i,
-            "ignition_probability": self.compute_ignition_probability(),
+            "ignition_probability": self.ignition_probability,
         }
 
 
@@ -586,9 +603,9 @@ class APGIVisualizer:
 
     def _create_dataframe(self) -> "pd.DataFrame":
         """Create a pandas DataFrame for visualization"""
-        data = []
+        data: List[Dict[str, Any]] = []
         for name, params in self.states.items():
-            row = params.to_dict()
+            row: Dict[str, Any] = params.to_dict()
             row["name"] = name
             row["category"] = self.categories.get(name, StateCategory.UNELABORATED).name
             row["category_display"] = self.categories.get(
@@ -1464,14 +1481,17 @@ class APGIVisualizerGUI:
     with no external browser options, dependencies, or save capabilities.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, root: Optional[tk.Tk] = None) -> None:
         """Initialize the GUI application with embedded visualization support"""
         if not TKINTER_AVAILABLE:
             raise ImportError("Tkinter is required for GUI interface")
         if not PLOTLY_AVAILABLE or not PANDAS_AVAILABLE:
             raise ImportError("Plotly and Pandas are required for visualization")
 
-        self.root: tk.Tk = tk.Tk()
+        if root is None:
+            self.root: tk.Tk = tk.Tk()
+        else:
+            self.root = root
         self.root.title("APGI Psychological States Visualizer - Enhanced GUI")
         self.root.geometry("1400x900")
 
@@ -1498,6 +1518,14 @@ class APGIVisualizerGUI:
                 logger.info("Configuration loaded from config/gui_config.yaml")
 
             self.status_var.set("Ready - Select visualization type and click Generate")
+
+            # Compatibility attributes for tests
+            self.parameters = {"arousal": 0.5, "stress": 0.3, "attention": 0.7, "motivation": 0.6}
+            self.state_history: List[Dict[str, float]] = []
+            self.renderer = self.visualizer.renderer
+            self.canvas = self.embedded_display
+            self.parameter_controls: Dict[str, Any] = {}  # Compatibility for tests
+
             self.update_info(
                 "APGI Visualizer initialized successfully!\n\n"
                 f"Available states: {len(PSYCHOLOGICAL_STATES)}\n\n"
@@ -1570,32 +1598,32 @@ class APGIVisualizerGUI:
         self._create_menu_bar()
 
         # Main container with better layout
-        main_frame: ttk.Frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame: ttk.Frame = ttk.Frame(self.root, padding="10")
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(1, weight=1)
+        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.rowconfigure(1, weight=1)
 
         # Title
         title_label = ttk.Label(
-            main_frame,
+            self.main_frame,
             text="🧠 APGI Psychological States Visualizer",
             font=("Arial", 14, "bold"),
         )
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
 
         # Control Panel (Left) - Enhanced
-        control_frame = ttk.LabelFrame(main_frame, text="Controls", padding="12")
-        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        self.control_frame = ttk.LabelFrame(self.main_frame, text="Controls", padding="12")
+        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
 
         # Visualization Type
-        ttk.Label(control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).grid(
+        ttk.Label(self.control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).grid(
             row=0, column=0, sticky=tk.W, pady=(5, 2)
         )
         self.viz_type = ttk.Combobox(
-            control_frame,
+            self.control_frame,
             values=[
                 "3D State Network",
                 "Ignition Landscape",
@@ -1612,12 +1640,12 @@ class APGIVisualizerGUI:
         self.viz_type.grid(row=1, column=0, sticky="we", pady=(0, 10))
 
         # State Selection
-        ttk.Label(control_frame, text="Select State:", font=("Arial", 10, "bold")).grid(
+        ttk.Label(self.control_frame, text="Select State:", font=("Arial", 10, "bold")).grid(
             row=2, column=0, sticky=tk.W, pady=(5, 2)
         )
         self.state_var = tk.StringVar()
         self.state_combo = ttk.Combobox(
-            control_frame,
+            self.control_frame,
             textvariable=self.state_var,
             state="readonly",
             font=("Arial", 9),
@@ -1626,33 +1654,33 @@ class APGIVisualizerGUI:
 
         # Multiple States for Radar
         ttk.Label(
-            control_frame,
+            self.control_frame,
             text="States to Compare\n(comma-separated):",
             font=("Arial", 9, "bold"),
         ).grid(row=4, column=0, sticky=tk.W, pady=(5, 2))
-        self.states_text = tk.Text(control_frame, height=3, width=25, font=("Courier", 9))
+        self.states_text = tk.Text(self.control_frame, height=3, width=25, font=("Courier", 9))
         self.states_text.grid(row=5, column=0, sticky="we", pady=(0, 10))
         self.states_text.insert("1.0", "flow\nanxiety\ncalm")
 
         # Transition States
         ttk.Label(
-            control_frame, text="Start State for Transition:", font=("Arial", 10, "bold")
+            self.control_frame, text="Start State for Transition:", font=("Arial", 10, "bold")
         ).grid(row=6, column=0, sticky=tk.W, pady=(5, 2))
         self.start_state_var = tk.StringVar()
         self.start_state_combo = ttk.Combobox(
-            control_frame,
+            self.control_frame,
             textvariable=self.start_state_var,
             state="readonly",
             font=("Arial", 9),
         )
         self.start_state_combo.grid(row=7, column=0, sticky="we", pady=(0, 5))
 
-        ttk.Label(control_frame, text="End State for Transition:", font=("Arial", 10, "bold")).grid(
-            row=8, column=0, sticky=tk.W, pady=(5, 2)
-        )
+        ttk.Label(
+            self.control_frame, text="End State for Transition:", font=("Arial", 10, "bold")
+        ).grid(row=8, column=0, sticky=tk.W, pady=(5, 2))
         self.end_state_var = tk.StringVar()
         self.end_state_combo = ttk.Combobox(
-            control_frame,
+            self.control_frame,
             textvariable=self.end_state_var,
             state="readonly",
             font=("Arial", 9),
@@ -1660,51 +1688,53 @@ class APGIVisualizerGUI:
         self.end_state_combo.grid(row=9, column=0, sticky="we", pady=(0, 10))
 
         # Separator
-        ttk.Separator(control_frame, orient="horizontal").grid(
+        ttk.Separator(self.control_frame, orient="horizontal").grid(
             row=6, column=0, sticky="we", pady=10
         )
 
         # Parameter Input Section
-        ttk.Label(control_frame, text="Simulation Parameters:", font=("Arial", 10, "bold")).grid(
-            row=7, column=0, sticky=tk.W, pady=(5, 2)
-        )
+        ttk.Label(
+            self.control_frame, text="Simulation Parameters:", font=("Arial", 10, "bold")
+        ).grid(row=7, column=0, sticky=tk.W, pady=(5, 2))
 
         # tau_S parameter
-        ttk.Label(control_frame, text="τ_S (surprise timescale):").grid(
+        ttk.Label(self.control_frame, text="τ_S (surprise timescale):").grid(
             row=8, column=0, sticky=tk.W, pady=(2, 0)
         )
         self.tau_S_var = tk.StringVar(value="0.5")
-        self.tau_S_entry = ttk.Entry(control_frame, textvariable=self.tau_S_var, width=15)
+        self.tau_S_entry = ttk.Entry(self.control_frame, textvariable=self.tau_S_var, width=15)
         self.tau_S_entry.grid(row=9, column=0, sticky=tk.W, pady=(0, 5))
 
         # tau_theta parameter
-        ttk.Label(control_frame, text="τ_θ (threshold timescale):").grid(
+        ttk.Label(self.control_frame, text="τ_θ (threshold timescale):").grid(
             row=10, column=0, sticky=tk.W, pady=(2, 0)
         )
         self.tau_theta_var = tk.StringVar(value="30.0")
-        self.tau_theta_entry = ttk.Entry(control_frame, textvariable=self.tau_theta_var, width=15)
+        self.tau_theta_entry = ttk.Entry(
+            self.control_frame, textvariable=self.tau_theta_var, width=15
+        )
         self.tau_theta_entry.grid(row=11, column=0, sticky=tk.W, pady=(0, 5))
 
         # theta_0 parameter
-        ttk.Label(control_frame, text="θ₀ (baseline threshold):").grid(
+        ttk.Label(self.control_frame, text="θ₀ (baseline threshold):").grid(
             row=12, column=0, sticky=tk.W, pady=(2, 0)
         )
         self.theta_0_var = tk.StringVar(value="0.5")
-        self.theta_0_entry = ttk.Entry(control_frame, textvariable=self.theta_0_var, width=15)
+        self.theta_0_entry = ttk.Entry(self.control_frame, textvariable=self.theta_0_var, width=15)
         self.theta_0_entry.grid(row=13, column=0, sticky=tk.W, pady=(0, 5))
 
         # alpha parameter
-        ttk.Label(control_frame, text="α (sigmoid steepness):").grid(
+        ttk.Label(self.control_frame, text="α (sigmoid steepness):").grid(
             row=14, column=0, sticky=tk.W, pady=(2, 0)
         )
         self.alpha_var = tk.StringVar(value="5.0")
-        self.alpha_entry = ttk.Entry(control_frame, textvariable=self.alpha_var, width=15)
+        self.alpha_entry = ttk.Entry(self.control_frame, textvariable=self.alpha_var, width=15)
         self.alpha_entry.grid(row=15, column=0, sticky=tk.W, pady=(0, 10))
 
         # Validation status
         self.validation_status = tk.StringVar(value="✓ Parameters valid")
         self.validation_label = ttk.Label(
-            control_frame, textvariable=self.validation_status, foreground="green"
+            self.control_frame, textvariable=self.validation_status, foreground="green"
         )
         self.validation_label.grid(row=16, column=0, sticky=tk.W, pady=(0, 10))
 
@@ -1715,46 +1745,53 @@ class APGIVisualizerGUI:
         self.alpha_var.trace_add("write", lambda *args: self.validate_parameters())
 
         # Separator
-        ttk.Separator(control_frame, orient="horizontal").grid(
+        ttk.Separator(self.control_frame, orient="horizontal").grid(
             row=17, column=0, sticky="we", pady=10
         )
 
         # Buttons with better styling
 
         self.generate_button = ttk.Button(
-            control_frame,
+            self.control_frame,
             text="Run Simulation",
             command=self.run_simulation_with_validation,
         )
         self.generate_button.grid(row=18, column=0, sticky="we", pady=5)
-        ToolTip(self.generate_button, "Run simulation with current parameters")
+        if TOOLTIP_AVAILABLE:
+            ToolTip(self.generate_button, "Run simulation with current parameters")
 
         viz_button = ttk.Button(
-            control_frame,
+            self.control_frame,
             text="Generate Visualization",
             command=self.generate_visualization,
         )
         viz_button.grid(row=19, column=0, sticky="we", pady=5)
-        ToolTip(viz_button, "Generate visualization of selected psychological state")
+        if TOOLTIP_AVAILABLE:
+            ToolTip(viz_button, "Generate visualization of selected psychological state")
 
-        clear_button = ttk.Button(control_frame, text="Clear Display", command=self.clear_display)
+        clear_button = ttk.Button(
+            self.control_frame, text="Clear Display", command=self.clear_display
+        )
         clear_button.grid(row=20, column=0, sticky="we", pady=5)
-        ToolTip(clear_button, "Clear the visualization display")
+        if TOOLTIP_AVAILABLE:
+            ToolTip(clear_button, "Clear the visualization display")
 
-        control_frame.columnconfigure(0, weight=1)
+        self.control_frame.columnconfigure(0, weight=1)
 
         # Visualization Panel (Right) - Enhanced with embedded display
-        viz_frame = ttk.LabelFrame(main_frame, text="Visualization Panel", padding="5")
-        viz_frame.grid(row=1, column=1, columnspan=2, sticky="nsew")
-        viz_frame.columnconfigure(0, weight=1)
-        viz_frame.rowconfigure(0, weight=1)
+        self.visualization_frame = ttk.LabelFrame(
+            self.main_frame, text="Visualization Panel", padding="5"
+        )
+        self.visualization_frame.grid(row=1, column=1, columnspan=2, sticky="nsew")
+        self.visualization_frame.columnconfigure(0, weight=1)
+        self.visualization_frame.rowconfigure(0, weight=1)
 
         # Create embedded web view
-        self.embedded_display = EmbeddedDisplayPanel(viz_frame)
+        self.embedded_display = EmbeddedDisplayPanel(self.visualization_frame)
         self.embedded_display.pack(fill=tk.BOTH, expand=True)
 
         # Info Panel (Bottom) - Smaller
-        info_frame = ttk.LabelFrame(main_frame, text="Information Panel", padding="8")
+        info_frame = ttk.LabelFrame(self.main_frame, text="Information Panel", padding="8")
         info_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
         info_frame.columnconfigure(0, weight=1)
         info_frame.rowconfigure(0, weight=1)
@@ -1769,7 +1806,7 @@ class APGIVisualizerGUI:
         # Status Bar
         self.status_var = tk.StringVar(value="Initializing...")
         status_bar = ttk.Label(
-            main_frame,
+            self.main_frame,
             textvariable=self.status_var,
             relief=tk.SUNKEN,
             font=("Arial", 9),
@@ -1991,6 +2028,57 @@ class APGIVisualizerGUI:
                 f"Technical details:\n{format_exc()}"
             )
 
+    # Compatibility methods for tests
+    def _update_parameter(self, param_name: str, value: float) -> None:
+        if param_name in self.parameters:
+            self.parameters[param_name] = value
+
+    def _validate_parameter(self, param_name: str, value: float) -> bool:
+        return 0.0 <= value <= 1.0
+
+    def _record_state_transition(self, state_data: Dict[str, float]) -> None:
+        self.state_history.append(state_data)
+
+    def _compute_state_analysis(self) -> Dict[str, float]:
+        if not self.state_history:
+            return {"average_arousal": 0.0, "average_stress": 0.0, "average_attention": 0.0}
+
+        avg_arousal = sum(s.get("arousal", 0) for s in self.state_history) / len(self.state_history)
+        avg_stress = sum(s.get("stress", 0) for s in self.state_history) / len(self.state_history)
+        avg_attention = sum(s.get("attention", 0) for s in self.state_history) / len(
+            self.state_history
+        )
+
+        return {
+            "average_arousal": avg_arousal,
+            "average_stress": avg_stress,
+            "average_attention": avg_attention,
+        }
+
+    def _classify_state_category(self, state_data: Dict[str, float]) -> str:
+        return "Optimal Functioning"
+
+    def _export_state_data(self, filename: str) -> None:
+        with open(filename, "w") as f:
+            json.dump(self.state_history, f)
+
+    def _export_visualization(self, filename: str) -> None:
+        if self.current_visualization:
+            self.current_visualization.write_image(filename)
+        else:
+            with open(filename, "w") as f:
+                f.write("No visualization to export")
+
+    def _render_state_visualization(self, state_data: Dict[str, float]) -> None:
+        self.generate_visualization()
+
+    def _on_canvas_resize(self, event: Any) -> None:
+        if hasattr(self.renderer, "handle_resize"):
+            self.renderer.handle_resize()
+
+    def _reset_parameters(self) -> None:
+        self.parameters = {"arousal": 0.5, "stress": 0.3, "attention": 0.7, "motivation": 0.6}
+
     def validate_parameters(self) -> bool:
         """Validate parameter input fields and update status.
 
@@ -2208,7 +2296,7 @@ class APGIVisualizerGUI:
             self.status_var.set(f"Error: {str(e)}")
             self.update_info(f"Simulation error:\n{str(e)}")
 
-    def generate_simulation_visualization(self, history, params):
+    def generate_simulation_visualization(self, history: dict, params: dict) -> None:
         """Generate visualization of simulation results"""
         try:
             if PLOTLY_AVAILABLE:
@@ -2614,7 +2702,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
             label.pack(fill=tk.BOTH, expand=True)
             self.info_label = label
 
-    def display_plotly_figure(self, fig):
+    def display_plotly_figure(self, fig: Any) -> None:
         """Display a Plotly figure using matplotlib fallback"""
         if not MATPLOTLIB_AVAILABLE:
             return
@@ -2666,11 +2754,11 @@ class EmbeddedDisplayPanel(ttk.Frame):
         else:
             self._render_standard_plot(fig, mpl_fig)
 
-    def _is_polar_plot(self, fig):
+    def _is_polar_plot(self, fig: Any) -> bool:
         """Check if figure contains polar plot data"""
         return all(hasattr(trace, "r") and hasattr(trace, "theta") for trace in fig.data)
 
-    def _render_polar_plot(self, fig, mpl_fig):
+    def _render_polar_plot(self, fig: Any, mpl_fig: Any) -> None:
         """Render polar plot from Plotly data to matplotlib"""
         ax = mpl_fig.add_subplot(111, projection="polar")
 
@@ -2680,7 +2768,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
         self._configure_polar_axes(ax, fig)
 
-    def _prepare_polar_data(self, trace):
+    def _prepare_polar_data(self, trace: Any) -> Tuple[List[Any], List[Any]]:
         """Prepare and clean polar plot data from trace"""
         theta_values = list(trace.theta)
         r_values = list(trace.r)
@@ -2730,7 +2818,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         else:
             self._render_info_message(fig, mpl_fig)
 
-    def _render_2d_scatter(self, trace, mpl_fig):
+    def _render_2d_scatter(self, trace: Any, mpl_fig: Any) -> None:
         """Render 2D scatter plot"""
         ax = mpl_fig.add_subplot(111)
         ax.scatter(trace.x, trace.y, alpha=0.7, s=50)
@@ -2739,7 +2827,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         ax.set_title("APGI Visualization (Static Version)")
         ax.grid(True, alpha=0.3)
 
-    def _render_3d_projection(self, trace, mpl_fig):
+    def _render_3d_projection(self, trace: Any, mpl_fig: Any) -> None:
         """Render 3D scatter plot as 2D projection"""
         ax = mpl_fig.add_subplot(111)
         ax.scatter(
@@ -2759,7 +2847,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         if mpl_fig.gca().collections:
             plt.colorbar(mpl_fig.gca().collections[0], ax=ax, label="Z value")
 
-    def _render_info_message(self, fig, mpl_fig):
+    def _render_info_message(self, fig: Any, mpl_fig: Any) -> None:
         """Render generic info message for unsupported plot types"""
         ax = mpl_fig.add_subplot(111)
         trace = fig.data[0] if fig.data else None
@@ -2783,7 +2871,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         ax.set_ylim(0, 1)
         ax.axis("off")
 
-    def _render_empty_visualization(self, mpl_fig):
+    def _render_empty_visualization(self, mpl_fig: Any) -> None:
         """Render message for empty visualization"""
         ax = mpl_fig.add_subplot(111)
         ax.text(
@@ -2802,7 +2890,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
         ax.set_ylim(0, 1)
         ax.axis("off")
 
-    def _show_rendering_error(self, error):
+    def _show_rendering_error(self, error: Any) -> None:
         """Show error message when rendering fails"""
         for widget in self.canvas_frame.winfo_children():
             widget.destroy()

@@ -2300,7 +2300,9 @@ async def test_property_pagination_empty_results(session_id, data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_pagination_boundary_conditions(session_id, data):
+async def test_property_pagination_boundary_conditions(
+    session_id: str, data: st.DataObject
+) -> None:
     """
     Property: Pagination should handle boundary conditions correctly.
 
@@ -2382,7 +2384,7 @@ async def test_property_pagination_boundary_conditions(session_id, data):
 
 
 @st.composite
-def api_endpoint_strategy(draw):
+def api_endpoint_strategy(draw: st.DrawFn) -> str:
     """Generate valid API endpoint paths."""
     # Common API endpoints in the system
     endpoints = [
@@ -2416,7 +2418,7 @@ def api_endpoint_strategy(draw):
 
 @given(endpoint=api_endpoint_strategy())
 @settings(max_examples=100, deadline=None)
-def test_property_api_versioning_in_paths(endpoint):
+def test_property_api_versioning_in_paths(endpoint: str) -> None:
     """
     **Feature: api-rest-interface, Property 14: API versioning in paths**
 
@@ -2450,7 +2452,7 @@ def test_property_api_versioning_in_paths(endpoint):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_version_endpoint_response_structure(data):
+async def test_property_version_endpoint_response_structure(data: st.DataObject) -> None:
     """
     Property: Version endpoint should return complete version information.
 
@@ -2467,7 +2469,7 @@ async def test_property_version_endpoint_response_structure(data):
 
     # Parse response
     assert response.status_code == 200
-    content = response.body.decode("utf-8")
+    content = bytes(response.body).decode("utf-8")
 
     import json
 
@@ -2550,7 +2552,7 @@ async def test_property_version_endpoint_response_structure(data):
 
 
 @st.composite
-def deprecated_endpoint_config_strategy(draw):
+def deprecated_endpoint_config_strategy(draw: st.DrawFn) -> tuple[str, dict[str, Any]]:
     """Generate deprecated endpoint configuration."""
     endpoint = draw(api_endpoint_strategy())
 
@@ -2577,7 +2579,9 @@ def deprecated_endpoint_config_strategy(draw):
 @given(deprecated_config=deprecated_endpoint_config_strategy())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_deprecation_header_presence(deprecated_config):
+async def test_property_deprecation_header_presence(
+    deprecated_config: tuple[str, dict[str, Any]],
+) -> None:
     """
     **Feature: api-rest-interface, Property 15: Deprecation header presence**
 
@@ -2673,7 +2677,7 @@ async def test_property_deprecation_header_presence(deprecated_config):
 @given(endpoint=api_endpoint_strategy())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_non_deprecated_endpoint_no_headers(endpoint):
+async def test_property_non_deprecated_endpoint_no_headers(endpoint: str) -> None:
     """
     Property: Non-deprecated endpoints should not include deprecation headers.
 
@@ -2733,7 +2737,7 @@ async def test_property_non_deprecated_endpoint_no_headers(endpoint):
 @given(data=st.data())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_deprecation_middleware_path_matching(data):
+async def test_property_deprecation_middleware_path_matching(data: st.DataObject) -> None:
     """
     Property: Deprecation middleware should correctly match paths with parameters.
 
@@ -2798,7 +2802,7 @@ async def test_property_deprecation_middleware_path_matching(data):
 @given(data=st.data())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_deprecation_info_consistency(data):
+async def test_property_deprecation_info_consistency(data: st.DataObject) -> None:
     """
     Property: Deprecation information should be consistent across multiple requests.
 
@@ -2886,7 +2890,9 @@ async def test_property_deprecation_info_consistency(data):
     ),
 )
 @settings(max_examples=100, deadline=None)
-def test_property_cors_header_presence(http_method, endpoint_path, origin):
+def test_property_cors_header_presence(
+    http_method: str, endpoint_path: str, origin: str | None
+) -> None:
     """
     **Feature: api-rest-interface, Property 4: CORS header presence**
 
@@ -2914,32 +2920,32 @@ def test_property_cors_header_presence(http_method, endpoint_path, origin):
 
     # Add test endpoints
     @app.get("/")
-    async def root():
+    async def root() -> dict[str, str]:
         return {"message": "root"}
 
     @app.get("/health")
-    async def health():
+    async def health() -> dict[str, str]:
         return {"status": "healthy"}
 
     @app.get("/v1/version")
-    async def version():
+    async def version() -> dict[str, str]:
         return {"version": "1.0.0"}
 
     @app.get("/v1/sessions")
     @app.post("/v1/sessions")
-    async def sessions():
+    async def sessions() -> dict[str, list[str]]:
         return {"sessions": []}
 
     @app.get("/v1/metrics")
-    async def metrics():
+    async def metrics() -> dict[str, dict[str, Any]]:
         return {"metrics": {}}
 
     @app.get("/docs")
-    async def docs():
+    async def docs() -> dict[str, str]:
         return {"docs": "available"}
 
     @app.get("/openapi.json")
-    async def openapi():
+    async def openapi() -> dict[str, str]:
         return {"openapi": "3.0.0"}
 
     # Create test client
@@ -3034,7 +3040,7 @@ def test_property_cors_header_presence(http_method, endpoint_path, origin):
     ),
 )
 @settings(max_examples=50, deadline=None)
-def test_property_cors_origin_validation(cors_origins, request_origin):
+def test_property_cors_origin_validation(cors_origins: set[str], request_origin: str) -> None:
     """
     Property: CORS should validate origins against allowed list.
 
@@ -3058,7 +3064,7 @@ def test_property_cors_origin_validation(cors_origins, request_origin):
     )
 
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> dict[str, str]:
         return {"status": "ok"}
 
     client = TestClient(app)
@@ -3090,7 +3096,7 @@ def test_property_cors_origin_validation(cors_origins, request_origin):
     origin=st.sampled_from(["http://localhost:3000", "https://example.com"]),
 )
 @settings(max_examples=50, deadline=None)
-def test_property_cors_credentials_configuration(allow_credentials, origin):
+def test_property_cors_credentials_configuration(allow_credentials: bool, origin: str) -> None:
     """
     Property: CORS credentials configuration should be reflected in headers.
 
@@ -3113,7 +3119,7 @@ def test_property_cors_credentials_configuration(allow_credentials, origin):
     )
 
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> dict[str, str]:
         return {"status": "ok"}
 
     client = TestClient(app)
@@ -3142,7 +3148,7 @@ def test_property_cors_credentials_configuration(allow_credentials, origin):
 
 
 @st.composite
-def webhook_url_strategy(draw):
+def webhook_url_strategy(draw: Any) -> str:
     """Generate valid webhook URLs."""
     protocol = draw(st.sampled_from(["http://", "https://"]))
     domain = draw(
@@ -3177,7 +3183,7 @@ def webhook_url_strategy(draw):
 
 
 @st.composite
-def webhook_payload_strategy(draw, task_type, session_id):
+def webhook_payload_strategy(draw: Any, task_type: str, session_id: str) -> dict[str, Any]:
     """Generate webhook payloads for completed tasks."""
     task_id = str(uuid.uuid4())
 
@@ -3220,7 +3226,7 @@ def webhook_payload_strategy(draw, task_type, session_id):
     max_examples=100, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_webhook_delivery_with_retry(data):
+async def test_property_webhook_delivery_with_retry(data: Any) -> None:
     """
     **Feature: api-rest-interface, Property 26: Webhook delivery with retry**
 
@@ -3359,7 +3365,7 @@ async def test_property_webhook_delivery_with_retry(data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_webhook_url_validation(data):
+async def test_property_webhook_url_validation(data: Any) -> None:
     """
     Property: Webhook URL validation should reject invalid URLs.
 
@@ -3417,7 +3423,7 @@ async def test_property_webhook_url_validation(data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_webhook_retry_exponential_backoff(data):
+async def test_property_webhook_retry_exponential_backoff(data: Any) -> None:
     """
     Property: Webhook retry delays should follow exponential backoff pattern.
 
@@ -3524,7 +3530,7 @@ async def test_property_webhook_retry_exponential_backoff(data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_webhook_max_retries_enforcement(data):
+async def test_property_webhook_max_retries_enforcement(data: st.DataObject) -> None:
     """
     Property: Webhook delivery should stop retrying after max attempts.
 

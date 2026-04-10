@@ -13,7 +13,7 @@ from apgi_system.monitoring import PerformanceMonitor, PerformanceMetrics
 class TestPerformanceMetrics:
     """Test PerformanceMetrics dataclass."""
 
-    def test_metrics_creation(self):
+    def test_metrics_creation(self) -> None:
         """Test creating a PerformanceMetrics instance."""
         metrics = PerformanceMetrics(
             step_time_ms=5.0,
@@ -36,23 +36,23 @@ class TestPerformanceMonitor:
     """Test PerformanceMonitor class."""
 
     @pytest.fixture
-    def config(self):
+    def config(self) -> dict:
         """Provide test configuration."""
         return {"monitoring": {"enabled": True, "max_history_size": 100}}
 
     @pytest.fixture
-    def monitor(self, config):
+    def monitor(self, config) -> PerformanceMonitor:
         """Provide a PerformanceMonitor instance."""
         return PerformanceMonitor(config)
 
-    def test_initialization(self, monitor):
+    def test_initialization(self, monitor) -> None:
         """Test monitor initialization."""
         assert monitor.enabled is True
         assert monitor.max_history_size == 100
         assert len(monitor.history) == 0
         assert len(monitor.ignition_times) == 0
 
-    def test_disabled_monitoring(self):
+    def test_disabled_monitoring(self) -> None:
         """Test that monitoring can be disabled."""
         config = {"monitoring": {"enabled": False}}
         monitor = PerformanceMonitor(config)
@@ -65,7 +65,7 @@ class TestPerformanceMonitor:
         assert metrics is None
         assert len(monitor.history) == 0
 
-    def test_step_timing(self, monitor):
+    def test_step_timing(self, monitor) -> None:
         """Test step execution time tracking."""
         monitor.start_step()
         time.sleep(0.01)  # Sleep for 10ms
@@ -78,7 +78,7 @@ class TestPerformanceMonitor:
         assert metrics.step_time_ms >= 10.0  # Should be at least 10ms
         assert metrics.step_time_ms < 100.0  # But not too long
 
-    def test_memory_tracking(self, monitor):
+    def test_memory_tracking(self, monitor) -> None:
         """Test memory usage tracking."""
         monitor.start_step()
 
@@ -90,7 +90,7 @@ class TestPerformanceMonitor:
         assert metrics.memory_usage_mb > 0
         assert metrics.memory_usage_mb < 10000  # Reasonable upper bound
 
-    def test_ignition_rate_calculation(self, monitor):
+    def test_ignition_rate_calculation(self, monitor) -> None:
         """Test ignition rate calculation."""
         # Record several ignition events
         for i in range(5):
@@ -109,7 +109,7 @@ class TestPerformanceMonitor:
         last_metrics = monitor.history[-1]
         assert last_metrics.ignition_rate_hz > 0
 
-    def test_ignition_rate_window(self, monitor):
+    def test_ignition_rate_window(self, monitor) -> None:
         """Test that ignition rate uses a sliding window."""
         # Add old ignition event (outside window)
         monitor.ignition_times.append(0.0)
@@ -127,7 +127,7 @@ class TestPerformanceMonitor:
         assert len(monitor.ignition_times) == 1
         assert monitor.ignition_times[0] == 2000.0
 
-    def test_history_recording(self, monitor):
+    def test_history_recording(self, monitor) -> None:
         """Test that metrics are recorded in history."""
         for i in range(10):
             monitor.start_step()
@@ -144,7 +144,7 @@ class TestPerformanceMonitor:
         assert monitor.history[0].free_energy_mean == 10.0
         assert monitor.history[9].free_energy_mean == 19.0
 
-    def test_history_size_limit(self):
+    def test_history_size_limit(self) -> None:
         """Test that history is limited to max_history_size."""
         config = {"monitoring": {"enabled": True, "max_history_size": 5}}
         monitor = PerformanceMonitor(config)
@@ -161,7 +161,7 @@ class TestPerformanceMonitor:
         assert monitor.history[0].timestamp == 5.0
         assert monitor.history[-1].timestamp == 9.0
 
-    def test_get_statistics_empty(self, monitor):
+    def test_get_statistics_empty(self, monitor) -> None:
         """Test statistics with no data."""
         stats = monitor.get_statistics()
 
@@ -169,7 +169,7 @@ class TestPerformanceMonitor:
         assert stats["mean_step_time_ms"] == 0.0
         assert stats["max_step_time_ms"] == 0.0
 
-    def test_get_statistics(self, monitor):
+    def test_get_statistics(self, monitor) -> None:
         """Test statistics calculation."""
         # Add some metrics
         for i in range(5):
@@ -190,7 +190,7 @@ class TestPerformanceMonitor:
         assert stats["mean_memory_mb"] > 0
         assert "std_step_time_ms" in stats
 
-    def test_get_recent_metrics(self, monitor):
+    def test_get_recent_metrics(self, monitor) -> None:
         """Test retrieving recent metrics."""
         # Add 10 metrics
         for i in range(10):
@@ -206,12 +206,12 @@ class TestPerformanceMonitor:
         assert recent[0].timestamp == 7.0
         assert recent[-1].timestamp == 9.0
 
-    def test_get_recent_metrics_empty(self, monitor):
+    def test_get_recent_metrics_empty(self, monitor) -> None:
         """Test getting recent metrics when history is empty."""
         recent = monitor.get_recent_metrics(n=5)
         assert len(recent) == 0
 
-    def test_reset(self, monitor):
+    def test_reset(self, monitor) -> None:
         """Test resetting the monitor."""
         # Add some data
         for i in range(5):
@@ -231,7 +231,7 @@ class TestPerformanceMonitor:
         assert monitor.step_start_time is None
         assert monitor.last_step_time_ms == 0.0
 
-    def test_log_performance_empty(self, monitor, capsys):
+    def test_log_performance_empty(self, monitor, capsys) -> None:
         """Test logging with no data."""
         monitor.log_performance()
         captured = capsys.readouterr()
@@ -239,7 +239,7 @@ class TestPerformanceMonitor:
         # Should not print anything when no data
         assert captured.out == ""
 
-    def test_log_performance(self, monitor, capsys):
+    def test_log_performance(self, monitor, capsys) -> None:
         """Test performance logging."""
         # Add some metrics
         for i in range(3):
@@ -256,7 +256,7 @@ class TestPerformanceMonitor:
         assert "Step time" in captured.out
         assert "Memory usage" in captured.out
 
-    def test_log_performance_verbose(self, monitor, capsys):
+    def test_log_performance_verbose(self, monitor, capsys) -> None:
         """Test verbose performance logging."""
         # Add some metrics
         for i in range(3):
@@ -271,7 +271,7 @@ class TestPerformanceMonitor:
         assert "Performance Statistics" in captured.out
         assert "Recent metrics" in captured.out
 
-    def test_step_without_start(self, monitor):
+    def test_step_without_start(self, monitor) -> None:
         """Test ending step without starting it."""
         metrics = monitor.end_step(
             system_time_ms=1.0, ignition_occurred=False, free_energy=10.0, precision=1.5
@@ -280,7 +280,7 @@ class TestPerformanceMonitor:
         # Should return None if start_step wasn't called
         assert metrics is None
 
-    def test_performance_meets_requirements(self, monitor):
+    def test_performance_meets_requirements(self, monitor) -> None:
         """Test that step time meets requirement 9.1 (< 10ms)."""
         # This is more of an integration test, but we can check
         # that the monitoring correctly tracks times

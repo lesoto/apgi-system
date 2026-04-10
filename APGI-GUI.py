@@ -191,7 +191,7 @@ class APGIGui:
         self.root.after(200, self._convert_to_tkinter_variables)
 
         # Apply theme to all components after GUI is fully created
-        self.root.after(300, self.apply_theme_to_gui)
+        self.root.after(300, self._apply_theme_to_root)
 
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
@@ -237,13 +237,11 @@ class APGIGui:
 
         try:
             self.root.configure(bg=theme_bg)
-        except tk.TclError:
-            pass  # Some themes may not support bg configuration
+        except tk.TclError as e:
+            logger.error(f"Error: {e}")  # Some themes may not support bg configuration
 
-    def apply_theme_to_gui(self) -> None:
-        """Apply current theme to all GUI components."""
-        # Apply to root
-        self._apply_theme_to_root()
+        # Apply to all widgets recursively
+        self._apply_theme_to_child_widgets(self.root)
 
         # Apply to canvases if they exist
         if hasattr(self, "neural_canvas"):
@@ -279,10 +277,21 @@ class APGIGui:
         # Force redraw of all components
         self.root.update_idletasks()
 
+    def _apply_theme_to_child_widgets(self, parent: tk.Misc) -> None:
+        """Recursively apply current theme to all child widgets."""
+        for child in parent.winfo_children():
+            # Skip matplotlib canvas widgets (handled separately)
+            if "canvas" in str(child).lower() and hasattr(child, "get_tk_widget"):
+                continue
+
+            self.theme_manager.apply_theme_to_widget(child)
+            if child.winfo_children():
+                self._apply_theme_to_child_widgets(child)
+
     def _change_theme(self, theme_name: str) -> None:
         """Change the current theme."""
         if self.theme_manager.set_theme(theme_name):
-            self.apply_theme_to_gui()
+            self._apply_theme_to_root()
             self._log_event(f"Theme changed to: {theme_name}")
 
             # Save theme to config
@@ -368,32 +377,12 @@ class APGIGui:
         # Convert buffer size variable
         self.buffer_size_var = tk.IntVar(master=self.root, value=self.buffer_size)
 
-        # Convert auto-save variable
-        self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
+        # Only initialize if not already initialized
+        if not hasattr(self, "auto_save_var"):
+            self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
+        else:
+            self.auto_save_var.set(self.auto_save)
 
-        # Initialize speed variable
-        self.speed_var = tk.DoubleVar(master=self.root, value=1.0)
-
-        # Convert parameter variables and assign to scales
-        for key, value in self.param_vars.items():
-            var_value = value.get() if isinstance(value, tk.Variable) else float(value)
-            var = tk.DoubleVar(master=self.root, value=var_value)
-            self.param_vars[key] = var
-
-            # Assign to scale if it exists
-            if key in self.param_scales:
-                self.param_scales[key].configure(variable=var)
-
-            # Update label if it exists
-            if key in self.param_labels:
-                var.trace_add(
-                    "write",
-                    lambda *args, v=var, label=self.param_labels[key]: label.config(
-                        text=f"{v.get():.2f}"
-                    ),
-                )
-
-        # Initialize view variables and assign to checkbuttons
         self.view_vars = {
             "control_panel": tk.BooleanVar(master=self.root, value=True),
             "neural_activity": tk.BooleanVar(master=self.root, value=True),
@@ -571,6 +560,10 @@ class APGIGui:
         self.log_lock = Lock()  # Simple lock for log data
         self.system_lock = RLock()  # Reentrant lock for system access
 
+        # Initialize panel frames to None to prevent AttributeErrors during early access
+        self.param_frame = None
+        self.log_frame = None
+
         # Logging with bounded buffer to prevent memory leaks
         self.log_buffer_size = 10000  # Maximum number of log entries to keep
         self.log_data = deque(maxlen=self.log_buffer_size)
@@ -637,10 +630,19 @@ class APGIGui:
         )
         file_menu.add_command(label="Export Plot...", command=self._export_plot)
         file_menu.add_separator()
-        # Auto-save checkbutton will be added after variables are initialized
+        file_menu.add_separator()
+        # Create auto-save variable if it doesn't exist yet
+        if not hasattr(self, "auto_save_var"):
+            self.auto_save_var = tk.BooleanVar(master=self.root, value=self.auto_save)
+
+        file_menu.add_checkbutton(
+            label="Auto-save Data",
+            variable=self.auto_save_var,
+            command=self._toggle_auto_save,
+        )
         file_menu.add_separator()
         file_menu.add_command(
-            label="Exit", command=self._exit_app, accelerator=f"{self.modifier_key}+Q"
+            label="Exit", command=self._confirm_exit, accelerator=f"{self.modifier_key}+Q"
         )
 
         # Edit Menu
@@ -772,7 +774,7 @@ class APGIGui:
                 self.simulation_thread.join(timeout=2.0)  # Wait up to 2 seconds
                 if self.simulation_thread.is_alive():
                     # Thread didn't finish, but continue with shutdown
-                    pass
+                    logger.warning("Simulation thread did not finish gracefully")
 
             # Clean up matplotlib canvases to prevent warnings
             canvases = [
@@ -790,8 +792,8 @@ class APGIGui:
                 if canvas:
                     try:
                         canvas.get_tk_widget().destroy()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error destroying canvas: {e}")
 
             # Clean up auto-save files on exit
             self._cleanup_auto_save_files()
@@ -804,11 +806,23 @@ class APGIGui:
 
         except Exception as e:
             # Log error but continue with shutdown
-            print(f"Error during shutdown: {e}")
+            logger.error(f"Error during shutdown: {e}", exc_info=True)
 
         finally:
             # Force quit
             self.root.quit()
+
+    def _cleanup_toplevel_windows(self) -> None:
+        """Clean up and close all toplevel windows."""
+        try:
+            for child in self.root.winfo_children():
+                if isinstance(child, tk.Toplevel):
+                    try:
+                        child.destroy()
+                    except Exception as e:
+                        logger.error(f"Error: {e}")
+        except Exception as e:
+            logger.error(f"Error cleaning up toplevel windows: {e}")
 
     def _create_main_layout(self) -> None:
         """Create main application layout."""
@@ -823,6 +837,7 @@ class APGIGui:
         # Right panel - Visualizations (tabbed)
         right_panel = ttk.Frame(main_paned)
         main_paned.add(right_panel, weight=1)
+        self.right_panel = right_panel
 
         # Store references for toggling
         self.main_paned = main_paned
@@ -897,12 +912,12 @@ class APGIGui:
             self.status_labels[label].pack(side=tk.RIGHT)
 
         # Parameter Adjustments
-        param_frame = ttk.LabelFrame(parent, text="Quick Parameters", padding=10)
-        param_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.param_frame = ttk.LabelFrame(parent, text="Quick Parameters", padding=10)
+        self.param_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Scrollable parameter list
-        canvas = tk.Canvas(param_frame, height=300)
-        scrollbar = ttk.Scrollbar(param_frame, orient=tk.VERTICAL, command=canvas.yview)
+        canvas = tk.Canvas(self.param_frame, height=300)
+        scrollbar = ttk.Scrollbar(self.param_frame, orient=tk.VERTICAL, command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
 
         scrollable_frame.bind(
@@ -954,11 +969,11 @@ class APGIGui:
         self._setup_param_cache()
 
         # Event Log
-        log_frame = ttk.LabelFrame(parent, text="Event Log", padding=10)
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.log_frame = ttk.LabelFrame(parent, text="Event Log", padding=10)
+        self.log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.log_text = scrolledtext.ScrolledText(
-            log_frame, height=8, width=40, font=("Courier", 9)
+            self.log_frame, height=8, width=40, font=("Courier", 9)
         )
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self._log_event("APGI System initialized")
@@ -1278,9 +1293,6 @@ class APGIGui:
             self._log_event(f"CRITICAL ERROR: {str(e)}")
             self._update_status("System initialization failed - See troubleshooting steps")
 
-            # Disable UI controls that require a valid system
-            self._enable_system_controls(False)
-
             # Log the full error for debugging
             logger.error(f"System initialization failed: {str(e)}", exc_info=True)
 
@@ -1293,8 +1305,8 @@ class APGIGui:
                 )
                 if reset_result:
                     self._reset_to_default_config()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error: {e}")
 
     def _reset_to_default_config(self) -> None:
         """Reset configuration to default settings."""
@@ -1471,7 +1483,8 @@ class APGIGui:
 
                     frame_count += 1
 
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Simulation error: {e}", exc_info=True)
                     self.is_running = False
                     self.is_paused = False
                     # Schedule GUI update with proper button states
@@ -1486,7 +1499,8 @@ class APGIGui:
                 last_time = current
 
             # Control simulation speed
-            time.sleep(0.001 / self.speed_var.get())
+            speed = self._get_thread_safe_speed()
+            time.sleep(0.001 / max(0.1, speed))
 
     def _generate_input(self, t: float) -> NDArray[np.float64]:
         """Generate sensory input."""
@@ -1529,27 +1543,27 @@ class APGIGui:
         try:
             if hasattr(self, "fps_label") and self.fps_label.winfo_exists():
                 self.fps_label.config(text=f"{fps:.1f} FPS")
-        except Exception:
+        except Exception as e:
             # Log errors during shutdown
-            logger.warning("Error updating FPS label")
+            logger.warning(f"Error updating FPS label: {str(e)}")
 
     def _safe_enable_system_controls(self, enabled: bool) -> None:
         """Safely enable/disable system controls with existence check."""
         try:
             if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._enable_system_controls(enabled)
-        except Exception:
+        except Exception as e:
             # Log errors during shutdown
-            logger.warning("Error enabling/disabling controls")
+            logger.warning(f"Error enabling/disabling controls: {str(e)}")
 
     def _safe_update_ui_after_error(self) -> None:
         """Safely update UI after error with existence check."""
         try:
             if hasattr(self, "start_btn") and self.start_btn.winfo_exists():
                 self._update_ui_after_error()
-        except Exception:
+        except Exception as e:
             # Ignore errors during shutdown
-            pass
+            logger.error(f"Error: {str(e)}")
 
     def _apply_parameters(self) -> None:
         """Apply parameter adjustments to system with validation and rollback."""
@@ -1581,8 +1595,8 @@ class APGIGui:
                         validation_errors.append(
                             f"{param_name}: Must be between {min_val} and {max_val}"
                         )
-                except Exception:
-                    validation_errors.append(f"{param_name}: Error reading value")
+                except Exception as e:
+                    validation_errors.append(f"{param_name}: Error reading value: {str(e)}")
 
         # Cross-parameter validation for incompatible combinations
         try:
@@ -1618,8 +1632,8 @@ class APGIGui:
                     "Consider reducing threshold or activity."
                 )
 
-        except Exception:
-            validation_errors.append("Cross-parameter validation error")
+        except Exception as e:
+            validation_errors.append("Cross-parameter validation error: " + str(e))
 
         # If validation errors exist, show them and abort
         if validation_errors:
@@ -1655,9 +1669,9 @@ class APGIGui:
                 "baseline_threshold"
             ]
 
-        except Exception:
+        except Exception as e:
             self._log_event("Error applying parameters - Rolling back...")
-            logger.error("Parameter application error", exc_info=True)
+            logger.error(f"Parameter application error: {str(e)}", exc_info=True)
 
             # Rollback to previous values
             try:
@@ -1764,8 +1778,8 @@ class APGIGui:
         try:
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
             self.memory_buffer.append(memory_mb)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error: {str(e)}")
 
         if self.is_running and not self.is_paused:
             self._update_status_labels()
@@ -1776,6 +1790,9 @@ class APGIGui:
 
     def _update_status_labels(self) -> None:
         """Update status labels with system validation."""
+        # Ensure status_labels are initialized before trying to update them
+        if not hasattr(self, "status_labels") or not self.status_labels:
+            return
         if self.apgi_system is None:
             # Show disabled status when system is not available
             self.status_labels["Time"].config(text="--.-- s")
@@ -1802,9 +1819,9 @@ class APGIGui:
             load = summary["allostatic_load"] * 100
             self.status_labels["Allostatic Load"].config(text=f"{load:.1f}%")
 
-        except Exception:
+        except Exception as e:
             self._log_event("Error updating status labels")
-            logger.error("Status update error", exc_info=True)
+            logger.error(f"Status update error: {str(e)}", exc_info=True)
 
     def _update_plots(self) -> None:
         """Update all plot canvases (thread-safe)."""
@@ -1846,9 +1863,9 @@ class APGIGui:
             # Update 3D state space
             self._update_state_space(time_data, data_copies)
 
-        except Exception:
+        except Exception as e:
             self._log_event("Error updating plots")
-            logger.error("Plot update error", exc_info=True)
+            logger.error(f"Plot update error: {str(e)}", exc_info=True)
 
     def _update_neural_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update neural activity plots."""
@@ -2095,8 +2112,8 @@ class APGIGui:
                 messagebox.showinfo("Success", "Configuration loaded successfully")
             except yaml.YAMLError:
                 messagebox.showerror("YAML Error", "Invalid YAML format")
-            except Exception:
-                messagebox.showerror("Error", "Failed to load configuration")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to load configuration: {str(e)}")
 
     def _save_config(self) -> None:
         """Save configuration file."""
@@ -2113,8 +2130,8 @@ class APGIGui:
                     yaml.dump(config, f)
                 self._log_event(f"Configuration saved: {filename}")
                 messagebox.showinfo("Success", "Configuration saved successfully")
-            except Exception:
-                messagebox.showerror("Error", "Failed to save configuration")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save configuration: {str(e)}")
 
     def _export_data(self) -> None:
         """Export simulation data (thread-safe)."""
@@ -2138,6 +2155,19 @@ class APGIGui:
         )
 
         if filename:
+            # Check data size before heavy processing (BUG-M04)
+            data_size = len(log_data_copy)
+            if data_size > 5000:
+                result = messagebox.askyesno(
+                    "Large Data Export",
+                    f"You are about to export {data_size} records.\n\n"
+                    "This may take some time and consume significant memory. "
+                    "Do you want to proceed?",
+                    icon="warning",
+                )
+                if not result:
+                    return
+
             try:
                 if filename.endswith(".json"):
                     with open(filename, "w") as f:
@@ -2152,8 +2182,8 @@ class APGIGui:
 
                 self._log_event(f"Data exported: {filename}")
                 messagebox.showinfo("Success", f"Data exported to {filename}")
-            except Exception:
-                messagebox.showerror("Error", "Failed to export data")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export data: {str(e)}")
 
     def _export_plot(self) -> None:
         """Export current plot or all plots."""
@@ -2416,8 +2446,8 @@ class APGIGui:
 
             with open(filename, "w") as f:
                 json.dump(state, f)
-        except Exception:
-            self._log_event("Auto-save failed")
+        except Exception as e:
+            self._log_event(f"Auto-save failed: {str(e)}")
 
     def _cleanup_auto_save_files(self) -> None:
         """Clean up old auto-save files on exit."""
@@ -2441,22 +2471,22 @@ class APGIGui:
                 try:
                     file_path.unlink()
                 except Exception as e:
-                    # Log but don't fail if cleanup fails
-                    print(f"Failed to remove auto-save file {file_path}: {e}")
+                    # Log error but don't fail if cleanup fails
+                    print(f"Failed to remove auto-save file {file_path}: {str(e)}")
 
         except Exception as e:
             # Log error but don't fail shutdown
-            print(f"Error during auto-save cleanup: {e}")
+            print(f"Error during auto-save cleanup: {str(e)}")
         """Clean up all toplevel windows to prevent Tkinter warnings."""
         try:
             for widget in self.root.winfo_children():
                 if isinstance(widget, tk.Toplevel):
                     try:
                         widget.destroy()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.error(f"Error: {e}")
+        except Exception as e:
+            logger.error(f"Error: {e}")
 
     def _edit_parameters(self) -> None:
         """Open parameter editor dialog."""
@@ -3498,15 +3528,16 @@ class APGIGui:
                 for trial_idx, trial in enumerate(task.trials):
                     # Update progress
                     progress = (trial_idx / total_trials) * 100
+
+                    def update_igt_progress(p: float, i: int, t: int) -> None:
+                        progress_var.set(p)
+                        if status_label.winfo_exists():
+                            status_label.config(text=f"Trial {i + 1} of {t}")
+
                     self.root.after(
                         0,
-                        lambda p=progress, i=trial_idx, t=total_trials: (
-                            progress_var.set(p),
-                            (
-                                status_label.config(text=f"Trial {i + 1} of {t}")
-                                if status_label.winfo_exists()
-                                else None
-                            ),
+                        lambda p=progress, i=trial_idx, t=total_trials: update_igt_progress(
+                            p, i, t
                         ),
                     )
 
@@ -3522,26 +3553,33 @@ class APGIGui:
                         msg = (
                             f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
                         )
-                        self.root.after(
-                            0,
-                            lambda m=msg, rt=results_text: (
-                                rt.insert(tk.END, m) if rt.winfo_exists() else None
-                            ),
-                        )
-                        self.root.after(
-                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
-                        )
+
+                        def log_igt_result(m: str, rt: "scrolledtext.ScrolledText") -> None:
+                            if rt.winfo_exists():
+                                rt.insert(tk.END, m)
+
+                        self.root.after(0, lambda m=msg, rt=results_text: log_igt_result(m, rt))
+
+                        def scroll_igt_to_end(rt: "scrolledtext.ScrolledText") -> None:
+                            if rt.winfo_exists():
+                                rt.see(tk.END)
+
+                        self.root.after(0, lambda rt=results_text: scroll_igt_to_end(rt))  # type: ignore[misc]
 
                 # Task complete
-                self.root.after(
-                    0, lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None
-                )
-                self.root.after(
-                    0,
-                    lambda sl=status_label: (
-                        sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                    ),
-                )
+                def set_igt_complete(pv: tk.DoubleVar) -> None:
+                    try:
+                        pv.set(100)
+                    except tk.TclError:
+                        pass  # Variable was destroyed
+
+                self.root.after(0, lambda pv=progress_var: set_igt_complete(pv))
+
+                def set_igt_status_complete(sl: ttk.Label) -> None:
+                    if sl.winfo_exists():
+                        sl.config(text="Analysis complete!")
+
+                self.root.after(0, lambda sl=status_label: set_igt_status_complete(sl))
 
                 # Analyze results
                 analysis = task.analyze_results()
@@ -3561,15 +3599,17 @@ class APGIGui:
                     deck_type = "Bad" if deck in ["A", "B"] else "Good"
                     summary += f"  Deck {deck} ({deck_type}): {deck_data['selections']} ({deck_data['selection_percentage']:.1f}%)\n"
 
-                self.root.after(
-                    0,
-                    lambda s=summary, rt=results_text: (
-                        rt.insert(tk.END, s) if rt.winfo_exists() else None
-                    ),
-                )
-                self.root.after(
-                    0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
-                )
+                def insert_igt_summary(s: str, rt: "scrolledtext.ScrolledText") -> None:
+                    if rt.winfo_exists():
+                        rt.insert(tk.END, s)
+
+                self.root.after(0, lambda s=summary, rt=results_text: insert_igt_summary(s, rt))
+
+                def scroll_igt_summary(rt: "scrolledtext.ScrolledText") -> None:
+                    if rt.winfo_exists():
+                        rt.see(tk.END)
+
+                self.root.after(0, lambda rt=results_text: scroll_igt_summary(rt))
 
                 # Save results
                 import datetime
@@ -3583,7 +3623,7 @@ class APGIGui:
                 )
 
                 # Add close button
-                def close_and_show_results():
+                def close_and_show_results() -> None:
                     progress_dialog.destroy()
                     task.print_results(analysis)
                     messagebox.showinfo(
@@ -3614,7 +3654,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _run_stroop_task(self, num_trials: int = 60):
+    def _run_stroop_task(self, num_trials: int = 60) -> None:
         """Run the Stroop Task experimental task."""
         if not self.apgi_system:
             messagebox.showerror("Error", "System not initialized")
@@ -3667,51 +3707,61 @@ class APGIGui:
                     # Update progress and status
                     for i, result in enumerate(results):
                         progress = (i + 1) / len(results) * 100
+
+                        def update_stroop_progress(p: float, pv: tk.DoubleVar) -> None:
+                            if pv.winfo_exists():
+                                pv.set(p)
+
                         self.root.after(
-                            0,
-                            lambda p=progress, pv=progress_var: (
-                                pv.set(p) if pv.winfo_exists() else None
-                            ),
+                            0, lambda p=progress, pv=progress_var: update_stroop_progress(p, pv)
                         )
+
+                        def update_stroop_status(idx: int, total: int, sl: ttk.Label) -> None:
+                            if sl.winfo_exists():
+                                sl.config(text=f"Trial {idx + 1} of {total}")
+
                         self.root.after(
                             0,
-                            lambda i=i, total=len(results), sl=status_label: (
-                                sl.config(text=f"Trial {i + 1} of {total}")
-                                if sl.winfo_exists()
-                                else None
-                            ),
+                            lambda i=i, total=len(results), sl=status_label: update_stroop_status(
+                                i, total, sl
+                            ),  # type: ignore[misc]
                         )
 
                         # Log trial results
-                        self.root.after(
-                            0,
-                            lambda r=result, rt=results_text: (
+                        def log_stroop_trial(
+                            r: Dict[str, Any], rt: "scrolledtext.ScrolledText"
+                        ) -> None:
+                            if rt.winfo_exists():
                                 rt.insert(
                                     tk.END,
                                     f"Trial {r['trial_number']}: {r['trial_type']} - RT: {r['response_time_ms']:.0f}ms - Correct: {r['is_correct']}\n",
                                 )
-                                if rt.winfo_exists()
-                                else None
-                            ),
-                        )
+
                         self.root.after(
-                            0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
+                            0, lambda r=result, rt=results_text: log_stroop_trial(r, rt)  # type: ignore[misc]
                         )
+
+                        def scroll_stroop_to_end(rt: "scrolledtext.ScrolledText") -> None:
+                            if rt.winfo_exists():
+                                rt.see(tk.END)
+
+                        self.root.after(0, lambda rt=results_text: scroll_stroop_to_end(rt))  # type: ignore[misc]
 
                         # Small delay to show progress
                         time.sleep(0.1)
 
                     # Complete progress
-                    self.root.after(
-                        0,
-                        lambda pv=progress_var: pv.set(100) if pv.winfo_exists() else None,
-                    )
-                    self.root.after(
-                        0,
-                        lambda sl=status_label: (
-                            sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                        ),
-                    )
+                    def set_stroop_complete(pv: tk.DoubleVar) -> None:
+                        if pv.winfo_exists():
+                            pv.set(100)
+
+                    self.root.after(0, lambda pv=progress_var: set_stroop_complete(pv))
+
+                    def set_stroop_status_complete(sl: ttk.Label) -> None:
+                        if sl.winfo_exists():
+                            sl.config(text="Analysis complete!")
+
+                    self.root.after(0, lambda sl=status_label: set_stroop_status_complete(sl))
 
                     # Analyze results
                     analysis = task.analyze_results()
@@ -3731,15 +3781,19 @@ class APGIGui:
                     summary += f"\nStroop Effect: {analysis['stroop_effect_ms']:.0f}ms\n"
                     summary += f"Interference Score: {analysis['interference_score']:.2f}\n"
 
+                    def insert_stroop_summary(s: str, rt: "scrolledtext.ScrolledText") -> None:
+                        if rt.winfo_exists():
+                            rt.insert(tk.END, s)
+
                     self.root.after(
-                        0,
-                        lambda s=summary, rt=results_text: (
-                            rt.insert(tk.END, s) if rt.winfo_exists() else None
-                        ),
+                        0, lambda s=summary, rt=results_text: insert_stroop_summary(s, rt)
                     )
-                    self.root.after(
-                        0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None
-                    )
+
+                    def scroll_stroop_summary(rt: "scrolledtext.ScrolledText") -> None:
+                        if rt.winfo_exists():
+                            rt.see(tk.END)
+
+                    self.root.after(0, lambda rt=results_text: scroll_stroop_summary(rt))
 
                     # Save results
                     import datetime
@@ -3753,7 +3807,7 @@ class APGIGui:
                     )
 
                     # Add close button
-                    def close_and_show_results():
+                    def close_and_show_results() -> None:
                         progress_dialog.destroy()
                         task.print_results(analysis)
                         messagebox.showinfo(
@@ -3765,12 +3819,12 @@ class APGIGui:
                             f"Results saved to:\n{filename}",
                         )
 
-                    self.root.after(
-                        0,
-                        lambda: ttk.Button(
+                    def add_close_button() -> None:
+                        ttk.Button(
                             progress_dialog, text="Close", command=close_and_show_results
-                        ).pack(pady=5),
-                    )
+                        ).pack(pady=5)
+
+                    self.root.after(0, add_close_button)
 
                 except Exception:
                     self.root.after(
@@ -4681,9 +4735,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                     trend_direction = (
                         "increasing"
                         if slope > 0.001
-                        else "decreasing"
-                        if slope < -0.001
-                        else "stable"
+                        else "decreasing" if slope < -0.001 else "stable"
                     )
                 else:
                     trend_direction = "insufficient data"
@@ -5077,11 +5129,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                         significance = (
                             "***"
                             if p_val < 0.001
-                            else "**"
-                            if p_val < 0.01
-                            else "*"
-                            if p_val < 0.05
-                            else ""
+                            else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
                         )
                         text_widget.insert(
                             tk.END, f"  {var2}: r={corr:.3f} {significance} (p={p_val:.3f})\n"
@@ -5246,9 +5294,9 @@ For more information, visit: https://github.com/lesoto/apgi-system
             if hasattr(self, "log_text") and self.log_text.winfo_exists():
                 self.log_text.insert(tk.END, message)
                 self.log_text.see(tk.END)
-        except Exception:
+        except Exception as e:
             # Ignore errors during shutdown
-            pass
+            logger.error(f"Error: {e}")
 
     def _update_status(self, message: str) -> None:
         """Update status bar message (thread-safe)."""
@@ -5261,9 +5309,15 @@ For more information, visit: https://github.com/lesoto/apgi-system
         try:
             if hasattr(self, "status_text") and self.status_text.winfo_exists():
                 self.status_text.config(text=message)
-        except Exception:
+        except Exception as e:
             # Ignore errors during shutdown
-            pass
+            logger.error(f"Error: {e}")
+
+    def _get_thread_safe_speed(self) -> float:
+        """Get simulation speed in a thread-safe manner."""
+        if hasattr(self, "_speed_value"):
+            return self._speed_value
+        return 1.0
 
     def _update_speed_cache(self) -> None:
         """Update thread-safe speed cache and label."""
@@ -5271,10 +5325,12 @@ For more information, visit: https://github.com/lesoto/apgi-system
             if hasattr(self, "speed_var") and hasattr(self, "speed_label"):
                 if self.speed_label.winfo_exists():
                     self._speed_value = self.speed_var.get()
-                    self.speed_label.config(text=f"{self._speed_value:.1f}x")
-        except Exception:
+                    # Safely update label on main thread
+                    new_text = f"{self._speed_value:.1f}x"
+                    self.root.after(0, lambda: self.speed_label.config(text=new_text))
+        except Exception as e:
             # Ignore errors during shutdown
-            pass
+            logger.debug(f"Error updating speed cache: {e}")
 
     def _setup_param_cache(self) -> None:
         """Set up thread-safe parameter cache with traces."""
@@ -5298,8 +5354,8 @@ For more information, visit: https://github.com/lesoto/apgi-system
                 var = self.param_vars[param_name]
                 if hasattr(var, "get"):
                     self._param_cache[param_name] = var.get()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error: {e}")
 
     def _show_help(self) -> None:
         """Show comprehensive help dialog."""
@@ -5376,39 +5432,59 @@ For more information, visit the documentation or contact support.
     def _toggle_parameter_panel(self) -> None:
         """Toggle parameter panel visibility."""
         try:
-            if hasattr(self, "param_frame"):
-                current_state = self.param_frame.winfo_ismapped()
-                if current_state:
-                    self.param_frame.pack_forget()
-                    self._log_event("Parameter panel hidden")
-                else:
-                    self.param_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-                    self._log_event("Parameter panel shown")
+            # Robust check for frame existence and validity
+            if getattr(self, "param_frame", None) is not None:
+                try:
+                    if self.param_frame.winfo_exists():
+                        current_state = self.param_frame.winfo_ismapped()
+                        if current_state:
+                            self.param_frame.pack_forget()
+                            self._log_event("Parameter panel hidden")
+                        else:
+                            self.param_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                            self._log_event("Parameter panel shown")
+                except tk.TclError:
+                    # Widget destroyed but reference still exists
+                    self._log_event("Warning: Parameter panel widget destroyed")
+            else:
+                self._log_event("Parameter panel not yet initialized")
         except Exception as e:
             self._log_event(f"Error toggling parameter panel: {e}")
 
     def _toggle_log_panel(self) -> None:
         """Toggle log panel visibility."""
         try:
-            if hasattr(self, "log_frame"):
-                current_state = self.log_frame.winfo_ismapped()
-                if current_state:
-                    self.log_frame.pack_forget()
-                    self._log_event("Log panel hidden")
-                else:
-                    self.log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-                    self._log_event("Log panel shown")
+            # Robust check for frame existence and validity
+            if getattr(self, "log_frame", None) is not None:
+                try:
+                    if self.log_frame.winfo_exists():
+                        current_state = self.log_frame.winfo_ismapped()
+                        if current_state:
+                            self.log_frame.pack_forget()
+                            self._log_event("Log panel hidden")
+                        else:
+                            self.log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                            self._log_event("Log panel shown")
+                except tk.TclError:
+                    # Widget destroyed but reference still exists
+                    self._log_event("Warning: Log panel widget destroyed")
+            else:
+                self._log_event("Log panel not yet initialized")
         except Exception as e:
             self._log_event(f"Error toggling log panel: {e}")
 
-    def _handle_tab_navigation(self, event: tk.Event) -> Optional[str]:
+    def _handle_tab_navigation(self, event: tk.Event) -> str:
         """Handle Tab key navigation."""
-        # Allow default Tkinter tab navigation
+        next_widget = event.widget.tk_focusNext()
+        if next_widget is not None:
+            next_widget.focus_set()
         return "break"
 
-    def _handle_shift_tab_navigation(self, event: tk.Event) -> Optional[str]:
+    def _handle_shift_tab_navigation(self, event: tk.Event) -> str:
         """Handle Shift+Tab key navigation."""
-        # Allow default Tkinter shift+tab navigation
+        prev_widget = event.widget.tk_focusPrev()
+        if prev_widget is not None:
+            prev_widget.focus_set()
         return "break"
 
     def _cycle_notebook_tabs(self, direction: int) -> None:
@@ -5465,17 +5541,17 @@ def main():
                 )
                 error_root.destroy()
 
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error: {e}")
 
             return
 
-    except ImportError:
+    except ImportError as e:
         # Silently continue if dependency checker is not available
-        pass
-    except Exception:
+        logger.error(f"Error: {e}")
+    except Exception as e:
         # Silently continue if dependency check fails
-        pass
+        logger.error(f"Error: {e}")
 
     # Create main application
     root = tk.Tk()

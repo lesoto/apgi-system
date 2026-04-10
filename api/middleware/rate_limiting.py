@@ -143,6 +143,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             return "task:execute"
         elif path == "/v1/auth/login" and method == "POST":
             return "auth:login"
+        elif path == "/v1/auth/refresh" and method == "POST":
+            return "auth:refresh"
         else:
             return "global"
 
@@ -265,8 +267,18 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
             # Try in-memory fallback rate limiting
             try:
+                # Use more restrictive limits in fallback mode to compensate for lack of synchronization
+                # across multi-instance deployments when Redis is unavailable.
+                default_limit, default_window = self.fallback_rate_limiter._get_limit_config(
+                    endpoint
+                )
+                fallback_limit = max(1, int(default_limit / 4))  # 25% of normal limit
+
                 result = await self.fallback_rate_limiter.check_rate_limit(
-                    client_id=client_id, endpoint=endpoint
+                    client_id=client_id,
+                    endpoint=endpoint,
+                    limit=fallback_limit,
+                    window_seconds=default_window,
                 )
 
                 # Get rate limit headers

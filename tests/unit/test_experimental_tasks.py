@@ -918,7 +918,7 @@ class TestBinocularRivalryTask:
         assert np.max(np.abs(pattern_a)) < 10.0
         assert np.max(np.abs(pattern_b)) < 10.0
 
-    def test_rivalry_stimulus_creation(self):
+    def test_rivalry_stimulus_creation(self) -> None:
         """Test that rivalry stimulus combines patterns correctly."""
         task = BinocularRivalryTask(num_trials=1)
         trial = task.trials[0]
@@ -933,7 +933,7 @@ class TestBinocularRivalryTask:
         # Stimuli should vary over time (temporal dynamics)
         assert not np.allclose(stimulus_t0, stimulus_t1)
 
-    def test_single_trial_execution(self, apgi_system):
+    def test_single_trial_execution(self, apgi_system) -> None:
         """Test running a single rivalry trial."""
         task = BinocularRivalryTask(
             trial_duration_ms=5000.0,  # Short trial for testing
@@ -958,7 +958,7 @@ class TestBinocularRivalryTask:
         # Dominance ratio should be between 0 and 1
         assert 0.0 <= result.pattern_a_dominance_ratio <= 1.0
 
-    def test_dominance_period_tracking(self, apgi_system):
+    def test_dominance_period_tracking(self, apgi_system) -> None:
         """Test that dominance periods are tracked correctly."""
         task = BinocularRivalryTask(
             trial_duration_ms=3000.0,
@@ -978,7 +978,7 @@ class TestBinocularRivalryTask:
             assert period.end_time >= period.start_time
             assert period.duration == period.end_time - period.start_time
 
-    def test_analysis_structure(self, apgi_system):
+    def test_analysis_structure(self, apgi_system) -> None:
         """Test that analysis returns expected structure."""
         task = BinocularRivalryTask(
             trial_duration_ms=2000.0,
@@ -1001,7 +1001,7 @@ class TestBinocularRivalryTask:
         assert "dominance_duration_distribution" in analysis
         assert "task_parameters" in analysis
 
-    def test_analysis_with_no_results(self):
+    def test_analysis_with_no_results(self) -> None:
         """Test that analysis handles empty results gracefully."""
         task = BinocularRivalryTask(num_trials=1)
         task.results = []
@@ -1011,7 +1011,7 @@ class TestBinocularRivalryTask:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system):
+    def test_task_reset(self, apgi_system) -> None:
         """Test that task reset works correctly."""
         task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
 

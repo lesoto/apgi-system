@@ -10,7 +10,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -47,19 +47,19 @@ class StructuredLogger:
         }
         return json.dumps(log_entry)
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log info message with structured data."""
         self.logger.info(self._format_log_entry("INFO", message, **kwargs))
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log warning message with structured data."""
         self.logger.warning(self._format_log_entry("WARNING", message, **kwargs))
 
-    def error(self, message: str, **kwargs):
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log error message with structured data."""
         self.logger.error(self._format_log_entry("ERROR", message, **kwargs))
 
-    def debug(self, message: str, **kwargs):
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log debug message with structured data."""
         self.logger.debug(self._format_log_entry("DEBUG", message, **kwargs))
 
@@ -79,7 +79,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.logger = StructuredLogger("api.requests")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Response]
+    ) -> Response:
         """
         Process request and log details.
 
@@ -116,6 +118,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 status_code=response.status_code,
                 duration_ms=round(duration_ms, 2),
                 client_id=client_id,
+                headers=self._sanitize_headers(request.headers),
                 user_agent=request.headers.get("user-agent", "unknown"),
             )
 
@@ -144,6 +147,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Re-raise exception to be handled by exception handlers
             raise
 
+    def _sanitize_headers(self, headers: Any) -> Dict[str, str]:
+        """Mask sensitive headers before logging."""
+        sanitized = {}
+        sensitive = {"authorization", "cookie", "x-csrf-token", "proxy-authorization", "set-cookie"}
+        for k, v in headers.items():
+            if k.lower() in sensitive:
+                sanitized[k] = "[REDACTED]"
+            else:
+                sanitized[k] = v
+        return sanitized
+
 
 class ResponseLoggingMiddleware(BaseHTTPMiddleware):
     """
@@ -159,7 +173,9 @@ class ResponseLoggingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.logger = StructuredLogger("api.responses")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Response]
+    ) -> Response:
         """
         Process request and log sanitized response body.
 
@@ -221,7 +237,7 @@ class ResponseLoggingMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def _sanitize_json(self, data):
+    def _sanitize_json(self, data: Any) -> Any:
         """
         Recursively sanitize JSON data by removing sensitive fields.
 
@@ -250,7 +266,7 @@ class ErrorLoggingHandler:
     Handler for logging errors with full context and stack traces.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = StructuredLogger("api.errors")
 
     def log_error(
@@ -258,8 +274,8 @@ class ErrorLoggingHandler:
         error: Exception,
         request: Optional[Request] = None,
         error_code: Optional[str] = None,
-        **context,
-    ):
+        **context: Any,
+    ) -> None:
         """
         Log error with full context.
 
@@ -298,7 +314,7 @@ class ErrorLoggingHandler:
 error_logger = ErrorLoggingHandler()
 
 
-def configure_structured_logging(log_level: str = "INFO"):
+def configure_structured_logging(log_level: str = "INFO") -> None:
     """
     Configure Python logging to use structured format.
 

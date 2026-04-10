@@ -343,3 +343,29 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self) -> str:
         return f"<WebhookDelivery(delivery_id={self.delivery_id}, status={self.status})>"
+
+
+class AlertLog(Base):  # type: ignore[misc, valid-type]
+    """System and security alert log."""
+
+    __tablename__ = "alert_logs"
+
+    alert_id = Column(
+        Integer, primary_key=True, autoincrement=True, comment="Primary key for alert log"
+    )
+    title = Column(String(255), nullable=False, index=True, comment="Alert title")
+    message = Column(Text, nullable=False, comment="Alert message")
+    severity = Column(String(20), nullable=False, index=True, comment="Alert severity level")
+    timestamp = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+        comment="Time of alert occurrence",
+    )
+    metadata_json = Column(JSON, nullable=True, comment="Additional alert metadata")
+    resolved = Column(Boolean, nullable=False, default=False, comment="Whether alert is resolved")
+    resolved_at = Column(DateTime(timezone=True), nullable=True, comment="Resolution timestamp")
+
+    def __repr__(self) -> str:
+        return f"<AlertLog(id={self.alert_id}, title={self.title}, severity={self.severity})>"

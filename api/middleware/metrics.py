@@ -188,7 +188,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
         return False
 
-    def _update_system_metrics(self):
+    def _update_system_metrics(self) -> None:
         """Update system-level metrics (memory and CPU usage)."""
         try:
             # Memory usage
@@ -209,7 +209,7 @@ class MetricsCollector:
     """
 
     @staticmethod
-    def set_active_sessions(count: int):
+    def set_active_sessions(count: int) -> None:
         """
         Update the active sessions gauge.
 
@@ -219,7 +219,7 @@ class MetricsCollector:
         active_sessions.set(count)
 
     @staticmethod
-    def set_task_queue_length(count: int):
+    def set_task_queue_length(count: int) -> None:
         """
         Update the task queue length gauge.
 

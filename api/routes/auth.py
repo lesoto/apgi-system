@@ -182,9 +182,7 @@ async def logout(
         if len(parts) == 2 and parts[0].lower() == "bearer":
             access_token = parts[1]
             # Blacklist the access token with its expiration time
-            from datetime import datetime
-
-            expires_at = datetime.fromtimestamp(current_user.exp)
+            expires_at = current_user.exp
             await auth_manager.blacklist_access_token(access_token, expires_at)
 
     # Return 204 No Content (no response body)

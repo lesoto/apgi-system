@@ -175,7 +175,7 @@ class ConfigValidator:
             "interoception": {
                 "required": True,
                 "fields": {
-                    "body_states": {"type": list, "required": True},
+                    "body_states": {"type": list, "required": True, "element_type": dict},
                     "prediction_lead_ms": {
                         "type": (int, float),
                         "required": True,
@@ -234,30 +234,39 @@ class ConfigValidator:
             "visualization": {"required": False, "fields": {}},
         }
 
-    def validate(self, config: Dict[str, Any]) -> None:
+    def validate(self, config: Dict[str, Any]) -> List[str]:
         """
         Validate configuration and raise exception if invalid.
+        Returns a list of warnings if validation succeeds.
 
         Parameters
         ----------
         config : Dict[str, Any]
             Configuration dictionary to validate
 
+        Returns
+        -------
+        List[str]
+            List of validation warnings (if any)
+
         Raises
         ------
         ConfigValidationError
             If configuration is invalid
-
-        Examples
-        --------
-        >>> validator = ConfigValidator()
-        >>> config = {"system": {"timestep_ms": 1.0}, ...}
-        >>> validator.validate(config)
         """
         errors = self.validate_with_details(config)
+        warnings_list = self.validate_parameter_ranges(config)
+
+        # Always surface warnings via the warnings module
+        for warning in warnings_list:
+            warnings.warn(warning, ConfigValidationWarning)
+
+        # Critical errors block execution
         if errors:
             error_msg = self._format_errors(errors)
             raise ConfigValidationError(f"Configuration validation failed:\n{error_msg}")
+
+        return warnings_list
 
     def validate_with_details(self, config: Dict[str, Any]) -> List[str]:
         """
@@ -423,9 +432,16 @@ class ConfigValidator:
     ) -> List[str]:
         """Validate list elements are numeric for range fields."""
         errors = []
-        if isinstance(field_value, list) and "length" in field_schema:
+        if isinstance(field_value, list):
+            element_type = field_schema.get("element_type")
             for i, val in enumerate(field_value):
-                if not isinstance(val, (int, float)):
+                if element_type and not isinstance(val, element_type):
+                    errors.append(
+                        f"Field '{field_path}[{i}]' has wrong type: "
+                        f"expected {element_type.__name__}, got {type(val).__name__}"
+                    )
+                elif "length" in field_schema and not isinstance(val, (int, float)):
+                    # Default for range-limited lists is numeric
                     errors.append(
                         f"Field '{field_path}[{i}]' must be numeric, got {type(val).__name__}"
                     )

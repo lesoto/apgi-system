@@ -336,6 +336,11 @@ def require_any_role(roles: List[Role]):
 # ============================================================================
 
 
+# ============================================================================
+# Resource Ownership Checks
+# ============================================================================
+
+
 def check_resource_ownership(
     resource_owner_id: str, current_user: TokenPayload, allow_admin: bool = True
 ) -> None:
@@ -359,3 +364,32 @@ def check_resource_ownership(
         return
 
     raise AuthorizationError(resource="resource", action="access", required_role="owner or admin")
+
+
+async def verify_session_owner(
+    session_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> None:
+    """
+    FastAPI dependency to verify that the current user owns the specified session.
+    Admins are always allowed access.
+
+    Args:
+        session_id: The ID of the session to check
+        current_user: The authenticated user payload
+
+    Raises:
+        HTTPException: 404 if session not found, 403 if not authorized
+    """
+    from api.services.session_manager import get_session_manager
+    from api.exceptions import SessionNotFoundError
+    from fastapi import HTTPException
+
+    manager = get_session_manager()
+    try:
+        sim_session = await manager.get_session(session_id)
+        check_resource_ownership(sim_session.user_id, current_user)
+    except ValueError:
+        raise SessionNotFoundError(session_id)
+    except AuthorizationError as e:
+        raise HTTPException(status_code=403, detail=str(e))
