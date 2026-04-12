@@ -76,9 +76,9 @@ class TestCoreSystemProperties:
 
             for obs in observations:
                 state = apgi_system.step(obs)
-                # Extract free energy from active inference info
-                if "active_inference" in state:
-                    fe = state["active_inference"].get("free_energy", 0.0)
+                # Extract free energy from state
+                if "free_energy" in state:
+                    fe = state["free_energy"]
                 else:
                     # Fallback: compute from prediction errors
                     fe = np.sum(obs**2)  # Simplified free energy proxy

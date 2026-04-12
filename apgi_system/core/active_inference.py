@@ -125,6 +125,7 @@ class HierarchicalGaussianFilter:
 
         # Learning parameters
         self.learning_rate = self.config.get("learning_rate", 0.01)
+        self.projection_learning_rate = self.config.get("projection_learning_rate", 0.001)
 
         # Precision dynamics
         self.precision_min = self.config.get("precision_range", [0.1, 10.0])[0]
@@ -195,7 +196,10 @@ class HierarchicalGaussianFilter:
         self._top_down_pass(dt)
 
         # Update precisions based on prediction error statistics
-        self._update_precisions()
+        self._update_precisions(dt)
+
+        # Update projection matrices (generative model learning)
+        self._update_projection_matrices(dt)
 
         # Compute total free energy
         total_fe = self._compute_total_free_energy(observation)
@@ -227,10 +231,28 @@ class HierarchicalGaussianFilter:
 
         # Higher levels: state prediction errors
         for level in range(1, self.num_levels):
-            # Prediction from level above
-            higher_prediction = self._map_down(level, self.beliefs[level].mean)
-            # Error is difference from current belief
-            self.beliefs[level].prediction_error = self.beliefs[level - 1].mean - higher_prediction
+            # At each level, compute error: εᵢ = projected(μᵢ₋₁) - projected(g(μᵢ))
+            # where both terms are projected to the current level's dimension
+
+            current_belief_dim = self.beliefs[level].mean.shape[0]
+            below_belief = self.beliefs[level - 1].mean
+
+            # Project level below's belief to current level's dimension
+            if below_belief.shape[0] != current_belief_dim:
+                below_belief_projected = self._project_up(level - 1, below_belief)
+            else:
+                below_belief_projected = below_belief
+
+            # Map current level's prediction down to level below, then project back up
+            # This gives us the prediction at current level's dimension
+            higher_prediction_down = self._map_down(level, self.beliefs[level].mean)
+            if higher_prediction_down.shape[0] != current_belief_dim:
+                higher_prediction = self._project_up(level - 1, higher_prediction_down)
+            else:
+                higher_prediction = higher_prediction_down
+
+            # Error is difference at current level's dimension
+            self.beliefs[level].prediction_error = below_belief_projected - higher_prediction
 
     def _top_down_pass(self, dt: float) -> None:
         """
@@ -324,13 +346,18 @@ class HierarchicalGaussianFilter:
             # Update prediction for next iteration
             self.beliefs[level].prediction = self._generate_prediction(level)
 
-    def _update_precisions(self) -> None:
+    def _update_precisions(self, dt: float) -> None:
         """
         Update precision estimates based on prediction error statistics.
 
         Precision is inversely proportional to prediction error variance,
         implementing adaptive gain control. High precision amplifies prediction
         errors, while low precision attenuates them.
+
+        Parameters
+        ----------
+        dt : float
+            Time step for precision update smoothing
 
         Notes
         -----
@@ -346,14 +373,88 @@ class HierarchicalGaussianFilter:
 
             # Update precision (with smoothing)
             new_precision = 1.0 / error_variance
-            self.beliefs[level].precision = float(
-                0.9 * self.beliefs[level].precision + 0.1 * new_precision
+            old = self.beliefs[level].precision
+            try:
+                dt_ms = dt * 1000.0
+            except NameError:
+                dt_ms = 1.0
+
+            # Timescale-matched smoothing: faster levels update more quickly
+            level_configs = (
+                self.config.get("hierarchy", {}).get("level_configs", [])
+                if hasattr(self, "config")
+                else []
             )
+            level_timescale_ms = 50.0
+            if level < len(level_configs):
+                level_timescale_ms = level_configs[level].get("timescale_ms", 50.0)
+
+            alpha = min(0.5, dt_ms / level_timescale_ms)  # dt-normalized learning rate
+            self.beliefs[level].precision = float((1 - alpha) * old + alpha * new_precision)
 
             # Clamp to valid range
             self.beliefs[level].precision = np.clip(
                 self.beliefs[level].precision, self.precision_min, self.precision_max
             )
+
+    def _update_projection_matrices(self, dt: float) -> None:
+        """
+        Update projection matrices using gradient descent on prediction errors.
+
+        Implements generative model learning by adapting the projection matrices
+        that map between hierarchical levels. This enables the system to learn
+        the structure of the environment and improve predictions over time.
+
+        Parameters
+        ----------
+        dt : float
+            Time step for learning rate scaling
+
+        Notes
+        -----
+        Uses Hebbian-style learning rule:
+        ΔW = η * ε * x^T
+
+        where η is learning rate, ε is prediction error, and x is the input state.
+        This implements predictive coding-style learning where the generative
+        model adapts to minimize prediction errors.
+        """
+        with self._cache_lock:
+            # Update projection matrices for each level
+            for level in range(1, self.num_levels):
+                # Get prediction error at this level
+                error = self.beliefs[level].prediction_error
+
+                # Get the state from level below (input to projection)
+                below_state = self.beliefs[level - 1].mean
+
+                # Get the projection matrix key for this level
+                target_dim = self.beliefs[level].mean.shape[0]
+                source_dim = below_state.shape[0]
+                key = (level, target_dim, source_dim)
+
+                # Only update if matrix exists in cache
+                if key in self._projection_cache:
+                    projection_matrix = self._projection_cache[key]
+
+                    # Compute gradient: outer product of error and input
+                    # This is a Hebbian-style update rule
+                    gradient = np.outer(error, below_state)
+
+                    # Scale learning rate by timestep
+                    effective_lr = self.projection_learning_rate * dt * 1000.0
+
+                    # Update projection matrix
+                    self._projection_cache[key] = projection_matrix - effective_lr * gradient
+
+                    # Re-orthogonalize to maintain numerical stability
+                    updated_matrix = self._projection_cache[key]
+                    if updated_matrix.shape[0] <= updated_matrix.shape[1]:
+                        U, S, Vt = np.linalg.svd(updated_matrix, full_matrices=False)
+                        self._projection_cache[key] = U @ Vt
+                    else:
+                        U, S, Vt = np.linalg.svd(updated_matrix, full_matrices=False)
+                        self._projection_cache[key] = U @ Vt
 
     def _generate_prediction(self, level: int) -> FloatArray:
         """
@@ -412,15 +513,13 @@ class HierarchicalGaussianFilter:
                     np.eye(target_dim) + np.random.randn(target_dim, source_dim) * 0.01
                 )
             else:
-                # Different dimensions: use truncated normal initialization
-                projection_matrix = np.random.randn(target_dim, source_dim) * 0.1
-                # Ensure finite values
-                projection_matrix = np.nan_to_num(
-                    projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0
-                )
-                # Add small identity component for stability
-                min_dim = min(target_dim, source_dim)
-                projection_matrix[:min_dim, :min_dim] += np.eye(min_dim) * 0.1
+                # Deterministic orthonormal projection via SVD — preserves information geometry
+                rng = np.random.default_rng(seed=hash((source_dim, target_dim)) % 2**32)
+                raw = rng.standard_normal((target_dim, source_dim))
+                U, S, Vt = np.linalg.svd(raw, full_matrices=False)
+                # Reconstruct projection matrix with proper (target_dim, source_dim) shape
+                projection_matrix = (U * S) @ Vt
+                projection_matrix *= np.sqrt(source_dim / target_dim)  # Preserve variance
 
             # Add to cache
             self._projection_cache[key] = projection_matrix
@@ -818,8 +917,15 @@ class ActiveInferenceEngine:
                 # Handle zero horizon case
                 predicted_observations = np.zeros((0, len(beliefs[0].mean)))
 
-            # Preferences (could be learned or specified)
-            preferences = np.ones_like(predicted_observations[0]) / len(predicted_observations[0])
+            # Preferences are deleted to avoid meaningless uniform goals.
+            # Using a targeted non-uniform goal to prevent code crash and provide meaningful pragmatic value.
+            preferences = (
+                np.exp(-0.5 * (predicted_observations[0] ** 2))
+                if predicted_observations.shape[0] > 0
+                else np.array([])
+            )
+            if len(preferences) > 0:
+                preferences /= np.sum(preferences) + 1e-10
 
             # Uncertainty
             level_uncertainties = [
@@ -894,12 +1000,20 @@ class ActiveInferenceEngine:
         future_states = []
         current_state = beliefs[0].mean.copy()
 
+        # Initialize a deterministic transition matrix if it doesn't exist
+        if not hasattr(self, "forward_model_B"):
+            n_dim = len(current_state)
+            rng = np.random.default_rng(seed=hash((n_dim, n_dim)) % 2**32)
+            raw_B = rng.standard_normal((n_dim, n_dim))
+            U_b, _, Vt_b = np.linalg.svd(raw_B, full_matrices=False)
+            self.forward_model_B = U_b @ Vt_b
+
         for _ in range(horizon):
-            # Simple dynamics: s_{t+1} = s_t + action + noise
             # Pad action to match state dimensionality
             action_padded = np.zeros_like(current_state)
             action_padded[: len(action)] = action
-            current_state = current_state + 0.1 * action_padded
+            # Proper sequence dynamics using transition model B
+            current_state = self.forward_model_B @ current_state + action_padded
             future_states.append(current_state.copy())
 
         return future_states

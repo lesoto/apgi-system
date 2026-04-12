@@ -219,7 +219,10 @@ class APGISystem:
 
         # Update threshold with metabolic state
         metabolic_info = self.metabolism.update(
-            ignition_occurred=ignition_occurred, task_active=True, dt=dt
+            ignition_occurred=ignition_occurred,
+            task_active=True,
+            dt=dt,
+            broadcast_content=extero_input,
         )
 
         self.ignition_threshold.update_metabolic_state(

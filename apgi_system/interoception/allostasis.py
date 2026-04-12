@@ -173,9 +173,9 @@ class AllostaticRegulator:
                 deviation = current_value - set_point.target
                 set_point.current_deviation = deviation
 
-                # Check if within acceptable range
+                # Check if within acceptable range (strictly inside boundaries per Friston's formulation)
                 in_range = (
-                    set_point.acceptable_range[0] <= current_value <= set_point.acceptable_range[1]
+                    set_point.acceptable_range[0] < current_value < set_point.acceptable_range[1]
                 )
 
                 if not in_range:

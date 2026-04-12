@@ -206,19 +206,23 @@ class OscillationEngine:
             # Generate signal
             signal = amplitude * np.sin(band.phase)
 
-            # Apply phase-amplitude coupling
+            # Apply phase-amplitude coupling (proper multiplicative gating)
             if band_name == "gamma":
                 # Gamma amplitude modulated by theta phase
                 if "theta" in self.bands:
                     theta_phase = self.bands["theta"].phase
-                    pac_modulation = 1.0 + self.coupling_strength * np.cos(theta_phase)
-                    signal *= pac_modulation
+                    pac_modulation = (1.0 + np.cos(theta_phase)) / 2.0
+                    signal *= (
+                        1.0 - self.coupling_strength
+                    ) + self.coupling_strength * pac_modulation
 
             if band_name == "gamma" and "alpha" in self.bands:
                 # Alpha-gamma coupling for attention
                 alpha_phase = self.bands["alpha"].phase
-                alpha_modulation = 1.0 + 0.5 * self.coupling_strength * np.sin(alpha_phase)
-                signal *= alpha_modulation
+                alpha_modulation = (1.0 + np.cos(alpha_phase)) / 2.0
+                signal *= (1.0 - self.coupling_strength * 0.5) + (
+                    self.coupling_strength * 0.5
+                ) * alpha_modulation
 
             band_signals[band_name] = signal
             total_signal += signal
@@ -260,7 +264,7 @@ class OscillationEngine:
             alpha_phase = self.bands["alpha"].phase
             gamma_power = self.bands["gamma"].power
 
-            coupling = gamma_power * np.sin(alpha_phase)
+            coupling = gamma_power * np.cos(alpha_phase)
             metrics["alpha_gamma_coupling"] = float(coupling)
 
         # Beta power (predictive signaling)

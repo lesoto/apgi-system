@@ -395,26 +395,20 @@ class GlobalWorkspace:
             original_magnitude = 1e-10
 
         # Recurrent amplification (increases magnitude)
-        amplification = 1.0 + (self.amplification_gain - 1.0) * (
-            self.state_time / self.amplification_duration_ms
+        # Apply principled recurrent damping using tanh to organically saturate growth without hard ceilings
+        time_factor = self.state_time / self.amplification_duration_ms
+        current_magnitude = np.linalg.norm(self.current_content.content) + 1e-10
+        # Saturation curve that smoothly approaches the maximum gain limit
+        target_magnitude = original_magnitude * (
+            1.0 + (self.amplification_gain - 1.0) * np.tanh(time_factor * 2.5)
         )
 
         # Apply amplification
-        self.current_content.content *= amplification
+        self.current_content.content *= target_magnitude / current_magnitude
 
-        # Normalize to prevent unbounded growth
-        current_magnitude = np.linalg.norm(self.current_content.content)
-        max_allowed_magnitude = (
-            original_magnitude * self.amplification_gain * 2.0
-        )  # Allow some growth but prevent explosion
-
-        if current_magnitude > max_allowed_magnitude:
-            # Scale down to prevent unbounded growth
-            scale_factor = max_allowed_magnitude / current_magnitude
-            self.current_content.content *= scale_factor
-
-        # Add noise for realism
-        noise = np.random.randn(*self.current_content.content.shape) * 0.01
+        # Add noise for realism, scaled by the content magnitude properly
+        signal_mean_abs = np.mean(np.abs(self.current_content.content)) + 1e-6
+        noise = np.random.randn(*self.current_content.content.shape) * (0.01 * signal_mean_abs)
         self.current_content.content += noise
 
     def _broadcast_to_subscribers(self) -> None:

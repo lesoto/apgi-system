@@ -80,8 +80,15 @@ class MetabolicBudget:
 
         self.current_reserves = self.total_budget
         self.total_consumed = 0.0
+        self.reference_magnitude = thermo_config.get("reference_magnitude", 1.0)
 
-    def update(self, ignition_occurred: bool, task_active: bool, dt: float = 1.0) -> Dict[str, Any]:
+    def update(
+        self,
+        ignition_occurred: bool,
+        task_active: bool,
+        dt: float = 1.0,
+        broadcast_content: Any = None,
+    ) -> Dict[str, Any]:
         """
         Update metabolic budget based on system activity.
 
@@ -111,7 +118,14 @@ class MetabolicBudget:
         consumption = self.baseline_rate * dt / 1000.0
 
         if ignition_occurred:
-            consumption += self.ignition_cost
+            import numpy as np
+
+            # Scale ignition cost by broadcast content magnitude — larger ignitions cost more
+            broadcast_magnitude = (
+                np.linalg.norm(broadcast_content) if broadcast_content is not None else 1.0
+            )
+            normalized_magnitude = np.clip(broadcast_magnitude / self.reference_magnitude, 0.5, 3.0)
+            consumption += self.ignition_cost * normalized_magnitude
 
         if task_active:
             consumption += self.task_overhead * dt / 1000.0
@@ -119,8 +133,9 @@ class MetabolicBudget:
         self.current_reserves -= consumption
         self.total_consumed += consumption
 
-        # Recovery
-        self.current_reserves += self.recovery_rate * dt / 1000.0
+        # Recovery is mathematically only enabled during pauses from task demands
+        if not task_active:
+            self.current_reserves += self.recovery_rate * dt / 1000.0
 
         # Clamp reserves to valid range [0, max_capacity]
         self.current_reserves = max(0.0, min(self.current_reserves, self.total_budget))

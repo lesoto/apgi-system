@@ -342,8 +342,15 @@ class FreeEnergyCalculator:
 
         for t in range(min(horizon, len(predicted_states))):
             # Epistemic value: Expected information gain
-            # Higher uncertainty -> more information gain -> more negative EFE
-            epistemic_value -= np.mean(state_uncertainty[t])
+            # Expected information gain: E[H[prior] - H[posterior]]
+            prior_entropy = 0.5 * np.sum(np.log(2 * np.pi * np.e * state_uncertainty[t] + self.eps))
+            posterior_uncertainty = state_uncertainty[t] / (
+                1.0 + state_uncertainty[t]
+            )  # Bayesian update approx.
+            posterior_entropy = 0.5 * np.sum(
+                np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
+            )
+            epistemic_value -= prior_entropy - posterior_entropy
 
             # Pragmatic value: KL divergence from preferences
             # Lower divergence from preferences -> more negative EFE
@@ -351,7 +358,8 @@ class FreeEnergyCalculator:
             pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)  # Normalize
             pref = preferences / (np.sum(preferences) + self.eps)
 
-            kl_div = np.sum(xlogy(pred_obs, pred_obs / (pref + self.eps)))
+            # Correct direction: KL[predicted || preferences] — minimize divergence TO goal
+            kl_div = np.sum(xlogy(pred_obs + self.eps, (pred_obs + self.eps) / (pref + self.eps)))
             pragmatic_value += kl_div
 
         total_efe = epistemic_value + pragmatic_value
@@ -680,7 +688,12 @@ class FreeEnergyCalculator:
         """
         epistemic_value = 0.0
         for t in range(min(horizon, len(predicted_states))):
-            epistemic_value -= np.mean(state_uncertainty[t])
+            prior_entropy = 0.5 * np.sum(np.log(2 * np.pi * np.e * state_uncertainty[t] + self.eps))
+            posterior_uncertainty = state_uncertainty[t] / (1.0 + state_uncertainty[t])
+            posterior_entropy = 0.5 * np.sum(
+                np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
+            )
+            epistemic_value -= prior_entropy - posterior_entropy
         return float(epistemic_value)
 
     def compute_pragmatic_value(
@@ -711,7 +724,7 @@ class FreeEnergyCalculator:
             pred_obs = predicted_observations[t]
             pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)
             pref = preferences / (np.sum(preferences) + self.eps)
-            kl_div = np.sum(xlogy(pred_obs, pred_obs / (pref + self.eps)))
+            kl_div = np.sum(xlogy(pref + self.eps, (pref + self.eps) / (pred_obs + self.eps)))
             pragmatic_value += kl_div
         return float(pragmatic_value)
 

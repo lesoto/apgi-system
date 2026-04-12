@@ -354,12 +354,14 @@ class IgnitionThreshold:
 
         # Metabolic modulation
         # Low reserves -> higher threshold (conserve energy)
-        metabolic_factor = 1.0 + (1.0 - self.metabolic_reserves) * 0.5
+        m_scalar = self.config.get("ignition", {}).get("metabolic_scaling", 0.5)
+        metabolic_factor = 1.0 + (1.0 - self.metabolic_reserves) * m_scalar
         theta *= metabolic_factor
 
         # Allostatic load modulation
         # High load -> higher threshold (prevent overload)
-        load_factor = 1.0 + self.allostatic_load * 0.3
+        l_scalar = self.config.get("ignition", {}).get("load_scaling", 0.3)
+        load_factor = 1.0 + self.allostatic_load * l_scalar
         theta *= load_factor
 
         # Recent ignition frequency
