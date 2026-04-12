@@ -4205,6 +4205,14 @@ class APGIGUI:
             self.logger.info("Step 3/4: Model warm-up")
 
             try:
+                # Calibrate baseline physiology first to avoid warnings
+                resting_data = [
+                    {"hr": 70, "hrv": 50, "resp": 16, "eda": 5.0},
+                    {"hr": 72, "hrv": 48, "resp": 15, "eda": 5.2},
+                    {"hr": 68, "hrv": 52, "resp": 17, "eda": 4.8},
+                ]
+                assistant.calibrate(resting_data)
+
                 # Run a dummy inference to warm up the models
                 dummy_data = {"hr": 70, "hrv": 50, "resp": 16, "eda": 5.0}
                 _ = assistant.encode_physiology(dummy_data)

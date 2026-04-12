@@ -351,12 +351,14 @@ class FreeEnergyCalculator:
         for t in range(min(horizon, len(predicted_states))):
             # Epistemic value: Expected information gain
             # Expected information gain: E[H[prior] - H[posterior]]
-            prior_entropy = 0.5 * np.sum(np.log(2 * np.pi * np.e * state_uncertainty[t] + self.eps))
+            prior_entropy = 0.5 * np.sum(
+                np.log(2 * np.pi * np.e * state_uncertainty[t] + float(self.eps))
+            )
             posterior_uncertainty = state_uncertainty[t] / (
                 1.0 + state_uncertainty[t]
             )  # Bayesian update approx.
             posterior_entropy = 0.5 * np.sum(
-                np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
+                np.log(2 * np.pi * np.e * posterior_uncertainty + float(self.eps))
             )
             epistemic_value += -(
                 prior_entropy - posterior_entropy
@@ -365,13 +367,17 @@ class FreeEnergyCalculator:
             # Pragmatic value: KL divergence from preferences
             # Lower divergence from preferences -> more negative EFE
             pred_obs = predicted_observations[t]
-            pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)  # Normalize
+            pred_obs = pred_obs / (np.sum(pred_obs) + float(self.eps))  # Normalize
             # Clip preferences to positive values to prevent NaN in log
-            pref_clipped = np.clip(preferences, self.eps, None)
-            pref = pref_clipped / (np.sum(pref_clipped) + self.eps)
+            pref_clipped = np.clip(preferences, float(self.eps), None)
+            pref = pref_clipped / (np.sum(pref_clipped) + float(self.eps))
 
             # KL[pref || pred_obs]: agent minimizes divergence FROM preferred outcomes
-            kl_div = np.sum(xlogy(pref + self.eps, (pref + self.eps) / (pred_obs + self.eps)))
+            kl_div = np.sum(
+                xlogy(
+                    pref + float(self.eps), (pref + float(self.eps)) / (pred_obs + float(self.eps))
+                )
+            )
             pragmatic_value += kl_div
 
         total_efe = epistemic_value + pragmatic_value
@@ -718,10 +724,12 @@ class FreeEnergyCalculator:
         """
         epistemic_value = 0.0
         for t in range(min(horizon, len(predicted_states))):
-            prior_entropy = 0.5 * np.sum(np.log(2 * np.pi * np.e * state_uncertainty[t] + self.eps))
+            prior_entropy = 0.5 * np.sum(
+                np.log(2 * np.pi * np.e * state_uncertainty[t] + float(self.eps))
+            )
             posterior_uncertainty = state_uncertainty[t] / (1.0 + state_uncertainty[t])
             posterior_entropy = 0.5 * np.sum(
-                np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
+                np.log(2 * np.pi * np.e * posterior_uncertainty + float(self.eps))
             )
             epistemic_value += -(prior_entropy - posterior_entropy)  # Negated: should be negative
         return float(epistemic_value)
@@ -752,11 +760,15 @@ class FreeEnergyCalculator:
         pragmatic_value = 0.0
         for t in range(min(horizon, len(predicted_observations))):
             pred_obs = predicted_observations[t]
-            pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)
+            pred_obs = pred_obs / (np.sum(pred_obs) + float(self.eps))
             # Clip preferences to positive values to prevent NaN in log
-            pref_clipped = np.clip(preferences, self.eps, None)
-            pref = pref_clipped / (np.sum(pref_clipped) + self.eps)
-            kl_div = np.sum(xlogy(pref + self.eps, (pref + self.eps) / (pred_obs + self.eps)))
+            pref_clipped = np.clip(preferences, float(self.eps), None)
+            pref = pref_clipped / (np.sum(pref_clipped) + float(self.eps))
+            kl_div = np.sum(
+                xlogy(
+                    pref + float(self.eps), (pref + float(self.eps)) / (pred_obs + float(self.eps))
+                )
+            )
             pragmatic_value += kl_div
         return float(pragmatic_value)
 

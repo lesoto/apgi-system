@@ -18,6 +18,7 @@ Implementation of the APGI framework including:
 """
 
 import json
+import logging
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
@@ -28,6 +29,9 @@ from typing import Any, Callable, Dict, List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+
+# Module logger
+logger = logging.getLogger(__name__)
 
 # Define module exports to prevent import issues
 __all__ = [
@@ -2480,7 +2484,7 @@ class EnhancedSurpriseIgnitionSystem:
         # Initialize state
         self.reset()
 
-        print("✅ Enhanced APGI system initialized with 100% equation implementation")
+        logger.info("Enhanced APGI system initialized with 100%% equation implementation")
 
     def _correct_parameters(self) -> None:
         """Apply corrections to parameters outside valid ranges"""

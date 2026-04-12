@@ -268,23 +268,25 @@ class APGISystemGUI:
         logger = logging.getLogger("APGIGUI")
         logger.setLevel(logging.DEBUG)
 
-        # Console handler
-        console = logging.StreamHandler()
-        console.setLevel(logging.INFO)
+        # Only add handlers if none exist (prevent duplicates)
+        if not logger.handlers:
+            # Console handler
+            console = logging.StreamHandler()
+            console.setLevel(logging.INFO)
 
-        # File handler
-        file_handler = RotatingFileHandler(
-            "apgi_system_gui.log", maxBytes=1024 * 1024, backupCount=5
-        )
-        file_handler.setLevel(logging.DEBUG)
+            # File handler
+            file_handler = RotatingFileHandler(
+                "apgi_system_gui.log", maxBytes=1024 * 1024, backupCount=5
+            )
+            file_handler.setLevel(logging.DEBUG)
 
-        # Formatter
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        console.setFormatter(formatter)
-        file_handler.setFormatter(formatter)
+            # Formatter
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            console.setFormatter(formatter)
+            file_handler.setFormatter(formatter)
 
-        logger.addHandler(console)
-        logger.addHandler(file_handler)
+            logger.addHandler(console)
+            logger.addHandler(file_handler)
 
         return logger
 

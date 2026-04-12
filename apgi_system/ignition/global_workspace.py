@@ -373,7 +373,9 @@ class GlobalWorkspace:
             return
 
         # Compute scores (priority + random noise for tie-breaking)
-        scores = [content.priority + 0.1 * float(self.rng.random()) for content in self.competing_contents]
+        scores = [
+            content.priority + 0.1 * float(self.rng.random()) for content in self.competing_contents
+        ]
 
         # Winner takes all
         winner_idx = np.argmax(scores)

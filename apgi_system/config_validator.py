@@ -277,6 +277,7 @@ class ConfigValidator:
             "oscillations": {"required": False, "fields": {}},
             "validation": {"required": False, "fields": {}},
             "visualization": {"required": False, "fields": {}},
+            "free_energy": {"required": False, "fields": {}},
         }
 
     def validate(self, config: Dict[str, Any]) -> List[str]:

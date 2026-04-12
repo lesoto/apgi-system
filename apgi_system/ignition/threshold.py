@@ -274,8 +274,8 @@ class IgnitionThreshold:
 
         # Canonical APGI: S(t) = ½Π_e·ε_e² + ½Π_i_eff·ε_i²
         # (scalar surprise in nats, not norm-scaled)
-        extero_scalar = float(np.mean(extero_error ** 2))
-        intero_scalar = float(np.mean(intero_error ** 2))
+        extero_scalar = float(np.mean(extero_error**2))
+        intero_scalar = float(np.mean(intero_error**2))
         self.extero_signal = 0.5 * extero_precision * extero_scalar
         self.intero_signal = 0.5 * intero_precision * intero_scalar
 
@@ -390,7 +390,9 @@ class IgnitionThreshold:
 
         dtheta_dt = restoration + somatic_modulation + surprise_feedback + noise
         theta = self.current_threshold + dtheta_dt * dt_sec
-        self.current_threshold = float(np.clip(theta, self.threshold_range[0], self.threshold_range[1]))
+        self.current_threshold = float(
+            np.clip(theta, self.threshold_range[0], self.threshold_range[1])
+        )
 
     def _sigmoid(self, x: float) -> float:
         """

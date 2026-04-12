@@ -193,7 +193,8 @@ class TestPermissionDeniedScenarios:
             pytest.skip("Permission tests behave differently on Windows")
 
         # Try to create directory in root (should fail without sudo)
-        with pytest.raises(PermissionError):
+        # macOS with SIP throws OSError (read-only filesystem), Linux throws PermissionError
+        with pytest.raises((PermissionError, OSError)):
             restricted_path = Path("/restricted_test_dir")
             restricted_path.mkdir(parents=True, exist_ok=False)
 

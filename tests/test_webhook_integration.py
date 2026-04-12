@@ -42,10 +42,11 @@ class TestWebhookValidation:
 
     @pytest.mark.asyncio
     async def test_validate_valid_http_url(self, webhook_manager: WebhookManager) -> None:
-        """Test validation of valid HTTP URL."""
+        """Test validation rejects HTTP URL (HTTPS required for security)."""
         url = "http://example.com/webhook"
-        result = await webhook_manager.validate_webhook_url(url)
-        assert result is True
+        # HTTP URLs should be rejected for security (SSRF protection requires HTTPS)
+        with pytest.raises(ValueError, match="unsafe destination"):
+            await webhook_manager.validate_webhook_url(url)
 
     @pytest.mark.asyncio
     async def test_validate_empty_url(self, webhook_manager: WebhookManager) -> None:

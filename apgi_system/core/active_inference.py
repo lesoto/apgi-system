@@ -626,7 +626,7 @@ class HierarchicalGaussianFilter:
         state = np.clip(state, -state_clip, state_clip)
 
         # Check for divide by zero conditions
-        eps = self.config.get("matrix_epsilon", 1e-10)
+        eps = float(self.config.get("matrix_epsilon", 1e-10))
         if np.any(np.abs(projection_matrix) < eps):
             projection_matrix = np.where(
                 np.abs(projection_matrix) < eps,
