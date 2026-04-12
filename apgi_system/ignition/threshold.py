@@ -9,7 +9,7 @@ Implements dynamic threshold for global ignition based on:
 """
 
 from collections import deque
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -98,7 +98,7 @@ class IgnitionThreshold:
     >>> print(f"Signal: {info['total_signal']:.2f}, Threshold: {info['threshold']:.2f}")
     """
 
-    def __init__(self, config: ConfigDict) -> None:
+    def __init__(self, config: ConfigDict, rng: Optional[np.random.Generator] = None) -> None:
         """
         Initialize ignition threshold system.
 
@@ -137,6 +137,17 @@ class IgnitionThreshold:
         # Components
         self.extero_signal = 0.0
         self.intero_signal = 0.0
+        self.accumulated_signal = 0.0  # persistent S(t) with leaky integration
+        self.tau_S = ignition_config.get("tau_S_ms", 500.0)  # decay time constant (ms)
+        self.sigma_S = ignition_config.get("sigma_S", 0.05)  # noise strength
+        self.tau_theta = ignition_config.get("tau_theta_ms", 30000.0)
+        self.sigma_theta = ignition_config.get("sigma_theta", 0.02)
+        self.theta_0_sleep = ignition_config.get("theta_0_sleep", 0.3)
+        self.theta_0_alert = ignition_config.get("theta_0_alert", 0.7)
+        self.gamma_M = ignition_config.get("gamma_M", -0.3)
+        self.lambda_S = ignition_config.get("lambda_S", 0.1)
+        self._last_signal_update_time: Optional[float] = None
+        self.rng = rng if rng is not None else np.random.default_rng()
 
         # Recent ignition history
         self.refractory_period_ms = ignition_config.get("refractory_period_ms", 200)
@@ -261,19 +272,36 @@ class IgnitionThreshold:
             current_time, "current_time", value_range=(0.0, float("inf"))
         )
 
-        # Exteroceptive component
-        self.extero_signal = float(extero_precision * np.linalg.norm(extero_error))
+        # Canonical APGI: S(t) = ½Π_e·ε_e² + ½Π_i_eff·ε_i²
+        # (scalar surprise in nats, not norm-scaled)
+        extero_scalar = float(np.mean(extero_error ** 2))
+        intero_scalar = float(np.mean(intero_error ** 2))
+        self.extero_signal = 0.5 * extero_precision * extero_scalar
+        self.intero_signal = 0.5 * intero_precision * intero_scalar
 
-        # Interoceptive component with somatic marker modulation
-        self.intero_signal = float(
-            intero_precision * somatic_marker_gain * np.linalg.norm(intero_error)
+        # Leaky integration: dS/dt = -S/τ_S + input + noise
+        input_drive = self.extero_signal + self.intero_signal
+        dt = (
+            current_time
+            if self._last_signal_update_time is None
+            else max(0.0, current_time - self._last_signal_update_time)
         )
-
-        # Total accumulated signal
-        self.current_signal = self.extero_signal + self.intero_signal
+        self._last_signal_update_time = current_time
+        dt_sec = dt / 1000.0
+        tau_s_sec = max(self.tau_S / 1000.0, 1e-6)
+        decay = -self.accumulated_signal / tau_s_sec
+        noise = self.sigma_S * np.sqrt(max(dt_sec, 0.0)) * float(self.rng.normal())
+        self.accumulated_signal = max(
+            0.0, self.accumulated_signal + (decay + input_drive) * dt_sec + noise
+        )
+        self.current_signal = self.accumulated_signal
 
         # Update dynamic threshold
-        self._update_threshold(current_time)
+        self._update_threshold(
+            current_time=current_time,
+            dt=dt,
+            somatic_marker_gain=somatic_marker_gain,
+        )
 
         # Compute ignition probability (sigmoid function)
         diff = self.current_signal - self.current_threshold
@@ -285,7 +313,7 @@ class IgnitionThreshold:
         # Check refractory period
         if (current_time - self.last_ignition_time) >= self.refractory_period_ms:
             # Stochastic ignition based on probability
-            if np.random.rand() < self.ignition_probability:
+            if float(self.rng.random()) < self.ignition_probability:
                 ignition_occurred = True
                 self.last_ignition_time = current_time
                 self.recent_ignitions.append(
@@ -312,7 +340,7 @@ class IgnitionThreshold:
 
         return ignition_occurred, components
 
-    def _update_threshold(self, current_time: float) -> None:
+    def _update_threshold(self, current_time: float, dt: float, somatic_marker_gain: float) -> None:
         """
         Update dynamic threshold based on metabolic and contextual factors.
 
@@ -349,44 +377,20 @@ class IgnitionThreshold:
         The final threshold is clamped to the valid range specified in configuration
         (default: [1.0, 5.0]) to prevent extreme values.
         """
-        # Base threshold
-        theta = self.baseline_threshold
+        # Arousal proxy in [0, 1]: high reserves + low allostatic load => more alert
+        arousal = float(np.clip(self.metabolic_reserves * (1.0 - self.allostatic_load), 0.0, 1.0))
+        theta_0 = self.theta_0_sleep + (1.0 - arousal) * (self.theta_0_alert - self.theta_0_sleep)
 
-        # Metabolic modulation
-        # Low reserves -> higher threshold (conserve energy)
-        m_scalar = self.config.get("ignition", {}).get("metabolic_scaling", 0.5)
-        metabolic_factor = 1.0 + (1.0 - self.metabolic_reserves) * m_scalar
-        theta *= metabolic_factor
+        dt_sec = dt / 1000.0
+        tau_theta_sec = max(self.tau_theta / 1000.0, 1e-6)
+        restoration = (theta_0 - self.current_threshold) / tau_theta_sec
+        somatic_modulation = self.gamma_M * somatic_marker_gain
+        surprise_feedback = self.lambda_S * self.current_signal
+        noise = self.sigma_theta * np.sqrt(max(dt_sec, 0.0)) * float(self.rng.normal())
 
-        # Allostatic load modulation
-        # High load -> higher threshold (prevent overload)
-        l_scalar = self.config.get("ignition", {}).get("load_scaling", 0.3)
-        load_factor = 1.0 + self.allostatic_load * l_scalar
-        theta *= load_factor
-
-        habituation_window_ms = self.config.get("ignition", {}).get("habituation_window_ms", 1000.0)
-        recent_count = len(
-            [
-                ign
-                for ign in self.recent_ignitions
-                if (current_time - ign["time"]) < habituation_window_ms
-            ]
-        )
-
-        habituation_threshold_count = self.config.get("ignition", {}).get(
-            "habituation_threshold_count", 3
-        )
-        if recent_count > habituation_threshold_count:
-            habituation_factor = self.config.get("ignition", {}).get("habituation_factor", 0.1)
-            frequency_factor = (
-                1.0 + (recent_count - habituation_threshold_count) * habituation_factor
-            )
-            theta *= frequency_factor
-
-        # Clamp to valid range
-        theta = np.clip(theta, self.threshold_range[0], self.threshold_range[1])
-
-        self.current_threshold = theta
+        dtheta_dt = restoration + somatic_modulation + surprise_feedback + noise
+        theta = self.current_threshold + dtheta_dt * dt_sec
+        self.current_threshold = float(np.clip(theta, self.threshold_range[0], self.threshold_range[1]))
 
     def _sigmoid(self, x: float) -> float:
         """
@@ -504,6 +508,8 @@ class IgnitionThreshold:
         self.ignition_probability = 0.0
         self.extero_signal = 0.0
         self.intero_signal = 0.0
+        self.accumulated_signal = 0.0  # persistent S(t) with leaky integration
+        self._last_signal_update_time = None
         self.recent_ignitions.clear()
         self.last_ignition_time = -np.inf
         self.metabolic_reserves = 1.0
