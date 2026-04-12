@@ -244,7 +244,7 @@ class RateLimiter:
 
             # Calculate remaining capacity
             if allowed:
-                remaining = max(0, limit - current_count - weight)
+                remaining = max(0, limit - (current_count + weight))
             else:
                 remaining = 0
 
@@ -376,6 +376,10 @@ class RateLimiter:
         key = self._get_redis_key(client_id, endpoint)
         if self.redis is not None:
             await self.redis.delete(key)
+        elif self.in_memory:
+            # Clear in-memory storage for this key
+            if key in self._memory_store:
+                del self._memory_store[key]
 
     def configure_limit(self, endpoint: str, limit: int, window_seconds: int) -> None:
         """

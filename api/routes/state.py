@@ -38,6 +38,7 @@ from api.services.authorization import (
     has_any_role,
     require_permission,
 )
+from api.exceptions import SessionNotFoundError
 from api.services.session_manager import SessionManager, get_session_manager
 
 logger = logging.getLogger(__name__)
@@ -153,8 +154,8 @@ async def get_system_state(
         logger.info(f"Retrieved state for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Session {session_id} not found: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
@@ -296,8 +297,8 @@ async def get_ignition_history(  # noqa: C901
         logger.info(f"Retrieved {len(paginated_events)} ignition events for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Session {session_id} not found: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
@@ -364,8 +365,8 @@ async def get_interoceptive_state(
         logger.info(f"Retrieved interoceptive state for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Session {session_id} not found: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
@@ -433,8 +434,8 @@ async def get_prediction_errors(
         logger.info(f"Retrieved prediction errors for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Session {session_id} not found: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
@@ -506,8 +507,8 @@ async def get_somatic_markers(
         logger.info(f"Retrieved somatic markers for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Session {session_id} not found: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
@@ -630,8 +631,8 @@ async def get_summary_statistics(
         logger.info(f"Generated summary statistics for session {session_id}")
         return response
 
-    except ValueError as e:
-        logger.warning(f"Summary statistics generation failed for session {session_id}: {e}")
+    except SessionNotFoundError:
+        logger.warning(f"Session {session_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     except Exception:
         logger.error(

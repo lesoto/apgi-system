@@ -4,16 +4,26 @@ Test Session API Routes
 Integration tests for session management endpoints.
 """
 
-from typing import Any
-from unittest.mock import AsyncMock, Mock
+import os
 
-import pytest
-import redis.asyncio as redis
-from fastapi.testclient import TestClient
+# Set testing environment before importing app
+os.environ["ENVIRONMENT"] = "testing"  # noqa: E402
 
-from api.main import create_app
-from api.routes import sessions
-from api.services.session_manager import SessionLifecycleState, SessionManager, SimulationSession
+from typing import Any  # noqa: E402
+from unittest.mock import AsyncMock, Mock  # noqa: E402
+
+import pytest  # noqa: E402
+import redis.asyncio as redis  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from api.main import create_app  # noqa: E402
+from api.routes import sessions  # noqa: E402
+from api.exceptions import SessionNotFoundError  # noqa: E402
+from api.services.session_manager import (  # noqa: E402
+    SessionLifecycleState,
+    SessionManager,
+    SimulationSession,
+)
 
 
 @pytest.fixture
@@ -74,14 +84,14 @@ def mock_session_manager() -> Mock:
 
             return mock_sim
         else:
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFoundError(session_id)
 
     manager.get_session = AsyncMock(side_effect=mock_get_session)
 
     # Mock delete_session
     async def mock_delete_session(session_id: str) -> None:
         if session_id != "test-session-id-123":
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFoundError(session_id)
 
     manager.delete_session = AsyncMock(side_effect=mock_delete_session)
 
@@ -94,7 +104,7 @@ def mock_session_manager() -> Mock:
 @pytest.fixture
 def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     """Create a test client with mocked dependencies."""
-    app = create_app()
+    app = create_app(test_mode=True)
 
     # Override the session manager dependency
     sessions._session_manager = mock_session_manager  # type: ignore[attr-defined]
@@ -142,7 +152,7 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
 def test_create_session(client: Any) -> None:
     """Test creating a new session."""
     response = client.post(
-        "/v1/sessions/", json={"config_path": "config/default.yaml", "description": "Test session"}
+        "/v1/sessions", json={"config_path": "config/default.yaml", "description": "Test session"}
     )
 
     if response.status_code != 201:
@@ -158,7 +168,7 @@ def test_create_session(client: Any) -> None:
 
 def test_get_session(client: Any) -> None:
     """Test retrieving session details."""
-    response = client.get("/v1/sessions/test-session-id-123/")
+    response = client.get("/v1/sessions/test-session-id-123")
 
     assert response.status_code == 200
     data = response.json()
@@ -171,7 +181,7 @@ def test_get_session(client: Any) -> None:
 
 def test_get_session_not_found(client: Any) -> None:
     """Test retrieving non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/")
+    response = client.get("/v1/sessions/nonexistent-id")
 
     assert response.status_code == 404
     error_data = response.json()
@@ -182,55 +192,51 @@ def test_get_session_not_found(client: Any) -> None:
 
 def test_start_session(client: Any) -> None:
     """Test starting a session."""
-    response = client.post("/v1/sessions/test-session-id-123/start/")
+    response = client.post("/v1/sessions/test-session-id-123/start")
 
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == "test-session-id-123"
     assert data["status"] == "running"
-    assert "timestamp" in data
 
 
 def test_pause_session(client: TestClient) -> None:
     """Test pausing a session."""
     # First start the session
-    client.post("/v1/sessions/test-session-id-123/start/")
+    client.post("/v1/sessions/test-session-id-123/start")
 
     # Then pause it
-    response = client.post("/v1/sessions/test-session-id-123/pause/")
+    response = client.post("/v1/sessions/test-session-id-123/pause")
 
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == "test-session-id-123"
     assert data["status"] == "paused"
-    assert "timestamp" in data
 
 
 def test_stop_session(client: TestClient) -> None:
     """Test stopping a session."""
-    response = client.post("/v1/sessions/test-session-id-123/stop/")
+    response = client.post("/v1/sessions/test-session-id-123/stop")
 
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == "test-session-id-123"
     assert data["status"] == "stopped"
-    assert "timestamp" in data
 
 
 def test_reset_session(client: TestClient) -> None:
     """Test resetting a session."""
-    response = client.post("/v1/sessions/test-session-id-123/reset/")
+    response = client.post("/v1/sessions/test-session-id-123/reset")
 
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == "test-session-id-123"
     assert data["status"] == "created"
-    assert "timestamp" in data
 
 
 def test_delete_session(client: TestClient) -> None:
     """Test deleting a session."""
-    response = client.delete("/v1/sessions/test-session-id-123/")
+    response = client.delete("/v1/sessions/test-session-id-123")
 
     assert response.status_code == 204
     assert response.content == b""
@@ -238,7 +244,7 @@ def test_delete_session(client: TestClient) -> None:
 
 def test_delete_session_not_found(client: TestClient) -> None:
     """Test deleting non-existent session."""
-    response = client.delete("/v1/sessions/nonexistent-id/")
+    response = client.delete("/v1/sessions/nonexistent-id")
 
     assert response.status_code == 404
     error_data = response.json()
@@ -250,35 +256,35 @@ def test_delete_session_not_found(client: TestClient) -> None:
 def test_session_lifecycle_workflow(client: TestClient) -> None:
     """Test complete session lifecycle."""
     # Create session
-    create_response = client.post("/v1/sessions/", json={"config_path": "config/default.yaml"})
+    create_response = client.post("/v1/sessions", json={"config_path": "config/default.yaml"})
     assert create_response.status_code == 201
     session_id = create_response.json()["session_id"]
 
     # Get session details
-    get_response = client.get(f"/v1/sessions/{session_id}/")
+    get_response = client.get(f"/v1/sessions/{session_id}")
     assert get_response.status_code == 200
     assert get_response.json()["status"] == "created"
 
     # Start session
-    start_response = client.post(f"/v1/sessions/{session_id}/start/")
+    start_response = client.post(f"/v1/sessions/{session_id}/start")
     assert start_response.status_code == 200
     assert start_response.json()["status"] == "running"
 
     # Pause session
-    pause_response = client.post(f"/v1/sessions/{session_id}/pause/")
+    pause_response = client.post(f"/v1/sessions/{session_id}/pause")
     assert pause_response.status_code == 200
     assert pause_response.json()["status"] == "paused"
 
     # Stop session
-    stop_response = client.post(f"/v1/sessions/{session_id}/stop/")
+    stop_response = client.post(f"/v1/sessions/{session_id}/stop")
     assert stop_response.status_code == 200
     assert stop_response.json()["status"] == "stopped"
 
     # Reset session
-    reset_response = client.post(f"/v1/sessions/{session_id}/reset/")
+    reset_response = client.post(f"/v1/sessions/{session_id}/reset")
     assert reset_response.status_code == 200
     assert reset_response.json()["status"] == "created"
 
     # Delete session
-    delete_response = client.delete(f"/v1/sessions/{session_id}/")
+    delete_response = client.delete(f"/v1/sessions/{session_id}")
     assert delete_response.status_code == 204

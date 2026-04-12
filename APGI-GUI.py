@@ -956,14 +956,20 @@ class APGIGui:
 
             ttk.Label(frame, text=label, width=18).pack(side=tk.LEFT)
 
-            # Store as regular variable for now
-            self.param_vars[key] = default
+            # Create tkinter variable immediately for test compatibility
+            var = tk.DoubleVar(master=self.root, value=default)
+            self.param_vars[key] = var
 
-            scale = ttk.Scale(frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL)
+            scale = ttk.Scale(frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL, variable=var)
             scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
             val_label = ttk.Label(frame, text=f"{default:.2f}", width=6)
             val_label.pack(side=tk.LEFT)
+
+            # Update label when variable changes
+            var.trace_add(
+                "write", lambda *args, v=var, lbl=val_label: lbl.config(text=f"{v.get():.2f}")
+            )
 
             # Store scale and label references for later
             self.param_scales[key] = scale
@@ -4194,8 +4200,8 @@ class APGIGui:
 
         intensity_label = ttk.Label(intensity_frame, text="0.50")
         intensity_label.pack(side=tk.LEFT)
-        intensity_var.trace(
-            "w", lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}")
+        intensity_var.trace_add(
+            "write", lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}")
         )
 
         def apply_stressor():
@@ -5331,9 +5337,7 @@ For more information, visit: https://github.com/lesoto/apgi-system
                 if hasattr(var, "get"):
                     self._param_cache[param_name] = var.get()
                     # Add trace to update cache when variable changes
-                    var.trace_add(
-                        "write", lambda *args, name=param_name: self._update_param_cache(name)
-                    )
+                    var.trace_add("write", lambda *args, n=param_name: self._update_param_cache(n))
                 else:
                     # Regular variable
                     self._param_cache[param_name] = var

@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session as SessionLocal
 from apgi_system.system import APGISystem
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
-from api.exceptions import ServiceUnavailableError
+from api.exceptions import ServiceUnavailableError, SessionNotFoundError
 from api.models.schemas import SessionCreateRequest
 
 # Import circuit breaker utilities
@@ -552,7 +552,7 @@ class SessionManager:
             db_model = result.scalar_one_or_none()
 
             if not db_model:
-                raise ValueError(f"Session {session_id} not found")
+                raise SessionNotFoundError(session_id)
 
             # Reconstruct session
             sim_session = SimulationSession(session_id, db_model.config, db_model.user_id)
@@ -593,7 +593,7 @@ class SessionManager:
             db_model = result.scalar_one_or_none()
 
             if not db_model:
-                raise ValueError(f"Session {session_id} not found")
+                raise SessionNotFoundError(session_id)
         finally:
             db_session.close()
 
@@ -601,7 +601,7 @@ class SessionManager:
         async with self.cache_lock:
             if session_id not in self.sessions:
                 # Already deleted by another concurrent call
-                raise ValueError(f"Session {session_id} not found")
+                raise SessionNotFoundError(session_id)
             del self.sessions[session_id]
 
         # Remove from Redis cache

@@ -4,16 +4,26 @@ Test State Access API Routes
 Integration tests for state access endpoints.
 """
 
-from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock
+import os
 
-import pytest
-import redis.asyncio as redis
-from fastapi.testclient import TestClient
+# Set testing environment before importing app
+os.environ["ENVIRONMENT"] = "testing"  # noqa: E402
 
-from api.main import create_app
-from api.routes import sessions
-from api.services.session_manager import SessionLifecycleState, SessionManager, SimulationSession
+from typing import Any, Dict  # noqa: E402
+from unittest.mock import AsyncMock, Mock  # noqa: E402
+
+import pytest  # noqa: E402
+import redis.asyncio as redis  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from api.exceptions import SessionNotFoundError  # noqa: E402
+from api.main import create_app  # noqa: E402
+from api.routes import sessions  # noqa: E402
+from api.services.session_manager import (  # noqa: E402
+    SessionLifecycleState,
+    SessionManager,
+    SimulationSession,
+)
 
 
 @pytest.fixture
@@ -94,10 +104,11 @@ def mock_session_manager() -> Mock:
                 }
 
             mock_sim.get_state = AsyncMock(side_effect=mock_get_state)
+            mock_sim.user_id = "test-user-123"
 
             return mock_sim
         else:
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFoundError(session_id)
 
     manager.get_session = AsyncMock(side_effect=mock_get_session)
 
@@ -107,7 +118,7 @@ def mock_session_manager() -> Mock:
 @pytest.fixture
 def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     """Create a test client with mocked dependencies."""
-    app = create_app()
+    app = create_app(test_mode=True)
 
     # Override the session manager dependency
     sessions._session_manager = mock_session_manager  # type: ignore[attr-defined]
@@ -154,7 +165,7 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
 
 def test_get_system_state(client: TestClient) -> None:
     """Test retrieving complete system state."""
-    response = client.get("/v1/sessions/test-session-id-123/state/")
+    response = client.get("/v1/sessions/test-session-id-123/state")
 
     assert response.status_code == 200
     data = response.json()
@@ -196,15 +207,15 @@ def test_get_system_state(client: TestClient) -> None:
 
 def test_get_system_state_not_found(client: TestClient) -> None:
     """Test retrieving state for non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/state/")
+    response = client.get("/v1/sessions/nonexistent-id/state")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["error"]["message"].lower()
 
 
 def test_get_ignition_history(client: TestClient) -> None:
     """Test retrieving ignition event history."""
-    response = client.get("/v1/sessions/test-session-id-123/ignition-history/")
+    response = client.get("/v1/sessions/test-session-id-123/ignition-history")
 
     assert response.status_code == 200
     data = response.json()
@@ -226,7 +237,7 @@ def test_get_ignition_history(client: TestClient) -> None:
 def test_get_ignition_history_with_time_filter(client: TestClient) -> None:
     """Test retrieving ignition history with time filters."""
     response = client.get(
-        "/v1/sessions/test-session-id-123/ignition-history/",
+        "/v1/sessions/test-session-id-123/ignition-history",
         params={"start_time": 2500.0, "end_time": 4500.0},
     )
 
@@ -241,7 +252,7 @@ def test_get_ignition_history_with_time_filter(client: TestClient) -> None:
 
 def test_get_ignition_history_with_limit(client: TestClient) -> None:
     """Test retrieving ignition history with limit."""
-    response = client.get("/v1/sessions/test-session-id-123/ignition-history/", params={"limit": 2})
+    response = client.get("/v1/sessions/test-session-id-123/ignition-history", params={"limit": 2})
 
     assert response.status_code == 200
     data = response.json()
@@ -257,15 +268,15 @@ def test_get_ignition_history_with_limit(client: TestClient) -> None:
 
 def test_get_ignition_history_not_found(client: TestClient) -> None:
     """Test retrieving ignition history for non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/ignition-history/")
+    response = client.get("/v1/sessions/nonexistent-id/ignition-history")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["error"]["message"].lower()
 
 
 def test_get_interoceptive_state(client: TestClient) -> None:
     """Test retrieving interoceptive body state."""
-    response = client.get("/v1/sessions/test-session-id-123/interoception/")
+    response = client.get("/v1/sessions/test-session-id-123/interoception")
 
     assert response.status_code == 200
     data = response.json()
@@ -283,15 +294,15 @@ def test_get_interoceptive_state(client: TestClient) -> None:
 
 def test_get_interoceptive_state_not_found(client: TestClient) -> None:
     """Test retrieving interoceptive state for non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/interoception/")
+    response = client.get("/v1/sessions/nonexistent-id/interoception")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["error"]["message"].lower()
 
 
 def test_get_prediction_errors(client: TestClient) -> None:
     """Test retrieving prediction errors."""
-    response = client.get("/v1/sessions/test-session-id-123/prediction-errors/")
+    response = client.get("/v1/sessions/test-session-id-123/prediction-errors")
 
     assert response.status_code == 200
     data = response.json()
@@ -314,15 +325,15 @@ def test_get_prediction_errors(client: TestClient) -> None:
 
 def test_get_prediction_errors_not_found(client: TestClient) -> None:
     """Test retrieving prediction errors for non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/prediction-errors/")
+    response = client.get("/v1/sessions/nonexistent-id/prediction-errors")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["error"]["message"].lower()
 
 
 def test_get_somatic_markers(client: TestClient) -> None:
     """Test retrieving somatic markers."""
-    response = client.get("/v1/sessions/test-session-id-123/somatic-markers/")
+    response = client.get("/v1/sessions/test-session-id-123/somatic-markers")
 
     assert response.status_code == 200
     data = response.json()
@@ -352,20 +363,20 @@ def test_get_somatic_markers(client: TestClient) -> None:
 
 def test_get_somatic_markers_not_found(client: TestClient) -> None:
     """Test retrieving somatic markers for non-existent session."""
-    response = client.get("/v1/sessions/nonexistent-id/somatic-markers/")
+    response = client.get("/v1/sessions/nonexistent-id/somatic-markers")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["error"]["message"].lower()
 
 
 def test_state_endpoints_require_valid_session(client: TestClient) -> None:
     """Test that all state endpoints require a valid session."""
     endpoints = [
-        "/v1/sessions/invalid-id/state/",
-        "/v1/sessions/invalid-id/ignition-history/",
-        "/v1/sessions/invalid-id/interoception/",
-        "/v1/sessions/invalid-id/prediction-errors/",
-        "/v1/sessions/invalid-id/somatic-markers/",
+        "/v1/sessions/invalid-id/state",
+        "/v1/sessions/invalid-id/ignition-history",
+        "/v1/sessions/invalid-id/interoception",
+        "/v1/sessions/invalid-id/prediction-errors",
+        "/v1/sessions/invalid-id/somatic-markers",
     ]
 
     for endpoint in endpoints:

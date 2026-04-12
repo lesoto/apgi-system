@@ -93,7 +93,8 @@ class FreeEnergyCalculator:
         >>> calc = FreeEnergyCalculator(config={'numerical_tolerance': 1e-8})
         """
         self.config = config or {}
-        self.eps = 1e-10  # Numerical stability
+        self.eps = self.config.get("eps", 1e-10)  # Numerical stability, configurable
+        self.temperature = self.config.get("temperature", 1.0)  # Temperature for scaling
         self.stability_monitor = NumericalStabilityMonitor(config)
 
         # Precision bounds to prevent numerical instability
@@ -254,6 +255,10 @@ class FreeEnergyCalculator:
 
         total_fe = accuracy + complexity
 
+        # Apply temperature scaling (higher temperature = more thermal noise)
+        if self.temperature != 1.0:
+            total_fe = total_fe * self.temperature
+
         # Check stability of total free energy
         self.stability_monitor.check_stability(total_fe, context="total_free_energy")
 
@@ -350,16 +355,20 @@ class FreeEnergyCalculator:
             posterior_entropy = 0.5 * np.sum(
                 np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
             )
-            epistemic_value -= prior_entropy - posterior_entropy
+            epistemic_value += -(
+                prior_entropy - posterior_entropy
+            )  # Negated: epistemic value should be negative
 
             # Pragmatic value: KL divergence from preferences
             # Lower divergence from preferences -> more negative EFE
             pred_obs = predicted_observations[t]
             pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)  # Normalize
-            pref = preferences / (np.sum(preferences) + self.eps)
+            # Clip preferences to positive values to prevent NaN in log
+            pref_clipped = np.clip(preferences, self.eps, None)
+            pref = pref_clipped / (np.sum(pref_clipped) + self.eps)
 
-            # Correct direction: KL[predicted || preferences] — minimize divergence TO goal
-            kl_div = np.sum(xlogy(pred_obs + self.eps, (pred_obs + self.eps) / (pref + self.eps)))
+            # KL[pref || pred_obs]: agent minimizes divergence FROM preferred outcomes
+            kl_div = np.sum(xlogy(pref + self.eps, (pref + self.eps) / (pred_obs + self.eps)))
             pragmatic_value += kl_div
 
         total_efe = epistemic_value + pragmatic_value
@@ -367,7 +376,9 @@ class FreeEnergyCalculator:
         components = {
             "epistemic_value": float(epistemic_value),
             "pragmatic_value": float(pragmatic_value),
-            "exploration_drive": float(-epistemic_value),
+            "exploration_drive": float(
+                -epistemic_value
+            ),  # Negative of epistemic value for cancellation
             "exploitation_drive": float(-pragmatic_value),
         }
 
@@ -658,6 +669,9 @@ class FreeEnergyCalculator:
         float
             Complexity value
         """
+        # Validate that means don't contain negative values (treated as invalid probabilities)
+        if np.any(posterior_mean < 0) or np.any(prior_mean < 0):
+            raise ValueError("Means cannot contain negative values")
         return self._kl_divergence_gaussian(posterior_mean, posterior_cov, prior_mean, prior_cov)
 
     def compute_epistemic_value(
@@ -693,7 +707,7 @@ class FreeEnergyCalculator:
             posterior_entropy = 0.5 * np.sum(
                 np.log(2 * np.pi * np.e * posterior_uncertainty + self.eps)
             )
-            epistemic_value -= prior_entropy - posterior_entropy
+            epistemic_value += -(prior_entropy - posterior_entropy)  # Negated: should be negative
         return float(epistemic_value)
 
     def compute_pragmatic_value(
@@ -723,7 +737,9 @@ class FreeEnergyCalculator:
         for t in range(min(horizon, len(predicted_observations))):
             pred_obs = predicted_observations[t]
             pred_obs = pred_obs / (np.sum(pred_obs) + self.eps)
-            pref = preferences / (np.sum(preferences) + self.eps)
+            # Clip preferences to positive values to prevent NaN in log
+            pref_clipped = np.clip(preferences, self.eps, None)
+            pref = pref_clipped / (np.sum(pref_clipped) + self.eps)
             kl_div = np.sum(xlogy(pref + self.eps, (pref + self.eps) / (pred_obs + self.eps)))
             pragmatic_value += kl_div
         return float(pragmatic_value)

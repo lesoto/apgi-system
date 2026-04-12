@@ -321,21 +321,35 @@ class HierarchicalGaussianFilter:
             if error_below.shape != belief_shape:
                 import logging
 
-                logging.warning(
-                    f"Shape mismatch at level {level}: "
-                    f"belief mean shape {belief_shape} vs error_below shape {error_below.shape}. "
-                    "Setting error_below to zeros."
-                )
-                error_below = np.zeros(belief_shape)
+                if error_below.size == np.prod(belief_shape):
+                    # Recoverable: same number of elements, reshape cleanly
+                    error_below = error_below.reshape(belief_shape)
+                    logging.debug(
+                        f"Reshaped error_below at level {level}: {error_below.shape} → {belief_shape}"
+                    )
+                else:
+                    # Unrecoverable: raise so the caller knows gradient flow is broken
+                    raise ValueError(
+                        f"Irrecoverable shape mismatch at level {level}: "
+                        f"belief {belief_shape}, error {error_below.shape}. "
+                        f"Check projection matrix dimensions."
+                    )
             if error_above.shape != belief_shape:
                 import logging
 
-                logging.warning(
-                    f"Shape mismatch at level {level}: "
-                    f"belief mean shape {belief_shape} vs error_above shape {error_above.shape}. "
-                    "Setting error_above to zeros."
-                )
-                error_above = np.zeros(belief_shape)
+                if error_above.size == np.prod(belief_shape):
+                    # Recoverable: same number of elements, reshape cleanly
+                    error_above = error_above.reshape(belief_shape)
+                    logging.debug(
+                        f"Reshaped error_above at level {level}: {error_above.shape} → {belief_shape}"
+                    )
+                else:
+                    # Unrecoverable: raise so the caller knows gradient flow is broken
+                    raise ValueError(
+                        f"Irrecoverable shape mismatch at level {level}: "
+                        f"belief {belief_shape}, error_above {error_above.shape}. "
+                        f"Check projection matrix dimensions."
+                    )
 
             update = self.learning_rate * (
                 precision_below * error_below - precision_above * error_above
@@ -508,10 +522,8 @@ class HierarchicalGaussianFilter:
             # Create new projection matrix with proper initialization
             # Use orthogonal initialization for better numerical stability
             if target_dim == source_dim:
-                # Same dimension: use identity with small noise
-                projection_matrix = (
-                    np.eye(target_dim) + np.random.randn(target_dim, source_dim) * 0.01
-                )
+                # Same dimension: deterministic identity (no noise — preserves exact information)
+                projection_matrix = np.eye(target_dim)
             else:
                 # Deterministic orthonormal projection via SVD — preserves information geometry
                 rng = np.random.default_rng(seed=hash((source_dim, target_dim)) % 2**32)
@@ -1012,8 +1024,8 @@ class ActiveInferenceEngine:
             # Pad action to match state dimensionality
             action_padded = np.zeros_like(current_state)
             action_padded[: len(action)] = action
-            # Proper sequence dynamics using transition model B
-            current_state = self.forward_model_B @ current_state + action_padded
+            # Proper sequence dynamics using transition model B with nonlinear activation
+            current_state = np.tanh(self.forward_model_B @ current_state + action_padded)
             future_states.append(current_state.copy())
 
         return future_states

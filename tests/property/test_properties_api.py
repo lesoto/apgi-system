@@ -4,6 +4,7 @@ Property-based tests for API endpoints.
 Tests universal properties that should hold across all valid API requests.
 """
 
+import asyncio
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
@@ -1158,10 +1159,12 @@ async def test_property_rate_limit_per_client_isolation(client_id: str, endpoint
         # Exhaust rate limit for first client
         for i in range(max_requests + 5):
             await rate_limiter.check_rate_limit(client_id, endpoint)
+            # Small delay to ensure Redis processes each request
+            await asyncio.sleep(0.001)
 
         # Verify first client is rate limited
         result1 = await rate_limiter.check_rate_limit(client_id, endpoint)
-        assert not result1.allowed
+        assert not result1.allowed, f"Expected rate limit to be exhausted but got: {result1}"
 
         # Verify second client can still make requests
         result2 = await rate_limiter.check_rate_limit(client_id_2, endpoint)
@@ -1216,10 +1219,12 @@ async def test_property_rate_limit_per_endpoint_isolation(
         # Exhaust rate limit for first endpoint
         for i in range(max_requests1 + 5):
             await rate_limiter.check_rate_limit(client_id, endpoint1)
+            # Small delay to ensure Redis processes each request
+            await asyncio.sleep(0.001)
 
         # Verify first endpoint is rate limited
         result1 = await rate_limiter.check_rate_limit(client_id, endpoint1)
-        assert not result1.allowed
+        assert not result1.allowed, f"Expected rate limit to be exhausted but got: {result1}"
 
         # Verify second endpoint is still accessible
         result2 = await rate_limiter.check_rate_limit(client_id, endpoint2)
@@ -1378,10 +1383,14 @@ async def test_property_rate_limit_header_completeness(client_id: str, endpoint:
         # Exhaust rate limit
         for i in range(max_requests + 5):
             await rate_limiter.check_rate_limit(client_id, endpoint)
+            # Small delay to ensure Redis processes each request
+            await asyncio.sleep(0.001)
 
         # Make one more request that should be denied
         denied_result = await rate_limiter.check_rate_limit(client_id, endpoint)
-        assert not denied_result.allowed
+        assert (
+            not denied_result.allowed
+        ), f"Expected rate limit to be exhausted but got: {denied_result}"
 
         # Get headers for denied request
         denied_headers = rate_limiter.get_rate_limit_headers(denied_result)
