@@ -5,9 +5,9 @@ Middleware to extract and verify JWT tokens from Authorization headers.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Awaitable, Callable, Optional
 
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -44,7 +44,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/v1/health/ready",
     }
 
-    def __init__(self, app):
+    def __init__(self, app: Any) -> None:
         """
         Initialize authentication middleware.
 
@@ -53,7 +53,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and verify authentication.
 

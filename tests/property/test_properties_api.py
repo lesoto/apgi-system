@@ -4,25 +4,27 @@ Property-based tests for API endpoints.
 Tests universal properties that should hold across all valid API requests.
 """
 
-import pytest
-from hypothesis import given, strategies as st, settings, assume, HealthCheck
-from unittest.mock import Mock, patch
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Any, Dict, List
+from unittest.mock import Mock, patch
 
-from api.services.task_executor import TaskExecutor, TaskType, TaskStatus
+import pytest
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
+
 from api.exceptions import (
     APIError,
+    AuthenticationError,
+    AuthorizationError,
+    ExpiredTokenError,
+    InvalidTokenError,
+    RateLimitExceededError,
     SessionNotFoundError,
     TaskNotFoundError,
     ValidationError,
-    AuthenticationError,
-    AuthorizationError,
-    RateLimitExceededError,
-    InvalidTokenError,
-    ExpiredTokenError,
 )
+from api.services.task_executor import TaskExecutor, TaskStatus, TaskType
 
 # ============================================================================
 # Strategies for generating test data
@@ -30,7 +32,7 @@ from api.exceptions import (
 
 
 @st.composite
-def task_type_strategy(draw) -> str:
+def task_type_strategy(draw: st.DrawFn) -> str:
     """Generate valid task types."""
     return draw(
         st.sampled_from(
@@ -44,7 +46,7 @@ def task_type_strategy(draw) -> str:
 
 
 @st.composite
-def task_parameters_strategy(draw, task_type: str) -> Dict[str, Any]:
+def task_parameters_strategy(draw: st.DrawFn, task_type: str) -> Dict[str, Any]:
     """Generate valid parameters for a given task type."""
     if task_type == TaskType.IOWA_GAMBLING.value:
         return {
@@ -79,15 +81,19 @@ def task_parameters_strategy(draw, task_type: str) -> Dict[str, Any]:
 
 
 @st.composite
-def session_id_strategy(draw) -> str:
+def session_id_strategy(draw: st.DrawFn) -> str:
     """Generate valid session IDs (UUIDs)."""
     return str(uuid.uuid4())
 
 
 @st.composite
-def task_result_strategy(draw, task_type, session_id):
+def task_result_strategy(draw: st.DrawFn, task_type: str, session_id: str) -> Dict[str, Any]:
     """Generate mock task results for a given task type."""
-    base_result = {"task_type": task_type, "session_id": session_id, "status": "completed"}
+    base_result: Dict[str, Any] = {
+        "task_type": task_type,
+        "session_id": session_id,
+        "status": "completed",
+    }
 
     if task_type == TaskType.IOWA_GAMBLING.value:
         base_result["results"] = {
@@ -121,7 +127,7 @@ def task_result_strategy(draw, task_type, session_id):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_task_execution_round_trip(data) -> None:
+async def test_property_task_execution_round_trip(data: st.DataObject) -> None:
     """
     **Feature: api-rest-interface, Property 10: Task execution and retrieval round-trip**
 
@@ -203,7 +209,7 @@ async def test_property_task_execution_round_trip(data) -> None:
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_task_status_tracking(data):
+async def test_property_task_status_tracking(data: st.DataObject) -> None:
     """
     Property: Task status should be trackable from submission to completion.
 
@@ -265,7 +271,9 @@ async def test_property_task_status_tracking(data):
 )
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_invalid_task_type_rejection(invalid_task_type, session_id):
+async def test_property_invalid_task_type_rejection(
+    invalid_task_type: str, session_id: str
+) -> None:
     """
     Property: Invalid task types should be rejected with clear error.
 
@@ -289,7 +297,7 @@ async def test_property_invalid_task_type_rejection(invalid_task_type, session_i
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_async_task_status_tracking(data):
+async def test_property_async_task_status_tracking(data: st.DataObject) -> None:
     """
     **Feature: api-rest-interface, Property 25: Async task status tracking**
 
@@ -389,7 +397,7 @@ async def test_property_async_task_status_tracking(data):
 @given(data=st.data())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_failed_task_status_tracking(data):
+async def test_property_failed_task_status_tracking(data: st.DataObject) -> None:
     """
     Property: Failed tasks should report error information.
 
@@ -449,7 +457,7 @@ async def test_property_failed_task_status_tracking(data):
 
 
 @st.composite
-def api_error_strategy(draw):
+def api_error_strategy(draw: st.DrawFn) -> Any:
     """Generate various APIError instances for testing."""
     error_type = draw(
         st.sampled_from(
@@ -487,7 +495,7 @@ def api_error_strategy(draw):
                 max_size=5,
             )
         )
-        return ValidationError(message, validation_errors)
+        return ValidationError(message, [str(e) for e in validation_errors])
     elif error_type == "authentication_error":
         message = draw(st.text(min_size=10, max_size=100))
         return AuthenticationError(message)
@@ -511,7 +519,7 @@ def api_error_strategy(draw):
 
 @given(error=api_error_strategy(), request_id=st.text(min_size=10, max_size=50))
 @settings(max_examples=100, deadline=None)
-def test_property_error_response_completeness(error, request_id):
+def test_property_error_response_completeness(error: APIError, request_id: str) -> None:
     """
     **Feature: api-rest-interface, Property 3: Error response completeness**
 
@@ -559,7 +567,7 @@ def test_property_error_response_completeness(error, request_id):
 
 @given(error=api_error_strategy())
 @settings(max_examples=100, deadline=None)
-def test_property_error_response_without_request_id(error):
+def test_property_error_response_without_request_id(error: APIError) -> None:
     """
     Property: Error responses should handle missing request IDs gracefully.
 
@@ -593,7 +601,9 @@ def test_property_error_response_without_request_id(error):
     status_code=st.sampled_from([400, 401, 403, 404, 409, 422, 429, 500, 502, 503, 504]),
 )
 @settings(max_examples=100, deadline=None)
-def test_property_custom_api_error_completeness(error_code, error_message, status_code):
+def test_property_custom_api_error_completeness(
+    error_code: str, error_message: str, status_code: int
+) -> None:
     """
     Property: Custom APIError instances should produce complete error responses.
 
@@ -635,7 +645,7 @@ def test_property_custom_api_error_completeness(error_code, error_message, statu
 
 
 @st.composite
-def user_credentials_strategy(draw):
+def user_credentials_strategy(draw: st.DrawFn) -> Dict[str, Any]:
     """Generate valid user credentials."""
     username = draw(
         st.text(
@@ -656,14 +666,16 @@ def user_credentials_strategy(draw):
 
 
 @st.composite
-def user_id_strategy(draw):
+def user_id_strategy(draw: st.DrawFn) -> str:
     """Generate valid user IDs (UUIDs)."""
     return str(uuid.uuid4())
 
 
 @given(credentials=user_credentials_strategy(), user_id=user_id_strategy())
 @settings(max_examples=100, deadline=None)
-def test_property_authentication_token_round_trip(credentials, user_id):
+def test_property_authentication_token_round_trip(
+    credentials: Dict[str, Any], user_id: str
+) -> None:
     """
     **Feature: api-rest-interface, Property 16: Authentication token round-trip**
 
@@ -672,8 +684,8 @@ def test_property_authentication_token_round_trip(credentials, user_id):
 
     **Validates: Requirements 7.1, 7.2**
     """
-    from api.services.auth_manager import AuthManager
     from api.database.connection import SessionLocal
+    from api.services.auth_manager import AuthManager
 
     # Create database session
     db = SessionLocal()
@@ -713,7 +725,7 @@ def test_property_authentication_token_round_trip(credentials, user_id):
 
 @given(credentials=user_credentials_strategy(), user_id=user_id_strategy())
 @settings(max_examples=100, deadline=None)
-def test_property_refresh_token_round_trip(credentials, user_id):
+def test_property_refresh_token_round_trip(credentials: Dict[str, Any], user_id: str) -> None:
     """
     Property: Refresh tokens should also support round-trip verification.
 
@@ -722,8 +734,8 @@ def test_property_refresh_token_round_trip(credentials, user_id):
 
     **Validates: Requirements 7.1, 7.2**
     """
-    from api.services.auth_manager import AuthManager
     from api.database.connection import SessionLocal
+    from api.services.auth_manager import AuthManager
 
     # Create database session
     db = SessionLocal()
@@ -772,7 +784,9 @@ def test_property_refresh_token_round_trip(credentials, user_id):
     ),
 )
 @settings(max_examples=100, deadline=None)
-def test_property_authorization_enforcement(credentials, user_id, required_permission):
+def test_property_authorization_enforcement(
+    credentials: Dict[str, Any], user_id: str, required_permission: str
+) -> None:
     """
     **Feature: api-rest-interface, Property 17: Authorization enforcement**
 
@@ -781,7 +795,7 @@ def test_property_authorization_enforcement(credentials, user_id, required_permi
 
     **Validates: Requirements 7.3, 7.5**
     """
-    from api.services.authorization import has_permission, Permission, get_permissions_for_roles
+    from api.services.authorization import Permission, get_permissions_for_roles, has_permission
 
     # Get user's permissions based on their roles
     user_permissions = get_permissions_for_roles(credentials["roles"])
@@ -802,8 +816,8 @@ def test_property_authorization_enforcement(credentials, user_id, required_permi
 
     # If user doesn't have permission, verify check_permission raises error
     if not has_perm:
-        from api.services.authorization import check_permission
         from api.exceptions import AuthorizationError
+        from api.services.authorization import check_permission
 
         with pytest.raises(AuthorizationError) as exc_info:
             check_permission(
@@ -829,7 +843,9 @@ def test_property_authorization_enforcement(credentials, user_id, required_permi
     expiration_seconds=st.integers(min_value=-3600, max_value=-1),
 )
 @settings(max_examples=100, deadline=None)
-def test_property_expired_token_rejection(credentials, user_id, expiration_seconds):
+def test_property_expired_token_rejection(
+    credentials: Dict[str, Any], user_id: str, expiration_seconds: int
+) -> None:
     """
     **Feature: api-rest-interface, Property 18: Expired token rejection**
 
@@ -838,11 +854,13 @@ def test_property_expired_token_rejection(credentials, user_id, expiration_secon
 
     **Validates: Requirements 7.4**
     """
-    from api.services.auth_manager import AuthManager, TokenPayload
-    from api.exceptions import ExpiredTokenError
-    from api.database.connection import SessionLocal
     from datetime import datetime
+
     import jwt
+
+    from api.database.connection import SessionLocal
+    from api.exceptions import ExpiredTokenError
+    from api.services.auth_manager import AuthManager, TokenPayload
 
     # Create database session
     db = SessionLocal()
@@ -863,6 +881,7 @@ def test_property_expired_token_rejection(credentials, user_id, expiration_secon
         )
 
         # Encode the token with past expiration
+        assert auth_manager.secret_key is not None
         expired_token = jwt.encode(
             payload.to_dict(), auth_manager.secret_key, algorithm=auth_manager.algorithm
         )
@@ -884,7 +903,7 @@ def test_property_expired_token_rejection(credentials, user_id, expiration_secon
 
 @given(credentials=user_credentials_strategy(), user_id=user_id_strategy())
 @settings(max_examples=50, deadline=None)
-def test_property_invalid_token_rejection(credentials, user_id):
+def test_property_invalid_token_rejection(credentials: Dict[str, Any], user_id: str) -> None:
     """
     Property: Invalid or malformed tokens should be rejected.
 
@@ -892,9 +911,9 @@ def test_property_invalid_token_rejection(credentials, user_id):
 
     **Validates: Requirements 7.2, 7.4**
     """
-    from api.services.auth_manager import AuthManager
-    from api.exceptions import InvalidTokenError
     from api.database.connection import SessionLocal
+    from api.exceptions import InvalidTokenError
+    from api.services.auth_manager import AuthManager
 
     # Create database session
     db = SessionLocal()
@@ -923,7 +942,7 @@ def test_property_invalid_token_rejection(credentials, user_id):
 
 @given(credentials=user_credentials_strategy(), user_id=user_id_strategy())
 @settings(max_examples=50, deadline=None)
-def test_property_wrong_token_type_rejection(credentials, user_id):
+def test_property_wrong_token_type_rejection(credentials: Dict[str, Any], user_id: str) -> None:
     """
     Property: Using wrong token type should be rejected.
 
@@ -931,9 +950,9 @@ def test_property_wrong_token_type_rejection(credentials, user_id):
 
     **Validates: Requirements 7.2**
     """
-    from api.services.auth_manager import AuthManager
-    from api.exceptions import InvalidTokenError
     from api.database.connection import SessionLocal
+    from api.exceptions import InvalidTokenError
+    from api.services.auth_manager import AuthManager
 
     # Create database session
     db = SessionLocal()
@@ -965,7 +984,7 @@ def test_property_wrong_token_type_rejection(credentials, user_id):
 
 
 @st.composite
-def client_id_strategy(draw):
+def client_id_strategy(draw: st.DrawFn) -> str:
     """Generate valid client IDs."""
     client_type = draw(st.sampled_from(["user", "ip"]))
     if client_type == "user":
@@ -977,7 +996,7 @@ def client_id_strategy(draw):
 
 
 @st.composite
-def endpoint_strategy(draw):
+def endpoint_strategy(draw: st.DrawFn) -> str:
     """Generate valid endpoint identifiers."""
     return draw(
         st.sampled_from(
@@ -1002,7 +1021,9 @@ def endpoint_strategy(draw):
     max_examples=100, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests):
+async def test_property_rate_limit_enforcement(
+    client_id: str, endpoint: str, num_requests: int
+) -> None:
     """
     **Feature: api-rest-interface, Property 19: Rate limit enforcement**
 
@@ -1011,11 +1032,13 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
 
     **Validates: Requirements 8.1, 8.2**
     """
-    from api.services.rate_limiter import RateLimiter
-    import redis.asyncio as redis
-    from api.config import settings
     import asyncio
     import time
+
+    import redis.asyncio as redis
+
+    from api.config import settings
+    from api.services.rate_limiter import RateLimiter
 
     # Create unique client_id to avoid collisions between parallel test runs
     # Use both test run ID and timestamp to ensure uniqueness across Hypothesis examples
@@ -1024,7 +1047,7 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
     unique_client_id = f"test_{test_run_id}_{timestamp_id}_{client_id}"
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter
@@ -1099,7 +1122,7 @@ async def test_property_rate_limit_enforcement(client_id, endpoint, num_requests
 @given(client_id=client_id_strategy(), endpoint=endpoint_strategy())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_rate_limit_per_client_isolation(client_id, endpoint):
+async def test_property_rate_limit_per_client_isolation(client_id: str, endpoint: str) -> None:
     """
     Property: Rate limits should be isolated per client.
 
@@ -1108,12 +1131,13 @@ async def test_property_rate_limit_per_client_isolation(client_id, endpoint):
 
     **Validates: Requirements 8.2**
     """
-    from api.services.rate_limiter import RateLimiter
     import redis.asyncio as redis
+
     from api.config import settings
+    from api.services.rate_limiter import RateLimiter
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter
@@ -1154,7 +1178,9 @@ async def test_property_rate_limit_per_client_isolation(client_id, endpoint):
 @given(client_id=client_id_strategy(), endpoint1=endpoint_strategy(), endpoint2=endpoint_strategy())
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_rate_limit_per_endpoint_isolation(client_id, endpoint1, endpoint2):
+async def test_property_rate_limit_per_endpoint_isolation(
+    client_id: str, endpoint1: str, endpoint2: str
+) -> None:
     """
     Property: Rate limits should be isolated per endpoint.
 
@@ -1163,15 +1189,16 @@ async def test_property_rate_limit_per_endpoint_isolation(client_id, endpoint1, 
 
     **Validates: Requirements 8.2**
     """
-    from api.services.rate_limiter import RateLimiter
     import redis.asyncio as redis
+
     from api.config import settings
+    from api.services.rate_limiter import RateLimiter
 
     # Skip if endpoints are the same
     assume(endpoint1 != endpoint2)
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter
@@ -1215,8 +1242,8 @@ async def test_property_rate_limit_per_endpoint_isolation(client_id, endpoint1, 
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
 async def test_property_rate_limit_custom_configuration(
-    client_id, endpoint, custom_limit, custom_window
-):
+    client_id: str, endpoint: str, custom_limit: int, custom_window: int
+) -> None:
     """
     Property: Custom rate limit configurations should be respected.
 
@@ -1225,12 +1252,13 @@ async def test_property_rate_limit_custom_configuration(
 
     **Validates: Requirements 8.2, 8.5**
     """
-    from api.services.rate_limiter import RateLimiter
     import redis.asyncio as redis
+
     from api.config import settings
+    from api.services.rate_limiter import RateLimiter
 
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter
@@ -1278,7 +1306,7 @@ async def test_property_rate_limit_custom_configuration(
 @given(client_id=client_id_strategy(), endpoint=endpoint_strategy())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_rate_limit_header_completeness(client_id, endpoint):
+async def test_property_rate_limit_header_completeness(client_id: str, endpoint: str) -> None:
     """
     **Feature: api-rest-interface, Property 20: Rate limit header completeness**
 
@@ -1287,13 +1315,15 @@ async def test_property_rate_limit_header_completeness(client_id, endpoint):
 
     **Validates: Requirements 8.3, 8.4, 8.5**
     """
-    from api.services.rate_limiter import RateLimiter
-    import redis.asyncio as redis
-    from api.config import settings
     from datetime import datetime
 
+    import redis.asyncio as redis
+
+    from api.config import settings
+    from api.services.rate_limiter import RateLimiter
+
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[arg-type]
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter
@@ -1382,7 +1412,7 @@ async def test_property_rate_limit_header_completeness(client_id, endpoint):
 
 
 @st.composite
-def simulation_history_strategy(draw):
+def simulation_history_strategy(draw: st.DrawFn) -> Dict[str, Any]:
     """Generate valid simulation history data."""
     # Generate a reasonable number of timesteps
     num_steps = draw(st.integers(min_value=10, max_value=500))
@@ -1423,7 +1453,9 @@ def simulation_history_strategy(draw):
 )
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_data_export_completeness(session_id, history, export_format):
+async def test_property_data_export_completeness(
+    session_id: str, history: Dict[str, Any], export_format: str
+) -> None:
     """
     **Feature: api-rest-interface, Property 11: Data export completeness**
 
@@ -1432,12 +1464,13 @@ async def test_property_data_export_completeness(session_id, history, export_for
 
     **Validates: Requirements 5.1**
     """
-    from api.services.data_export import DataExportService
-    from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
-    import json
     import csv
     import io
+    import json
+    from unittest.mock import AsyncMock, Mock
+
+    from api.services.data_export import DataExportService
+    from api.services.session_manager import SessionManager, SimulationSession
 
     # Create mock session manager and simulation session
     mock_session_manager = Mock(spec=SessionManager)
@@ -1530,8 +1563,8 @@ async def test_property_data_export_completeness(session_id, history, export_for
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
 async def test_property_data_export_time_filtering(
-    session_id, history, start_time_offset, end_time_offset
-):
+    session_id: str, history: Dict[str, Any], start_time_offset: float, end_time_offset: float
+) -> None:
     """
     Property: Data export with time filtering should include only timesteps
     within the specified range.
@@ -1541,10 +1574,11 @@ async def test_property_data_export_time_filtering(
 
     **Validates: Requirements 5.1**
     """
+    import json
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
-    import json
 
     # Skip if history is too small
     assume(len(history["time"]) >= 10)
@@ -1602,7 +1636,9 @@ async def test_property_data_export_time_filtering(
 )
 @settings(max_examples=50, deadline=None)
 @pytest.mark.asyncio
-async def test_property_data_export_variable_filtering(session_id, history, variables_to_export):
+async def test_property_data_export_variable_filtering(
+    session_id: str, history: Dict[str, Any], variables_to_export: List[str]
+) -> None:
     """
     Property: Data export with variable filtering should include only the
     requested variables (plus time).
@@ -1612,10 +1648,11 @@ async def test_property_data_export_variable_filtering(session_id, history, vari
 
     **Validates: Requirements 5.1**
     """
+    import json
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
-    import json
 
     # Create mock session manager and simulation session
     mock_session_manager = Mock(spec=SessionManager)
@@ -1662,7 +1699,7 @@ async def test_property_data_export_variable_filtering(session_id, history, vari
 
 
 @st.composite
-def time_series_variables_strategy(draw):
+def time_series_variables_strategy(draw: st.DrawFn) -> List[str]:
     """Generate valid variable names for time series export."""
     # Common variables available in APGI system history
     available_vars = [
@@ -1689,7 +1726,7 @@ def time_series_variables_strategy(draw):
 
 
 @st.composite
-def mock_time_series_history_strategy(draw, num_steps):
+def mock_time_series_history_strategy(draw: st.DrawFn, num_steps: int) -> Dict[str, Any]:
     """Generate mock history data for time series testing."""
     # Generate timestamps (monotonically increasing)
     start_time = draw(st.floats(min_value=0.0, max_value=1000.0))
@@ -1730,7 +1767,7 @@ def mock_time_series_history_strategy(draw, num_steps):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_time_series_data_consistency(data):
+async def test_property_time_series_data_consistency(data: st.DataObject) -> None:
     """
     **Feature: api-rest-interface, Property 12: Time series data consistency**
 
@@ -1739,9 +1776,10 @@ async def test_property_time_series_data_consistency(data):
 
     **Validates: Requirements 5.3**
     """
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
 
     # Generate test data
     num_steps = data.draw(st.integers(min_value=10, max_value=100))
@@ -1837,7 +1875,7 @@ async def test_property_time_series_data_consistency(data):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_time_series_filtering_consistency(data):
+async def test_property_time_series_filtering_consistency(data: st.DataObject) -> None:
     """
     Property: Time series filtering should preserve ordering and variable selection.
 
@@ -1846,9 +1884,10 @@ async def test_property_time_series_filtering_consistency(data):
 
     **Validates: Requirements 5.3**
     """
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
 
     # Generate test data
     num_steps = data.draw(st.integers(min_value=20, max_value=100))
@@ -1927,7 +1966,7 @@ async def test_property_time_series_filtering_consistency(data):
     suppress_health_check=[HealthCheck.large_base_example, HealthCheck.data_too_large],
 )
 @pytest.mark.asyncio
-async def test_property_time_series_downsampling_consistency(data):
+async def test_property_time_series_downsampling_consistency(data: st.DataObject) -> None:
     """
     Property: Downsampled time series should maintain ordering and variable selection.
 
@@ -1937,9 +1976,10 @@ async def test_property_time_series_downsampling_consistency(data):
 
     **Validates: Requirements 5.3**
     """
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
 
     # Generate test data
     num_steps = data.draw(st.integers(min_value=50, max_value=200))
@@ -2018,7 +2058,7 @@ async def test_property_time_series_downsampling_consistency(data):
     ],
 )
 @pytest.mark.asyncio
-async def test_property_pagination_consistency(session_id, data):
+async def test_property_pagination_consistency(session_id: str, data: st.DataObject) -> None:
     """
     **Feature: api-rest-interface, Property 13: Pagination consistency**
 
@@ -2027,9 +2067,10 @@ async def test_property_pagination_consistency(session_id, data):
 
     **Validates: Requirements 5.5**
     """
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
 
     # Generate test data with a reasonable number of timesteps for pagination testing
     num_steps = data.draw(st.integers(min_value=50, max_value=300))
@@ -2053,7 +2094,7 @@ async def test_property_pagination_consistency(session_id, data):
 
     # Collect all data by following pagination
     all_times = []
-    all_data = {var: [] for var in variables}
+    all_data: dict[str, list[Any]] = {var: [] for var in variables}
     cursor = None
     page_count = 0
     max_pages = 100  # Safety limit to prevent infinite loops
@@ -2153,7 +2194,7 @@ async def test_property_pagination_consistency(session_id, data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_pagination_cursor_validity(session_id, data):
+async def test_property_pagination_cursor_validity(session_id: str, data: st.DataObject) -> None:
     """
     Property: Pagination cursors should be valid and decodable.
 
@@ -2162,11 +2203,12 @@ async def test_property_pagination_cursor_validity(session_id, data):
 
     **Validates: Requirements 5.5**
     """
-    from api.services.data_export import DataExportService
-    from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
     import base64
     import json
+    from unittest.mock import AsyncMock, Mock
+
+    from api.services.data_export import DataExportService
+    from api.services.session_manager import SessionManager, SimulationSession
 
     # Generate test data
     num_steps = data.draw(st.integers(min_value=30, max_value=100))
@@ -2241,7 +2283,7 @@ async def test_property_pagination_cursor_validity(session_id, data):
     max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @pytest.mark.asyncio
-async def test_property_pagination_empty_results(session_id, data):
+async def test_property_pagination_empty_results(session_id: str, data: st.DataObject) -> None:
     """
     Property: Pagination should handle empty results gracefully.
 
@@ -2250,12 +2292,13 @@ async def test_property_pagination_empty_results(session_id, data):
 
     **Validates: Requirements 5.5**
     """
-    from api.services.data_export import DataExportService
-    from api.services.session_manager import SessionManager, SimulationSession
     from unittest.mock import AsyncMock, Mock
 
+    from api.services.data_export import DataExportService
+    from api.services.session_manager import SessionManager, SimulationSession
+
     # Create empty history
-    empty_history = {
+    empty_history: dict[str, list[Any]] = {
         "time": [],
         "free_energy": [],
         "ignitions": [],
@@ -2311,9 +2354,10 @@ async def test_property_pagination_boundary_conditions(
 
     **Validates: Requirements 5.5**
     """
+    from unittest.mock import AsyncMock, Mock
+
     from api.services.data_export import DataExportService
     from api.services.session_manager import SessionManager, SimulationSession
-    from unittest.mock import AsyncMock, Mock
 
     # Generate page size first
     page_size = data.draw(st.integers(min_value=10, max_value=30))
@@ -2461,8 +2505,9 @@ async def test_property_version_endpoint_response_structure(data: st.DataObject)
 
     **Validates: Requirements 6.1, 6.4**
     """
-    from api.routes.version import get_version_info
     from datetime import datetime
+
+    from api.routes.version import get_version_info
 
     # Call the version endpoint
     response = await get_version_info()
@@ -2590,16 +2635,17 @@ async def test_property_deprecation_header_presence(
 
     **Validates: Requirements 6.5**
     """
-    from api.middleware.deprecation import DeprecationMiddleware
     from starlette.applications import Starlette
     from starlette.responses import JSONResponse
     from starlette.routing import Route
     from starlette.testclient import TestClient
 
+    from api.middleware.deprecation import DeprecationMiddleware
+
     endpoint_path, deprecation_info = deprecated_config
 
     # Create a simple test app with the deprecation middleware
-    async def test_endpoint(request):
+    async def test_endpoint(request: Any) -> JSONResponse:
         return JSONResponse({"message": "test"})
 
     # Create routes for the endpoint
@@ -2686,14 +2732,15 @@ async def test_property_non_deprecated_endpoint_no_headers(endpoint: str) -> Non
 
     **Validates: Requirements 6.5**
     """
-    from api.middleware.deprecation import DeprecationMiddleware
     from starlette.applications import Starlette
     from starlette.responses import JSONResponse
     from starlette.routing import Route
     from starlette.testclient import TestClient
 
+    from api.middleware.deprecation import DeprecationMiddleware
+
     # Create a simple test app with the deprecation middleware
-    async def test_endpoint_handler(request):
+    async def test_endpoint_handler(request: Any) -> JSONResponse:
         return JSONResponse({"message": "test"})
 
     # Convert path parameters to Starlette format
@@ -2746,12 +2793,14 @@ async def test_property_deprecation_middleware_path_matching(data: st.DataObject
 
     **Validates: Requirements 6.5**
     """
-    from api.middleware.deprecation import DeprecationMiddleware
+    import uuid
+
     from starlette.applications import Starlette
     from starlette.responses import JSONResponse
     from starlette.routing import Route
     from starlette.testclient import TestClient
-    import uuid
+
+    from api.middleware.deprecation import DeprecationMiddleware
 
     # Use an endpoint with path parameters
     endpoint_pattern = "/v1/sessions/{session_id}/state"
@@ -2766,7 +2815,7 @@ async def test_property_deprecation_middleware_path_matching(data: st.DataObject
     deprecation_info = {"sunset": sunset_str, "replacement": "/v2/sessions/{session_id}/state"}
 
     # Create test app
-    async def test_endpoint_handler(request):
+    async def test_endpoint_handler(request: Any) -> JSONResponse:
         return JSONResponse({"message": "test"})
 
     starlette_path = "/v1/sessions/{session_id:str}/state"
@@ -2811,11 +2860,12 @@ async def test_property_deprecation_info_consistency(data: st.DataObject) -> Non
 
     **Validates: Requirements 6.5**
     """
-    from api.middleware.deprecation import DeprecationMiddleware
     from starlette.applications import Starlette
     from starlette.responses import JSONResponse
     from starlette.routing import Route
     from starlette.testclient import TestClient
+
+    from api.middleware.deprecation import DeprecationMiddleware
 
     endpoint_path = "/v1/sessions"
 
@@ -2829,7 +2879,7 @@ async def test_property_deprecation_info_consistency(data: st.DataObject) -> Non
     deprecation_info = {"sunset": sunset_str, "replacement": "/v2/sessions"}
 
     # Create test app
-    async def test_endpoint_handler(request):
+    async def test_endpoint_handler(request: Any) -> JSONResponse:
         return JSONResponse({"message": "test"})
 
     app = Starlette(routes=[Route(endpoint_path, test_endpoint_handler, methods=["GET", "POST"])])
@@ -2903,8 +2953,8 @@ def test_property_cors_header_presence(
     """
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.testclient import TestClient
     from fastapi.responses import JSONResponse  # noqa: F401
+    from fastapi.testclient import TestClient
 
     # Create a simple test app with CORS middleware
     app = FastAPI()
@@ -3057,7 +3107,7 @@ def test_property_cors_origin_validation(cors_origins: set[str], request_origin:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
+        allow_origins=list(cors_origins),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -3197,26 +3247,30 @@ def webhook_payload_strategy(draw: Any, task_type: str, session_id: str) -> dict
     }
 
     # Add task-specific results
+    results: dict[str, Any]
     if task_type == TaskType.IOWA_GAMBLING.value:
-        payload["results"] = {
+        results = {
             "total_trials": draw(st.integers(min_value=10, max_value=200)),
             "advantageous_ratio": draw(st.floats(min_value=0.0, max_value=1.0)),
             "final_balance": draw(st.integers(min_value=-5000, max_value=10000)),
         }
+        payload["results"] = results  # type: ignore[assignment]
     elif task_type == TaskType.MASKING_PARADIGM.value:
-        payload["results"] = {
+        results = {
             "ignition_probabilities": draw(
                 st.lists(st.floats(min_value=0.0, max_value=1.0), min_size=3, max_size=10)
             ),
             "mean_ignition_probability": draw(st.floats(min_value=0.0, max_value=1.0)),
         }
+        payload["results"] = results  # type: ignore[assignment]
     elif task_type == TaskType.ATTENTIONAL_BLINK.value:
-        payload["results"] = {
+        results = {
             "t1_accuracy": draw(st.floats(min_value=0.0, max_value=1.0)),
             "t2_accuracy_by_lag": draw(
                 st.lists(st.floats(min_value=0.0, max_value=1.0), min_size=2, max_size=8)
             ),
         }
+        payload["results"] = results  # type: ignore[assignment]
 
     return payload
 
@@ -3235,10 +3289,11 @@ async def test_property_webhook_delivery_with_retry(data: Any) -> None:
 
     **Validates: Requirements 11.3, 11.4, 11.5**
     """
-    from api.services.webhook_manager import WebhookManager, WebhookStatus
-    from api.database.models import WebhookDelivery
-    from unittest.mock import MagicMock
     from datetime import datetime, timedelta
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from api.services.webhook_manager import WebhookManager, WebhookStatus
 
     # Generate test data
     task_type = data.draw(task_type_strategy())
@@ -3266,98 +3321,108 @@ async def test_property_webhook_delivery_with_retry(data: Any) -> None:
     mock_response.status_code = response_status
     mock_response.text = "OK" if should_succeed else "Error"
 
-    # Create a mock delivery record
+    # Create a mock delivery record - use SimpleNamespace to track attribute changes
     delivery_id = str(uuid.uuid4())
-    mock_delivery = MagicMock(spec=WebhookDelivery)
-    mock_delivery.delivery_id = delivery_id
-    mock_delivery.task_id = task_id
-    mock_delivery.webhook_url = webhook_url
-    mock_delivery.payload = payload
-    mock_delivery.status = WebhookStatus.PENDING.value
-    mock_delivery.attempts = 0
-    mock_delivery.last_attempt_at = None
-    mock_delivery.next_retry_at = None
-    mock_delivery.response_status = None
-    mock_delivery.response_body = None
-    mock_delivery.error_message = None
-    mock_delivery.created_at = datetime.utcnow()
+    mock_delivery = SimpleNamespace(
+        delivery_id=delivery_id,
+        task_id=task_id,
+        webhook_url=webhook_url,
+        payload=payload,
+        status=WebhookStatus.PENDING.value,
+        attempts=0,
+        last_attempt_at=None,
+        next_retry_at=None,
+        response_status=None,
+        response_body=None,
+        error_message=None,
+        created_at=datetime.utcnow(),
+    )
 
-    # Configure mock database query
+    # Configure mock database query - use side_effect to ensure same object is returned
     mock_query = MagicMock()
-    mock_query.filter.return_value.first.return_value = mock_delivery
-    mock_db.query.return_value = mock_query
+    mock_filter_result = MagicMock()
+    # Use side_effect to always return the same mock_delivery object
+    mock_filter_result.first = MagicMock(return_value=mock_delivery)
+    mock_query.filter = MagicMock(return_value=mock_filter_result)
+    mock_db.query = MagicMock(return_value=mock_query)
 
-    # Mock the HTTP client post method
+    # Mock the HTTP client post method, IP check, and DNS resolution
     with patch.object(webhook_manager.http_client, "post", return_value=mock_response):
-        # Test webhook delivery
-        result = await webhook_manager.deliver_webhook(mock_db, delivery_id)
+        with patch.object(webhook_manager, "_is_private_ip", return_value=False):
+            with patch(
+                "api.services.webhook_manager.socket.gethostbyname", return_value="93.184.216.34"
+            ):
+                # Test webhook delivery
+                result = await webhook_manager.deliver_webhook(mock_db, delivery_id)
 
-        # Property 1: Delivery attempt should increment attempt count
-        assert mock_delivery.attempts > 0, "Webhook delivery should increment attempt count"
+                # Property 1: Delivery attempt should increment attempt count
+                assert mock_delivery.attempts > 0, "Webhook delivery should increment attempt count"
 
-        # Property 2: Last attempt timestamp should be set
-        assert (
-            mock_delivery.last_attempt_at is not None
-        ), "Webhook delivery should record last attempt timestamp"
-
-        # Property 3: Response status should be recorded
-        assert (
-            mock_delivery.response_status == response_status
-        ), f"Webhook delivery should record response status, expected {response_status}, got {mock_delivery.response_status}"
-
-        # Property 4: Successful delivery should return True and set status to DELIVERED
-        if should_succeed:
-            assert result is True, "Successful webhook delivery should return True"
-            assert (
-                mock_delivery.status == WebhookStatus.DELIVERED.value
-            ), "Successful webhook delivery should set status to DELIVERED"
-            assert (
-                mock_delivery.next_retry_at is None
-            ), "Successful webhook delivery should clear next_retry_at"
-
-        # Property 5: Failed delivery should return False and schedule retry
-        else:
-            assert result is False, "Failed webhook delivery should return False"
-
-            # If not at max retries, should schedule retry
-            if mock_delivery.attempts < WebhookManager.MAX_RETRIES:
+                # Property 2: Last attempt timestamp should be set
                 assert (
-                    mock_delivery.status == WebhookStatus.RETRYING.value
-                ), "Failed webhook delivery should set status to RETRYING"
+                    mock_delivery.last_attempt_at is not None
+                ), "Webhook delivery should record last attempt timestamp"
+
+                # Property 3: Response status should be recorded
                 assert (
-                    mock_delivery.next_retry_at is not None
-                ), "Failed webhook delivery should schedule next retry"
+                    mock_delivery.response_status == response_status
+                ), f"Webhook delivery should record response status, expected {response_status}, got {mock_delivery.response_status}"
 
-                # Property 6: Retry should use exponential backoff
-                # Calculate expected delay
-                expected_delay = min(
-                    WebhookManager.INITIAL_RETRY_DELAY_SECONDS
-                    * (WebhookManager.BACKOFF_MULTIPLIER ** (mock_delivery.attempts - 1)),
-                    WebhookManager.MAX_RETRY_DELAY_SECONDS,
-                )
+                # Property 4: Successful delivery should return True and set status to DELIVERED
+                if should_succeed:
+                    assert result is True, "Successful webhook delivery should return True"
+                    assert (
+                        mock_delivery.status == WebhookStatus.DELIVERED.value
+                    ), "Successful webhook delivery should set status to DELIVERED"
+                    assert (
+                        mock_delivery.next_retry_at is None
+                    ), "Successful webhook delivery should clear next_retry_at"
 
-                # Verify next_retry_at is approximately correct (within 5 seconds tolerance)
-                expected_retry_time = mock_delivery.last_attempt_at + timedelta(
-                    seconds=expected_delay
-                )
-                time_diff = abs((mock_delivery.next_retry_at - expected_retry_time).total_seconds())
+                # Property 5: Failed delivery should return False and schedule retry
+                else:
+                    assert result is False, "Failed webhook delivery should return False"
 
-                assert time_diff < 5, (
-                    f"Retry should use exponential backoff, expected delay ~{expected_delay}s, "
-                    f"but time difference is {time_diff}s"
-                )
+                    # If not at max retries, should schedule retry
+                    if mock_delivery.attempts < WebhookManager.MAX_RETRIES:
+                        assert (
+                            mock_delivery.status == WebhookStatus.RETRYING.value
+                        ), "Failed webhook delivery should set status to RETRYING"
+                        assert (
+                            mock_delivery.next_retry_at is not None
+                        ), "Failed webhook delivery should schedule next retry"
 
-            # If at max retries, should mark as failed
-            else:
-                assert (
-                    mock_delivery.status == WebhookStatus.FAILED.value
-                ), "Webhook delivery at max retries should set status to FAILED"
-                assert (
-                    mock_delivery.next_retry_at is None
-                ), "Webhook delivery at max retries should not schedule retry"
+                        # Property 6: Retry should use exponential backoff
+                        # Calculate expected delay
+                        expected_delay = min(
+                            WebhookManager.INITIAL_RETRY_DELAY_SECONDS
+                            * (WebhookManager.BACKOFF_MULTIPLIER ** (mock_delivery.attempts - 1)),
+                            WebhookManager.MAX_RETRY_DELAY_SECONDS,
+                        )
 
-        # Property 7: Database commit should be called
-        assert mock_db.commit.called, "Webhook delivery should commit changes to database"
+                        # Verify next_retry_at is approximately correct (within 5 seconds tolerance)
+                        expected_retry_time = mock_delivery.last_attempt_at + timedelta(
+                            seconds=expected_delay
+                        )
+                        time_diff = abs(
+                            (mock_delivery.next_retry_at - expected_retry_time).total_seconds()
+                        )
+
+                        assert time_diff < 5, (
+                            f"Retry should use exponential backoff, expected delay ~{expected_delay}s, "
+                            f"but time difference is {time_diff}s"
+                        )
+
+                    # If at max retries, should mark as failed
+                    else:
+                        assert (
+                            mock_delivery.status == WebhookStatus.FAILED.value
+                        ), "Webhook delivery at max retries should set status to FAILED"
+                        assert (
+                            mock_delivery.next_retry_at is None
+                        ), "Webhook delivery at max retries should not schedule retry"
+
+                # Property 7: Database commit should be called
+                assert mock_db.commit.called, "Webhook delivery should commit changes to database"
 
 
 @given(data=st.data())
@@ -3432,9 +3497,10 @@ async def test_property_webhook_retry_exponential_backoff(data: Any) -> None:
 
     **Validates: Requirements 11.5**
     """
-    from api.services.webhook_manager import WebhookManager, WebhookStatus
-    from api.database.models import WebhookDelivery
     from unittest.mock import MagicMock
+
+    from api.database.models import WebhookDelivery
+    from api.services.webhook_manager import WebhookManager, WebhookStatus
 
     # Generate test data
     task_type = data.draw(task_type_strategy())
@@ -3539,9 +3605,10 @@ async def test_property_webhook_max_retries_enforcement(data: st.DataObject) -> 
 
     **Validates: Requirements 11.5**
     """
-    from api.services.webhook_manager import WebhookManager, WebhookStatus
-    from api.database.models import WebhookDelivery
     from unittest.mock import MagicMock
+
+    from api.database.models import WebhookDelivery
+    from api.services.webhook_manager import WebhookManager, WebhookStatus
 
     # Generate test data
     task_type = data.draw(task_type_strategy())

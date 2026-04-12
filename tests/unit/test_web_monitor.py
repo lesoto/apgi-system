@@ -5,12 +5,12 @@ Tests the web monitor functionality including data updates,
 WebSocket communication, and dashboard features.
 """
 
-import time
 import threading
-from unittest.mock import patch, MagicMock
+import time
 from typing import Any
+from unittest.mock import MagicMock, patch
 
-from apgi_system.visualization.simple_monitor import SimpleMonitor, MonitoringIntegration
+from apgi_system.visualization.simple_monitor import MonitoringIntegration, SimpleMonitor
 from apgi_system.visualization.web_monitor import WebMonitor
 
 

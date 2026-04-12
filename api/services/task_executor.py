@@ -4,11 +4,13 @@ Task Executor Service
 Manages asynchronous execution of experimental tasks using Celery.
 """
 
+import asyncio
 import logging
 from enum import Enum
-import asyncio
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from celery.result import AsyncResult  # type: ignore
+
 from api.celery_app import celery_app
 from api.tasks.task_registry import TASK_REGISTRY, TaskType
 

@@ -3,9 +3,10 @@ Unit tests for configuration validator.
 """
 
 import pytest
+
 from apgi_system.config_validator import (
-    ConfigValidator,
     ConfigValidationError,
+    ConfigValidator,
     validate_config_file,
 )
 

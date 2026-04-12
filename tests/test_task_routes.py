@@ -4,19 +4,50 @@ Integration tests for task execution routes.
 Tests the task API endpoints for submitting and monitoring experimental tasks.
 """
 
+from datetime import datetime
+from typing import Any
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Any
 
+import api.services.authorization as auth
 from api.main import create_app
+from api.routes.tasks import init_task_routes
+from api.services.auth_manager import TokenPayload
+from api.services.authorization import get_current_user, require_permission
 from api.services.task_executor import TaskExecutor
 
 
 @pytest.fixture
 def app() -> Any:
     """Create test FastAPI application."""
-    return create_app()
+    # Create app in test mode (disables auth and CSRF middleware)
+    app = create_app(test_mode=True)
+
+    # Initialize task routes
+    init_task_routes()
+
+    # Create mock user with admin role to pass permission checks
+    mock_user = TokenPayload(
+        user_id="test-user-123",
+        username="testuser",
+        roles=["admin"],
+        exp=datetime.fromtimestamp(9999999999),
+    )
+
+    async def mock_get_current_user() -> TokenPayload:
+        return mock_user
+
+    # Override require_permission to pass through
+    async def mock_require_permission(permission: auth.Permission) -> TokenPayload:
+        return mock_user
+
+    # Apply overrides
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[require_permission] = mock_require_permission
+
+    return app
 
 
 @pytest.fixture
@@ -50,7 +81,7 @@ def mock_task_executor() -> Mock:
             "message": "Task cancellation requested",
         }
     )
-    executor.list_available_tasks = Mock(
+    executor.list_available_tasks = AsyncMock(
         return_value={
             "tasks": [
                 {

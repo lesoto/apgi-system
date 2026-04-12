@@ -31,7 +31,7 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
         self.deprecated_endpoints = deprecated_endpoints or {}
-        self._validate_sunset_dates()  # type: ignore[no-untyped-call]
+        self._validate_sunset_dates()
 
     def _validate_sunset_dates(self) -> None:
         """Validate that all sunset dates are in a valid format."""
@@ -158,7 +158,7 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
 
         return msg
 
-    def update_deprecated_endpoints(self, deprecated_endpoints: Dict[str, Dict[str, str]]):
+    def update_deprecated_endpoints(self, deprecated_endpoints: Dict[str, Dict[str, str]]) -> None:
         """
         Update the deprecated endpoints configuration.
 

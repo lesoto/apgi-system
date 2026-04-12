@@ -1,7 +1,8 @@
 """Unit tests for extended analysis capabilities."""
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_system.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
 from apgi_system.system import APGISystem
 
@@ -17,7 +18,7 @@ def test_analysis_results_dataclass():
     assert isinstance(results.temporal_dynamics, dict)
 
 
-def test_analysis_results_with_data():
+def test_analysis_results_with_data() -> None:
     """Test AnalysisResults with actual data."""
     results = AnalysisResults(
         ignition_statistics={"total_ignitions": 10, "ignition_rate_hz": 2.0},
@@ -34,14 +35,14 @@ def test_analysis_results_with_data():
     assert len(results.temporal_dynamics["time"]) == 3
 
 
-def test_system_analyzer_initialization(config):
+def test_system_analyzer_initialization(config: dict) -> None:
     """Test SystemAnalyzer initialization."""
     analyzer = SystemAnalyzer(config)
 
     assert analyzer.config == config
 
 
-def test_compute_ignition_statistics_empty(config):
+def test_compute_ignition_statistics_empty(config: dict) -> None:
     """Test ignition statistics computation with no ignitions."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -53,7 +54,7 @@ def test_compute_ignition_statistics_empty(config):
     assert stats["mean_ignition_interval_ms"] == 0.0
 
 
-def test_compute_ignition_statistics_with_data(config):
+def test_compute_ignition_statistics_with_data(config: dict) -> None:
     """Test ignition statistics computation with actual data."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -81,7 +82,7 @@ def test_compute_ignition_statistics_with_data(config):
     assert stats["max_ignition_interval_ms"] > 0.0
 
 
-def test_compute_energy_budget_summary_empty(config):
+def test_compute_energy_budget_summary_empty(config: dict) -> None:
     """Test energy budget summary with no history."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -93,7 +94,7 @@ def test_compute_energy_budget_summary_empty(config):
     assert summary["min_reserves"] == 1.0
 
 
-def test_compute_energy_budget_summary_with_data(config):
+def test_compute_energy_budget_summary_with_data(config: dict) -> None:
     """Test energy budget summary with actual data."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -112,7 +113,7 @@ def test_compute_energy_budget_summary_with_data(config):
     assert summary["energy_per_ignition"] > 0.0
 
 
-def test_compute_somatic_marker_statistics(config):
+def test_compute_somatic_marker_statistics(config: dict) -> None:
     """Test somatic marker statistics computation."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -131,7 +132,7 @@ def test_compute_somatic_marker_statistics(config):
     assert stats["mean_marker_strength"] > 0.0
 
 
-def test_compute_coherence_metrics(config):
+def test_compute_coherence_metrics(config: dict) -> None:
     """Test coherence metrics computation."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -144,7 +145,7 @@ def test_compute_coherence_metrics(config):
     assert 0.0 <= metrics["mean_coherence"] <= 1.0
 
 
-def test_extract_temporal_dynamics(config):
+def test_extract_temporal_dynamics(config: dict) -> None:
     """Test temporal dynamics extraction."""
     analyzer = SystemAnalyzer(config)
     system = APGISystem()
@@ -169,7 +170,7 @@ def test_extract_temporal_dynamics(config):
     assert len(dynamics["threshold"]) == 4
 
 
-def test_analyze_system_integration(config):
+def test_analyze_system_integration(config: dict) -> None:
     """Test full system analysis integration."""
     system = APGISystem()
 

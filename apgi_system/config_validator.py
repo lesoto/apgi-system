@@ -6,8 +6,8 @@ including parameter range validation, schema validation, and helpful
 error messages for common configuration mistakes.
 """
 
-from typing import Dict, Any, List, Tuple, Union
 import warnings
+from typing import Any, Dict, List, Tuple, Union
 
 
 class ConfigValidationError(Exception):
@@ -751,8 +751,9 @@ def validate_config_file(config_path: str) -> None:
     --------
     >>> validate_config_file("config/default.yaml")
     """
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     config_file = Path(config_path)
     if not config_file.exists():

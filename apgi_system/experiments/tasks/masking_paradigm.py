@@ -22,12 +22,13 @@ References:
   nonlinear threshold for access to consciousness. PLoS Biology, 5(10), e260.
 """
 
-import numpy as np
-from typing import Dict, Any, List, Optional, cast
-from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
 from random import shuffle
+from typing import Any, Dict, List, Optional, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 
 class MaskType(Enum):

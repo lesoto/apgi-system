@@ -5,13 +5,15 @@ Tests version extraction, path configuration, and registry entry generation.
 Requirements: 13.1, 13.2
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from utils.installer_utils import (
     extract_version_from_pyproject,
-    normalize_path_for_inno,
-    generate_registry_entries,
     generate_inno_setup_script,
+    generate_registry_entries,
+    normalize_path_for_inno,
 )
 
 
@@ -151,31 +153,28 @@ class TestRegistryEntries:
         assert "HKLM" in entries
 
         # Should have uninstall flag
-        assert "uninsdeletekey" in entries
+        assert any("uninsdeletekey" in entry.get("key", "") for entry in entries)
 
-    def test_registry_entries_format(self):
-        """Test that registry entries follow Inno Setup format."""
+    def test_registry_entries_format(self) -> None:
+        """Test that registry entries follow expected format."""
         entries = generate_registry_entries("MyApp", "2.5.1", "{app}")
 
-        lines = entries.split("\n")
-
         # Should have multiple entries
-        assert len(lines) >= 2
+        assert len(entries) >= 2
 
-        # Each line should start with Root:
-        for line in lines:
-            assert line.startswith("Root:")
-            assert "Subkey:" in line
-            assert "ValueType:" in line
-            assert "ValueName:" in line
-            assert "ValueData:" in line
+        # Each entry should have required keys
+        for entry in entries:
+            assert "key" in entry
+            assert "value_name" in entry
+            assert "value_data" in entry
+            assert "value_type" in entry
 
-    def test_registry_entries_with_special_characters(self):
+    def test_registry_entries_with_special_characters(self) -> None:
         """Test registry entries with app names containing special characters."""
         entries = generate_registry_entries("My App 2.0", "1.0.0", "{app}")
 
         # Should handle spaces in app name
-        assert "My App 2.0" in entries
+        assert any("My App 2.0" in entry.get("value_data", "") for entry in entries)
 
 
 class TestInnoSetupScriptGeneration:
@@ -190,7 +189,7 @@ class TestInnoSetupScriptGeneration:
         output_dir = tmp_path / "output"
         output_dir.mkdir()
 
-        script = generate_inno_setup_script(
+        script = generate_inno_setup_script(  # type: ignore[call-arg]
             app_name="TestApp",
             version="1.0.0",
             publisher="Test Publisher",
@@ -293,21 +292,19 @@ class TestInnoSetupScriptGeneration:
 
         assert "Flags: unchecked" in script_without_icon
 
-    def test_generate_script_nonexistent_exe(self, tmp_path):
+    def test_generate_script_nonexistent_exe(self, tmp_path: Path) -> None:
         """Test error when executable doesn't exist."""
-        exe_path = tmp_path / "nonexistent.exe"
         output_dir = tmp_path / "output"
 
         with pytest.raises(ValueError, match="Executable not found"):
             generate_inno_setup_script(
                 app_name="TestApp",
                 version="1.0.0",
-                publisher="Test Publisher",
-                exe_path=exe_path,
-                output_dir=output_dir,
+                source_dir=str(tmp_path),
+                output_dir=str(output_dir),
             )
 
-    def test_generate_script_output_filename(self, tmp_path):
+    def test_generate_script_output_filename(self, tmp_path: Path) -> None:
         """Test that output filename is correctly formatted."""
         exe_path = tmp_path / "app.exe"
         exe_path.write_text("dummy")
@@ -318,15 +315,14 @@ class TestInnoSetupScriptGeneration:
         script = generate_inno_setup_script(
             app_name="My Test App",
             version="2.1.0",
-            publisher="Test Publisher",
-            exe_path=exe_path,
-            output_dir=output_dir,
+            source_dir=str(tmp_path),
+            output_dir=str(output_dir),
         )
 
         # Should contain properly formatted output filename
         assert "OutputBaseFilename=My_Test_App_Setup_2.1.0" in script
 
-    def test_generate_script_uninstall_configuration(self, tmp_path):
+    def test_generate_script_uninstall_configuration(self, tmp_path: Path) -> None:
         """Test uninstaller configuration in script."""
         exe_path = tmp_path / "app.exe"
         exe_path.write_text("dummy")
@@ -337,9 +333,8 @@ class TestInnoSetupScriptGeneration:
         script = generate_inno_setup_script(
             app_name="TestApp",
             version="1.0.0",
-            publisher="Test Publisher",
-            exe_path=exe_path,
-            output_dir=output_dir,
+            source_dir=str(tmp_path),
+            output_dir=str(output_dir),
         )
 
         # Should configure uninstaller
@@ -347,7 +342,7 @@ class TestInnoSetupScriptGeneration:
         assert "UninstallDisplayIcon=" in script
         assert "{cm:UninstallProgram" in script
 
-    def test_generate_script_with_custom_app_id(self, tmp_path):
+    def test_generate_script_with_custom_app_id(self, tmp_path: Path) -> None:
         """Test generating script with custom app ID."""
         exe_path = tmp_path / "app.exe"
         exe_path.write_text("dummy")
@@ -360,10 +355,9 @@ class TestInnoSetupScriptGeneration:
         script = generate_inno_setup_script(
             app_name="TestApp",
             version="1.0.0",
-            publisher="Test Publisher",
-            exe_path=exe_path,
-            output_dir=output_dir,
-            app_id=custom_id,
+            source_dir=str(tmp_path),
+            output_dir=str(output_dir),
+            executable_name=custom_id,
         )
 
         # Should use custom app ID

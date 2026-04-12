@@ -9,7 +9,7 @@ import logging
 import logging.config
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, Optional
 
 import yaml
 
@@ -338,8 +338,8 @@ def log_performance(func_name: Optional[str] = None) -> Callable[..., Any]:
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        import time
         import functools
+        import time
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:

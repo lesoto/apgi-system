@@ -1,15 +1,16 @@
 """Unit tests for FreeEnergyCalculator."""
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_system.core.free_energy import (
     FreeEnergyCalculator,
-    compute_variational_free_energy,
-    compute_expected_free_energy,
     compute_accuracy,
     compute_complexity,
     compute_epistemic_value,
+    compute_expected_free_energy,
     compute_pragmatic_value,
+    compute_variational_free_energy,
 )
 
 
@@ -162,7 +163,7 @@ class TestFreeEnergyWrappers:
         assert isinstance(fe, float)
         assert fe >= 0
 
-    def test_compute_expected_free_energy_wrapper(self):
+    def test_compute_expected_free_energy_wrapper(self) -> None:
         """Test expected free energy wrapper."""
         policy = np.array([1.0])
         pred_states = [np.random.randn(10) for _ in range(3)]
@@ -176,7 +177,7 @@ class TestFreeEnergyWrappers:
 
         assert isinstance(efe, float)
 
-    def test_compute_accuracy_wrapper(self):
+    def test_compute_accuracy_wrapper(self) -> None:
         """Test accuracy wrapper."""
         obs = np.array([1.0, 2.0, 3.0])
         pred = np.array([1.1, 1.9, 3.2])
@@ -186,7 +187,7 @@ class TestFreeEnergyWrappers:
         assert isinstance(accuracy, float)
         assert accuracy >= 0
 
-    def test_compute_complexity_wrapper(self):
+    def test_compute_complexity_wrapper(self) -> None:
         """Test complexity wrapper."""
         post_mean = np.array([1.0, 2.0])
         post_cov = 0.1 * np.eye(2)

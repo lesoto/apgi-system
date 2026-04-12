@@ -5,23 +5,23 @@ Tests module exclusion logic, hidden import detection, and resource file discove
 _Requirements: 12.1, 12.2_
 """
 
-from pathlib import Path
-import tempfile
 import shutil
 import sys
-
-from utils.build_common import (
-    analyze_dependencies,
-    detect_hidden_imports,
-    collect_resources,
-    get_version,
-    should_exclude_module,
-    get_excluded_modules,
-)
+import tempfile
+from pathlib import Path
 
 # Add project root to path to import build module
 project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root))  # noqa: E402
+
+from utils.build_common import analyze_dependencies  # noqa: E402
+from utils.build_common import (  # noqa: E402
+    collect_resources,
+    detect_hidden_imports,
+    get_excluded_modules,
+    get_version,
+    should_exclude_module,
+)
 
 
 class TestModuleExclusion:
@@ -133,9 +133,9 @@ class TestResourceFileDiscovery:
         (self.temp_path / "config.yaml").write_text("test: value")
         (self.temp_path / "data.yml").write_text("data: value")
 
-        resources = collect_resources(str(self.temp_path))
+        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
 
-        yaml_files = [r for r in resources if r[0].endswith((".yaml", ".yml"))]
+        yaml_files = [r for r in resources["config_files"] if r.endswith((".yaml", ".yml"))]
         assert len(yaml_files) == 2
 
     def test_collect_image_files(self) -> None:
@@ -144,9 +144,9 @@ class TestResourceFileDiscovery:
         (self.temp_path / "icon.png").write_bytes(b"fake png data")
         (self.temp_path / "logo.ico").write_bytes(b"fake ico data")
 
-        resources = collect_resources(str(self.temp_path))
+        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
 
-        image_files = [r for r in resources if r[0].endswith((".png", ".ico"))]
+        image_files = [r for r in resources["resource_files"] if r.endswith((".png", ".ico"))]
         assert len(image_files) == 2
 
     def test_collect_nested_resources(self) -> None:
@@ -156,12 +156,12 @@ class TestResourceFileDiscovery:
         subdir.mkdir()
         (subdir / "nested.yaml").write_text("nested: value")
 
-        resources = collect_resources(str(self.temp_path))
+        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
 
-        nested_files = [r for r in resources if "nested.yaml" in r[0]]
+        nested_files = [r for r in resources["config_files"] if "nested.yaml" in r]
         assert len(nested_files) == 1
-        # Check destination path includes subdirectory
-        assert "subdir" in nested_files[0][1]
+        # Check path includes subdirectory
+        assert "subdir" in nested_files[0]
 
     def test_collect_with_custom_patterns(self) -> None:
         """Test collection with custom file patterns."""
@@ -170,23 +170,21 @@ class TestResourceFileDiscovery:
         (self.temp_path / "config.yaml").write_text("test: value")
         (self.temp_path / "readme.txt").write_text("readme")
 
-        # Only collect CSV files
-        resources = collect_resources(str(self.temp_path))
+        # Collect all resources
+        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
 
-        # resources is a dict, flatten it to get all file paths
-        all_files = []
-        for file_list in resources.values():
-            all_files.extend(file_list)
+        # CSV should be in data_files, YAML in config_files, TXT in data_files
+        assert len(resources["data_files"]) == 2  # csv and txt
+        assert len(resources["config_files"]) == 1  # yaml
+        assert any(f.endswith(".csv") for f in resources["data_files"])
 
-        assert len(all_files) == 1
-        assert all_files[0].endswith(".csv")
-
-    def test_nonexistent_directory_returns_empty_list(self) -> None:
-        """Test that nonexistent directory returns empty list."""
+    def test_nonexistent_directory_returns_empty_dict(self) -> None:
+        """Test that nonexistent directory returns empty dict."""
         fake_path = Path("/nonexistent/path/xyz")
         resources = collect_resources(str(fake_path))
         assert isinstance(resources, dict)
-        assert len(resources) == 0
+        assert len(resources) == 4  # Has empty lists for all categories
+        assert all(len(v) == 0 for v in resources.values())
 
     def test_resource_tuples_format(self) -> None:
         """Test that resources are returned as categorized lists."""
@@ -209,10 +207,11 @@ class TestResourceFileDiscovery:
         subdir.mkdir()
         (self.temp_path / "file.yaml").write_text("test: value")
 
-        resources = collect_resources(str(self.temp_path))
+        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
 
         # Should only have the file, not the directory
-        assert all(".yaml" in r[0] for r in resources)
+        assert all(".yaml" in r for r in resources["config_files"])
+        assert len(resources["config_files"]) == 1
 
 
 class TestDependencyAnalysis:
@@ -238,9 +237,11 @@ import numpy
 
         deps = analyze_dependencies(str(test_file))
 
-        assert "os" in deps
-        assert "sys" in deps
-        assert "numpy" in deps
+        # os and sys are stdlib modules, so they are excluded
+        # numpy is in requirements.txt common list
+        all_deps = deps["requirements_txt"] | deps["pyproject_toml"]
+        assert "numpy" in all_deps
+        assert deps["total_dependencies"] == 1
 
     def test_analyze_from_imports(self) -> None:
         """Test analysis of from...import statements."""
@@ -252,8 +253,10 @@ from scipy import stats
 
         deps = analyze_dependencies(str(test_file))
 
-        assert "pathlib" in deps
-        assert "scipy" in deps
+        # pathlib is stdlib, scipy is in requirements.txt common list
+        all_deps = deps["requirements_txt"] | deps["pyproject_toml"]
+        assert "scipy" in all_deps
+        assert deps["total_dependencies"] == 1
 
     def test_analyze_with_exclusions(self) -> None:
         """Test analysis with module exclusions."""
@@ -267,9 +270,11 @@ import hypothesis
         exclude = {"pytest", "hypothesis"}
         deps = analyze_dependencies(str(test_file), exclude_modules=exclude)
 
-        assert "numpy" in deps
-        assert "pytest" not in deps
-        assert "hypothesis" not in deps
+        all_deps = deps["requirements_txt"] | deps["pyproject_toml"]
+        assert "numpy" in all_deps
+        assert "pytest" not in all_deps
+        assert "hypothesis" not in all_deps
+        assert deps["total_dependencies"] == 1
 
     def test_analyze_dotted_imports(self) -> None:
         """Test that dotted imports return top-level package."""
@@ -282,17 +287,21 @@ from matplotlib.pyplot import plot
         deps = analyze_dependencies(str(test_file))
 
         # Should return top-level packages
-        assert "scipy" in deps
-        assert "matplotlib" in deps
+        all_deps = deps["requirements_txt"] | deps["pyproject_toml"]
+        assert "scipy" in all_deps
+        assert "matplotlib" in all_deps
         # Should not include submodules
-        assert "scipy.stats" not in deps
+        assert "scipy.stats" not in all_deps
+        assert deps["total_dependencies"] == 2
 
     def test_analyze_nonexistent_file(self) -> None:
-        """Test analysis of nonexistent file returns empty set."""
+        """Test analysis of nonexistent file returns empty dict."""
         fake_file = self.temp_path / "nonexistent.py"
         deps = analyze_dependencies(str(fake_file))
-        assert isinstance(deps, set)
-        assert len(deps) == 0
+        assert isinstance(deps, dict)
+        assert len(deps["requirements_txt"]) == 0
+        assert len(deps["pyproject_toml"]) == 0
+        assert deps["total_dependencies"] == 0
 
     def test_analyze_invalid_syntax(self) -> None:
         """Test that files with syntax errors are handled gracefully."""
@@ -305,17 +314,23 @@ this is invalid python syntax!!!
         # Should not raise exception
         deps = analyze_dependencies(str(test_file))
 
-        # May or may not include numpy depending on when parsing fails
-        assert isinstance(deps, set)
+        # Should return empty dict on syntax error
+        assert isinstance(deps, dict)
+        assert len(deps["requirements_txt"]) == 0
+        assert len(deps["pyproject_toml"]) == 0
+        assert deps["total_dependencies"] == 0
 
-    def test_returns_set(self) -> None:
-        """Test that analyze_dependencies returns a set."""
+    def test_returns_dict(self) -> None:
+        """Test that analyze_dependencies returns a dict."""
         test_file = self.temp_path / "test.py"
-        test_file.write_text("import os")
+        test_file.write_text("import numpy")
 
         deps = analyze_dependencies(str(test_file))
 
-        assert isinstance(deps, set)
+        assert isinstance(deps, dict)
+        assert "requirements_txt" in deps
+        assert "pyproject_toml" in deps
+        assert "total_dependencies" in deps
 
 
 class TestVersionExtraction:

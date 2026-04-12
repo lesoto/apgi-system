@@ -1,6 +1,6 @@
 """Coherence maintenance between minimal and narrative self."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class CoherenceMaintenance:

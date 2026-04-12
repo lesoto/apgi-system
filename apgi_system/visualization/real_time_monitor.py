@@ -1,9 +1,10 @@
 """Real-time monitoring dashboard for APGI system."""
 
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Dict, Any
 from collections import deque
+from typing import Any, Dict
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class RealTimeMonitor:

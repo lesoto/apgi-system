@@ -4,17 +4,20 @@ Property-based test for async task status tracking.
 Tests that task status can be tracked from submission to completion.
 """
 
-import pytest
-from hypothesis import given, strategies as st, settings
-from unittest.mock import Mock, patch
 import uuid
+from typing import Any
+from unittest.mock import Mock, patch
 
-from api.services.task_executor import TaskExecutor, TaskType, TaskStatus
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from api.services.task_executor import TaskExecutor, TaskStatus, TaskType
 
 
 # Strategies for generating test data
 @st.composite
-def task_type_strategy(draw):
+def task_type_strategy(draw: Any) -> Any:
     """Generate valid task types."""
     return draw(
         st.sampled_from(
@@ -28,7 +31,7 @@ def task_type_strategy(draw):
 
 
 @st.composite
-def task_parameters_strategy(draw, task_type):
+def task_parameters_strategy(draw: Any, task_type: str) -> Any:
     """Generate valid parameters for a given task type."""
     if task_type == TaskType.IOWA_GAMBLING.value:
         return {
@@ -47,13 +50,13 @@ def task_parameters_strategy(draw, task_type):
 
 
 @st.composite
-def session_id_strategy(draw):
+def session_id_strategy(draw: Any) -> Any:
     """Generate valid session IDs (UUIDs)."""
     return str(uuid.uuid4())
 
 
 @st.composite
-def task_result_strategy(draw, task_type, session_id):
+def task_result_strategy(draw: Any, task_type: str, session_id: str) -> Any:
     """Generate mock task results for a given task type."""
     return {
         "task_type": task_type,
@@ -66,7 +69,7 @@ def task_result_strategy(draw, task_type, session_id):
 @given(data=st.data())
 @settings(max_examples=100, deadline=None)
 @pytest.mark.asyncio
-async def test_property_async_task_status_tracking(data):
+async def test_property_async_task_status_tracking(data: st.DataObject) -> None:
     """
     **Feature: api-rest-interface, Property 25: Async task status tracking**
 

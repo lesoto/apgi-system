@@ -8,19 +8,20 @@ configuration are working correctly.
 import sys
 from pathlib import Path
 
-import pytest
-import numpy as np
-from typing import Any, Dict
-from hypothesis import given, settings
-
 # Add project root to path for local imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))  # noqa: E402
 
+from typing import Any, Dict  # noqa: E402
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+from hypothesis import given, settings  # noqa: E402
+
+from tests.strategies import belief_state_strategy  # noqa: E402
 from tests.strategies import (  # noqa: E402
     body_state_strategy,
-    observation_strategy,
-    belief_state_strategy,
     error_variance_strategy,
+    observation_strategy,
 )
 
 

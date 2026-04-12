@@ -4,13 +4,14 @@ Tests for Session Manager
 Unit tests for SessionManager and SimulationSession classes.
 """
 
-import pytest
-import numpy as np
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict, Any, Callable
+from typing import Any, Callable, Dict
+from unittest.mock import AsyncMock, MagicMock
 
-from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
+import numpy as np
+import pytest
+
 from api.models.schemas import SessionCreateRequest
+from api.services.session_manager import SessionLifecycleState, SessionManager, SimulationSession
 
 
 class TestSimulationSession:
@@ -567,31 +568,46 @@ class TestSessionManagerConcurrency:
         # Note: Due to concurrency, exact ordering may vary, but all should be positive
 
     @pytest.mark.asyncio
-    async def test_session_manager_thread_safety(
-        self, concurrent_session_manager: SessionManager
-    ) -> None:
+    async def test_session_manager_thread_safety(self) -> None:
         """Test overall thread safety of SessionManager."""
         import asyncio
         import threading
+        from unittest.mock import AsyncMock, MagicMock
 
         results = []
         errors = []
 
         def run_async_test() -> None:
-            """Run async test in a thread."""
+            """Run async test in a thread with its own SessionManager."""
 
             async def test() -> None:
                 try:
+                    # Create fresh mocks for this thread/event loop
+                    redis_mock = AsyncMock()
+                    redis_mock.get = AsyncMock(return_value=None)
+                    redis_mock.setex = AsyncMock()
+                    redis_mock.delete = AsyncMock()
+
+                    db_mock = MagicMock()
+                    db_mock.add = MagicMock()
+                    db_mock.commit = MagicMock()
+                    db_mock.rollback = MagicMock()
+                    db_mock.close = MagicMock()
+                    db_mock.execute = MagicMock()
+
+                    # Create SessionManager within this thread's event loop
+                    session_manager = SessionManager(redis_mock, lambda: db_mock)
+
                     # Create session
                     request = SessionCreateRequest(
                         config_path="config/default.yaml",
                         description="Thread test",
                         custom_config=None,
                     )
-                    session_id = await concurrent_session_manager.create_session(request)
+                    session_id = await session_manager.create_session(request)
 
                     # Get session
-                    session = await concurrent_session_manager.get_session(session_id)
+                    session = await session_manager.get_session(session_id)
 
                     # Perform operations
                     await session.start()
@@ -623,7 +639,7 @@ class TestSessionManagerConcurrency:
             thread.join()
 
         # Verify no errors occurred
-        assert len(errors) == 0
+        assert len(errors) == 0, f"Errors occurred: {errors}"
 
         # Verify results
         assert len(results) == 5

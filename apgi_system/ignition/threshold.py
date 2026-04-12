@@ -8,11 +8,13 @@ Implements dynamic threshold for global ignition based on:
 - Recent ignition history
 """
 
-import numpy as np
-from typing import Dict, Any, Tuple
 from collections import deque
+from typing import Any, Dict, Tuple
+
+import numpy as np
+
+from ..types import ConfigDict, FloatArray
 from ..validation import InputValidator
-from ..types import FloatArray, ConfigDict
 
 
 class IgnitionThreshold:

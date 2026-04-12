@@ -24,14 +24,15 @@ References:
   paradigm: A meta-analysis of normative functional neuroimaging studies. Human Brain Mapping, 25(1), 46-59.
 """
 
-import numpy as np
-from typing import Dict, Any, List, Optional
+import random
+import string
+import time
 from dataclasses import dataclass
 from enum import Enum
-import random
-import time
-import string
-from scipy.special import erfcinv  # type: ignore
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+from scipy.special import erfcinv
 
 
 class StimulusType(Enum):
@@ -406,3 +407,43 @@ class NBackTask:
                 "target_probability": self.target_probability,
             },
         }
+
+    def save_results(self, filename: str) -> None:
+        """
+        Save results to JSON file.
+
+        Args:
+            filename: Path to save the results
+        """
+        import json
+
+        results = self.analyze_results()
+        with open(filename, "w") as f:
+            json.dump(results, f, indent=2)
+
+    def print_results(self, analysis: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Print formatted results to console.
+
+        Args:
+            analysis: Pre-computed analysis results (optional)
+        """
+        if analysis is None:
+            analysis = self.analyze_results()
+
+        print(f"\n{'=' * 70}")
+        print("N-BACK TASK RESULTS")
+        print(f"{'=' * 70}\n")
+
+        if "error" in analysis:
+            print(f"Error: {analysis['error']}")
+            return
+
+        print(f"Overall Accuracy: {analysis['overall_accuracy']:.1%}")
+        print(f"Hit Rate: {analysis['hit_rate']:.1%}")
+        print(f"False Alarm Rate: {analysis['false_alarm_rate']:.1%}")
+        print(f"d' (d-prime): {analysis['d_prime']:.2f}")
+        print(f"Criterion: {analysis['criterion']:.2f}")
+        print(f"Mean RT (Hits): {analysis['mean_rt_hits']:.0f}ms")
+        print(f"Mean RT (Correct Rejections): {analysis['mean_rt_correct_rejections']:.0f}ms")
+        print(f"\n{'=' * 70}\n")

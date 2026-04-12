@@ -1,7 +1,8 @@
 """Unit tests for AllostaticRegulator."""
 
+from typing import Any, Dict
+
 import pytest
-from typing import Dict, Any
 
 from apgi_system.interoception.allostasis import AllostaticRegulator
 
@@ -164,7 +165,7 @@ class TestAllostaticRegulator:
         """Test input validation."""
         # Test invalid body_state type
         with pytest.raises(TypeError, match="body_state must be dict"):
-            regulator.update("not a dict")
+            regulator.update("not a dict")  # type: ignore[arg-type]
 
         # Test invalid dt
         body_state = {"heart_rate": 70.0}

@@ -1,8 +1,9 @@
 """Narrative Self - long-term identity and autobiographical memory."""
 
-import numpy as np
-from typing import Dict, Any
 from collections import deque
+from typing import Any, Dict
+
+import numpy as np
 
 
 class NarrativeSelf:

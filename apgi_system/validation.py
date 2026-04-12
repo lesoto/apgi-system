@@ -5,8 +5,9 @@ Provides centralized input validation for the APGI system to ensure
 data integrity and catch errors early.
 """
 
-import numpy as np
 from typing import Any, Optional, Tuple, Union
+
+import numpy as np
 
 
 class InputValidator:

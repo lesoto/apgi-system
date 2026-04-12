@@ -4,16 +4,18 @@ Property-based tests for logging and monitoring functionality.
 Tests universal properties for request logging, error logging, and metrics.
 """
 
-import pytest
 import json
-from hypothesis import given, strategies as st, settings
-from unittest.mock import Mock, patch
 from datetime import datetime
-from typing import Callable, Any
+from typing import Any, Callable
+from unittest.mock import Mock, patch
 
-from api.middleware.logging import StructuredLogger, ErrorLoggingHandler
-from api.middleware.metrics import request_counter, request_duration, error_counter
+import pytest
 from fastapi import Request
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from api.middleware.logging import ErrorLoggingHandler, StructuredLogger
+from api.middleware.metrics import error_counter, request_counter, request_duration
 
 # ============================================================================
 # Strategies for generating test data
@@ -169,7 +171,7 @@ def test_property_error_logging_completeness(
     Validates: Requirements 10.2
     """
     # Create error logging handler
-    error_logger = ErrorLoggingHandler()  # type: ignore
+    error_logger = ErrorLoggingHandler()
 
     # Create a mock exception
     try:

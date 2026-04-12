@@ -4,12 +4,13 @@ Integration tests for webhook functionality.
 Tests webhook registration, validation, delivery, and retry logic.
 """
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-import httpx
+from unittest.mock import AsyncMock, Mock, patch
 
-from api.services.webhook_manager import WebhookManager, WebhookStatus
+import httpx
+import pytest
+
 from api.database.models import WebhookDelivery
+from api.services.webhook_manager import WebhookManager, WebhookStatus
 
 
 @pytest.fixture

@@ -12,15 +12,16 @@ Key Features:
 - State-dependent processing strategies
 """
 
-import time
+import logging
 import random
+import time
+import warnings
+from collections import deque
+from typing import Any, Dict, List, Optional, Union, cast
+
 import numpy as np
 import torch
 import torch.nn as nn
-from collections import deque
-from typing import Dict, List, Optional, Any, Union, cast
-import warnings
-import logging
 
 # Setup logging
 LOGGER = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ except ImportError:
     warnings.warn("torchdiffeq not available. Install with: pip install torchdiffeq")
 
 try:
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
     HAS_TRANSFORMERS = True
 except ImportError:

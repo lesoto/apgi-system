@@ -1,7 +1,8 @@
 """Minimal Self - moment-to-moment embodied self."""
 
+from typing import Any, Dict
+
 import numpy as np
-from typing import Dict, Any
 
 
 class MinimalSelf:
@@ -140,7 +141,7 @@ class MinimalSelf:
             "depersonalization": depersonalization,
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self.body_schema = np.zeros(6)
         self.temporal_continuity = 1.0
         self.sense_of_agency = 1.0

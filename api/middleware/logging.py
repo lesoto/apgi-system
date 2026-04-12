@@ -10,12 +10,12 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 from starlette.responses import StreamingResponse
+from starlette.types import ASGIApp
 
 
 class StructuredLogger:
@@ -26,7 +26,7 @@ class StructuredLogger:
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
 
-    def _format_log_entry(self, level: str, message: str, **kwargs) -> str:
+    def _format_log_entry(self, level: str, message: str, **kwargs: Any) -> str:
         """
         Format log entry as JSON.
 
@@ -80,7 +80,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.logger = StructuredLogger("api.requests")
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Response]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         """
         Process request and log details.
@@ -174,7 +174,7 @@ class ResponseLoggingMiddleware(BaseHTTPMiddleware):
         self.logger = StructuredLogger("api.responses")
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Response]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         """
         Process request and log sanitized response body.
@@ -197,7 +197,8 @@ class ResponseLoggingMiddleware(BaseHTTPMiddleware):
             try:
                 # Read response body
                 body = b""
-                async for chunk in response.body_iterator:
+                # body_iterator exists on Response but isn't in type stubs
+                async for chunk in response.body_iterator:  # type: ignore[attr-defined]
                     body += chunk
 
                 # Parse and sanitize JSON

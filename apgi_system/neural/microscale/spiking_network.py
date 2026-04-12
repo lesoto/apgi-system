@@ -7,9 +7,10 @@ Implements leaky integrate-and-fire neurons with:
 - Landauer cost calculation
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 
 @dataclass
@@ -147,8 +148,8 @@ class SpikingNeuralNetwork:
         self.bits_erased = 0.0
 
         # Recording
-        self.spike_times = []
-        self.spike_neurons = []
+        self.spike_times: List[float] = []
+        self.spike_neurons: List[int] = []
 
     def _initialize_connectivity(self, prob: float) -> np.ndarray:
         """
@@ -251,7 +252,7 @@ class SpikingNeuralNetwork:
 
         return spike_mask, info
 
-    def _update_synaptic_currents(self, spike_mask: np.ndarray, dt: float):
+    def _update_synaptic_currents(self, spike_mask: np.ndarray, dt: float) -> None:
         """Update synaptic currents from spikes."""
         for i in range(self.num_neurons):
             if spike_mask[i]:
@@ -263,7 +264,7 @@ class SpikingNeuralNetwork:
                 num_synapses = np.sum(postsynaptic)
                 self.total_energy_consumed += num_synapses * self.synapse_energy_cost
 
-    def _apply_stdp(self, spike_mask: np.ndarray, current_time: float):
+    def _apply_stdp(self, spike_mask: np.ndarray, current_time: float) -> None:
         """
         Apply spike-timing-dependent plasticity.
 
@@ -328,7 +329,7 @@ class SpikingNeuralNetwork:
 
         return rates
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset network state."""
         self.neurons = [NeuronState() for _ in range(self.num_neurons)]
         self.synaptic_currents = np.zeros(self.num_neurons)

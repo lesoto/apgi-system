@@ -1,6 +1,6 @@
 """Entropy production and thermodynamic tracking."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class EntropyTracker:

@@ -13,12 +13,12 @@ Error Handling:
 - Logging for debugging bundled executables
 """
 
-import os
-import sys
-import platform
 import logging
+import os
+import platform
+import sys
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 # Configure logging for error handling
 logger = logging.getLogger(__name__)

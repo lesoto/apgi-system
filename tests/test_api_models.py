@@ -4,25 +4,27 @@ Tests for API Data Models
 Basic tests to verify Pydantic models and SQLAlchemy models work correctly.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from api.models import (
+    AllostaticState,
+    BodyState,
+    ErrorResponse,
+    IgnitionState,
+    MetabolicState,
+    MinimalSelfState,
+    NarrativeSelfState,
+    PrecisionState,
+    SelfModelState,
     SessionCreateRequest,
     SessionCreateResponse,
     SystemStateResponse,
-    IgnitionState,
-    WorkspaceState,
-    BodyState,
-    AllostaticState,
-    PrecisionState,
-    MetabolicState,
-    SelfModelState,
-    MinimalSelfState,
-    NarrativeSelfState,
     TaskExecuteRequest,
     TaskResult,
-    ErrorResponse,
     TaskStatusEnum,
+    WorkspaceState,
 )
 
 
@@ -150,8 +152,8 @@ class TestSQLAlchemyModels:
     def test_user_model_structure(self) -> None:
         """Test User model structure."""
         # Import directly from models to avoid connection issues
-        import sys
         import importlib.util
+        import sys
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
         if spec is None or spec.loader is None:
@@ -177,8 +179,8 @@ class TestSQLAlchemyModels:
 
     def test_session_model_structure(self) -> None:
         """Test Session model structure."""
-        import sys
         import importlib.util
+        import sys
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
         if spec is None or spec.loader is None:
@@ -203,8 +205,8 @@ class TestSQLAlchemyModels:
 
     def test_task_model_structure(self) -> None:
         """Test Task model structure."""
-        import sys
         import importlib.util
+        import sys
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
         if spec is None or spec.loader is None:
@@ -230,8 +232,8 @@ class TestSQLAlchemyModels:
 
     def test_session_data_model_structure(self) -> None:
         """Test SessionData model structure."""
-        import sys
         import importlib.util
+        import sys
 
         spec = importlib.util.spec_from_file_location("models", "api/database/models.py")
         if spec is None or spec.loader is None:

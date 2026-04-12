@@ -7,8 +7,9 @@ that simulates physiological states and generates interoceptive predictions.
 
 from typing import Any, Dict
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_system.interoception.body_model import BodyModel, PhysiologicalState
 
 

@@ -2,13 +2,14 @@
 Unit tests for numerical stability monitoring.
 """
 
-import pytest
-import numpy as np
 import warnings
 
+import numpy as np
+import pytest
+
 from apgi_system.stability import (
-    NumericalStabilityMonitor,
     NumericalInstabilityError,
+    NumericalStabilityMonitor,
     NumericalStabilityWarning,
 )
 

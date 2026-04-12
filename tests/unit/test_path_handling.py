@@ -5,13 +5,14 @@ Tests config file loading, resource file access, and data export
 with platform-appropriate directories.
 """
 
-import pytest
-import yaml
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from apgi_system.platform_utils import get_resource_path, get_data_dir, get_config_dir
+import pytest
+import yaml
+
+from apgi_system.platform_utils import get_config_dir, get_data_dir, get_resource_path
 from apgi_system.system import APGISystem
 
 

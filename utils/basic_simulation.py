@@ -9,19 +9,15 @@ visualizations of ignition events, free energy, precision, and metabolic reserve
 import argparse
 import os
 import sys
-from typing import Optional, Callable, Dict, Any, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
-import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 
-from apgi_system.system import APGISystem
 from apgi_system.platform_utils import get_resource_path
-from utils.datetime_utils import (
-    utc_now,
-    get_elapsed_ms,
-    format_duration_ms,
-)
+from apgi_system.system import APGISystem
+from utils.datetime_utils import format_duration_ms, get_elapsed_ms, utc_now
 
 
 def parse_arguments() -> argparse.Namespace:

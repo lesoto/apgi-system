@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 import bcrypt
 import jwt
 import redis.asyncio as redis
-
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 

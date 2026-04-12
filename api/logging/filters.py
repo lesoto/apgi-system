@@ -7,7 +7,7 @@ sensitive data masking and performance tracking.
 
 import logging
 import re
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class SensitiveDataFilter(logging.Filter):

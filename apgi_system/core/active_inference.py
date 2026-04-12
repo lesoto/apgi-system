@@ -5,15 +5,16 @@ Implements the core active inference loop using variational message passing
 and hierarchical Bayesian filtering.
 """
 
-import numpy as np
-from typing import List, Tuple, Optional, Dict, Any, Deque
-from dataclasses import dataclass
-from collections import deque
 import threading
+from collections import deque
+from dataclasses import dataclass
+from typing import Any, Deque, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
+from apgi_system.types import ConfigDict, FloatArray
 from apgi_system.validation import InputValidator
-from apgi_system.types import FloatArray, ConfigDict
 
 
 @dataclass

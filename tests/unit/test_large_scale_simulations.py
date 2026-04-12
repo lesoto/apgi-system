@@ -9,14 +9,15 @@ Tests focus on ensuring the APGI system can handle prolonged operation without
 degradation in performance or correctness.
 """
 
-import pytest
-import numpy as np
-import time
-import psutil
+import csv
 import gc
 import tempfile
-import csv
-from typing import Dict, Any
+import time
+from typing import Any, Dict
+
+import numpy as np
+import psutil
+import pytest
 
 from apgi_system.system import APGISystem
 

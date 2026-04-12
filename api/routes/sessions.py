@@ -5,9 +5,10 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, status
+
 from api.exceptions import SessionStateConflictError
 from api.models.schemas import (
     ErrorResponse,
@@ -20,19 +21,15 @@ from api.models.schemas import (
     SessionResponse,
 )
 from api.services.authorization import (
-    require_permission,
     Permission,
-    get_current_user,
     Role,
-    has_any_role,
     TokenPayload,
+    get_current_user,
+    has_any_role,
+    require_permission,
     verify_session_owner,
 )
-from api.services.session_manager import (
-    SessionManager,
-    get_session_manager,
-    SessionLifecycleState,
-)
+from api.services.session_manager import SessionLifecycleState, SessionManager, get_session_manager
 
 logger = logging.getLogger(__name__)
 

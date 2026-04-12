@@ -5,15 +5,17 @@ Tests the performance monitoring capabilities including metrics tracking,
 performance analysis, and system monitoring functionality.
 """
 
-import pytest
 import time
+from unittest.mock import MagicMock, patch
+
 import numpy as np
-from unittest.mock import patch, MagicMock
+import pytest
+
 from apgi_system.monitoring import (
+    MetricsCollector,
     PerformanceMetrics,
     PerformanceMonitor,
     SystemProfiler,
-    MetricsCollector,
 )
 
 

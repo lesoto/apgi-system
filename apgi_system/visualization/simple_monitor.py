@@ -5,12 +5,12 @@ Provides basic real-time monitoring capabilities without web dependencies.
 This is a lightweight alternative to the full web monitor.
 """
 
-import time
-import threading
 import json
-from typing import Dict, Any, List, Optional
+import threading
+import time
 from collections import deque
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class SimpleMonitor:
 
         # Data buffers
         self.time_buffer: deque[float] = deque(maxlen=buffer_size)
-        self.ignition_buffer: deque[int] = deque(maxlen=buffer_size)
+        self.ignition_buffer: deque[int | float] = deque(maxlen=buffer_size)
         self.free_energy_buffer: deque[float] = deque(maxlen=buffer_size)
         self.precision_buffer: deque[float] = deque(maxlen=buffer_size)
         self.energy_reserves_buffer: deque[float] = deque(maxlen=buffer_size)
@@ -295,14 +295,15 @@ class SimpleMonitor:
             stats: Dict[str, Any] = {}
 
             # Metric statistics
-            for metric_name, buffer in [
+            metrics_data: List[Tuple[str, deque[int | float]]] = [
                 ("ignition_signal", self.ignition_buffer),
                 ("free_energy", self.free_energy_buffer),
                 ("precision", self.precision_buffer),
                 ("energy_reserves", self.energy_reserves_buffer),
                 ("coherence", self.coherence_buffer),
-            ]:
-                if len(buffer) > 0:
+            ]
+            for metric_name, buffer in metrics_data:
+                if buffer and len(buffer) > 0:
                     values = np.array(list(buffer))
                     stats[metric_name] = {
                         "mean": float(np.mean(values)),
@@ -376,7 +377,7 @@ class SimpleMonitor:
 
         print("=" * 50)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup when monitor is destroyed."""
         self.stop_monitoring()
 
@@ -396,7 +397,7 @@ class MonitoringIntegration:
         self.monitor = monitor
         self.is_connected = False
 
-    def connect_system(self, apgi_system):
+    def connect_system(self, apgi_system: Any) -> None:
         """
         Connect APGI system to monitor.
 
@@ -411,7 +412,7 @@ class MonitoringIntegration:
         else:
             print("Warning: APGI system does not support monitoring callbacks")
 
-    def disconnect_system(self, apgi_system):
+    def disconnect_system(self, apgi_system: Any) -> None:
         """
         Disconnect APGI system from monitor.
 
@@ -423,7 +424,7 @@ class MonitoringIntegration:
             self.is_connected = False
             print("APGI system disconnected from simple monitor")
 
-    def simulate_data(self, duration: float = 60.0, interval: float = 0.1):
+    def simulate_data(self, duration: float = 60.0, interval: float = 0.1) -> None:
         """
         Simulate APGI system data for testing the monitor.
 

@@ -32,6 +32,11 @@ try:
 except ImportError:
     print("Warning: ToolTip component not available.")
 
+    # Fallback no-op ToolTip class
+    class ToolTip:  # type: ignore[no-redef]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
 
 class ScriptRunnerGUI:
     """Base GUI for running scripts from a directory.

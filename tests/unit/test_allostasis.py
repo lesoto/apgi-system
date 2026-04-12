@@ -1,11 +1,11 @@
 """Unit tests for AllostaticRegulator."""
 
-import pytest
+from typing import Any, Dict
+
 import numpy as np
-from apgi_system.interoception.allostasis import (
-    AllostaticRegulator,
-    AllostaticSetPoint,
-)
+import pytest
+
+from apgi_system.interoception.allostasis import AllostaticRegulator, AllostaticSetPoint
 
 
 class TestAllostaticSetPoint:
@@ -32,7 +32,7 @@ class TestAllostaticRegulator:
     """Test AllostaticRegulator functionality."""
 
     @pytest.fixture
-    def config(self):
+    def config(self) -> Dict[str, Any]:
         """Simple test configuration."""
         return {
             "interoception": {
@@ -45,11 +45,11 @@ class TestAllostaticRegulator:
         }
 
     @pytest.fixture
-    def regulator(self, config):
+    def regulator(self, config: Dict[str, Any]) -> AllostaticRegulator:
         """Create regulator instance."""
         return AllostaticRegulator(config)
 
-    def test_initialization(self, regulator):
+    def test_initialization(self, regulator: AllostaticRegulator) -> None:
         """Test regulator initializes correctly."""
         assert len(regulator.set_points) == 4
         assert regulator.total_load == 0.0
@@ -63,7 +63,7 @@ class TestAllostaticRegulator:
         assert "glucose" in sp_names
         assert "cortisol" in sp_names
 
-    def test_update_normal_body_state(self, regulator):
+    def test_update_normal_body_state(self, regulator: AllostaticRegulator) -> None:
         """Test update with normal body state."""
         body_state = {
             "heart_rate": 70.0,
@@ -85,7 +85,7 @@ class TestAllostaticRegulator:
         assert result["allostatic_load"] < 0.1
         assert result["homeostatic_stability"] > 0.8
 
-    def test_update_stressed_body_state(self, regulator):
+    def test_update_stressed_body_state(self, regulator: AllostaticRegulator) -> None:
         """Test update with stressed body state."""
         body_state = {
             "heart_rate": 90.0,  # High
@@ -107,7 +107,7 @@ class TestAllostaticRegulator:
         assert signals["glucose"] > 0  # Should increase glucose
         assert signals["cortisol"] < 0  # Should reduce cortisol
 
-    def test_update_partial_body_state(self, regulator):
+    def test_update_partial_body_state(self, regulator: AllostaticRegulator) -> None:
         """Test update with partial body state."""
         body_state = {"heart_rate": 80.0}
 

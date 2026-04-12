@@ -8,11 +8,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db
-from api.services.authorization import require_role, Role
-from pydantic import BaseModel
+from api.services.authorization import Role, require_role
 
 router = APIRouter(prefix="/v1/admin", tags=["Administration"])
 
@@ -137,8 +137,9 @@ async def get_redis_stats() -> RedisStatsResponse:
         HTTPException: If Redis is not available
     """
     try:
-        from api.config import settings
         import redis.asyncio as redis
+
+        from api.config import settings
 
         redis_client = redis.Redis.from_url(settings.redis_url)
         info = await redis_client.info()
@@ -187,8 +188,9 @@ async def clear_redis_cache() -> Dict[str, str]:
         HTTPException: If Redis is not available
     """
     try:
-        from api.config import settings
         import redis.asyncio as redis
+
+        from api.config import settings
 
         redis_client = redis.Redis.from_url(settings.redis_url)
         await redis_client.flushall()
@@ -218,8 +220,9 @@ async def get_circuit_breaker_states() -> List[CircuitBreakerState]:
         List of circuit breaker state information
     """
     # Retrieve metrics from the global circuit breaker registry
-    from utils.circuit_breaker_utils import circuit_breaker_registry
     from datetime import datetime
+
+    from utils.circuit_breaker_utils import circuit_breaker_registry
 
     metrics = circuit_breaker_registry.get_metrics()
 
@@ -323,8 +326,9 @@ async def get_rate_limit_stats(
     Returns:
         List of rate limiting statistics
     """
-    from api.config import settings
     import redis.asyncio as redis
+
+    from api.config import settings
 
     redis_client = redis.Redis.from_url(settings.redis_url)
     keys = await redis_client.keys("rate_limit:*")

@@ -9,8 +9,8 @@ __version__ = "0.1.0"
 
 from apgi_system.core.active_inference import ActiveInferenceEngine
 from apgi_system.core.free_energy import FreeEnergyCalculator
-from apgi_system.core.predictive_processing import HierarchicalPredictor
 from apgi_system.core.precision import PrecisionWeighting
+from apgi_system.core.predictive_processing import HierarchicalPredictor
 
 __all__ = [
     "ActiveInferenceEngine",

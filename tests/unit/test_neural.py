@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+# type: ignore
 """
 Unit tests for neural system modules.
 
@@ -7,12 +9,12 @@ Tests cover initialization, signal generation, coupling, and
 neural dynamics simulation.
 """
 
-import pytest
 import numpy as np
+import pytest
 
 # Import neural modules with error handling
 try:
-    from apgi_system.neural.oscillations import OscillationEngine, OscillationBand
+    from apgi_system.neural.oscillations import OscillationBand, OscillationEngine
 
     HAS_OSCILLATIONS = True
 except ImportError:

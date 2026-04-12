@@ -5,12 +5,14 @@ Implements global broadcasting mechanism based on Global Workspace Theory.
 When ignition occurs, information is broadcast to all subscriber systems.
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
+
+from ..types import ConfigDict, FloatArray
 from ..validation import InputValidator
-from ..types import FloatArray, ConfigDict
 
 
 class WorkspaceState(Enum):

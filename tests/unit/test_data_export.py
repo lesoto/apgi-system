@@ -7,12 +7,14 @@ with specific data scenarios and edge cases.
 **Validates: Requirements 12.1, 12.2, 12.3, 12.4, 12.5**
 """
 
+import csv
+import json
+import os
+import tempfile
+from typing import Any
+
 import numpy as np
 import pytest
-import json
-import csv
-import tempfile
-import os
 
 from apgi_system.system import APGISystem
 
@@ -27,9 +29,9 @@ class DataExporter:
 
     def __init__(self) -> None:
         """Initialize data exporter."""
-        self.log_data = []
+        self.log_data: list[dict[str, Any]] = []
 
-    def record_state(self, state: dict) -> None:
+    def record_state(self, state: dict[str, Any]) -> None:
         """
         Record state data from simulation step.
 
@@ -103,7 +105,7 @@ class DataExporter:
             json.dump(self.log_data, f, indent=2)
         return True
 
-    def generate_analysis_report(self) -> dict:
+    def generate_analysis_report(self) -> dict[str, Any]:
         """
         Generate analysis report with summary statistics.
 

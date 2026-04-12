@@ -7,9 +7,9 @@ uncovered code, categorized by module and gap type.
 """
 
 import json
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict
-from collections import defaultdict
 
 
 class GapAnalyzer:
@@ -41,7 +41,10 @@ class GapAnalyzer:
             raise FileNotFoundError(f"Coverage file not found: {self.coverage_file}")
 
         with open(self.coverage_file, "r") as f:
-            return json.load(f)
+            content = f.read().strip()
+            if not content:
+                raise ValueError(f"Coverage file is empty: {self.coverage_file}")
+            return json.loads(content)
 
     def classify_gap(self, filename: str, line_num: int) -> str:
         """
@@ -228,7 +231,12 @@ def main() -> int:
 
     except FileNotFoundError as e:
         print(f"\nError: {e}")
-        print("Please run tests with coverage first: pytest --cov\n")
+        print("Please run tests with coverage first: make test-coverage or pytest --cov\n")
+        return 1
+
+    except ValueError as e:
+        print(f"\nError: {e}")
+        print("Please run tests with coverage first: make test-coverage or pytest --cov\n")
         return 1
 
     return 0

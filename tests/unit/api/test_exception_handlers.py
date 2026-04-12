@@ -11,18 +11,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
 from api.exception_handlers import (
-    unhandled_exception_handler,
-    validation_error_handler,
+    api_error_handler,
     circuit_breaker_handler,
     http_exception_handler,
-    api_error_handler,
+    unhandled_exception_handler,
+    validation_error_handler,
 )
-from api.exceptions import APIError
-from api.exceptions import (
-    InvalidTokenError,
-    AuthorizationError,
-    SessionNotFoundError,
-)
+from api.exceptions import APIError, AuthorizationError, InvalidTokenError, SessionNotFoundError
 from utils.circuit_breaker_utils import CircuitBreakerOpenException
 
 

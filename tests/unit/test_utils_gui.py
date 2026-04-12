@@ -8,13 +8,14 @@ configuration management without launching the full GUI.
 Tests focus on the backend logic that powers the Utils GUI functionality.
 """
 
-import pytest
-import tkinter as tk
-from unittest.mock import Mock, patch
-import tempfile
 import json
 import subprocess
+import tempfile
+import tkinter as tk
 from typing import Any
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Import GUI class with error handling
 try:

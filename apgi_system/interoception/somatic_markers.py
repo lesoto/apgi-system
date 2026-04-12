@@ -6,9 +6,11 @@ Learns associations between contexts/actions and body states,
 then uses these to bias decision-making.
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+
 from apgi_system.validation import InputValidator
 
 

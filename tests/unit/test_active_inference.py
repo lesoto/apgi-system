@@ -1,19 +1,21 @@
 """Unit tests for ActiveInferenceEngine."""
 
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
+from typing import Any, Dict
+
+import numpy as np
+import pytest
+import yaml
 
 from apgi_system.core.active_inference import (
     ActiveInferenceEngine,
-    HierarchicalGaussianFilter,
     BeliefState,
+    HierarchicalGaussianFilter,
 )
 
 
 @pytest.fixture
-def config():
+def config() -> Dict[str, Any]:
     """Load default configuration."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
@@ -21,7 +23,7 @@ def config():
 
 
 @pytest.fixture
-def simple_config():
+def simple_config() -> Dict[str, Any]:
     """Simple test configuration."""
     return {
         "hierarchy": {
@@ -42,7 +44,7 @@ def simple_config():
 class TestActiveInferenceEngine:
     """Test ActiveInferenceEngine functionality."""
 
-    def test_initialization(self, simple_config) -> None:
+    def test_initialization(self, simple_config: Dict[str, Any]) -> None:
         """Test engine initializes correctly."""
         engine = ActiveInferenceEngine(simple_config)
 
@@ -53,7 +55,7 @@ class TestActiveInferenceEngine:
         assert engine.time == 0.0
         assert engine.timestep == 0.001
 
-    def test_step_with_observation(self, simple_config) -> None:
+    def test_step_with_observation(self, simple_config: Dict[str, Any]) -> None:
         """Test single step with observation."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)
@@ -75,7 +77,7 @@ class TestActiveInferenceEngine:
         assert info["time"] > 0.0
         assert engine.time > 0.0
 
-    def test_step_with_actions(self, simple_config) -> None:
+    def test_step_with_actions(self, simple_config: Dict[str, Any]) -> None:
         """Test step with available actions."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)
@@ -92,7 +94,7 @@ class TestActiveInferenceEngine:
         # EFE components might be empty if no valid policy evaluation occurred
         assert isinstance(info["efe_components"], dict)
 
-    def test_step_without_actions(self, simple_config) -> None:
+    def test_step_without_actions(self, simple_config: Dict[str, Any]) -> None:
         """Test step without available actions."""
         engine = ActiveInferenceEngine(simple_config)
         observation = np.random.randn(64)

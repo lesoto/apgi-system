@@ -6,16 +6,18 @@ and integration tests.
 """
 
 import os
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
-from hypothesis import settings, HealthCheck
-from typing import Generator, Dict, Any
+from typing import Any, Dict, Generator
+
+import numpy as np
+import pytest
+import yaml
+from hypothesis import HealthCheck, settings
 from numpy.typing import NDArray
-from apgi_system.system import APGISystem
-from apgi_system.interoception.body_model import BodyModel
 from sqlalchemy.orm import Session
+
+from apgi_system.interoception.body_model import BodyModel
+from apgi_system.system import APGISystem
 
 # Set environment variables for testing
 os.environ["ENVIRONMENT"] = "testing"
@@ -174,6 +176,7 @@ def db() -> Generator[Session, None, None]:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool
+
     from api.database.models import Base
 
     # Create in-memory SQLite database for testing with thread-safety
@@ -247,7 +250,7 @@ def empty_input_cases():
 
 
 @pytest.fixture
-def boundary_values():
+def boundary_values() -> Dict[str, Any]:
     """
     Provide boundary value test cases.
 
@@ -271,7 +274,7 @@ def boundary_values():
 
 
 @pytest.fixture
-def invalid_inputs():
+def invalid_inputs() -> Dict[str, Any]:
     """
     Provide invalid input cases for error handling tests.
 
@@ -292,7 +295,7 @@ def invalid_inputs():
 
 
 @pytest.fixture(scope="session")
-def test_data_dir(tmp_path_factory) -> Path:
+def test_data_dir(tmp_path_factory: Any) -> Path:
     """
     Provide a temporary directory for test data.
 
@@ -351,7 +354,7 @@ def sample_time_series() -> NDArray[np.float64]:
 
 
 @pytest.fixture
-def performance_timer():
+def performance_timer() -> Any:
     """
     Provide a context manager for timing test execution.
 
@@ -364,7 +367,7 @@ def performance_timer():
     from contextlib import contextmanager
 
     @contextmanager
-    def timer():
+    def timer() -> Any:
         start = time.perf_counter()
         yield lambda: time.perf_counter() - start
 

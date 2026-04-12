@@ -5,8 +5,8 @@ This module provides strategies for generating valid test data for
 property-based testing of the APGI system components.
 """
 
-from hypothesis import strategies as st
 import numpy as np
+from hypothesis import strategies as st
 
 # ============================================================================
 # Core Strategies (as specified in design document)

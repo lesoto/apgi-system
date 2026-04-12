@@ -14,12 +14,13 @@ References:
 - Dehaene & Changeux (2011). "Experimental and theoretical approaches to conscious processing"
 """
 
-import numpy as np
-from typing import Dict, Any, List, Tuple, Optional, cast
-from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
 from random import shuffle
+from typing import Any, Dict, List, Optional, Tuple, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 
 class StimulusType(Enum):

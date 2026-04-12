@@ -8,8 +8,9 @@ Tests the complete API integration including:
 - Protected endpoint access
 """
 
+from typing import Any, Dict, Optional
+
 import requests
-from typing import Dict, Any, Optional
 
 
 class APITestClient:

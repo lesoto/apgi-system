@@ -4,11 +4,11 @@ This script demonstrates how to use the analysis module to examine
 APGI system behavior after a simulation run.
 """
 
-from apgi_system.system import APGISystem
 from apgi_system.analysis import analyze_simulation_run
+from apgi_system.system import APGISystem
 
 
-def main():
+def main() -> None:
     """Run a simulation and perform comprehensive analysis."""
     print("=" * 60)
     print("APGI System Analysis Demonstration")

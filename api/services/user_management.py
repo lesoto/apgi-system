@@ -11,14 +11,14 @@ Provides comprehensive user management functionality including:
 import secrets
 import string
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from api.database.models import User
-from api.services.auth_manager import AuthManager
 from api.exceptions import UserNotFoundError
+from api.services.auth_manager import AuthManager
 
 
 class UserManagementService:
@@ -230,13 +230,13 @@ class UserManagementService:
 
         # Update fields
         if email is not None:
-            user.email = email
+            user.email = email  # type: ignore[assignment]
         if roles is not None:
-            user.roles = roles
+            user.roles = roles  # type: ignore[assignment]
         if is_active is not None:
-            user.is_active = is_active
+            user.is_active = is_active  # type: ignore[assignment]
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.utcnow()  # type: ignore[assignment]
         self.db.commit()
         self.db.refresh(user)
 
@@ -265,8 +265,8 @@ class UserManagementService:
             new_password = self.generate_secure_password()
 
         # Hash and update password
-        user.password_hash = self.auth_manager.hash_password(new_password)
-        user.updated_at = datetime.utcnow()
+        user.password_hash = self.auth_manager.hash_password(new_password)  # type: ignore[assignment]
+        user.updated_at = datetime.utcnow()  # type: ignore[assignment]
 
         self.db.commit()
 
@@ -288,7 +288,7 @@ class UserManagementService:
 
         stmt = stmt.order_by(User.created_at.desc())
         result = self.db.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     def delete_user(self, user_id: str) -> bool:
         """
@@ -322,7 +322,7 @@ class UserManagementService:
         """
         return self.auth_manager.authenticate_user(username, password)
 
-    def get_user_stats(self) -> Dict[str, int]:
+    def get_user_stats(self) -> Dict[str, Any]:
         """
         Get user statistics.
 
@@ -337,9 +337,9 @@ class UserManagementService:
         result = self.db.execute(stmt)
         all_users = result.scalars().all()
 
-        role_counts = {}
+        role_counts: dict[str, int] = {}
         for user in all_users:
-            for role in user.roles:
+            for role in user.roles:  # type: ignore[attr-defined]
                 role_counts[role] = role_counts.get(role, 0) + 1
 
         # Sort role_counts for consistent ordering (alphabetical by role name)

@@ -5,10 +5,9 @@ Validates API responses against OpenAPI schemas to ensure contract compliance.
 Logs validation failures for monitoring and debugging.
 """
 
-from datetime import datetime
-from typing import Any, Dict, Optional, Callable, Awaitable, List
-
 import json
+from datetime import datetime
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

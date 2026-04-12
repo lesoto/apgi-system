@@ -4,9 +4,11 @@ Body State Model
 Simulates physiological states and generates interoceptive predictions.
 """
 
-import numpy as np
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict
+
+import numpy as np
+
 from apgi_system.validation import InputValidator
 
 
@@ -214,7 +216,7 @@ class BodyModel:
             "stress": self.stress_level,
         }
 
-    def _update_heart_rate(self, dt: float):
+    def _update_heart_rate(self, dt: float) -> None:
         """
         Update heart rate dynamics.
 
@@ -243,7 +245,7 @@ class BodyModel:
         noise_std = self.state_configs.get("heart_rate", {}).get("variance", 5)
         self.current_state.heart_rate += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
-    def _update_respiration(self, dt: float):
+    def _update_respiration(self, dt: float) -> None:
         """
         Update respiration rate dynamics.
 
@@ -267,7 +269,7 @@ class BodyModel:
         noise_std = self.state_configs.get("respiration", {}).get("variance", 2)
         self.current_state.respiration += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
-    def _update_temperature(self, dt: float):
+    def _update_temperature(self, dt: float) -> None:
         """
         Update body temperature dynamics.
 
@@ -291,7 +293,7 @@ class BodyModel:
         noise_std = self.state_configs.get("temperature", {}).get("variance", 0.2)
         self.current_state.temperature += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
-    def _update_glucose(self, dt: float):
+    def _update_glucose(self, dt: float) -> None:
         """
         Update blood glucose dynamics.
 
@@ -316,7 +318,7 @@ class BodyModel:
         noise_std = self.state_configs.get("glucose", {}).get("variance", 0.5)
         self.current_state.glucose += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
-    def _update_cortisol(self, dt: float):
+    def _update_cortisol(self, dt: float) -> None:
         """
         Update cortisol level dynamics.
 
@@ -340,7 +342,7 @@ class BodyModel:
         noise_std = self.state_configs.get("cortisol", {}).get("variance", 3)
         self.current_state.cortisol += np.random.randn() * noise_std * np.sqrt(dt / 1000.0)
 
-    def _update_blood_pressure(self, dt: float):
+    def _update_blood_pressure(self, dt: float) -> None:
         """
         Update blood pressure dynamics.
 
@@ -362,7 +364,7 @@ class BodyModel:
 
         self.current_state.blood_pressure += np.random.randn() * 5 * np.sqrt(dt / 1000.0)
 
-    def _generate_prediction(self):
+    def _generate_prediction(self) -> None:
         """
         Generate prediction for future state using forward dynamics model.
 
@@ -398,7 +400,7 @@ class BodyModel:
         cortisol_target = self.state_configs.get("cortisol", {}).get("baseline", 10)
         cortisol_target += self.stress_level * 25 + self.arousal_level * 5
 
-        bp_target = 120  # Default systolic
+        bp_target = 120.0  # Default systolic
         bp_target += self.stress_level * 20 + self.arousal_level * 10
 
         # Apply forward dynamics: trend + exponential smoothing toward target
@@ -476,7 +478,7 @@ class BodyModel:
 
         return error
 
-    def set_arousal(self, level: float):
+    def set_arousal(self, level: float) -> None:
         """
         Set arousal level.
 
@@ -490,7 +492,7 @@ class BodyModel:
         """
         self.arousal_level = np.clip(level, 0.0, 1.0)
 
-    def set_activity(self, level: float):
+    def set_activity(self, level: float) -> None:
         """
         Set activity level.
 
@@ -505,7 +507,7 @@ class BodyModel:
         """
         self.activity_level = np.clip(level, 0.0, 1.0)
 
-    def set_stress(self, level: float):
+    def set_stress(self, level: float) -> None:
         """
         Set stress level.
 

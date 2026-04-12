@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 # Check dependencies before starting (skip in testing)
 try:
     import os
+
     from utils.dependency_checker import check_dependencies_on_startup
 
     if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies_on_startup():
@@ -35,7 +36,7 @@ from api.middleware.authentication import AuthenticationMiddleware
 from api.middleware.body_cache import RequestBodyCachingMiddleware
 from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
-from api.middleware.request_size_limit import RequestSizeLimitMiddleware
+from api.middleware.https_redirect import HTTPSRedirectMiddleware
 from api.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
@@ -43,10 +44,10 @@ from api.middleware.logging import (
 )
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
+from api.middleware.request_size_limit import RequestSizeLimitMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from api.middleware.https_redirect import HTTPSRedirectMiddleware
-from .middleware.security_headers import SecurityHeadersMiddleware
 from api.routes import (
+    admin,
     auth,
     export,
     health,
@@ -57,8 +58,9 @@ from api.routes import (
     users,
     version,
     webhooks,
-    admin,
 )
+
+from .middleware.security_headers import SecurityHeadersMiddleware
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)

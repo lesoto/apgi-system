@@ -4,10 +4,12 @@ Unit Tests for Response Schema Validation Middleware
 Tests the schema validation middleware functionality.
 """
 
+from typing import Any
+
 import pytest
 from fastapi import FastAPI, Response
-from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
 
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
@@ -22,7 +24,7 @@ def app_with_validation() -> FastAPI:
 
     # Define test endpoints
     @app.get("/test/valid", response_model=dict)
-    async def valid_endpoint() -> dict[str, any]:
+    async def valid_endpoint() -> dict[str, Any]:
         """Endpoint that returns valid response."""
         return {"status": "ok", "data": {"value": 123}}
 

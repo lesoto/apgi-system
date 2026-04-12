@@ -5,10 +5,10 @@ This module provides utilities for installing and managing the APGI system.
 """
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 class InstallerError(Exception):
@@ -138,6 +138,7 @@ def get_system_info() -> Dict[str, Any]:
         System information
     """
     import platform
+
     import psutil
 
     return {

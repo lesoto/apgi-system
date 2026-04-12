@@ -7,10 +7,11 @@ Implements macroscale brain networks:
 - Default mode network (self-modeling and simulation)
 """
 
-import numpy as np
 import threading
-from typing import Dict, Any, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, Optional, Tuple
+
+import numpy as np
 
 
 class NetworkType(Enum):
@@ -92,7 +93,7 @@ class FrontoparietalNetwork:
 
         # Network state
         self.activity = np.zeros(num_nodes)
-        self.broadcast_state = np.zeros(num_nodes)
+        self.broadcast_state: Optional[np.ndarray] = np.zeros(num_nodes)
 
         # Connectivity (sparse long-range)
         self.connection_density = 0.05  # 5% connectivity
@@ -105,8 +106,8 @@ class FrontoparietalNetwork:
 
         # Broadcasting
         self.is_broadcasting = False
-        self.broadcast_content = None
-        self.broadcast_start_time = None
+        self.broadcast_content: Optional[np.ndarray] = None
+        self.broadcast_start_time: Optional[float] = None
 
     def _initialize_weights(self) -> np.ndarray:
         """Initialize sparse connectivity."""
@@ -218,15 +219,16 @@ class FrontoparietalNetwork:
 
             return self.activity.copy(), info
 
-    def _initiate_broadcast(self):
+    def _initiate_broadcast(self) -> None:
         """Initiate global broadcast."""
         self.is_broadcasting = True
         # Winner pattern becomes broadcast content
         self.broadcast_content = self.activity.copy()
-        self.broadcast_state = self.broadcast_content
+        if self.broadcast_content is not None:
+            self.broadcast_state = self.broadcast_content
         self.broadcast_start_time = 0.0
 
-    def _maintain_broadcast(self, dt: float):
+    def _maintain_broadcast(self, dt: float) -> None:
         """Maintain broadcast for sustained period."""
         broadcast_duration = 300.0  # ms
 
@@ -244,11 +246,11 @@ class FrontoparietalNetwork:
 
     def get_broadcast(self) -> Optional[np.ndarray]:
         """Get current broadcast content."""
-        if self.is_broadcasting:
+        if self.is_broadcasting and self.broadcast_state is not None:
             return self.broadcast_state.copy()
         return None
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset network."""
         self.activity = np.zeros(self.num_nodes)
         self.broadcast_state = np.zeros(self.num_nodes)
@@ -339,7 +341,7 @@ class SalienceNetwork:
         self.salience_threshold = 1.0
 
         # Switching state
-        self.current_attention = None  # Which network is prioritized
+        self.current_attention: Optional[str] = None  # Which network is prioritized
 
     def update(
         self,
@@ -428,7 +430,7 @@ class SalienceNetwork:
             "exteroceptive": float(extero_modulation),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset network."""
         self.insula_activity = np.zeros(self.insula_nodes)
         self.acc_activity = np.zeros(self.acc_nodes)
@@ -524,7 +526,7 @@ class DefaultModeNetwork:
 
         # Self-model state
         self.self_representation = np.zeros(num_nodes)
-        self.narrative_buffer = []
+        self.narrative_buffer: list[str] = []
 
     def update(
         self,
@@ -602,7 +604,7 @@ class DefaultModeNetwork:
         """Get current self-model representation."""
         return self.self_representation.copy()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset network."""
         self.activity = np.zeros(self.num_nodes)
         self.mpfc_activity = np.zeros(self.num_nodes // 3)
@@ -764,7 +766,7 @@ class LargeScaleNetworkManager:
             },
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all networks."""
         self.frontoparietal.reset()
         self.salience.reset()

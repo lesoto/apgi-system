@@ -5,14 +5,15 @@ Tests specific threshold scenarios, broadcasting mechanics, and temporal orchest
 for IgnitionThreshold, GlobalWorkspace, and IgnitionTimeline components.
 """
 
-import pytest
-import numpy as np
-from typing import Dict, Any
-from unittest.mock import Mock
+from typing import Any, Dict
 
+import numpy as np
+import pytest
+
+from apgi_system.ignition.global_workspace import BroadcastContent, GlobalWorkspace, WorkspaceState
+
+# from apgi_system.ignition.temporal_dynamics import IgnitionTimeline, TimelinePhase  # Module removed in cleanup
 from apgi_system.ignition.threshold import IgnitionThreshold
-from apgi_system.ignition.global_workspace import GlobalWorkspace, WorkspaceState, BroadcastContent
-from apgi_system.ignition.temporal_dynamics import IgnitionTimeline, TimelinePhase
 
 
 class TestIgnitionThreshold:
@@ -259,7 +260,7 @@ class TestIgnitionThreshold:
         assert "mean_threshold" in stats
         assert "ignition_rate" in stats
 
-    def test_reset_functionality(self, threshold) -> None:
+    def test_reset_functionality(self, threshold: IgnitionThreshold) -> None:
         """Test reset restores initial state."""
         # Modify state
         threshold.metabolic_reserves = 0.5
@@ -288,11 +289,11 @@ class TestGlobalWorkspace:
         return {"ignition": {"amplification_duration_ms": 300}}
 
     @pytest.fixture
-    def workspace(self, workspace_config) -> GlobalWorkspace:
+    def workspace(self, workspace_config: Dict[str, Any]) -> GlobalWorkspace:
         """Create GlobalWorkspace instance."""
         return GlobalWorkspace(workspace_config)
 
-    def test_initialization(self, workspace) -> None:
+    def test_initialization(self, workspace: GlobalWorkspace) -> None:
         """Test proper initialization of GlobalWorkspace."""
         assert workspace.amplification_duration_ms == 300
         assert workspace.state == WorkspaceState.IDLE
@@ -301,7 +302,7 @@ class TestGlobalWorkspace:
         assert len(workspace.competing_contents) == 0
         assert len(workspace.subscribers) == 0
 
-    def test_idle_to_igniting_transition(self, workspace) -> None:
+    def test_idle_to_igniting_transition(self, workspace: GlobalWorkspace) -> None:
         """Test transition from IDLE to IGNITING state."""
         # Add candidate content
         candidate = np.random.randn(256)
@@ -347,7 +348,7 @@ class TestGlobalWorkspace:
         assert "broadcast_content" in state
         # Higher priority should have better chance of winning (though stochastic)
 
-    def test_broadcasting_phase(self, workspace) -> None:
+    def test_broadcasting_phase(self, workspace: GlobalWorkspace) -> None:
         """Test broadcasting phase mechanics."""
         # Set up and trigger ignition
         candidate = np.random.randn(256)
@@ -364,12 +365,12 @@ class TestGlobalWorkspace:
         assert state["is_broadcasting"]
         assert state["is_reportable"]
 
-    def test_subscriber_notification(self, workspace) -> None:
+    def test_subscriber_notification(self, workspace: GlobalWorkspace) -> None:
         """Test subscriber notification during broadcasting."""
         # Set up subscriber
         received_content = []
 
-        def test_subscriber(content):
+        def test_subscriber(content: BroadcastContent) -> None:
             received_content.append(content)
 
         workspace.subscribe(test_subscriber)
@@ -401,10 +402,10 @@ class TestGlobalWorkspace:
         assert workspace.state == WorkspaceState.IGNITING  # type: ignore[comparison-overlap]
 
         # Progress through IGNITING (50ms)
-        for _ in range(60):
+        for _ in range(60):  # type: ignore[unreachable]
             workspace.update(ignition_occurred=False, dt=1.0)
             if workspace.state != WorkspaceState.IGNITING:
-                break  # type: ignore
+                break
 
         # Should be BROADCASTING
         assert workspace.state == WorkspaceState.BROADCASTING
@@ -501,269 +502,3 @@ class TestGlobalWorkspace:
         assert workspace.state_time == 0.0
         assert len(workspace.competing_contents) == 0
         assert len(workspace.subscribers) == 0
-
-
-class TestIgnitionTimeline:
-    """Unit tests for IgnitionTimeline component."""
-
-    @pytest.fixture
-    def timeline_config(self):
-        """Configuration for timeline tests."""
-        return {}
-
-    @pytest.fixture
-    def timeline(self, timeline_config):
-        """Create IgnitionTimeline instance."""
-        return IgnitionTimeline(timeline_config)
-
-    def test_initialization(self, timeline):
-        """Test proper initialization of IgnitionTimeline."""
-        assert timeline.pre_ignition_duration == 500.0
-        assert timeline.ignition_duration == 500.0
-        assert timeline.current_phase == TimelinePhase.PRE_IGNITION
-        assert timeline.phase_time == 0.0
-        assert timeline.total_time == 0.0
-        assert len(timeline.events) == 0
-        assert not timeline.context_recognized
-        assert not timeline.reportability_active
-
-    def test_pre_ignition_processing(self, timeline):
-        """Test pre-ignition phase processing and event timing."""
-        # Progress through pre-ignition phase
-        context_info = {"context_id": "test_context"}
-
-        # Initial state
-        state = timeline.update(ignition_signal=False, context_info=context_info, dt=1.0)
-        assert state["phase"] == "pre_ignition"
-        assert timeline.context_recognized  # Should be immediate
-
-        # Progress to 50ms - predictions should activate
-        for _ in range(49):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 50ms
-        assert timeline.predictions_activated
-
-        # Progress to 100ms - precision should be modulated
-        for _ in range(49):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 100ms
-        assert timeline.precision_modulated
-
-        # Progress to 150ms - somatic markers should be retrieved
-        for _ in range(49):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 150ms
-        assert timeline.somatic_marker_retrieved
-
-        # Progress to 300ms - thalamus should be gated
-        for _ in range(149):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 300ms
-        assert timeline.thalamus_gated
-        assert state["pre_ignition_complete"]
-
-    def test_ignition_transition(self, timeline):
-        """Test transition from pre-ignition to ignition event."""
-        # Progress through some pre-ignition
-        for _ in range(100):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        # Trigger ignition
-        state = timeline.update(ignition_signal=True, dt=1.0)
-
-        assert state["phase"] == "ignition_event"
-        assert timeline.current_phase == TimelinePhase.IGNITION_EVENT
-        assert timeline.phase_time == 0.0  # Reset to 0 after transition
-
-        # Process one more step to trigger ignition event processing
-        state = timeline.update(ignition_signal=False, dt=1.0)
-        assert timeline.threshold_crossed
-
-    def test_ignition_event_processing(self, timeline):
-        """Test ignition event phase processing."""
-        # Trigger ignition
-        timeline.update(ignition_signal=True, dt=1.0)
-
-        # Process ignition event - threshold crossing happens on first processing step
-        timeline.update(ignition_signal=False, dt=1.0)
-        assert timeline.threshold_crossed
-
-        # Progress to 20ms - frontoparietal recruitment
-        for _ in range(19):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 20ms
-        assert timeline.frontoparietal_recruited
-
-        # Progress to 50ms - amplification should start
-        for _ in range(29):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 50ms
-        assert timeline.amplification_active
-
-        # Progress to 100ms - broadcasting should start
-        for _ in range(49):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        state = timeline.update(ignition_signal=False, dt=1.0)  # 100ms
-        assert timeline.broadcasting
-        assert state["ignition_active"]
-
-    def test_post_ignition_transition(self, timeline):
-        """Test transition to post-ignition phase."""
-        # Trigger ignition and progress through ignition event
-        timeline.update(ignition_signal=True, dt=1.0)
-
-        # Progress through entire ignition duration (500ms)
-        for _ in range(500):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        # Should transition to post-ignition
-        state = timeline.update(ignition_signal=False, dt=1.0)
-        assert state["phase"] == "post_ignition"
-        assert timeline.current_phase == TimelinePhase.POST_IGNITION
-
-    def test_post_ignition_processing(self, timeline):
-        """Test post-ignition phase processing."""
-        # Get to post-ignition phase
-        timeline.update(ignition_signal=True, dt=1.0)
-        for _ in range(501):  # Complete ignition phase
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        # Should have reportability immediately
-        assert timeline.reportability_active
-
-        # Progress to 200ms - motor planning
-        for _ in range(199):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        _ = timeline.update(ignition_signal=False, dt=1.0)  # 200ms
-        assert timeline.motor_planned
-
-        # Progress to 400ms - memory encoding
-        for _ in range(199):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        timeline.update(ignition_signal=False, dt=1.0)  # 400ms
-        assert timeline.memory_encoded
-
-        # Progress to 700ms - marker updating
-        for _ in range(299):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        _ = timeline.update(ignition_signal=False, dt=1.0)  # 700ms
-        assert timeline.markers_updated
-
-    def test_complete_cycle(self, timeline):
-        """Test complete timeline cycle."""
-        # Start in pre-ignition
-        assert timeline.current_phase == TimelinePhase.PRE_IGNITION
-
-        # Progress through pre-ignition and trigger ignition
-        for _ in range(100):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        timeline.update(ignition_signal=True, dt=1.0)
-        assert timeline.current_phase == TimelinePhase.IGNITION_EVENT
-
-        # Progress through ignition event
-        for _ in range(500):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        timeline.update(ignition_signal=False, dt=1.0)
-        assert timeline.current_phase == TimelinePhase.POST_IGNITION
-
-        # Progress through post-ignition
-        for _ in range(1000):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        timeline.update(ignition_signal=False, dt=1.0)
-        assert timeline.current_phase == TimelinePhase.PRE_IGNITION
-
-    def test_event_logging(self, timeline):
-        """Test event logging functionality."""
-        # Initial events should be empty
-        assert len(timeline.events) == 0
-
-        # Progress through timeline to generate events
-        timeline.update(ignition_signal=False, dt=1.0)  # Context recognition
-        assert len(timeline.events) > 0
-
-        # Check event structure
-        event = timeline.events[0]
-        assert hasattr(event, "time")
-        assert hasattr(event, "phase")
-        assert hasattr(event, "event_type")
-        assert hasattr(event, "data")
-
-        # Progress more to generate more events
-        for _ in range(100):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        # Should have multiple events
-        assert len(timeline.events) > 1
-
-    def test_events_in_range(self, timeline):
-        """Test getting events within time range."""
-        # Generate some events
-        for i in range(200):
-            timeline.update(ignition_signal=False, dt=1.0)
-
-        # Get events in specific range
-        events = timeline.get_events_in_range(50.0, 150.0)
-
-        # All events should be within range
-        for event in events:
-            assert 50.0 <= event.time <= 150.0
-
-    def test_reset_functionality(self, timeline):
-        """Test reset restores initial state."""
-        # Modify state
-        timeline.current_phase = TimelinePhase.POST_IGNITION
-        timeline.phase_time = 100.0
-        timeline.total_time = 1000.0
-        timeline.context_recognized = True
-        timeline.reportability_active = True
-        timeline.events.append(Mock())
-
-        # Reset
-        timeline.reset()
-
-        # Check restoration
-        assert timeline.current_phase == TimelinePhase.PRE_IGNITION
-        assert timeline.phase_time == 0.0
-        assert timeline.total_time == 0.0
-        assert not timeline.context_recognized
-        assert not timeline.reportability_active
-        assert len(timeline.events) == 0
-
-    def test_state_information_completeness(self, timeline):
-        """Test that state information includes all required fields."""
-        state = timeline.update(ignition_signal=False, dt=1.0)
-
-        required_fields = [
-            "phase",
-            "phase_time",
-            "total_time",
-            "pre_ignition_complete",
-            "ignition_active",
-            "reportable",
-            "recent_events",
-        ]
-
-        for field in required_fields:
-            assert field in state, f"Missing required field: {field}"
-
-        # Check types
-        assert isinstance(state["phase"], str)
-        assert isinstance(state["phase_time"], float)
-        assert isinstance(state["total_time"], float)
-        assert isinstance(state["pre_ignition_complete"], bool)
-        assert isinstance(state["ignition_active"], bool)
-        assert isinstance(state["reportable"], bool)
-        assert isinstance(state["recent_events"], list)

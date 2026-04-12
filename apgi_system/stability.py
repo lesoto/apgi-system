@@ -5,11 +5,12 @@ Provides monitoring and handling of numerical stability issues in computations.
 Detects NaN, Inf, and overflow conditions with configurable thresholds.
 """
 
-import numpy as np
 import warnings
-from typing import Union, Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
-from apgi_system.types import FloatArray, ConfigDict
+import numpy as np
+
+from apgi_system.types import ConfigDict, FloatArray
 
 
 class NumericalInstabilityError(Exception):

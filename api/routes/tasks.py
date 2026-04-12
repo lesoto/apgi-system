@@ -5,7 +5,7 @@ API endpoints for executing and managing experimental tasks.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -16,7 +16,7 @@ from api.models.schemas import (
     TaskSubmitRequest,
     TaskSubmitResponse,
 )
-from api.services.authorization import require_permission, Permission
+from api.services.authorization import Permission, require_permission
 from api.services.task_executor import TaskExecutor
 
 logger = logging.getLogger(__name__)

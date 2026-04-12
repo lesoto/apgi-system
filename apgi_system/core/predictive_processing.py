@@ -5,13 +5,14 @@ Implements predictive coding with separate exteroceptive and interoceptive
 prediction error channels.
 """
 
-import numpy as np
-from typing import Dict, Any, Optional
 from collections import deque
+from typing import Any, Dict, Optional
 
-from apgi_system.validation import InputValidator
-from apgi_system.types import FloatArray, ConfigDict
+import numpy as np
+
 from apgi_system.stability import NumericalStabilityMonitor
+from apgi_system.types import ConfigDict, FloatArray
+from apgi_system.validation import InputValidator
 
 
 class PredictionErrorChannel:
@@ -135,7 +136,7 @@ class PredictionErrorChannel:
         >>> error = channel.update(obs, pred, precision=1.5)
         >>> print(f"Error magnitude: {np.linalg.norm(error):.3f}")
         """
-        self.current_error = observation - prediction  # type: ignore[assignment]
+        self.current_error = observation - prediction
         self.precision = precision
 
         # Add to sliding window
@@ -471,7 +472,7 @@ class HierarchicalPredictor:
             }
 
             # Update interoceptive prediction (simple running average)
-            self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input  # type: ignore[assignment]
+            self.intero_prediction = 0.9 * self.intero_prediction + 0.1 * intero_input
 
             # Check stability of updated prediction
             self.stability_monitor.check_stability(
@@ -483,7 +484,7 @@ class HierarchicalPredictor:
 
         # Collect hierarchical errors
         for level in self.levels:
-            results["hierarchical_errors"].append(  # type: ignore[attr-defined]
+            results["hierarchical_errors"].append(
                 {
                     "level": level["name"],
                     "error": level["error"].copy(),

@@ -1,13 +1,13 @@
 """Tests for core active inference components."""
 
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from apgi_system.core import FreeEnergyCalculator, ActiveInferenceEngine
-from apgi_system.core import PrecisionWeighting
+import numpy as np
+import pytest
+import yaml
+
+from apgi_system.core import ActiveInferenceEngine, FreeEnergyCalculator, PrecisionWeighting
 
 
 @pytest.fixture

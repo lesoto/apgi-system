@@ -5,15 +5,16 @@ Tests the comprehensive data export capabilities including multiple formats,
 statistical analysis, and visualization exports.
 """
 
-import pytest
-import numpy as np
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from apgi_system.data_export import DataExporter, AdvancedAnalytics
+import numpy as np
+import pytest
+
 from apgi_system.analysis import AnalysisResults
+from apgi_system.data_export import AdvancedAnalytics, DataExporter
 
 
 class TestDataExporter:
@@ -313,7 +314,7 @@ class TestDataExporter:
         assert isinstance(converted["scalar"], float)
         assert isinstance(converted["nested"]["inner_array"], list)
 
-    def test_error_handling(self):
+    def test_error_handling(self) -> None:
         """Test error handling in export functions."""
         exporter = DataExporter()
 
@@ -330,12 +331,12 @@ class TestDataExporter:
 class TestAdvancedAnalytics:
     """Test the AdvancedAnalytics class."""
 
-    def test_analytics_initialization(self):
+    def test_analytics_initialization(self) -> None:
         """Test AdvancedAnalytics initialization."""
         analytics = AdvancedAnalytics()
         assert analytics is not None
 
-    def test_compute_correlation_matrix(self):
+    def test_compute_correlation_matrix(self) -> None:
         """Test correlation matrix computation."""
         analytics = AdvancedAnalytics()
 

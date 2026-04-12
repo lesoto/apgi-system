@@ -7,8 +7,9 @@ Rate-coded neural columns with:
 - Beta oscillation generation (12-30 Hz)
 """
 
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
 
 
 class NeuralColumn:
@@ -222,7 +223,7 @@ class NeuralColumn:
 
         return output
 
-    def set_prediction(self, prediction: np.ndarray):
+    def set_prediction(self, prediction: np.ndarray) -> None:
         """Set prediction directly."""
         self.prediction_units = prediction.copy()
 
@@ -230,7 +231,7 @@ class NeuralColumn:
         """Get current prediction error."""
         return self.error_units.copy()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset column state."""
         self.prediction_units = np.zeros(self.num_units)
         self.error_units = np.zeros(self.num_units)
@@ -294,7 +295,7 @@ class HierarchicalColumnNetwork:
     Layer 0 error: 0.087
     """
 
-    def __init__(self, layer_sizes: list, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, layer_sizes: List[int], config: Optional[Dict[str, Any]] = None):
         """
         Initialize hierarchical network.
 

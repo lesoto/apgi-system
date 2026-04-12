@@ -17,15 +17,11 @@ from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy.orm import Session as DBSession
-from typing import cast
 
 from api.database.models import WebhookDelivery
 
 # Import circuit breaker utilities
-from utils.circuit_breaker_utils import (
-    circuit_breaker,
-    CircuitBreakerException,
-)
+from utils.circuit_breaker_utils import CircuitBreakerException, circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +67,7 @@ class WebhookManager:
         )
         logger.info("WebhookManager initialized")
 
-    def _is_private_ip(self, ip: ipaddress.IPv4Address) -> bool:
+    def _is_private_ip(self, ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         """
         Check if an IP address is private or blocked.
 
@@ -81,6 +77,11 @@ class WebhookManager:
         Returns:
             True if the IP is private or blocked, False otherwise
         """
+        # IPv6 addresses are generally not private in the same way as IPv4
+        # For now, treat all IPv6 as not private (can be refined later)
+        if isinstance(ip, ipaddress.IPv6Address):
+            return False
+
         private_ranges = [
             ipaddress.IPv4Network("10.0.0.0/8"),  # Private network
             ipaddress.IPv4Network("172.16.0.0/12"),  # Private network
@@ -255,14 +256,11 @@ class WebhookManager:
             # Update attempt count and timestamp
             delivery.attempts += 1  # type: ignore[assignment]
             delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
-            delivery.status = cast(
-                str,
-                (
-                    WebhookStatus.RETRYING.value
-                    if delivery.attempts > 1
-                    else WebhookStatus.PENDING.value
-                ),
-            )  # type: ignore[assignment]
+            delivery.status = (
+                WebhookStatus.RETRYING.value  # type: ignore[assignment]
+                if delivery.attempts > 1
+                else WebhookStatus.PENDING.value
+            )
             db.commit()
         except Exception as e:
             db.rollback()
@@ -297,7 +295,7 @@ class WebhookManager:
                 headers[self.signature_header] = signature
 
             # Re-validate webhook URL to prevent DNS rebinding attacks
-            parsed = urlparse(delivery.webhook_url)
+            parsed = urlparse(str(delivery.webhook_url))
             hostname = parsed.hostname
 
             if hostname:
@@ -305,15 +303,11 @@ class WebhookManager:
                     resolved_ip = socket.gethostbyname(hostname)
                     ip = ipaddress.ip_address(resolved_ip)
                     if self._is_private_ip(ip):
-                        delivery.error_message = (
-                            "Webhook URL resolves to private or blocked IP address"
-                        )
+                        delivery.error_message = "Webhook URL resolves to private or blocked IP address"  # type: ignore[assignment]
                         await self._schedule_retry(db, delivery)
                         return False
                 except (socket.gaierror, ValueError) as e:
-                    delivery.error_message = (
-                        f"Cannot resolve or validate hostname '{hostname}': {e}"
-                    )
+                    delivery.error_message = f"Cannot resolve or validate hostname '{hostname}': {e}"  # type: ignore[assignment]
                     await self._schedule_retry(db, delivery)
                     return False
 

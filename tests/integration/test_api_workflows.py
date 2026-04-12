@@ -14,18 +14,20 @@ Requirements tested:
 - 5.1: Data export
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock, patch
 from typing import Any, Generator
-import redis.asyncio as redis
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+import redis.asyncio as redis
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from api.database.models import User
 from api.main import create_app
 from api.routes import export, tasks
-from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
-from api.services.task_executor import TaskExecutor
 from api.services.data_export import DataExportService
-from api.database.models import User
+from api.services.session_manager import SessionLifecycleState, SessionManager, SimulationSession
+from api.services.task_executor import TaskExecutor
 
 
 @pytest.fixture
@@ -322,10 +324,11 @@ def client(
     mock_db_session: Mock,
 ) -> Generator[TestClient, None, None]:
     """Create a test client with all mocked dependencies."""
-    from api.services.authorization import get_current_user, require_permission
-    from api.services.auth_manager import TokenPayload
-    from api.services.session_manager import get_session_manager, get_redis_client
     from datetime import datetime, timedelta
+
+    from api.services.auth_manager import TokenPayload
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.session_manager import get_redis_client, get_session_manager
 
     # Create app in test mode (disables auth and CSRF middleware)
     app = create_app(test_mode=True)
@@ -385,19 +388,25 @@ def client(
 
 @pytest.fixture
 def client_with_db(
-    db, mock_redis, mock_session_manager, mock_data_export_service, mock_task_executor
+    db: Any,
+    mock_redis: Any,
+    mock_session_manager: Any,
+    mock_data_export_service: Any,
+    mock_task_executor: Any,
 ) -> Generator[TestClient, None, None]:
     """Create a test client with real database and mocked dependencies.
 
     This fixture ensures the API uses the same database session as the test,
     allowing tests to create data that the API can access.
     """
-    from api.services.authorization import get_current_user, require_permission
-    from api.services.auth_manager import TokenPayload
-    from api.services.session_manager import get_session_manager, get_redis_client
-    from api.database.connection import get_db
     from datetime import datetime, timedelta
+
     from sqlalchemy.orm import Session
+
+    from api.database.connection import get_db
+    from api.services.auth_manager import TokenPayload
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.session_manager import get_redis_client, get_session_manager
 
     # Create app in test mode (disables auth and CSRF middleware)
     app = create_app(test_mode=True)
@@ -467,7 +476,7 @@ class TestCompleteSimulationWorkflow:
     Validates: Requirements 1.1, 2.1, 2.2, 3.1, 5.1
     """
 
-    def test_end_to_end_simulation_workflow(self, client):
+    def test_end_to_end_simulation_workflow(self, client: TestClient) -> None:
         """
         Test complete simulation workflow from creation to data export.
 
@@ -544,7 +553,7 @@ class TestCompleteSimulationWorkflow:
         get_response = client.get(f"/v1/sessions/{session_id}")
         assert get_response.status_code == 404, "Deleted session should return 404"
 
-    def test_simulation_workflow_with_pause_resume(self, client):
+    def test_simulation_workflow_with_pause_resume(self, client: TestClient) -> None:
         """
         Test simulation workflow with pause and resume operations.
 
@@ -574,7 +583,7 @@ class TestCompleteSimulationWorkflow:
         # Clean up
         client.delete(f"/v1/sessions/{session_id}")
 
-    def test_simulation_workflow_with_reset(self, client):
+    def test_simulation_workflow_with_reset(self, client: TestClient) -> None:
         """
         Test simulation workflow with reset operation.
 
@@ -601,7 +610,7 @@ class TestCompleteSimulationWorkflow:
         # Clean up
         client.delete(f"/v1/sessions/{session_id}")
 
-    def test_multiple_concurrent_sessions(self, client):
+    def test_multiple_concurrent_sessions(self, client: TestClient) -> None:
         """
         Test managing multiple concurrent simulation sessions.
 
@@ -645,8 +654,12 @@ class TestAuthenticationWorkflow:
     @patch("api.services.auth_manager.AuthManager.authenticate_user")
     @patch("api.services.auth_manager.AuthManager.create_tokens_for_user")
     def test_complete_authentication_flow(
-        self, mock_create_tokens, mock_authenticate, client, mock_db_session
-    ):
+        self,
+        mock_create_tokens: Mock,
+        mock_authenticate: Mock,
+        client: TestClient,
+        mock_db_session: Session,
+    ) -> None:
         """
         Test complete authentication flow: login → use token → refresh → logout.
 
@@ -690,7 +703,9 @@ class TestAuthenticationWorkflow:
 
     @patch("api.services.auth_manager.AuthManager.authenticate_user")
     @patch("api.services.auth_manager.AuthManager.create_tokens_for_user")
-    def test_authentication_failure(self, mock_create_tokens, mock_authenticate, client):
+    def test_authentication_failure(
+        self, mock_create_tokens: Mock, mock_authenticate: Mock, client: TestClient
+    ) -> None:
         """
         Test authentication failure with invalid credentials.
 
@@ -716,7 +731,9 @@ class TestFullAuthWorkflowWithRealDatabase:
     Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
     """
 
-    def test_complete_authenticated_workflow_with_real_db(self, client_with_db, db):
+    def test_complete_authenticated_workflow_with_real_db(
+        self, client_with_db: TestClient, db: Session
+    ) -> None:
         """
         Test complete authenticated workflow using real database operations.
 
@@ -725,9 +742,10 @@ class TestFullAuthWorkflowWithRealDatabase:
 
         Validates: Requirements 2.1, 2.2, 3.1, 5.1, 7.1, 7.2
         """
+        import json
+
         from api.database.models import User
         from api.services.auth_manager import AuthManager
-        import json
 
         # Step 1: Create a real user in the database
         auth_manager = AuthManager(db)
@@ -838,7 +856,7 @@ class TestUserStatsOrdering:
     Tests that role_counts in GET /v1/users/stats are returned in a consistent order.
     """
 
-    def test_user_stats_role_counts_ordering(self, client, mocker):
+    def test_user_stats_role_counts_ordering(self, client: TestClient, mocker: Mock) -> None:
         """
         Test that role_counts are returned in a consistent, predictable order.
 
@@ -884,7 +902,7 @@ class TestUserStatsOrdering:
         role_keys = list(role_counts.keys())
         assert role_keys == ["admin", "user", "researcher"]
 
-    def test_user_stats_empty_database(self, client_with_db, db):
+    def test_user_stats_empty_database(self, client_with_db: TestClient, db: Session) -> None:
         """
         Test user stats with empty database.
         """
@@ -897,12 +915,13 @@ class TestUserStatsOrdering:
         assert stats_data["inactive_users"] == 0
         assert stats_data["role_counts"] == {}
 
-    def test_user_stats_mixed_roles_ordering(self, client_with_db, db):
+    def test_user_stats_mixed_roles_ordering(self, client_with_db: TestClient, db: Session) -> None:
         """
         Test role_counts ordering with mixed role assignments.
         """
-        from api.database.models import User
         from werkzeug.security import generate_password_hash
+
+        from api.database.models import User
 
         # Create users with roles in different order than expected
         test_users = [
@@ -957,7 +976,7 @@ class TestUserStatsOrdering:
     Validates: Requirements 4.1, 4.2, 4.3
     """
 
-    def test_complete_task_execution_flow(self, client):
+    def test_complete_task_execution_flow(self, client: TestClient) -> None:
         """
         Test complete task execution: create session → submit task → check status → get results.
 
@@ -997,7 +1016,7 @@ class TestUserStatsOrdering:
         # Clean up
         client.delete(f"/v1/sessions/{session_id}")
 
-    def test_list_available_tasks(self, client):
+    def test_list_available_tasks(self, client: TestClient) -> None:
         """
         Test listing available experimental tasks.
 
@@ -1017,7 +1036,7 @@ class TestErrorHandling:
     Validates: Requirements 1.1, 1.3
     """
 
-    def test_404_for_nonexistent_session(self, client):
+    def test_404_for_nonexistent_session(self, client: TestClient) -> None:
         """Test 404 error for non-existent session."""
         response = client.get("/v1/sessions/nonexistent-id")
         assert response.status_code == 404
@@ -1026,12 +1045,12 @@ class TestErrorHandling:
         assert "code" in error_data["error"]
         assert "message" in error_data["error"]
 
-    def test_404_for_nonexistent_task(self, client) -> None:
+    def test_404_for_nonexistent_task(self, client: TestClient) -> None:
         """Test 404 error for non-existent task."""
         response = client.get("/v1/tasks/nonexistent-task-id")
         assert response.status_code == 404
 
-    def test_error_response_structure(self, client) -> None:
+    def test_error_response_structure(self, client: TestClient) -> None:
         """
         Test that error responses follow consistent structure.
 

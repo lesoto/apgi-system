@@ -10,30 +10,26 @@ import logging
 import re
 import time
 import uuid
+from collections import OrderedDict
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional, Tuple
-from collections import OrderedDict
-
-# from sqlalchemy.orm import Session
 
 import redis.asyncio as redis
 from sqlalchemy import select
-
-from api.database.models import Session as SessionModel
-from api.database.models import SessionState
-
-from api.exceptions import ServiceUnavailableError
 from sqlalchemy.orm import Session as SessionLocal
 
-# Import circuit breaker utilities
-from utils.circuit_breaker_utils import (
-    circuit_breaker,
-    CircuitBreakerException,
-)
-
 from apgi_system.system import APGISystem
+from api.database.models import Session as SessionModel
+from api.database.models import SessionState
+from api.exceptions import ServiceUnavailableError
 from api.models.schemas import SessionCreateRequest
+
+# Import circuit breaker utilities
+from utils.circuit_breaker_utils import CircuitBreakerException, circuit_breaker
+
+# from sqlalchemy.orm import Session
+
 
 logger = logging.getLogger(__name__)
 

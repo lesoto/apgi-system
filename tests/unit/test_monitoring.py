@@ -4,10 +4,12 @@ Unit tests for performance monitoring.
 Tests the PerformanceMonitor class and PerformanceMetrics dataclass.
 """
 
-import pytest
-import numpy as np
 import time
-from apgi_system.monitoring import PerformanceMonitor, PerformanceMetrics
+
+import numpy as np
+import pytest
+
+from apgi_system.monitoring import PerformanceMetrics, PerformanceMonitor
 
 
 class TestPerformanceMetrics:

@@ -1,12 +1,13 @@
 """Unit tests for PrecisionWeighting."""
 
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
 from typing import Any
 
-from apgi_system.core.precision import PrecisionWeighting, NeuromodulatorType
+import numpy as np
+import pytest
+import yaml
+
+from apgi_system.core.precision import NeuromodulatorType, PrecisionWeighting
 
 
 @pytest.fixture
@@ -373,7 +374,7 @@ class TestPrecisionWeighting:
 
         # Directly call _apply_attention with a value that triggers else branch
         # This tests defensive programming even though it shouldn't happen in normal use
-        precision._apply_attention(None)
+        precision._apply_attention(None)  # type: ignore[arg-type]
 
         # Should set neutral attention gain
         assert precision.attention_gain == 1.0

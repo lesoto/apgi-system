@@ -15,13 +15,14 @@ Requirements tested:
 Feature: cross-platform-executable
 """
 
-import pytest
+import json
+import os
 import sys
 import tempfile
-import yaml
-import json
 from pathlib import Path
-import os
+
+import pytest
+import yaml
 
 
 class TestCrossPlatformConfigCompatibility:
@@ -236,7 +237,7 @@ class TestExportedDataCompatibility:
         # Verify data integrity
         assert imported_data == sample_export_data, "Export data should be preserved"
 
-    def test_csv_export_compatibility(self, temp_export_dir):
+    def test_csv_export_compatibility(self, temp_export_dir: Path) -> None:
         """
         Test that CSV export works across platforms.
 
@@ -257,7 +258,10 @@ class TestExportedDataCompatibility:
         # Export to CSV
         with open(export_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerows(data)
+            csv_data: list[list[str | int | float | bool]] = [
+                [str(x) for x in row] if isinstance(row, list) else [str(row)] for row in data
+            ]
+            writer.writerows(csv_data)
 
         # Import from CSV
         with open(export_file, "r", newline="") as f:
@@ -269,7 +273,7 @@ class TestExportedDataCompatibility:
         assert imported_data[0] == data[0]  # Header
         assert imported_data[1][0] == "1"  # First trial
 
-    def test_numpy_export_compatibility(self, temp_export_dir):
+    def test_numpy_export_compatibility(self, temp_export_dir: Path) -> None:
         """
         Test that numpy array export works across platforms.
 
@@ -294,7 +298,7 @@ class TestExportedDataCompatibility:
         # Verify data integrity
         assert np.array_equal(imported_data, data), "NumPy data should be preserved"
 
-    def test_export_with_metadata(self, temp_export_dir, sample_export_data):
+    def test_export_with_metadata(self, temp_export_dir: Path, sample_export_data: dict) -> None:
         """
         Test that export includes metadata for cross-platform compatibility.
 
@@ -333,11 +337,11 @@ class TestExperimentalTasksExecution:
     """Test that experimental tasks execute correctly in bundled environment."""
 
     @pytest.fixture
-    def project_root(self):
+    def project_root(self) -> Path:
         """Get project root directory."""
         return Path(__file__).parent.parent.parent
 
-    def test_iowa_gambling_task_import(self):
+    def test_iowa_gambling_task_import(self) -> None:
         """
         Test that Iowa Gambling Task can be imported.
 
@@ -350,7 +354,7 @@ class TestExperimentalTasksExecution:
         except ImportError as e:
             pytest.fail(f"Failed to import Iowa Gambling Task: {e}")
 
-    def test_iowa_gambling_task_execution(self):
+    def test_iowa_gambling_task_execution(self) -> None:
         """
         Test that Iowa Gambling Task can be executed.
 
@@ -383,7 +387,7 @@ class TestExperimentalTasksExecution:
         except Exception as e:
             pytest.fail(f"Iowa Gambling Task execution failed: {e}")
 
-    def test_masking_paradigm_import(self):
+    def test_masking_paradigm_import(self) -> None:
         """
         Test that Masking Paradigm can be imported.
 
@@ -396,7 +400,7 @@ class TestExperimentalTasksExecution:
         except ImportError as e:
             pytest.fail(f"Failed to import Masking Paradigm: {e}")
 
-    def test_masking_paradigm_execution(self):
+    def test_masking_paradigm_execution(self) -> None:
         """
         Test that Masking Paradigm can be executed.
 
@@ -422,16 +426,14 @@ class TestExperimentalTasksExecution:
         except Exception as e:
             pytest.fail(f"Masking Paradigm execution failed: {e}")
 
-    def test_attentional_blink_import(self):
+    def test_attentional_blink_import(self) -> None:
         """
         Test that Attentional Blink can be imported.
 
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_system.experiments.tasks.attentional_blink import (
-                AttentionalBlinkTask,
-            )
+            from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
             assert AttentionalBlinkTask is not None
         except ImportError as e:
@@ -444,9 +446,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_system.experiments.tasks.attentional_blink import (
-                AttentionalBlinkTask,
-            )
+            from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
             # Create task instance
             task = AttentionalBlinkTask()
@@ -517,11 +517,7 @@ class TestPlatformSpecificFeatures:
         Validates: Requirements 9.4
         """
         try:
-            from apgi_system.platform_utils import (
-                get_platform,
-                is_bundled,
-                get_resource_path,
-            )
+            from apgi_system.platform_utils import get_platform, get_resource_path, is_bundled
 
             # Test platform detection
             platform = get_platform()
@@ -567,7 +563,7 @@ class TestPlatformSpecificFeatures:
         Validates: Requirements 9.3, 9.4
         """
         try:
-            from apgi_system.platform_utils import get_data_dir, get_config_dir
+            from apgi_system.platform_utils import get_config_dir, get_data_dir
 
             # Get directories
             data_dir = get_data_dir()

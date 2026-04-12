@@ -8,9 +8,9 @@ Cross-Site Request Forgery attacks.
 import hashlib
 import secrets
 from datetime import datetime
-from typing import Optional
+from typing import Any, Awaitable, Callable, Optional
 
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -29,13 +29,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: Any,
         enabled: bool = True,
         cookie_name: str = "csrf_token",
         header_name: str = "X-CSRF-Token",
         token_expiry_minutes: int = 60,
         secure: bool = False,
-    ):
+    ) -> None:
         """
         Initialize CSRF middleware.
 
@@ -124,15 +124,17 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # Try form data
         try:
             if hasattr(request, "_form") and request._form:
-                token = request._form.get("csrf_token")
-                if token:
-                    return token
+                token_value = request._form.get("csrf_token")
+                if isinstance(token_value, str):
+                    return token_value
         except Exception:
             pass
 
         return None
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request with CSRF protection.
 
@@ -169,10 +171,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         else:
             # For unsafe methods, validate CSRF token
             if self._should_protect(request):
-                token = self._get_csrf_token_from_request(request)
-                cookie_token = request.cookies.get(self.cookie_name)
+                request_token: Optional[str] = self._get_csrf_token_from_request(request)
+                cookie_token: Optional[str] = request.cookies.get(self.cookie_name)
 
-                if not token or not cookie_token:
+                if not request_token or not cookie_token:
                     logger.warning(
                         "CSRF token missing",
                         method=request.method,
@@ -193,7 +195,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     )
 
                 # Validate token (constant-time comparison would be ideal here)
-                if not secrets.compare_digest(token, cookie_token):
+                if not secrets.compare_digest(request_token, cookie_token):
                     logger.warning(
                         "CSRF token mismatch", method=request.method, path=request.url.path
                     )

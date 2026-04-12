@@ -6,13 +6,15 @@ Property-based test for response schema validation.
 Tests that all API responses validate against their OpenAPI schemas.
 """
 
+from typing import Any, Dict, List, Optional
+
 import pytest
-from hypothesis import given, strategies as st, settings, assume
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
 
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 

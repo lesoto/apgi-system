@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from api.models.schemas import (
     AllostaticState,
@@ -23,20 +23,20 @@ from api.models.schemas import (
     NarrativeSelfState,
     PaginationInfo,
     PrecisionState,
-    SelfModelState,
-    SystemStateResponse,
-    WorkspaceState,
     PredictionErrorsResponse,
+    SelfModelState,
     SomaticMarkersResponse,
     SummaryStatistics,
+    SystemStateResponse,
+    WorkspaceState,
 )
 from api.services.authorization import (
-    require_permission,
     Permission,
-    get_current_user,
-    TokenPayload,
-    has_any_role,
     Role,
+    TokenPayload,
+    get_current_user,
+    has_any_role,
+    require_permission,
 )
 from api.services.session_manager import SessionManager, get_session_manager
 

@@ -5,9 +5,9 @@ Provides Prometheus metrics for monitoring API performance and health.
 """
 
 import time
-import psutil
-from typing import Callable
+from typing import Awaitable, Callable
 
+import psutil
 from fastapi import Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -73,7 +73,9 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and collect metrics.
 
@@ -229,7 +231,7 @@ class MetricsCollector:
         task_queue_length.set(count)
 
     @staticmethod
-    def increment_error(error_type: str, endpoint: str):
+    def increment_error(error_type: str, endpoint: str) -> None:
         """
         Increment error counter.
 

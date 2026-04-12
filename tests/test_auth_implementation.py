@@ -4,29 +4,26 @@ Basic tests for authentication implementation.
 Tests the core authentication functionality to ensure it works correctly.
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from sqlalchemy.orm import Session
 
+from api.database.models import User
+from api.exceptions import AuthenticationError, AuthorizationError, InvalidTokenError
 from api.services.auth_manager import AuthManager, TokenPayload
 from api.services.authorization import (
     Permission,
+    check_permission,
     get_permissions_for_roles,
     has_permission,
-    check_permission,
-)
-from api.database.models import User
-from api.exceptions import (
-    AuthenticationError,
-    InvalidTokenError,
-    AuthorizationError,
 )
 
 
 class TestAuthManager:
     """Test AuthManager functionality."""
 
-    def test_password_hashing(self):
+    def test_password_hashing(self) -> None:
         """Test password hashing and verification."""
         password = "test_password_123"
 
@@ -39,7 +36,7 @@ class TestAuthManager:
         # Verify incorrect password fails
         assert not AuthManager.verify_password("wrong_password", hashed)
 
-    def test_create_access_token(self, db: Session):
+    def test_create_access_token(self, db: Session) -> None:
         """Test access token creation."""
         auth_manager = AuthManager(db)
 
@@ -59,7 +56,7 @@ class TestAuthManager:
         assert payload.roles == ["researcher"]
         assert payload.token_type == "access"
 
-    def test_create_refresh_token(self, db: Session):
+    def test_create_refresh_token(self, db: Session) -> None:
         """Test refresh token creation."""
         auth_manager = AuthManager(db)
 
@@ -79,7 +76,7 @@ class TestAuthManager:
         assert payload.roles == ["researcher"]
         assert payload.token_type == "refresh"
 
-    def test_verify_token_wrong_type(self, db: Session):
+    def test_verify_token_wrong_type(self, db: Session) -> None:
         """Test that verifying token with wrong type fails."""
         auth_manager = AuthManager(db)
 
@@ -92,7 +89,7 @@ class TestAuthManager:
         with pytest.raises(InvalidTokenError):
             auth_manager.verify_token(access_token, expected_type="refresh")
 
-    def test_verify_invalid_token(self, db: Session):
+    def test_verify_invalid_token(self, db: Session) -> None:
         """Test that invalid tokens are rejected."""
         auth_manager = AuthManager(db)
 

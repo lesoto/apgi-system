@@ -5,17 +5,18 @@ This test verifies that input validation is properly integrated into
 the core components and catches invalid inputs.
 """
 
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
 
+import numpy as np
+import pytest
+import yaml
+
 from apgi_system.core.active_inference import HierarchicalGaussianFilter
-from apgi_system.core.predictive_processing import HierarchicalPredictor
-from apgi_system.core.precision import PrecisionWeighting
 from apgi_system.core.free_energy import FreeEnergyCalculator
-from apgi_system.ignition.threshold import IgnitionThreshold
+from apgi_system.core.precision import PrecisionWeighting
+from apgi_system.core.predictive_processing import HierarchicalPredictor
 from apgi_system.ignition.global_workspace import GlobalWorkspace
+from apgi_system.ignition.threshold import IgnitionThreshold
 
 # Load default config
 config_path = Path(__file__).parent.parent / "config" / "default.yaml"

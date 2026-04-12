@@ -4,9 +4,9 @@ Shared Theme Utility for APGI GUI Applications
 Provides consistent theming support across all GUI applications.
 """
 
+import tkinter as tk
 from typing import Any, Dict, Optional, cast
 
-import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
@@ -175,7 +175,7 @@ class ThemeManager:
 
         # Apply background and foreground if widget supports it
         try:
-            widget.configure(bg=theme["bg"], fg=theme["fg"])
+            widget.configure(bg=theme["bg"], fg=theme["fg"])  # type: ignore
         except tk.TclError:
             # Widget doesn't support bg/fg configuration
             pass
@@ -196,7 +196,8 @@ class ThemeManager:
             if hasattr(canvas, "figure"):
                 # For matplotlib canvases, set the figure's facecolor
                 canvas.figure.set_facecolor(theme["canvas_bg"])
-                canvas.draw()  # Redraw to apply the change
+                if hasattr(canvas, "draw"):
+                    canvas.draw()  # Redraw to apply the change
             else:
                 # For Tkinter canvases, use config
                 canvas.config(bg=cast(str, theme["canvas_bg"]))

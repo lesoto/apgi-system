@@ -9,25 +9,22 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import numpy as np
-import yaml
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from hypothesis import given, strategies as st, settings, assume
-from hypothesis import HealthCheck
+import numpy as np
+import yaml
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_system.interoception.body_model import BodyModel  # noqa: E402
 from apgi_system.interoception.allostasis import AllostaticRegulator  # noqa: E402
+from apgi_system.interoception.body_model import BodyModel  # noqa: E402
 from apgi_system.interoception.somatic_markers import SomaticMarkerSystem  # noqa: E402
-from tests.strategies import (  # noqa: E402
-    body_state_strategy,
-    observation_strategy,
-)
+from tests.strategies import body_state_strategy, observation_strategy  # noqa: E402
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(

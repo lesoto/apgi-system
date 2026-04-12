@@ -5,7 +5,7 @@ Role-Based Access Control (RBAC) for API endpoints.
 """
 
 from enum import Enum
-from typing import Dict, List, Set
+from typing import Any, Callable, Dict, List, Set
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -250,7 +250,7 @@ async def get_current_user(
             )
 
 
-def require_permission(permission: Permission):
+def require_permission(permission: Permission) -> Callable[[Any], Any]:
     """
     Create a FastAPI dependency that requires a specific permission.
 
@@ -281,7 +281,7 @@ def require_permission(permission: Permission):
     return permission_checker
 
 
-def require_role(role: Role):
+def require_role(role: Role) -> Callable[[Any], Any]:
     """
     Create a FastAPI dependency that requires a specific role.
 
@@ -306,7 +306,7 @@ def require_role(role: Role):
     return role_checker
 
 
-def require_any_role(roles: List[Role]):
+def require_any_role(roles: List[Role]) -> Callable[[Any], Any]:
     """
     Create a FastAPI dependency that requires any of the specified roles.
 
@@ -381,14 +381,15 @@ async def verify_session_owner(
     Raises:
         HTTPException: 404 if session not found, 403 if not authorized
     """
-    from api.services.session_manager import get_session_manager
-    from api.exceptions import SessionNotFoundError
     from fastapi import HTTPException
+
+    from api.exceptions import SessionNotFoundError
+    from api.services.session_manager import get_session_manager
 
     manager = get_session_manager()
     try:
         sim_session = await manager.get_session(session_id)
-        check_resource_ownership(sim_session.user_id, current_user)
+        check_resource_ownership(str(sim_session.user_id), current_user)
     except ValueError:
         raise SessionNotFoundError(session_id)
     except AuthorizationError as e:

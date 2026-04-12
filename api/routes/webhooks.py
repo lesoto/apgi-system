@@ -5,14 +5,15 @@ Endpoints for managing webhook deliveries and retry logic.
 """
 
 from typing import List, Optional, cast
+
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db
 from api.database.models import WebhookDelivery
-from api.services.authorization import has_any_role, Role
+from api.services.authorization import Role, has_any_role
 from api.services.webhook_manager import WebhookManager
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 

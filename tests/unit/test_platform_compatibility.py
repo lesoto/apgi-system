@@ -8,13 +8,14 @@ Tests ensure the system works correctly across different operating systems
 and deployment environments.
 """
 
-import pytest
-import platform
-import sys
 import os
-import subprocess
-import tempfile
+import platform
 import shutil
+import subprocess
+import sys
+import tempfile
+
+import pytest
 
 try:
     import tkinter

@@ -26,13 +26,13 @@ References:
   before knowing the advantageous strategy. Science, 275(5304), 1293-1295.
 """
 
-import numpy as np
-from typing import Dict, Any, List, Optional, cast
-from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
 from random import shuffle
-from typing import TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 
 class DeckSchedule(TypedDict):

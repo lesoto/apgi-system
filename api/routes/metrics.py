@@ -7,7 +7,7 @@ Endpoints for exposing Prometheus metrics.
 from fastapi import APIRouter, Depends, Response
 
 from api.middleware.metrics import get_metrics_response
-from api.services.authorization import require_permission, Permission
+from api.services.authorization import Permission, require_permission
 
 router = APIRouter(prefix="/v1", tags=["Metrics"])
 

@@ -6,6 +6,7 @@ Tests the /v1/version endpoint to ensure it returns correct version information.
 
 import pytest
 from fastapi.testclient import TestClient
+
 from api.main import app
 
 

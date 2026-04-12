@@ -8,12 +8,13 @@ manual interventions without launching the full GUI.
 Tests focus on the backend logic that powers the GUI functionality.
 """
 
-import pytest
-import numpy as np
-import tkinter as tk
-import tempfile
 import csv
 import json
+import tempfile
+import tkinter as tk
+
+import numpy as np
+import pytest
 
 from apgi_system.system import APGISystem
 

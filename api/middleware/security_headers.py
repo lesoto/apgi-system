@@ -5,6 +5,7 @@ Middleware to add security headers to all HTTP responses.
 """
 
 from typing import Any
+
 from starlette.middleware.base import BaseHTTPMiddleware
 
 

@@ -4,7 +4,7 @@ Authentication Routes
 Endpoints for user authentication, token management, and logout.
 """
 
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db

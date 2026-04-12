@@ -4,16 +4,12 @@ Health Check Routes
 Endpoints for API health monitoring.
 """
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
 from typing import Any, Optional
 
-from api.services.authorization import (
-    get_current_user,
-    TokenPayload,
-    has_any_role,
-    Role,
-)
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+
+from api.services.authorization import Role, TokenPayload, get_current_user, has_any_role
 from api.services.health_check import HealthCheckService
 
 router = APIRouter(prefix="/v1", tags=["Health"])

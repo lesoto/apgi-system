@@ -6,11 +6,11 @@ Tests DMG structure validation, symlink creation, and file permissions.
 Validates: Requirements 14.1, 14.2
 """
 
-import unittest
-import tempfile
-import shutil
 import os
+import shutil
 import stat
+import tempfile
+import unittest
 from pathlib import Path
 
 

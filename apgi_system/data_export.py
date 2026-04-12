@@ -6,16 +6,16 @@ including scientific formats, statistical analysis, and visualization exports.
 """
 
 import json
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
-from dataclasses import asdict
-import h5py  # type: ignore[import-untyped]
-import scipy.io  # type: ignore[import-untyped]
-from datetime import datetime
-import matplotlib.pyplot as plt
-
+import scipy.io
 from numpy.typing import NDArray
 
 from apgi_system.analysis import AnalysisResults

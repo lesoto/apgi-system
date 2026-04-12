@@ -4,26 +4,23 @@ Main APGI System Integrator
 Integrates all subsystems into a cohesive consciousness model.
 """
 
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
 import numpy as np
 import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, Callable
 from numpy.typing import NDArray
 
-from apgi_system.platform_utils import get_resource_path
-from apgi_system.config_validator import ConfigValidator, ConfigValidationError
-from apgi_system.core import (
-    ActiveInferenceEngine,
-    HierarchicalPredictor,
-    PrecisionWeighting,
-)
-from apgi_system.neural.oscillations import OscillationEngine
-from apgi_system.neural.macroscale.large_scale_networks import LargeScaleNetworkManager
-from apgi_system.ignition import IgnitionThreshold, GlobalWorkspace, IgnitionTimeline
-from apgi_system.interoception import BodyModel, AllostaticRegulator, SomaticMarkerSystem
-from apgi_system.self_model import MinimalSelf, NarrativeSelf, CoherenceMaintenance
-from apgi_system.thermodynamic import MetabolicBudget, EntropyTracker
+from apgi_system.config_validator import ConfigValidationError, ConfigValidator
+from apgi_system.core import ActiveInferenceEngine, HierarchicalPredictor, PrecisionWeighting
+from apgi_system.ignition import GlobalWorkspace, IgnitionThreshold
+from apgi_system.interoception import AllostaticRegulator, BodyModel, SomaticMarkerSystem
 from apgi_system.monitoring import PerformanceMonitor
+from apgi_system.neural.macroscale.large_scale_networks import LargeScaleNetworkManager
+from apgi_system.neural.oscillations import OscillationEngine
+from apgi_system.platform_utils import get_resource_path
+from apgi_system.self_model import CoherenceMaintenance, MinimalSelf, NarrativeSelf
+from apgi_system.thermodynamic import EntropyTracker, MetabolicBudget
 
 
 class APGISystem:
@@ -107,7 +104,6 @@ class APGISystem:
         # Ignition and global workspace
         self.ignition_threshold = IgnitionThreshold(self.config)
         self.global_workspace = GlobalWorkspace(self.config)
-        self.ignition_timeline = IgnitionTimeline(self.config)
 
         # Large-scale networks
         self.networks = LargeScaleNetworkManager(self.config)
@@ -239,10 +235,8 @@ class APGISystem:
             dt=dt,
         )
 
-        # 9. Timeline orchestration
-        timeline_info = self.ignition_timeline.update(
-            ignition_signal=ignition_occurred, context_info=context, dt=dt
-        )
+        # 9. Timeline orchestration (disabled - temporal_dynamics module removed)
+        timeline_info = {"current_phase": "idle", "time_in_phase": 0.0}
 
         # 10. Large-scale networks
         network_info = self.networks.update(
@@ -385,19 +379,18 @@ class APGISystem:
         self.active_inference.reset()
         self.predictor.reset()
         self.precision.reset()
-        self.body_model.reset()  # type: ignore
-        self.allostasis.reset()  # type: ignore
-        self.somatic_markers.reset()  # type: ignore
+        self.body_model.reset()
+        self.allostasis.reset()
+        self.somatic_markers.reset()
         self.ignition_threshold.reset()
         self.global_workspace.reset()
-        self.ignition_timeline.reset()
-        self.networks.reset()  # type: ignore
-        self.minimal_self.reset()  # type: ignore
-        self.narrative_self.reset()  # type: ignore
-        self.coherence.reset()  # type: ignore
-        self.metabolism.reset()  # type: ignore
-        self.entropy.reset()  # type: ignore
-        self.oscillations.reset()  # type: ignore
+        self.networks.reset()
+        self.minimal_self.reset()
+        self.narrative_self.reset()
+        self.coherence.reset()
+        self.metabolism.reset()
+        self.entropy.reset()
+        self.oscillations.reset()
         self.performance_monitor.reset()
 
         self.time = 0.0
@@ -447,7 +440,7 @@ class APGISystem:
                 "workspace_state": (
                     "broadcasting" if self.global_workspace.is_reportable() else "idle"
                 ),
-                "timeline_state": self.ignition_timeline.get_current_state(),
+                "timeline_state": "idle",  # temporal_dynamics module removed
             },
             "interoception": {
                 "body_state": self.body_model.get_current_state(),

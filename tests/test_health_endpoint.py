@@ -4,17 +4,37 @@ Test Health Check Endpoint
 Tests for the comprehensive /v1/health endpoint that checks all dependencies.
 """
 
+from datetime import datetime
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, AsyncMock
+
 from api.main import create_app
+from api.services.auth_manager import TokenPayload
+from api.services.authorization import get_current_user
 from api.services.health_check import HealthCheckService
 
 
 @pytest.fixture
 def client() -> TestClient:
     """Create a test client for the API."""
-    app = create_app()
+    app = create_app(test_mode=True)
+
+    # Create mock user for dependency override
+    mock_user = TokenPayload(
+        user_id="test-user-123",
+        username="testuser",
+        roles=["admin"],
+        exp=datetime.fromtimestamp(9999999999),
+    )
+
+    async def mock_get_current_user() -> TokenPayload:
+        return mock_user
+
+    # Override get_current_user dependency
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+
     return TestClient(app)
 
 
@@ -215,35 +235,21 @@ def test_health_service_check_celery_success() -> None:
     """Test health service Celery check when successful."""
     mock_celery = Mock()
     mock_inspect = Mock()
-    mock_inspect.active.return_value = {"worker1": []}
+    mock_inspect.ping.return_value = {"worker1": {"ok": "pong"}}
     mock_celery.control.inspect.return_value = mock_inspect
 
     service = HealthCheckService(celery_app=mock_celery)
     status, message = service.check_celery()
 
     assert status == "healthy"
-    assert "active" in message.lower()
+    assert "responding" in message.lower()
 
 
 def test_health_service_check_celery_no_workers() -> None:
     """Test health service Celery check when no workers are active."""
     mock_celery = Mock()
     mock_inspect = Mock()
-    mock_inspect.active.return_value = {}
-    mock_celery.control.inspect.return_value = mock_inspect
-
-    service = HealthCheckService(celery_app=mock_celery)
-    status, message = service.check_celery()
-
-    assert status == "unhealthy"
-    assert "no active" in message.lower()
-
-
-def test_health_service_check_celery_none_response() -> None:
-    """Test health service Celery check when inspect returns None."""
-    mock_celery = Mock()
-    mock_inspect = Mock()
-    mock_inspect.active.return_value = None
+    mock_inspect.ping.return_value = {}
     mock_celery.control.inspect.return_value = mock_inspect
 
     service = HealthCheckService(celery_app=mock_celery)
@@ -251,6 +257,20 @@ def test_health_service_check_celery_none_response() -> None:
 
     assert status == "unhealthy"
     assert "no celery workers available" in message.lower()
+
+
+def test_health_service_check_celery_none_response() -> None:
+    """Test health service Celery check when inspect returns None."""
+    mock_celery = Mock()
+    mock_inspect = Mock()
+    mock_inspect.ping.return_value = None
+    mock_celery.control.inspect.return_value = mock_inspect
+
+    service = HealthCheckService(celery_app=mock_celery)
+    status, message = service.check_celery()
+
+    assert status == "unhealthy"
+    assert "broker unreachable" in message.lower()
 
 
 def test_health_service_check_celery_failure() -> None:

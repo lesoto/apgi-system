@@ -7,20 +7,22 @@ including dependency analysis, resource collection, and build validation.
 Feature: cross-platform-executable
 """
 
-import pytest
 import sys
-from pathlib import Path
-from unittest.mock import Mock
 import tempfile
+from pathlib import Path
+from typing import Any
+from unittest.mock import Mock
+
+import pytest
 
 # Import build modules
 from utils.build_common import (
     analyze_dependencies,
     collect_resources,
-    get_version,
     detect_hidden_imports,
-    should_exclude_module,
     get_excluded_modules,
+    get_version,
+    should_exclude_module,
 )
 
 
@@ -220,7 +222,9 @@ class TestMacOSBuildIntegration:
         Validates: Requirements 9.1
         """
         # Check that required files exist
-        assert (project_root / "apgi_gui.py").exists(), "Entry point apgi_gui.py not found"
+        assert (
+            project_root / "Assistant-GUI.py"
+        ).exists(), "Entry point Assistant-GUI.py not found"
         assert (project_root / "requirements.txt").exists(), "requirements.txt not found"
 
         # Check Python version
@@ -324,9 +328,9 @@ class TestExecutableFunctionality:
 
         # Test tkinter submodules
         try:
-            import tkinter.ttk
             import tkinter.filedialog
             import tkinter.messagebox
+            import tkinter.ttk
         except ImportError as e:
             pytest.fail(f"Required tkinter submodule not available: {e}")
 
@@ -445,7 +449,7 @@ class TestBuildVersioning:
 class TestBuildErrorHandling:
     """Test error handling in build process."""
 
-    def test_missing_entry_point_detection(self):
+    def test_missing_entry_point_detection(self) -> None:
         """
         Test that missing entry point is detected.
 
@@ -458,7 +462,7 @@ class TestBuildErrorHandling:
         assert isinstance(deps_dict, dict), "Should return a dict"
         assert "total_dependencies" in deps_dict, "Should have total_dependencies key"
 
-    def test_invalid_resource_directory(self):
+    def test_invalid_resource_directory(self) -> None:
         """
         Test that invalid resource directory is handled.
 
@@ -471,7 +475,7 @@ class TestBuildErrorHandling:
         assert isinstance(resources, dict), "Should return a dict"
         assert all(isinstance(v, list) for v in resources.values()), "All values should be lists"
 
-    def test_module_exclusion_edge_cases(self):
+    def test_module_exclusion_edge_cases(self) -> None:
         """
         Test edge cases in module exclusion logic.
 
@@ -482,7 +486,7 @@ class TestBuildErrorHandling:
 
         # Test with None (should not crash)
         try:
-            should_exclude_module(None)
+            should_exclude_module(None)  # type: ignore[arg-type]
             # If it doesn't crash, that's acceptable
         except (TypeError, AttributeError):
             # Expected for None input
@@ -492,7 +496,7 @@ class TestBuildErrorHandling:
 class TestCrossPlatformCompatibility:
     """Test cross-platform compatibility of build system."""
 
-    def test_path_handling_cross_platform(self, tmp_path):
+    def test_path_handling_cross_platform(self, tmp_path: Any) -> None:
         """
         Test that path handling works across platforms.
 
@@ -521,7 +525,7 @@ class TestCrossPlatformCompatibility:
         for file_path in resources["config_files"]:
             assert isinstance(file_path, str), "File path should be string"
 
-    def test_platform_detection(self):
+    def test_platform_detection(self) -> None:
         """
         Test that platform can be detected correctly.
 
@@ -535,7 +539,7 @@ class TestCrossPlatformCompatibility:
             "linux2",
         ], f"Platform {sys.platform} should be recognized"
 
-    def test_dependency_analysis_cross_platform(self):
+    def test_dependency_analysis_cross_platform(self) -> None:
         """
         Test that dependency analysis works on all platforms.
 

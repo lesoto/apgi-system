@@ -6,9 +6,9 @@ Includes utilities for simulation time tracking, duration formatting, and
 timestamp parsing for the APGI system.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Union, Optional
 import re
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Union
 
 
 def utc_now() -> datetime:

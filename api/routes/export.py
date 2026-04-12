@@ -7,13 +7,13 @@ API endpoints for exporting simulation data, summary statistics, and event analy
 import io
 import logging
 import re
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from api.models.schemas import ErrorResponse
-from api.services.authorization import require_permission, Permission
+from api.services.authorization import Permission, require_permission
 from api.services.data_export import DataExportService
 
 logger = logging.getLogger(__name__)

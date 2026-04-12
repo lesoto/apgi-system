@@ -1,10 +1,12 @@
 """Tests for Rate Limiting Middleware with Redis."""
 
+from typing import Any, List
+from unittest.mock import AsyncMock
+
 import pytest
 import redis
-from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
-from typing import Any, List
+
 from api.main import create_app
 
 
@@ -35,7 +37,7 @@ def client_with_rate_limiting(redis_client: AsyncMock) -> TestClient:
             original_middleware = middleware.cls
 
             def create_test_middleware(app: Any) -> Any:
-                return original_middleware(app, redis_client=redis_client, enabled=True)  # type: ignore[call-arg]
+                return original_middleware(app, redis_client=redis_client, enabled=True)  # type: ignore[call-arg, arg-type]
 
             # Create a new middleware object with the same interface
             from types import SimpleNamespace
@@ -43,7 +45,7 @@ def client_with_rate_limiting(redis_client: AsyncMock) -> TestClient:
             test_middleware = SimpleNamespace(
                 cls=create_test_middleware, options=getattr(middleware, "options", {})
             )
-            app.user_middleware[i] = test_middleware  # type: ignore[list-item]
+            app.user_middleware[i] = test_middleware  # type: ignore[call-overload]
             break
 
     return TestClient(app)
@@ -162,7 +164,7 @@ class TestRateLimitingWithRedis:
                 original_middleware = middleware.cls
 
                 def create_test_middleware(app: Any) -> Any:
-                    return original_middleware(app, redis_client=redis_client, enabled=False)  # type: ignore[call-arg]
+                    return original_middleware(app, redis_client=redis_client, enabled=False)  # type: ignore[call-arg, arg-type]
 
                 # Create a new middleware object with the same interface
                 from types import SimpleNamespace
@@ -170,7 +172,7 @@ class TestRateLimitingWithRedis:
                 test_middleware = SimpleNamespace(
                     cls=create_test_middleware, options=getattr(middleware, "options", {})
                 )
-                app.user_middleware[i] = test_middleware  # type: ignore[list-item]
+                app.user_middleware[i] = test_middleware  # type: ignore[call-overload]
                 break
 
         client = TestClient(app)

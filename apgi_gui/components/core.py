@@ -5,9 +5,9 @@ Core GUI components and utilities for the APGI system.
 Provides modular components to break down the large monolithic GUI file.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
 import time
+import tkinter as tk
+from tkinter import messagebox, ttk
 from typing import Any, Callable, Optional
 
 import matplotlib

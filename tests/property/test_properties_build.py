@@ -9,16 +9,18 @@ These tests verify correctness properties of the build system including:
 
 import sys
 from pathlib import Path
-from hypothesis import given, strategies as st, settings
+
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from utils.build_common import (
-    get_version,
     analyze_dependencies,
     collect_resources,
-    get_hidden_imports,
     get_excluded_modules,
+    get_hidden_imports,
     get_project_root,
+    get_version,
 )
 
 # Add project root to path
@@ -138,7 +140,7 @@ class TestDependencyCompleteness:
         We expect to find at least: numpy, scipy, matplotlib, tkinter, yaml
         """
         project_root = get_project_root()
-        entry_point = project_root / "apgi_gui.py"
+        entry_point = project_root / "APGI-GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")
@@ -161,7 +163,7 @@ class TestDependencyCompleteness:
         Dependency analysis should return a dict with set values.
         """
         project_root = get_project_root()
-        entry_point = project_root / "apgi_gui.py"
+        entry_point = project_root / "APGI-GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")
@@ -183,7 +185,7 @@ class TestDependencyCompleteness:
         Standard library modules don't need to be bundled.
         """
         project_root = get_project_root()
-        entry_point = project_root / "apgi_gui.py"
+        entry_point = project_root / "APGI-GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")

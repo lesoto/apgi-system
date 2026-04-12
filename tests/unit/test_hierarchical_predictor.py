@@ -1,9 +1,11 @@
 """Unit tests for HierarchicalPredictor."""
 
-import pytest
-import numpy as np
-import yaml
 from pathlib import Path
+from typing import Any, Dict
+
+import numpy as np
+import pytest
+import yaml
 
 from apgi_system.core.predictive_processing import HierarchicalPredictor, PredictionErrorChannel
 
@@ -229,7 +231,7 @@ class TestHierarchicalPredictor:
             late_avg = np.mean(errors[-window:])
             assert late_avg <= early_avg * 1.2  # Allow 20% tolerance
 
-    def test_get_prediction_errors(self, simple_config):
+    def test_get_prediction_errors(self, simple_config: Dict[str, Any]) -> None:
         """Test prediction error retrieval."""
         predictor = HierarchicalPredictor(simple_config)
 
@@ -249,7 +251,7 @@ class TestHierarchicalPredictor:
         assert errors["exteroceptive_signal"] >= 0
         assert errors["interoceptive_signal"] >= 0
 
-    def test_reset(self, simple_config):
+    def test_reset(self, simple_config: Dict[str, Any]) -> None:
         """Test predictor reset."""
         predictor = HierarchicalPredictor(simple_config)
 
@@ -271,7 +273,7 @@ class TestHierarchicalPredictor:
 
         assert np.allclose(predictor.intero_prediction, 0.0)
 
-    def test_invalid_extero_input_shape(self, simple_config):
+    def test_invalid_extero_input_shape(self, simple_config: Dict[str, Any]) -> None:
         """Test error handling for invalid exteroceptive input shape."""
         predictor = HierarchicalPredictor(simple_config)
 
@@ -279,7 +281,7 @@ class TestHierarchicalPredictor:
         with pytest.raises(ValueError):
             predictor.predict(extero_input=np.random.randn(16))  # Should be 32
 
-    def test_invalid_intero_input_shape(self, simple_config):
+    def test_invalid_intero_input_shape(self, simple_config: Dict[str, Any]) -> None:
         """Test error handling for invalid interoceptive input shape."""
         predictor = HierarchicalPredictor(simple_config)
 
@@ -287,7 +289,7 @@ class TestHierarchicalPredictor:
         with pytest.raises(ValueError):
             predictor.predict(intero_input=np.random.randn(4))  # Should be 6
 
-    def test_invalid_dt(self, simple_config):
+    def test_invalid_dt(self, simple_config: Dict[str, Any]) -> None:
         """Test error handling for invalid dt."""
         predictor = HierarchicalPredictor(simple_config)
 

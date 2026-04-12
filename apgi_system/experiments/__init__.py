@@ -2,8 +2,8 @@
 
 from apgi_system.experiments.tasks import (
     AttentionalBlinkTask,
-    ChangeBlindnessTask,
     BinocularRivalryTask,
+    ChangeBlindnessTask,
     MaskingParadigmTask,
 )
 

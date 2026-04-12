@@ -1526,6 +1526,10 @@ class APGIVisualizerGUI:
             self.canvas = self.embedded_display
             self.parameter_controls: Dict[str, Any] = {}  # Compatibility for tests
 
+            # Matplotlib components
+            self.matplotlib_canvas: Optional[FigureCanvasTkAgg] = None
+            self.toolbar: Optional[NavigationToolbar2Tk] = None
+
             self.update_info(
                 "APGI Visualizer initialized successfully!\n\n"
                 f"Available states: {len(PSYCHOLOGICAL_STATES)}\n\n"
@@ -1599,7 +1603,7 @@ class APGIVisualizerGUI:
 
         # Main container with better layout
         self.main_frame: ttk.Frame = ttk.Frame(self.root, padding="10")
-        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -1616,7 +1620,7 @@ class APGIVisualizerGUI:
 
         # Control Panel (Left) - Enhanced
         self.control_frame = ttk.LabelFrame(self.main_frame, text="Controls", padding="12")
-        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        self.control_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
 
         # Visualization Type
         ttk.Label(self.control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).grid(
@@ -1894,7 +1898,7 @@ class APGIVisualizerGUI:
                     messagebox.showerror("Error", "Please enter states to compare")
                     return
 
-                cache_key_params = {"type": "radar", "states": tuple(sorted(states))}
+                cache_key_params = {"type": "radar", "states": str(",".join(sorted(states)))}
                 cached_fig = self.visualizer.cache.get("radar", **cache_key_params)
                 from_cache = cached_fig is not None
 
@@ -1971,7 +1975,7 @@ class APGIVisualizerGUI:
                     messagebox.showerror("Error", "Please enter at least 2 states to compare")
                     return
 
-                cache_key_params = {"type": "comparative", "states": tuple(sorted(states))}
+                cache_key_params = {"type": "comparative", "states": ",".join(sorted(states))}
                 cached_fig = self.visualizer.cache.get("comparative", **cache_key_params)
                 from_cache = cached_fig is not None
 
@@ -2126,8 +2130,9 @@ class APGIVisualizerGUI:
 
             # Check each parameter with enhanced validation
             for param_name, rules in validation_rules.items():
-                value = rules["value"]
-                min_val, max_val = rules["min"], rules["max"]
+                value: Any = rules["value"]
+                min_val: float = float(rules["min"])  # type: ignore[arg-type]
+                max_val: float = float(rules["max"])  # type: ignore[arg-type]
 
                 if not (min_val <= value <= max_val):
                     self.validation_status.set(f"✗ {rules['error']}")
@@ -2597,15 +2602,19 @@ class EmbeddedDisplayPanel(ttk.Frame):
     browser dependencies, opening options, or save capabilities.
     """
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent: Any, **kwargs: Any) -> None:
         """Initialize the embedded display panel"""
         super().__init__(parent, **kwargs)
+
+        # Initialize Optional attributes
+        self.matplotlib_canvas: Optional[Any] = None
+        self.toolbar: Optional[Any] = None
 
         # Try different display methods
         self.display_method = self._setup_display()
         self._canvas_cleanup()
 
-    def _canvas_cleanup(self):
+    def _canvas_cleanup(self) -> None:
         """Clean up matplotlib canvas to prevent memory leaks"""
         self._cleanup_matplotlib_canvas()
         self._cleanup_toolbar()
@@ -2613,7 +2622,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
     def _cleanup_matplotlib_canvas(self) -> None:
         """Clean up the matplotlib canvas widget"""
-        if not hasattr(self, "matplotlib_canvas") or not self.matplotlib_canvas:
+        if not self.matplotlib_canvas:  # type: ignore[has-type]
             return
 
         try:
@@ -2624,7 +2633,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
                 plt.close(self.matplotlib_canvas.figure)
 
             # Destroy the tkinter widget
-            widget = self.matplotlib_canvas.get_tk_widget()
+            widget = self.matplotlib_canvas.get_tk_widget()  # type: ignore[has-type]
             if widget.winfo_exists():
                 widget.destroy()
             self.matplotlib_canvas = None
@@ -2633,7 +2642,7 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
     def _cleanup_toolbar(self) -> None:
         """Clean up the matplotlib toolbar"""
-        if not hasattr(self, "toolbar") or not self.toolbar:
+        if not self.toolbar:
             return
 
         try:

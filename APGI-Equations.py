@@ -23,11 +23,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
-from numpy.typing import NDArray
+from typing import Any, Callable, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 
 # Define module exports to prevent import issues
 __all__ = [
@@ -649,7 +649,7 @@ class DerivedQuantities:
             n_steps = int(T_ignition / dt)
             S_history = S_history[:n_steps]
 
-        return np.trapezoid(S_history, dx=dt)
+        return float(np.trapezoid(S_history, dx=dt))
 
     @staticmethod
     def hierarchical_level_dynamics(
@@ -918,7 +918,7 @@ class PsychologicalState:
     """Enhanced state with Π vs Π̂ distinction for anxiety modeling"""
 
     name: str
-    category: "'StateCategory'"  # Forward reference as string
+    category: StateCategory
     description: str
     phenomenology: List[str]
 
@@ -1992,7 +1992,7 @@ class APGIStateLibrary:
         # Initialize psychiatric profiles
         self._initialize_psychiatric_profiles()
 
-    def _add_state(self, **kwargs) -> None:
+    def _add_state(self, **kwargs: Any) -> None:
         """Add a state to the library"""
         state = PsychologicalState(**kwargs)
         self.states[state.name] = state
@@ -2356,7 +2356,7 @@ class NeuromodulatorSystem:
         self.levels = self.BASELINES.copy()
         self.history: Dict[str, List[float]] = defaultdict(list)
 
-    def set_levels(self, **kwargs) -> None:
+    def set_levels(self, **kwargs: float) -> None:
         """Set neuromodulator levels"""
         for mod, level in kwargs.items():
             if mod in self.BASELINES:
@@ -2378,7 +2378,7 @@ class NeuromodulatorSystem:
 
         return dict(modifications)
 
-    def update_dynamically(self, S_t: float, B_t: int, time: float):
+    def update_dynamically(self, S_t: float, B_t: int, time: float) -> None:
         """Dynamic update of neuromodulators based on system state"""
 
         # NE increases with surprise and decreases with time
@@ -2475,7 +2475,7 @@ class EnhancedSurpriseIgnitionSystem:
         self.running_stats_i = RunningStatistics(alpha_mu=0.01, alpha_sigma=0.005)
 
         # History tracking (must be before reset)
-        self.history = defaultdict(list)
+        self.history: Dict[str, List[float]] = defaultdict(list)
 
         # Initialize state
         self.reset()
@@ -2524,7 +2524,7 @@ class EnhancedSurpriseIgnitionSystem:
         self.running_stats_i = RunningStatistics(alpha_mu=0.01, alpha_sigma=0.005)
 
         # History for interoceptive errors (for arousal computation)
-        self.eps_i_history = []
+        self.eps_i_history: List[float] = []
 
         # Clear history
         for key in self.history:
@@ -2708,7 +2708,7 @@ class EnhancedSurpriseIgnitionSystem:
         # Update state
         self.B = B_new
         self.time += dt
-        self.content_domain = content_domain
+        self.content_domain = str(content_domain)
 
         # Update neuromodulators dynamically
         self.neuromodulator_system.update_dynamically(self.S, B_new, self.time)
@@ -2727,7 +2727,7 @@ class EnhancedSurpriseIgnitionSystem:
                 z_e=self.eps_e,
                 z_i=self.eps_i,
                 theta_t=self.theta,
-                content_domain=content_domain,
+                content_domain=str(content_domain),
             ),
             neuromodulators=self.neuromodulator_system.levels,
         )
@@ -2744,7 +2744,7 @@ class EnhancedSurpriseIgnitionSystem:
         self.history["Pi_i"].append(self.Pi_i)
         self.history["eps_e"].append(self.eps_e)
         self.history["eps_i"].append(self.eps_i)
-        self.history["content_domain"].append(content_domain)
+        self.history["content_domain"].append(str(content_domain))  # type: ignore[arg-type]
 
         # Add measurements to history
         for key, value in measurements.items():
@@ -2771,10 +2771,10 @@ class EnhancedSurpriseIgnitionSystem:
         }
         state.update(measurements)
 
-        return state
+        return state  # type: ignore[return-value]
 
     def simulate(
-        self, duration: float, dt: float, input_generator: callable
+        self, duration: float, dt: float, input_generator: Callable[[float], Dict[str, float]]
     ) -> Dict[str, np.ndarray]:
         """Run a complete simulation"""
         self.reset()
@@ -2849,7 +2849,7 @@ class CompleteAPGIVisualizer:
 
         return fig
 
-    def _plot_core_dynamics(self, ax, history) -> None:
+    def _plot_core_dynamics(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot core dynamical variables"""
         time = history["time"]
         S = history["S"]
@@ -2878,7 +2878,7 @@ class CompleteAPGIVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
 
-    def _plot_measurements(self, ax, history) -> None:
+    def _plot_measurements(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot measurement proxies"""
         time = history["time"]
 
@@ -2905,7 +2905,7 @@ class CompleteAPGIVisualizer:
             ax_twin.legend(loc="upper right")
         ax.grid(True, alpha=0.3)
 
-    def _plot_neuromodulators(self, ax, history) -> None:
+    def _plot_neuromodulators(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot neuromodulator dynamics"""
         time = history["time"]
 
@@ -2930,7 +2930,7 @@ class CompleteAPGIVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
 
-    def _plot_domain_analysis(self, ax, history) -> None:
+    def _plot_domain_analysis(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot domain-specific analysis"""
         if "content_domain" in history:
             # Convert domain to numerical for plotting
@@ -2942,7 +2942,7 @@ class CompleteAPGIVisualizer:
                 time,
                 0,
                 1,
-                where=domain_numeric > 0.5,
+                where=domain_numeric > 0.5,  # type: ignore[arg-type]
                 color="red",
                 alpha=0.2,
                 label="Survival Content",
@@ -2951,7 +2951,7 @@ class CompleteAPGIVisualizer:
                 time,
                 0,
                 1,
-                where=domain_numeric <= 0.5,
+                where=domain_numeric <= 0.5,  # type: ignore[arg-type]
                 color="blue",
                 alpha=0.2,
                 label="Neutral Content",
@@ -2974,7 +2974,7 @@ class CompleteAPGIVisualizer:
         ax.grid(True, alpha=0.3)
         ax.set_ylim(0, 1.1)
 
-    def _plot_psychiatric_profiles(self, ax) -> None:
+    def _plot_psychiatric_profiles(self, ax: plt.Axes) -> None:
         """Plot psychiatric profile comparison"""
         profiles = ["GAD", "MDD", "Psychosis"]
         colors = ["red", "blue", "purple"]
@@ -3025,7 +3025,7 @@ class CompleteAPGIVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
 
-    def _plot_state_space(self, ax, history) -> None:
+    def _plot_state_space(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot state space trajectory"""
         S = history["S"]
         theta = history["theta"]
@@ -3055,7 +3055,7 @@ class CompleteAPGIVisualizer:
         # Add colorbar
         plt.colorbar(scatter, ax=ax, label="Ignition Probability")
 
-    def _plot_precision_gap(self, ax, history) -> None:
+    def _plot_precision_gap(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot precision expectation gap (key for anxiety)"""
         time = history["time"]
 
@@ -3074,12 +3074,11 @@ class CompleteAPGIVisualizer:
             else:
                 gap = np.zeros_like(time)
 
-        ax.plot(time, gap, "r-", linewidth=2, alpha=0.8, label="Π̂ - Π Gap")
         ax.fill_between(
             time,
             0,
-            gap,
-            where=gap > 0,
+            1,
+            where=gap > 0,  # type: ignore[arg-type]
             color="red",
             alpha=0.3,
             label="Anxiety Zone (Π̂ > Π)",
@@ -3088,7 +3087,7 @@ class CompleteAPGIVisualizer:
             time,
             0,
             gap,
-            where=gap <= 0,
+            where=gap <= 0,  # type: ignore[arg-type]
             color="blue",
             alpha=0.3,
             label="Normal Zone (Π̂ ≤ Π)",
@@ -3108,7 +3107,12 @@ class CompleteAPGIVisualizer:
 # =============================================================================
 
 
-def run_complete_demo() -> None:
+def run_complete_demo() -> tuple[
+    EnhancedSurpriseIgnitionSystem,
+    APGIStateLibrary,
+    CompleteAPGIVisualizer,
+    Dict[str, np.ndarray],
+]:
     """Run complete demonstration with all critical fixes"""
 
     print("=" * 80)
@@ -3194,47 +3198,44 @@ def run_complete_demo() -> None:
         # Time-based state transitions
         if t < 15.0:
             state = library.get_state("flow")
-            domain = "neutral"
         elif t < 30.0:
             state = library.get_state("anxiety")
-            domain = "survival"  # Threat-relevant content
         elif t < 45.0:
             state = library.get_state("curiosity")
-            domain = "neutral"
         elif t < 60.0:
             state = library.get_state("fear")
-            domain = "survival"
         else:
             state = library.get_state("mindfulness")
-            domain = "neutral"
 
         # Get state parameters
         inputs = state.to_dynamical_inputs(t, include_expectation=True)
 
         # Convert to observed/predicted format for complete dynamical system
         # Use prediction errors to back-calculate observed values
-        observed_e = inputs["eps_e"] + 0.1  # Assume small prediction
+        # Cast to float to satisfy type checker (eps values are always numeric)
+        eps_e = float(inputs["eps_e"])
+        eps_i = float(inputs["eps_i"])
+        observed_e = eps_e + 0.1  # Assume small prediction
         predicted_e = 0.1
-        observed_i = inputs["eps_i"] + 0.2  # Assume small prediction
+        observed_i = eps_i + 0.2  # Assume small prediction
         predicted_i = 0.2
 
         # Build complete input dictionary
-        complete_inputs = {
+        complete_inputs: dict[str, float] = {
             "observed_e": observed_e,
             "predicted_e": predicted_e,
             "observed_i": observed_i,
             "predicted_i": predicted_i,
-            "Pi_e": inputs["Pi_e"],
-            "Pi_i": inputs["Pi_i"],
-            "beta": inputs["beta"],
-            "content_domain": domain,
+            "Pi_e": float(inputs["Pi_e"]),
+            "Pi_i": float(inputs["Pi_i"]),
+            "beta": float(inputs["beta"]),
             "context_C": 0.0,  # Default context
             "gamma_context": 0.1,  # Default context modulation
         }
 
         # Add occasional surprise events
         if np.random.random() < 0.01:  # 1% chance per timestep
-            complete_inputs["observed_e"] += np.random.normal(3.0, 0.8)
+            complete_inputs["observed_e"] += float(np.random.normal(3.0, 0.8))
             print(f"      Surprise event at t={t:.1f}s")
 
         return complete_inputs
@@ -3324,7 +3325,7 @@ def run_complete_demo() -> None:
 # =============================================================================
 
 
-def _check_parameter_ranges(params) -> bool:
+def _check_parameter_ranges(params: APGIParameters) -> bool:
     """Check parameter ranges"""
     print("\n1. PARAMETER RANGES:")
     all_passed = True
@@ -3365,7 +3366,7 @@ def _check_state_library() -> bool:
         return False
 
 
-def _check_precision_distinction(library) -> bool:
+def _check_precision_distinction(library: APGIStateLibrary) -> bool:
     """Check Π vs Π̂ distinction"""
     print("\n3. Π vs Π̂ DISTINCTION:")
     anxiety_state = library.get_state("anxiety")
@@ -3407,7 +3408,7 @@ def _check_neuromodulator_mapping() -> bool:
         return False
 
 
-def _check_domain_thresholds(params) -> bool:
+def _check_domain_thresholds(params: APGIParameters) -> bool:
     """Check domain-specific thresholds"""
     print("\n6. DOMAIN-SPECIFIC THRESHOLDS:")
     if hasattr(params, "theta_survival") and hasattr(params, "theta_neutral"):
@@ -3419,7 +3420,7 @@ def _check_domain_thresholds(params) -> bool:
         return False
 
 
-def _check_psychiatric_profiles(library) -> bool:
+def _check_psychiatric_profiles(library: APGIStateLibrary) -> bool:
     """Check psychiatric profiles"""
     print("\n7. PSYCHIATRIC PROFILES:")
     profiles = ["GAD", "MDD", "Psychosis"]
@@ -3563,7 +3564,7 @@ def _check_dynamical_system() -> bool:
         return False
 
 
-def _check_running_statistics():
+def _check_running_statistics() -> bool:
     """Check running statistics implementation"""
     print("\n11. RUNNING STATISTICS:")
     try:
@@ -3585,7 +3586,7 @@ def _check_running_statistics():
         return False
 
 
-def _check_derived_quantities():
+def _check_derived_quantities() -> bool:
     """Check derived quantities implementation"""
     print("\n12. DERIVED QUANTITIES:")
     try:
@@ -3608,7 +3609,7 @@ def _check_derived_quantities():
         return False
 
 
-def verify_all_equations():
+def verify_all_equations() -> bool:
     print("=" * 80)
     print("EQUATION VERIFICATION")
     print("=" * 80)

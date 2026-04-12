@@ -6,9 +6,9 @@ This script runs pytest with coverage, generates reports, and provides
 detailed analysis of coverage gaps.
 """
 
-import sys
-import subprocess
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 

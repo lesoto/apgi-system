@@ -113,7 +113,7 @@ class APGITask(Task):  # type: ignore[misc]
         return self._apgi_system
 
 
-@celery_app.task(  # type: ignore[misc]
+@celery_app.task(
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_iowa_gambling_task"
 )
 def execute_iowa_gambling_task(
@@ -189,7 +189,7 @@ def execute_iowa_gambling_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
+@celery_app.task(
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_masking_paradigm_task"
 )
 def execute_masking_paradigm_task(
@@ -265,7 +265,7 @@ def execute_masking_paradigm_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
+@celery_app.task(
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_attentional_blink_task"
 )
 def execute_attentional_blink_task(
@@ -338,7 +338,7 @@ def execute_attentional_blink_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
+@celery_app.task(
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_change_blindness_task"
 )
 def execute_change_blindness_task(
@@ -402,9 +402,7 @@ def execute_change_blindness_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
-    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_nback_task"
-)
+@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_nback_task")
 def execute_nback_task(
     self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -469,9 +467,7 @@ def execute_nback_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
-    bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_stroop_task"
-)
+@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_stroop_task")
 def execute_stroop_task(
     self: APGITask, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -534,7 +530,7 @@ def execute_stroop_task(
     return result
 
 
-@celery_app.task(  # type: ignore[misc]
+@celery_app.task(
     bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_binocular_rivalry_task"
 )
 def execute_binocular_rivalry_task(

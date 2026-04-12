@@ -2,10 +2,11 @@
 Integration tests for numerical stability monitoring with core components.
 """
 
-import pytest
-import numpy as np
 import warnings
-from typing import Dict, Any
+from typing import Any, Dict
+
+import numpy as np
+import pytest
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 from apgi_system.core.predictive_processing import HierarchicalPredictor

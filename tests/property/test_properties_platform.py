@@ -9,19 +9,20 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import sys
 import platform
+import sys
 from pathlib import Path
+
 import pytest
-from hypothesis import given, strategies as st, settings, assume
-from hypothesis import HealthCheck
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
 
 from apgi_system.platform_utils import (
-    get_platform,
-    is_bundled,
-    get_resource_path,
     get_config_dir,
     get_data_dir,
+    get_platform,
+    get_resource_path,
+    is_bundled,
 )
 
 # Configure Hypothesis for property-based testing

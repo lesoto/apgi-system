@@ -6,28 +6,28 @@ This test verifies that all custom strategies generate valid data.
 
 import sys
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from hypothesis import HealthCheck, given, settings
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-import pytest  # noqa: E402
-import numpy as np  # noqa: E402
-from hypothesis import given, settings, HealthCheck  # noqa: E402
-from typing import Any  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent.parent))  # noqa: E402
 
 from tests.strategies import (  # noqa: E402
-    belief_states,
-    precision_values,
-    observations,
-    configurations,
-    body_state_strategy,
-    observation_strategy,
+    allostatic_load_strategy,
     belief_state_strategy,
+    belief_states,
+    body_state_strategy,
     config_strategy,
-    precision_weighted_error_strategy,
+    configurations,
     error_variance_strategy,
     metabolic_reserve_strategy,
-    allostatic_load_strategy,
+    observation_strategy,
+    observations,
+    precision_values,
+    precision_weighted_error_strategy,
     somatic_marker_gain_strategy,
 )
 

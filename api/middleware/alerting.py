@@ -5,16 +5,16 @@ Monitors critical errors and triggers alerts through configured notification cha
 """
 
 import asyncio
+import json
+import smtplib
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import Dict, List, Optional, Any
-import json
-import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 
@@ -42,9 +42,9 @@ class Alert:
     message: str
     severity: AlertSeverity
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert alert to dictionary."""
         return {
             "title": self.title,
@@ -213,6 +213,16 @@ class EmailNotificationChannel(NotificationChannel):
             True if email was sent successfully
         """
         try:
+            # Validate email configuration
+            if not self.from_email or not self.to_emails:
+                logger.warning(
+                    "Email not configured, skipping alert",
+                    alert_title=alert.title,
+                    from_email=self.from_email,
+                    to_emails=self.to_emails,
+                )
+                return False
+
             # Create message
             msg = MIMEMultipart()
             msg["From"] = self.from_email
@@ -676,7 +686,7 @@ class DatabaseNotificationChannel(NotificationChannel):
     Logs alerts to database for audit trails and historical analysis.
     """
 
-    def __init__(self, db_session_factory=None):
+    def __init__(self, db_session_factory: Optional[Callable[[], Any]] = None):
         """
         Initialize database notification channel.
 
@@ -705,10 +715,12 @@ class DatabaseNotificationChannel(NotificationChannel):
             # Run synchronous database operation in executor to avoid blocking the event loop
             loop = asyncio.get_event_loop()
 
-            def _log_to_db():
+            def _log_to_db() -> Optional[str]:
                 # Import here to avoid circular imports
                 from api.database.models import AlertLog
 
+                if self.db_session_factory is None:
+                    return None
                 session = self.db_session_factory()
                 try:
                     alert_record = AlertLog(
@@ -719,7 +731,7 @@ class DatabaseNotificationChannel(NotificationChannel):
                     )
                     session.add(alert_record)
                     session.commit()
-                    return alert_record.alert_id
+                    return str(alert_record.alert_id)
                 except Exception as db_error:
                     session.rollback()
                     logger.error(f"Database error logging alert: {db_error}")
@@ -755,7 +767,7 @@ class AlertManager:
     Monitors error rates and triggers alerts when thresholds are exceeded.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alert manager."""
         self.channels: List[NotificationChannel] = []
         self.error_counts: Dict[str, List[datetime]] = {}
@@ -767,7 +779,7 @@ class AlertManager:
         self.error_rate_window = timedelta(minutes=1)
         self.alert_cooldown = timedelta(minutes=5)  # Don't spam alerts
 
-    def add_channel(self, channel: NotificationChannel):
+    def add_channel(self, channel: NotificationChannel) -> None:
         """
         Add a notification channel.
 
@@ -782,8 +794,8 @@ class AlertManager:
         )
 
     async def record_error(
-        self, error_type: str, error_message: str, metadata: Optional[Dict] = None
-    ):
+        self, error_type: str, error_message: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """
         Record an error and check if alert should be triggered.
 
@@ -818,8 +830,12 @@ class AlertManager:
                 )
 
     async def _trigger_high_error_rate_alert(
-        self, error_type: str, error_count: int, error_message: str, metadata: Optional[Dict]
-    ):
+        self,
+        error_type: str,
+        error_count: int,
+        error_message: str,
+        metadata: Optional[Dict[str, Any]],
+    ) -> None:
         """
         Trigger alert for high error rate.
 
@@ -863,8 +879,8 @@ class AlertManager:
         title: str,
         message: str,
         severity: AlertSeverity = AlertSeverity.ERROR,
-        metadata: Optional[Dict] = None,
-    ):
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Trigger a custom alert.
 
@@ -878,7 +894,7 @@ class AlertManager:
 
         await self._send_alert(alert)
 
-    async def _send_alert(self, alert: Alert):
+    async def _send_alert(self, alert: Alert) -> None:
         """
         Send alert through all configured channels.
 
@@ -920,17 +936,17 @@ alert_manager = AlertManager()
 
 def configure_alerting(
     webhook_urls: Optional[List[str]] = None,
-    email_config: Optional[Dict] = None,
-    sms_config: Optional[Dict] = None,
-    slack_config: Optional[Dict] = None,
-    teams_config: Optional[Dict] = None,
-    pagerduty_config: Optional[Dict] = None,
-    database_config: Optional[Dict] = None,
+    email_config: Optional[Dict[str, Any]] = None,
+    sms_config: Optional[Dict[str, Any]] = None,
+    slack_config: Optional[Dict[str, Any]] = None,
+    teams_config: Optional[Dict[str, Any]] = None,
+    pagerduty_config: Optional[Dict[str, Any]] = None,
+    database_config: Optional[Dict[str, Any]] = None,
     enable_log_channel: bool = True,
     error_rate_threshold: int = 10,
     error_rate_window_minutes: int = 1,
     alert_cooldown_minutes: int = 5,
-):
+) -> None:
     """
     Configure the alerting system with multiple notification channels.
 

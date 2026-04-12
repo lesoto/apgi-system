@@ -11,25 +11,23 @@ and validates specific requirements from the requirements document.
 
 import sys
 from pathlib import Path
+from typing import Any, Dict, List
+
+import numpy as np
+import yaml
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from numpy.typing import NDArray
 
 # Add project root to path for local imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # noqa: E402
 
-import numpy as np  # noqa: E402
-import yaml  # noqa: E402
-from typing import List, Dict, Any  # noqa: E402
-from numpy.typing import NDArray  # noqa: E402
-from hypothesis import given, strategies as st, settings  # noqa: E402
-from hypothesis import HealthCheck  # noqa: E402
-from apgi_system.system import APGISystem  # noqa: E402
 from apgi_system.core.precision import PrecisionWeighting  # noqa: E402
 from apgi_system.interoception.body_model import BodyModel  # noqa: E402
+from apgi_system.system import APGISystem  # noqa: E402
 from apgi_system.thermodynamic.metabolism import MetabolicBudget  # noqa: E402
-from tests.strategies import (  # noqa: E402
-    observation_strategy,
-    body_state_strategy,
-    error_variance_strategy,
-)
+from tests.strategies import body_state_strategy  # noqa: E402
+from tests.strategies import error_variance_strategy, observation_strategy  # noqa: E402
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(

@@ -36,10 +36,10 @@ Total runtime for all tests: ~5-10 minutes
 import numpy as np
 import pytest
 
-from apgi_system.system import APGISystem
+from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
 from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
 from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_system.system import APGISystem
 
 # Mark all tests in this module as slow
 pytestmark = pytest.mark.slow

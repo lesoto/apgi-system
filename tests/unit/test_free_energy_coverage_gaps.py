@@ -14,8 +14,9 @@ Coverage gaps addressed:
 Requirements validated: 1.2, 1.6
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_system.core.free_energy import FreeEnergyCalculator
 
 
@@ -504,7 +505,7 @@ class TestEdgeCasesForCoverage:
         free_energies = []
         for precision in precisions:
             fe, _ = calc.compute_variational_free_energy(
-                obs, pred, precision, posterior_mean, posterior_cov, prior_mean, prior_cov
+                obs, pred, precision, posterior_mean, posterior_cov, prior_mean, prior_cov  # type: ignore[arg-type]
             )
             free_energies.append(fe)
 

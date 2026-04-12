@@ -9,20 +9,21 @@ and validates specific requirements from the requirements document.
 """
 
 import json
-import yaml
-from pathlib import Path
-from typing import Dict, Any
-import pytest
-from hypothesis import given, strategies as st, settings, assume
-from hypothesis import HealthCheck
 import tkinter as tk
+from pathlib import Path
+from typing import Any, Dict
+
+import pytest
+import yaml
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
 
 from apgi_system.platform_utils import (
-    get_platform,
-    is_bundled,
-    get_resource_path,
     get_config_dir,
     get_data_dir,
+    get_platform,
+    get_resource_path,
+    is_bundled,
 )
 
 # Configure Hypothesis for property-based testing

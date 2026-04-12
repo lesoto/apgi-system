@@ -12,14 +12,15 @@ complementing the property-based tests that verify general properties.
 Requirements tested: 7.1, 7.2, 7.3, 7.4, 7.5
 """
 
+from typing import Any
+
 import numpy as np
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask, DeckType, DECK_SCHEDULES
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
+
 from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
+from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
 from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
-from apgi_system.experiments.tasks.binocular_rivalry import (
-    BinocularRivalryTask,
-)
+from apgi_system.experiments.tasks.iowa_gambling import DECK_SCHEDULES, DeckType, IowaGamblingTask
+from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
 
 
 class TestIowaGamblingTask:
@@ -558,7 +559,7 @@ class TestAttentionalBlink:
             assert "t2_given_t1_accuracy" in lag_data
             assert "blink_rate" in lag_data
 
-    def test_analysis_with_no_results(self):
+    def test_analysis_with_no_results(self) -> None:
         """Test that analysis handles empty results gracefully."""
         task = AttentionalBlinkTask(lags=[1, 2], num_trials_per_lag=1)
         task.results = []
@@ -568,7 +569,7 @@ class TestAttentionalBlink:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system):
+    def test_task_reset(self, apgi_system: Any) -> None:
         """Test that task reset works correctly."""
         task = AttentionalBlinkTask(lags=[1, 2], num_trials_per_lag=2)
 
@@ -586,7 +587,7 @@ class TestAttentionalBlink:
         assert task.current_trial_idx == 0
         assert len(task.trials) == len(task.lags) * task.num_trials_per_lag
 
-    def test_blink_detection_logic(self, apgi_system):
+    def test_blink_detection_logic(self, apgi_system: Any) -> None:
         """Test that blink detection logic works correctly."""
         task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
@@ -603,7 +604,7 @@ class TestAttentionalBlink:
 class TestTaskResultCompleteness:
     """Test that all tasks produce complete result structures."""
 
-    def test_iowa_gambling_result_fields(self, apgi_system):
+    def test_iowa_gambling_result_fields(self, apgi_system: Any) -> None:
         """Test that Iowa Gambling results have all required fields."""
         task = IowaGamblingTask(num_trials=1)
         trial = task.trials[0]
@@ -627,7 +628,7 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_masking_result_fields(self, apgi_system):
+    def test_masking_result_fields(self, apgi_system: Any) -> None:
         """Test that Masking Paradigm results have all required fields."""
         task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
         trial = task.trials[0]
@@ -670,7 +671,7 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_change_blindness_result_fields(self, apgi_system):
+    def test_change_blindness_result_fields(self, apgi_system: Any) -> None:
         """Test that Change Blindness results have all required fields."""
         task = ChangeBlindnessTask(
             max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5]
@@ -692,7 +693,7 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_binocular_rivalry_result_fields(self, apgi_system):
+    def test_binocular_rivalry_result_fields(self, apgi_system: Any) -> None:
         """Test that Binocular Rivalry results have all required fields."""
         task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
         trial = task.trials[0]
@@ -720,7 +721,7 @@ class TestTaskResultCompleteness:
 class TestChangeBlindnessTask:
     """Unit tests for Change Blindness Task with specific change conditions."""
 
-    def test_task_initialization(self):
+    def test_task_initialization(self) -> None:
         """Test that change blindness task initializes correctly."""
         change_magnitudes = [0.3, 0.5, 0.8]
         task = ChangeBlindnessTask(
@@ -740,7 +741,7 @@ class TestChangeBlindnessTask:
         expected_trials = len(ChangeType) * len(change_magnitudes) * 5
         assert len(task.trials) == expected_trials
 
-    def test_change_type_distribution(self):
+    def test_change_type_distribution(self) -> None:
         """Test that trials are distributed across all change types."""
         task = ChangeBlindnessTask(change_magnitudes=[0.5], num_trials_per_condition=2)
 

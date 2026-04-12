@@ -5,14 +5,15 @@ Implements variational free energy (F) and expected free energy (G)
 calculations for active inference.
 """
 
-import numpy as np
-from typing import List, Tuple, Optional, Dict, Union, Any
-from scipy import linalg  # type: ignore
-from scipy.special import xlogy  # type: ignore
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from apgi_system.validation import InputValidator
-from apgi_system.types import FloatArray, ConfigDict
+import numpy as np
+from scipy import linalg
+from scipy.special import xlogy
+
 from apgi_system.stability import NumericalStabilityMonitor
+from apgi_system.types import ConfigDict, FloatArray
+from apgi_system.validation import InputValidator
 
 
 class FreeEnergyCalculator:

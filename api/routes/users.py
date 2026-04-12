@@ -8,28 +8,28 @@ password reset, and user administration.
 from datetime import datetime
 from typing import Any, List, cast
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from api.database.connection import get_db
 from api.exceptions import UserNotFoundError
 from api.models.schemas import (
     ErrorResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
     UserCreateRequest,
     UserCreateResponse,
     UserResponse,
-    UserUpdateRequest,
-    PasswordResetRequest,
-    PasswordResetResponse,
     UserStatsResponse,
+    UserUpdateRequest,
 )
 from api.services.authorization import (
     Permission,
-    require_permission,
-    get_current_user,
-    TokenPayload,
     Role,
+    TokenPayload,
+    get_current_user,
     has_any_role,
+    require_permission,
 )
 from api.services.user_management import get_user_management_service
 

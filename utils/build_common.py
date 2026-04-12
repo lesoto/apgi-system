@@ -6,7 +6,7 @@ This module provides common build and development utilities.
 
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set, TypedDict
+from typing import Any, Dict, List, Optional, Set, TypedDict
 
 
 class Dependencies(TypedDict):

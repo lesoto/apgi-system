@@ -4,9 +4,11 @@ HTTPS Redirect Middleware
 Middleware to redirect HTTP requests to HTTPS when HTTPS is enabled.
 """
 
-from fastapi import Request
-from starlette.responses import RedirectResponse
+from typing import Any, Awaitable, Callable
+
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import RedirectResponse
 
 
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
@@ -17,7 +19,7 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
     This ensures secure communication and prevents mixed content issues.
     """
 
-    def __init__(self, app, https_enabled: bool):
+    def __init__(self, app: Any, https_enabled: bool) -> None:
         """
         Initialize the middleware.
 
@@ -28,7 +30,9 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.https_enabled = https_enabled
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process the request and redirect to HTTPS if necessary.
 

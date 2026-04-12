@@ -11,11 +11,12 @@ def test_imports() -> bool:
     """Test all required imports."""
     print("Testing imports...")
     try:
+        import tkinter  # noqa: F401
+
+        import matplotlib  # noqa: F401
         import numpy  # noqa: F401
         import scipy  # noqa: F401
-        import matplotlib  # noqa: F401
         import yaml  # noqa: F401
-        import tkinter  # noqa: F401
 
         print("[OK] All core dependencies imported successfully")
         return True
@@ -28,8 +29,8 @@ def test_apgi_system() -> bool:
     """Test APGI system initialization."""
     print("\nTesting APGI System...")
     try:
-        from apgi_system.system import APGISystem
         from apgi_system.platform_utils import get_resource_path
+        from apgi_system.system import APGISystem
 
         APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         print("[OK] APGI System initialized successfully")
@@ -45,8 +46,9 @@ def test_system_step() -> bool:
     print("\nTesting system step...")
     try:
         import numpy as np
-        from apgi_system.system import APGISystem
+
         from apgi_system.platform_utils import get_resource_path
+        from apgi_system.system import APGISystem
 
         system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         extero_input = np.random.randn(256)
@@ -86,6 +88,7 @@ def test_gui_imports() -> bool:
     try:
         import tkinter as tk  # noqa: F401
         from tkinter import ttk  # noqa: F401
+
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # noqa: F401
         from matplotlib.figure import Figure  # noqa: F401
 
@@ -100,8 +103,10 @@ def test_config_file() -> bool:
     """Test configuration file."""
     print("\nTesting configuration file...")
     try:
-        import yaml  # noqa: F401
         from pathlib import Path  # noqa: F401
+
+        import yaml  # noqa: F401
+
         from apgi_system.platform_utils import get_resource_path
 
         config_path = get_resource_path("config/default.yaml")
@@ -135,8 +140,8 @@ def test_experimental_tasks() -> bool:
     try:
         from apgi_system.experiments.tasks import (  # noqa: F401
             AttentionalBlinkTask,
-            ChangeBlindnessTask,
             BinocularRivalryTask,
+            ChangeBlindnessTask,
             IowaGamblingTask,
             MaskingParadigmTask,
         )
@@ -154,6 +159,7 @@ def test_gui_launch() -> bool:
     print("\nTesting GUI launch...")
     try:
         import tkinter as tk
+
         from apgi_gui import APGIGui
 
         # Create root window
@@ -181,7 +187,7 @@ def test_gui_launch() -> bool:
         return False
 
 
-def main() -> None:
+def main() -> int:
     """Run all validation tests."""
     print("=" * 60)
     print("APGI System Validation")

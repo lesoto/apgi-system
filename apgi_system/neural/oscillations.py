@@ -4,16 +4,12 @@ Neural Oscillation Engine
 Generates multi-band oscillations and phase-amplitude coupling.
 """
 
-from typing import Dict, Optional, Tuple, Any
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from apgi_system.constants import (
-    DEFAULT_TIMESTEP_MS,
-    TWO_PI,
-    MILLISECONDS_TO_SECONDS,
-)
-from dataclasses import dataclass
+from apgi_system.constants import DEFAULT_TIMESTEP_MS, MILLISECONDS_TO_SECONDS, TWO_PI
 
 
 @dataclass
@@ -134,7 +130,7 @@ class OscillationEngine:
         )
 
         # History for power calculation
-        self.signal_history = []
+        self.signal_history: List[float] = []
         self.max_history = 100
 
     def generate(
@@ -273,7 +269,7 @@ class OscillationEngine:
 
         return metrics
 
-    def modulate_band(self, band_name: str, amplitude_factor: float):
+    def modulate_band(self, band_name: str, amplitude_factor: float) -> None:
         """
         Modulate a specific oscillation band's amplitude.
 
@@ -300,7 +296,7 @@ class OscillationEngine:
         if band_name in self.bands:
             self.bands[band_name].amplitude *= amplitude_factor
 
-    def set_band_frequency(self, band_name: str, frequency: float):
+    def set_band_frequency(self, band_name: str, frequency: float) -> None:
         """
         Set center frequency of a band.
 
@@ -371,7 +367,7 @@ class OscillationEngine:
             "gamma_burst": self.detect_gamma_burst(),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset oscillation engine."""
         for band in self.bands.values():
             band.phase = np.random.rand() * 2 * np.pi

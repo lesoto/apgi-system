@@ -8,24 +8,24 @@ adjustments without launching the full GUI.
 Tests focus on the backend logic that powers the Psychological States GUI functionality.
 """
 
+import json
+import tempfile
+import tkinter as tk
+from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
-import tkinter as tk
-from unittest.mock import patch
-import tempfile
-import json
-from pathlib import Path
 
 # Import the GUI class with error handling
 try:
-    from Psychological_States_GUI import APGIVisualizerGUI, APGIVisualizer
+    from Psychological_States_GUI import APGIVisualizer, APGIVisualizerGUI  # type: ignore[import-not-found, no-redef]
 
     HAS_PSYCHOLOGICAL_GUI = True
 except ImportError as e:
     HAS_PSYCHOLOGICAL_GUI = False
-    APGIVisualizerGUI: Any = None
-    APGIVisualizer: Any = None
+    APGIVisualizerGUI: Any = None  # type: ignore[assignment, no-redef]
+    APGIVisualizer: Any = None  # type: ignore[assignment, no-redef]
     print(f"Warning: Could not import APGIVisualizerGUI: {e}")
 
 try:

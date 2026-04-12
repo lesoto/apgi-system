@@ -5,16 +5,17 @@ Tests the free energy calculation capabilities including variational free energy
 expected free energy, and their constituent components.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_system.core.free_energy import (
     FreeEnergyCalculator,
-    compute_variational_free_energy,
-    compute_expected_free_energy,
     compute_accuracy,
     compute_complexity,
     compute_epistemic_value,
+    compute_expected_free_energy,
     compute_pragmatic_value,
+    compute_variational_free_energy,
 )
 
 

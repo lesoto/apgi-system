@@ -8,23 +8,24 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import numpy as np
-import pytest
-import yaml
 import sys
 from pathlib import Path
 from typing import Any, Dict
+
+import numpy as np
+import pytest
+import yaml
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from numpy.typing import NDArray
-from hypothesis import given, strategies as st, settings
-from hypothesis import HealthCheck
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_system.system import APGISystem  # noqa
 from apgi_system.core.active_inference import HierarchicalGaussianFilter  # noqa
+from apgi_system.system import APGISystem  # noqa
 from apgi_system.validation import InputValidator  # noqa
-from tests.strategies import observation_strategy, config_strategy  # noqa
+from tests.strategies import config_strategy, observation_strategy  # noqa
 
 # Configure Hypothesis for property-based testing
 settings.register_profile(
@@ -354,8 +355,8 @@ class TestConfigurationProperties:
         config["system"]["timestep_ms"] = timestep_ms
 
         # Write modified config to a temporary file
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
@@ -423,8 +424,8 @@ class TestConfigurationProperties:
         config["active_inference"]["learning_rate"] = invalid_learning_rate
 
         # Write modified config to a temporary file
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
@@ -477,8 +478,8 @@ class TestConfigurationProperties:
         config["ignition"]["threshold_range"] = [threshold_range_min, threshold_range_max]
 
         # Write modified config to a temporary file
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
@@ -532,8 +533,8 @@ class TestConfigurationProperties:
                 config[key] = value
 
         # Write modified config to a temporary file
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
@@ -594,8 +595,8 @@ class TestConfigurationProperties:
         config_wrong_type["system"]["timestep_ms"] = "not a number"
 
         # Write modified config to a temporary file
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_wrong_type, f)

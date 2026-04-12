@@ -5,14 +5,15 @@ Implements dynamic precision modulation for attention, uncertainty,
 and neuromodulator effects.
 """
 
-import numpy as np
 import threading
 from collections import deque
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any, Dict, Optional
 
+import numpy as np
+
+from apgi_system.types import ConfigDict, FloatArray
 from apgi_system.validation import InputValidator
-from apgi_system.types import FloatArray, ConfigDict
 
 
 class NeuromodulatorType(Enum):
@@ -168,7 +169,7 @@ class PrecisionWeighting:
         # Volatility tracking
         self.extero_volatility = 0.0
         self.intero_volatility = 0.0
-        self.volatility_window = deque(maxlen=10)  # Fixed-size deque for O(1) operations
+        self.volatility_window: deque = deque(maxlen=10)  # type: ignore[type-arg]
 
     def update(
         self,
@@ -331,7 +332,7 @@ class PrecisionWeighting:
 
         Attended stream gets increased precision.
         """
-        self.attention_focus = target
+        self.attention_focus = target  # type: ignore[assignment]
 
         if target == "extero":
             self.attention_gain = self.gain_range[1]  # High gain
@@ -524,7 +525,6 @@ class PrecisionWeighting:
         self.attention_gain = 1.0
         self.fatigue_level = 0.0
         self.cognitive_load = 0.0
-        self.volatility_window = []
 
         for modulator in self.neuromodulators:
             self.neuromodulators[modulator] = 0.5

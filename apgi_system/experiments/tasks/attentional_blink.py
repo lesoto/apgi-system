@@ -12,12 +12,13 @@ References:
 - Sergent & Dehaene (2004). "Is consciousness a gradual phenomenon?"
 """
 
-import numpy as np
-from typing import Dict, Any, List, Optional, cast
-from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
 from random import shuffle
+from typing import Any, Dict, List, Optional, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 
 class StimulusType(Enum):

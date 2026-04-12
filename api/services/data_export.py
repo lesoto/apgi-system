@@ -150,13 +150,10 @@ class DataExportService:
         start_idx = 0
         if cursor:
             try:
-                import jwt
-                from api.config import settings
-
-                # Decode JWT cursor
-                cursor_data = jwt.decode(
-                    cursor, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
-                )
+                # Decode base64-encoded JSON cursor (matches encoding method)
+                decoded_bytes = base64.b64decode(cursor)
+                decoded_str = decoded_bytes.decode("utf-8")
+                cursor_data = json.loads(decoded_str)
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")

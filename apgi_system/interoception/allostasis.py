@@ -4,8 +4,9 @@ Allostatic Regulation
 Maintains homeostatic set points and manages allostatic load.
 """
 
-from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
 from apgi_system.validation import InputValidator
 
 

@@ -5,10 +5,11 @@ including ignition statistics, energy budget summaries, somatic marker analysis,
 coherence metrics computation, and advanced statistical analysis.
 """
 
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Union
+
 import numpy as np
 import scipy.stats as stats
-from dataclasses import dataclass, field
-from typing import Dict, Any, List, Union
 
 
 @dataclass
@@ -736,6 +737,227 @@ class SystemAnalyzer:
             return f"Low self-coherence ({coherence:.2f}) - fragmented self-experience"
         else:
             return f"Very low self-coherence ({coherence:.2f}) - severe depersonalization"
+
+    def _compute_ignition_statistics(
+        self, ignition_times: List[float], ignition_durations: List[float], total_time: float
+    ) -> Dict[str, float]:
+        """Compute ignition statistics from raw data.
+
+        Parameters
+        ----------
+        ignition_times : List[float]
+            List of ignition event timestamps
+        ignition_durations : List[float]
+            List of ignition event durations
+        total_time : float
+            Total simulation time
+
+        Returns
+        -------
+        Dict[str, float]
+            Ignition statistics dictionary
+        """
+        if len(ignition_times) == 0:
+            return {
+                "total_ignitions": 0,
+                "ignition_rate_hz": 0.0,
+                "mean_ignition_duration_ms": 0.0,
+                "mean_ignition_interval_ms": 0.0,
+            }
+
+        total_ignitions = len(ignition_times)
+        ignition_rate = total_ignitions / max(total_time / 1000.0, 0.001)
+        mean_duration = float(np.mean(ignition_durations)) if ignition_durations else 0.0
+
+        # Compute intervals
+        intervals = []
+        if len(ignition_times) > 1:
+            intervals = [
+                ignition_times[i + 1] - ignition_times[i] for i in range(len(ignition_times) - 1)
+            ]
+        mean_interval = float(np.mean(intervals)) if intervals else 0.0
+
+        return {
+            "total_ignitions": total_ignitions,
+            "ignition_rate_hz": ignition_rate,
+            "mean_ignition_duration_ms": mean_duration,
+            "mean_ignition_interval_ms": mean_interval,
+        }
+
+    def _compute_energy_budget_summary(
+        self, energy_history: List[float], reserve_history: List[float], ignition_count: int
+    ) -> Dict[str, float]:
+        """Compute energy budget summary from raw data.
+
+        Parameters
+        ----------
+        energy_history : List[float]
+            List of energy consumption values
+        reserve_history : List[float]
+            List of reserve levels
+        ignition_count : int
+            Number of ignition events
+
+        Returns
+        -------
+        Dict[str, float]
+            Energy budget summary dictionary
+        """
+        if len(energy_history) == 0:
+            return {
+                "total_energy_consumed": 0.0,
+                "mean_energy_per_step": 0.0,
+                "energy_per_ignition": 0.0,
+                "final_reserves": 1.0,
+                "min_reserves": 1.0,
+            }
+
+        total_energy = sum(energy_history)
+        mean_energy = total_energy / len(energy_history)
+        energy_per_ignition = total_energy / max(ignition_count, 1)
+        final_reserves = reserve_history[-1] if reserve_history else 1.0
+        min_reserves = float(np.min(reserve_history)) if reserve_history else 1.0
+
+        return {
+            "total_energy_consumed": total_energy,
+            "mean_energy_per_step": mean_energy,
+            "energy_per_ignition": energy_per_ignition,
+            "final_reserves": final_reserves,
+            "min_reserves": min_reserves,
+        }
+
+    def _compute_coherence_metrics(self, coherence_history: List[float]) -> Dict[str, float]:
+        """Compute coherence metrics from raw data.
+
+        Parameters
+        ----------
+        coherence_history : List[float]
+            List of coherence values over time
+
+        Returns
+        -------
+        Dict[str, float]
+            Coherence metrics dictionary
+        """
+        if len(coherence_history) == 0:
+            return {
+                "mean_coherence": 0.0,
+                "min_coherence": 0.0,
+                "max_coherence": 0.0,
+                "std_coherence": 0.0,
+            }
+
+        coherence_array = np.array(coherence_history)
+        return {
+            "mean_coherence": float(np.mean(coherence_array)),
+            "min_coherence": float(np.min(coherence_array)),
+            "max_coherence": float(np.max(coherence_array)),
+            "std_coherence": float(np.std(coherence_array)),
+        }
+
+    def generate_report(self, results: AnalysisResults) -> str:
+        """Generate a human-readable analysis report.
+
+        Parameters
+        ----------
+        results : AnalysisResults
+            Analysis results to report
+
+        Returns
+        -------
+        str
+            Formatted report string
+        """
+        report = "=" * 60 + "\n"
+        report += "APGI System Analysis Report\n"
+        report += "=" * 60 + "\n\n"
+
+        report += "Ignition Statistics:\n"
+        report += "-" * 40 + "\n"
+        for key, value in results.ignition_statistics.items():
+            report += f"  {key}: {value}\n"
+        report += "\n"
+
+        report += "Energy Budget Summary:\n"
+        report += "-" * 40 + "\n"
+        for key, value in results.energy_budget_summary.items():
+            report += f"  {key}: {value}\n"
+        report += "\n"
+
+        report += "Coherence Metrics:\n"
+        report += "-" * 40 + "\n"
+        for key, value in results.coherence_metrics.items():
+            report += f"  {key}: {value}\n"
+        report += "\n"
+
+        report += "=" * 60 + "\n"
+        return report
+
+    def export_json(self, results: AnalysisResults) -> str:
+        """Export analysis results to JSON format.
+
+        Parameters
+        ----------
+        results : AnalysisResults
+            Analysis results to export
+
+        Returns
+        -------
+        str
+            JSON formatted string
+        """
+        import json
+
+        results_dict = {
+            "ignition_statistics": results.ignition_statistics,
+            "energy_budget_summary": results.energy_budget_summary,
+            "somatic_marker_stats": results.somatic_marker_stats,
+            "coherence_metrics": results.coherence_metrics,
+            "temporal_dynamics": results.temporal_dynamics,
+        }
+        return json.dumps(results_dict, indent=2)
+
+    def export_csv(self, results: AnalysisResults) -> str:
+        """Export temporal dynamics to CSV format.
+
+        Parameters
+        ----------
+        results : AnalysisResults
+            Analysis results to export
+
+        Returns
+        -------
+        str
+            CSV formatted string
+        """
+        import csv
+        from io import StringIO
+
+        output = StringIO()
+        temporal = results.temporal_dynamics
+
+        if not temporal:
+            return ""
+
+        # Get all keys from temporal dynamics
+        keys = list(temporal.keys())
+        writer = csv.DictWriter(output, fieldnames=keys)
+        writer.writeheader()
+
+        # Write rows (transpose the data)
+        if keys:
+            max_length = max(len(temporal[k]) for k in keys if isinstance(temporal[k], list))
+            for i in range(max_length):
+                row = {}
+                for key in keys:
+                    value = temporal.get(key, [])
+                    if isinstance(value, list) and i < len(value):
+                        row[key] = value[i]
+                    else:
+                        row[key] = float("nan")
+                writer.writerow(row)
+
+        return output.getvalue()
 
 
 def analyze_simulation_run(system: Any) -> AnalysisResults:

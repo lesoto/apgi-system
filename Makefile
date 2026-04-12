@@ -34,14 +34,14 @@ test-integration:
 	pytest tests/integration/ -v -m integration
 
 test-coverage:
-	python scripts/run_coverage.py
+	python3 utils/run_coverage.py
 
 coverage-report:
 	pytest tests/ -v --cov=apgi_system --cov=api --cov-report=html --cov-report=term-missing
 	@echo "\nHTML report: htmlcov/index.html"
 
 coverage-gaps:
-	python scripts/analyze_gaps.py
+	python3 utils/analyze_gaps.py
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

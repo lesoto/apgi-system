@@ -11,17 +11,14 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, sessionmaker
 
 from api.config import settings
 from api.database.models import Base, User
 
 # Import circuit breaker utilities
-from utils.circuit_breaker_utils import (
-    circuit_breaker,
-    CircuitBreakerException,
-)
+from utils.circuit_breaker_utils import CircuitBreakerException, circuit_breaker
 
 logger = logging.getLogger(__name__)
 

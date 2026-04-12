@@ -7,15 +7,17 @@ Requirements tested:
 - 12.3: Response schema validation
 """
 
+from typing import Any, Callable, Dict, Generator, List, Optional
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 import redis.asyncio as redis
-from typing import Dict, Any, Generator, List, Optional, Callable
 from fastapi.testclient import TestClient
+
 from api.routes import export, tasks
-from api.services.session_manager import SessionManager, SimulationSession, SessionLifecycleState
-from api.services.task_executor import TaskExecutor
 from api.services.data_export import DataExportService
+from api.services.session_manager import SessionLifecycleState, SessionManager, SimulationSession
+from api.services.task_executor import TaskExecutor
 
 
 @pytest.fixture
@@ -185,12 +187,14 @@ def client(
     mock_task_executor: Mock,
 ) -> Generator[TestClient, None, None]:
     """Create a test client with mocked dependencies."""
-    from api.main import create_app
-    from fastapi.testclient import TestClient
-    from api.services.authorization import get_current_user, require_permission
-    from api.services.auth_manager import TokenPayload
-    from api.services.session_manager import get_session_manager, get_redis_client
     from datetime import datetime, timedelta
+
+    from fastapi.testclient import TestClient
+
+    from api.main import create_app
+    from api.services.auth_manager import TokenPayload
+    from api.services.authorization import get_current_user, require_permission
+    from api.services.session_manager import get_redis_client, get_session_manager
 
     # Create app in test mode (disables auth and CSRF middleware)
     app = create_app(test_mode=True)

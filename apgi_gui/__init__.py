@@ -5,10 +5,11 @@ This package provides a comprehensive GUI for the Allostatic Precision-Gated Ign
 The main GUI class is APGIGui, which can be imported and used directly.
 """
 
+import importlib.util
+import os
+
 # Import the main GUI class directly from the module file
 import sys
-import os
-import importlib.util
 
 # Add the parent directory to the path to allow direct import
 parent_dir = os.path.dirname(os.path.dirname(__file__))

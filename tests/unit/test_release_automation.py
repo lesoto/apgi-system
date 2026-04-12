@@ -12,18 +12,19 @@ Requirements tested:
 Feature: cross-platform-executable
 """
 
-import pytest
-import sys
-import tempfile
 import json
 import subprocess
-from pathlib import Path
-from unittest.mock import Mock, patch
-from typing import Generator
+import sys
+import tempfile
 from datetime import datetime
+from pathlib import Path
+from typing import Generator
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Import release module
-from utils.release import ReleaseManager, ReleaseError
+from utils.release import ReleaseError, ReleaseManager
 
 
 class TestVersionValidation:

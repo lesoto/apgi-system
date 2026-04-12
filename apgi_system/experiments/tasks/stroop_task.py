@@ -24,12 +24,13 @@ References:
   An integrative review. Psychological Bulletin, 109(2), 163-203.
 """
 
-import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
-from enum import Enum
 import random
 import time
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 
 class TrialType(Enum):
@@ -440,10 +441,10 @@ class StroopTask:
 
         # Prepare detailed trial data
         trial_data = []
-        for trial in self.trials:
+        for idx, trial in enumerate(self.trials, start=1):
             trial_data.append(
                 {
-                    "trial_number": trial.trial_number,
+                    "trial_number": idx,
                     "trial_type": trial.trial_type.value,
                     "word": trial.word,
                     "ink_color": trial.ink_color.value,

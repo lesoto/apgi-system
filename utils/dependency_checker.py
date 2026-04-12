@@ -5,11 +5,11 @@ This module provides utilities to check for required dependencies
 at startup and provide helpful installation instructions.
 """
 
-import sys
 import importlib
-import subprocess
 import platform
-from typing import List, Dict, Tuple, Optional
+import subprocess
+import sys
+from typing import Dict, List, Optional, Tuple
 
 
 class DependencyChecker:
@@ -17,7 +17,7 @@ class DependencyChecker:
 
     errors: List[str]
     warnings: List[str]
-    python_version: sys.version_info
+    python_version: Tuple[int, int, int, str, int]
     platform: str
 
     def __init__(self) -> None:

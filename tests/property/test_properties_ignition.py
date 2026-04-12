@@ -9,24 +9,26 @@ Each test is tagged with the corresponding property from the design document
 and validates specific requirements from the requirements document.
 """
 
-import numpy as np
-import yaml
 import sys
 from pathlib import Path
-from typing import Dict, Any
-from numpy.typing import NDArray
-from hypothesis import given, strategies as st, settings, assume
-from hypothesis import HealthCheck
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # noqa: E402
 
-from apgi_system.ignition.threshold import IgnitionThreshold  # noqa: E402
+from typing import Any, Dict  # noqa: E402
+
+import numpy as np  # noqa: E402
+import yaml  # noqa: E402
+from hypothesis import HealthCheck, assume, given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+from numpy.typing import NDArray  # noqa: E402
+
 from apgi_system.ignition.global_workspace import GlobalWorkspace  # noqa: E402
+from apgi_system.ignition.threshold import IgnitionThreshold  # noqa: E402
+from tests.strategies import observation_strategy  # noqa: E402
 from tests.strategies import (  # noqa: E402
     precision_weighted_error_strategy,
     somatic_marker_gain_strategy,
-    observation_strategy,
 )
 
 # Configure Hypothesis for property-based testing

@@ -5,18 +5,18 @@ Provides a modern web interface for real-time monitoring of APGI system dynamics
 using Flask, WebSockets, and interactive JavaScript visualizations.
 """
 
-import time
 import threading
-from typing import Dict, Any, List, Optional
+import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 # Optional imports for web functionality
 try:
-    from flask import Flask, render_template, jsonify, request
+    from flask import Flask, jsonify, render_template, request
     from flask_socketio import SocketIO, emit
 
     WEB_DEPENDENCIES_AVAILABLE = True

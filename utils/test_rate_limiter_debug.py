@@ -1,14 +1,16 @@
 """Debug script to test rate limiter"""
 
 import asyncio
+
 import redis.asyncio as redis
-from api.services.rate_limiter import RateLimiter
+
 from api.config import settings
+from api.services.rate_limiter import RateLimiter
 
 
-async def test_rate_limiter():
+async def test_rate_limiter() -> None:
     # Create Redis client
-    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
 
     try:
         # Create rate limiter

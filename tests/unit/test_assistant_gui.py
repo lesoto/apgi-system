@@ -8,12 +8,13 @@ interactions without launching the full GUI.
 Tests focus on the backend logic that powers the Assistant GUI functionality.
 """
 
-import pytest
+import json
+import tempfile
+import time
 import tkinter as tk
 from unittest.mock import patch
-import tempfile
-import json
-import time
+
+import pytest
 
 # Import the GUI class with error handling
 try:
@@ -26,7 +27,7 @@ except ImportError as e:
     print(f"Warning: Could not import APGIGUI: {e}")
 
 try:
-    from AI_Assistant import APGIAssistant
+    from AI_Assistant import APGIAssistant  # type: ignore[import-not-found]
 
     HAS_ASSISTANT = True
 except ImportError:

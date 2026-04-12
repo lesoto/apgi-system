@@ -10,17 +10,18 @@ Tests cover:
 Requirements: 11.1, 11.2, 11.3, 11.4
 """
 
-import pytest
 import sys
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 import yaml
 
 from apgi_system.platform_utils import (
-    get_resource_path,
     get_config_dir,
     get_data_dir,
     get_platform,
+    get_resource_path,
     is_bundled,
 )
 

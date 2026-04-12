@@ -1,7 +1,7 @@
 """Unit tests for FreeEnergyCalculator."""
 
-import pytest
 import numpy as np
+import pytest
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
 

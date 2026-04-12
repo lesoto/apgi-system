@@ -5,13 +5,13 @@ Middleware for enforcing rate limits on API requests.
 """
 
 from datetime import datetime
+from typing import Any, Awaitable, Callable, List, Optional
 
 import redis.asyncio as redis
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from typing import List, Optional
 from api.middleware.logging import StructuredLogger
 from api.services.rate_limiter import RateLimiter
 
@@ -28,11 +28,11 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
-        redis_client=None,
+        app: Any,
+        redis_client: Optional[Any] = None,
         enabled: bool = True,
         trusted_proxies: Optional[List[str]] = None,
-    ):
+    ) -> None:
         """
         Initialize rate limiting middleware.
 
@@ -50,7 +50,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         self.fallback_rate_limiter = RateLimiter(redis_client=None)  # In-memory
         self.trusted_proxies = trusted_proxies or []
 
-    def set_redis_client(self, redis_client: redis.Redis):
+    def set_redis_client(self, redis_client: redis.Redis) -> None:
         """
         Set Redis client and initialize rate limiter.
 
@@ -170,7 +170,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
         return False
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request with rate limiting.
 

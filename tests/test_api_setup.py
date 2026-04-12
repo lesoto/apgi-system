@@ -6,6 +6,7 @@ Verifies that the API application is properly configured and can start.
 
 import pytest
 from fastapi.testclient import TestClient
+
 from api.main import create_app
 
 

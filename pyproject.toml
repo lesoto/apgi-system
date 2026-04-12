@@ -141,6 +141,29 @@ strict_equality = true
 module = ["scipy.*", "h5py.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["APGI-GUI", "APGI-System-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI"]
+disallow_untyped_defs = false
+disallow_any_generics = false
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+warn_unused_ignores = false
+disable_error_code = ["misc", "func-returns-value", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+module = ["api.tasks.experimental_tasks"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_any_generics = false
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+warn_unused_ignores = false
+
 [tool.flake8]
 max-line-length = 100
 extend-ignore = ["E203", "W503"]

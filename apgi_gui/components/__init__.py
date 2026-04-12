@@ -7,11 +7,11 @@ Modular GUI components for the APGI system.
 from .core import (
     BaseFrame,
     ControlPanel,
-    ParameterPanel,
-    VisualizationPanel,
-    StatusBar,
     MenuBar,
+    ParameterPanel,
+    StatusBar,
     ToolTip,
+    VisualizationPanel,
 )
 
 __all__ = [

@@ -4,10 +4,10 @@ This module provides type aliases and custom types used throughout the APGI syst
 to improve type safety and code clarity.
 """
 
+from typing import Any, Dict
+
 import numpy as np
 import numpy.typing as npt
-
-from typing import Dict, Any
 
 # Array types
 FloatArray = npt.NDArray[np.float64]

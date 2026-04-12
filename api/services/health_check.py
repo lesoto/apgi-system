@@ -68,7 +68,7 @@ class HealthCheckService:
             # Ping Redis to verify connection with 5s timeout
             import asyncio
 
-            await asyncio.wait_for(self.redis_client.ping(), timeout=5.0)  # type: ignore[misc]
+            await asyncio.wait_for(self.redis_client.ping(), timeout=5.0)  # type: ignore[arg-type]
             return "healthy", "Redis connection successful"
         except asyncio.TimeoutError:
             logger.error("Redis health check timed out")

@@ -12,12 +12,13 @@ References:
 - Simons & Levin (1997). "Change blindness"
 """
 
-import numpy as np
-from typing import Dict, Any, List, Tuple, Optional, cast
-from numpy.typing import NDArray
 from dataclasses import dataclass
 from enum import Enum
 from random import shuffle
+from typing import Any, Dict, List, Optional, Tuple, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 
 class ChangeType(Enum):
@@ -663,13 +664,13 @@ class ChangeBlindnessTask:
 
         # Determine stimulus based on phase
         if state["phase"] == "original":
-            stimulus = trial.original_image  # type: ignore[union-attr]
+            stimulus = trial.original_image
             phase_duration = self.presentation_duration_ms
         elif state["phase"] == "blank":
             stimulus = state["blank_screen"]
             phase_duration = self.blank_duration_ms
         else:  # modified
-            stimulus = trial.modified_image  # type: ignore[union-attr]
+            stimulus = trial.modified_image
             phase_duration = self.presentation_duration_ms
 
         # Step the system
@@ -703,12 +704,12 @@ class ChangeBlindnessTask:
                 state["alternation"] += 1
 
                 # Check if should stop (detected or max alternations)
-                if state["change_detected"] or state["alternation"] >= trial.max_alternations:  # type: ignore[union-attr]
+                if state["change_detected"] or state["alternation"] >= trial.max_alternations:
                     # Trial complete
                     result = TrialResult(
-                        trial_number=trial.trial_number,  # type: ignore[union-attr]
-                        change_type=trial.change_type,  # type: ignore[union-attr]
-                        change_magnitude=trial.change_magnitude,  # type: ignore[union-attr]
+                        trial_number=trial.trial_number,
+                        change_type=trial.change_type,
+                        change_magnitude=trial.change_magnitude,
                         change_detected=state["change_detected"],
                         alternations_to_detection=state["alternations_to_detection"],
                         time_to_detection=state["time_to_detection"],
@@ -722,7 +723,7 @@ class ChangeBlindnessTask:
                     return {
                         "done": self.get_next_trial() is None,
                         "trial_complete": True,
-                        "trial_number": trial.trial_number,  # type: ignore[union-attr]
+                        "trial_number": trial.trial_number,
                         "phase": None,
                         "alternation": state["alternation"],
                         "stimulus": None,
@@ -733,7 +734,7 @@ class ChangeBlindnessTask:
         return {
             "done": False,
             "trial_complete": False,
-            "trial_number": trial.trial_number,  # type: ignore[union-attr]
+            "trial_number": trial.trial_number,
             "phase": state["phase"],
             "alternation": state["alternation"],
             "stimulus": stimulus,
