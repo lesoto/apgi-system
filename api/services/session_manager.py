@@ -250,8 +250,10 @@ class SimulationSession:
             if not self.is_running:
                 raise ValueError(f"Session {self.session_id} is not running")
 
-            # Execute step in APGI system
-            state = self.apgi_system.step(extero_input)
+            # Execute step in APGI system off the event loop
+            import asyncio
+
+            state = await asyncio.to_thread(self.apgi_system.step, extero_input)
             self.updated_at = datetime.utcnow()
 
             return state

@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import logging
 import time
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -34,12 +35,14 @@ class TokenPayload:
         roles: List[str],
         exp: datetime,
         token_type: str = "access",
+        jti: Optional[str] = None,
     ):
         self.user_id = user_id
         self.username = username
         self.roles = roles
         self.exp = exp
         self.token_type = token_type
+        self.jti = jti or str(uuid.uuid4())
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JWT encoding."""
@@ -49,6 +52,7 @@ class TokenPayload:
             "roles": self.roles,
             "exp": int(self.exp.timestamp()),
             "token_type": self.token_type,
+            "jti": self.jti,
         }
 
     @classmethod
@@ -60,6 +64,7 @@ class TokenPayload:
             roles=data["roles"],
             exp=datetime.fromtimestamp(data["exp"]),
             token_type=data.get("token_type", "access"),
+            jti=data.get("jti"),
         )
 
 
@@ -83,6 +88,8 @@ class AuthManager:
         """
         self.db = db
         self.secret_key = settings.jwt_secret_key
+        self.private_key = settings.jwt_private_key
+        self.public_key = settings.jwt_public_key
         self.algorithm = settings.jwt_algorithm
         self.access_token_expire_minutes = settings.jwt_access_token_expire_minutes
         self.refresh_token_expire_days = settings.jwt_refresh_token_expire_days
@@ -218,7 +225,8 @@ class AuthManager:
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)  # type: ignore[arg-type]
+        sign_key = self.private_key if self.algorithm.startswith("RS") else self.secret_key
+        token = jwt.encode(payload.to_dict(), sign_key, algorithm=self.algorithm)  # type: ignore[arg-type]
 
         return token
 
@@ -240,7 +248,8 @@ class AuthManager:
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)  # type: ignore[arg-type]
+        sign_key = self.private_key if self.algorithm.startswith("RS") else self.secret_key
+        token = jwt.encode(payload.to_dict(), sign_key, algorithm=self.algorithm)  # type: ignore[arg-type]
 
         return token
 
@@ -265,8 +274,9 @@ class AuthManager:
         """
         try:
             # Decode token
-            assert self.secret_key is not None, "JWT secret key not configured"
-            payload_dict = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            verify_key = self.public_key if self.algorithm.startswith("RS") else self.secret_key
+            assert verify_key is not None, f"JWT verification key ({self.algorithm}) not configured"
+            payload_dict = jwt.decode(token, verify_key, algorithms=[self.algorithm])
 
             # Parse payload
             payload = TokenPayload.from_dict(payload_dict)
@@ -601,14 +611,21 @@ class AuthManager:
             return False
 
         try:
+            # Decode token to get JTI without validation (validation happens in verify_token)
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            jti = unverified_payload.get("jti")
+
+            if not jti:
+                logger.warning("Token has no JTI, falling back to hashing token string")
+                jti = hashlib.sha256(token.encode("utf-8")).hexdigest()
+
             # Calculate TTL in seconds from now until expiration
             ttl_seconds = int((expires_at - datetime.utcnow()).total_seconds())
             if ttl_seconds <= 0:
                 # Token already expired, no need to blacklist
                 return True
 
-            # Use token as key, value can be anything (e.g., "blacklisted")
-            key = f"blacklisted_token:{token}"
+            key = f"blacklisted_jti:{jti}"
             await self.redis_client.setex(key, ttl_seconds, "blacklisted")
             return True
         except Exception as e:
@@ -630,7 +647,13 @@ class AuthManager:
             return False
 
         try:
-            key = f"blacklisted_token:{token}"
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            jti = unverified_payload.get("jti")
+
+            if not jti:
+                jti = hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+            key = f"blacklisted_jti:{jti}"
             result = await self.redis_client.exists(key)
             return bool(result)
         except Exception as e:

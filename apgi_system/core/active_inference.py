@@ -399,9 +399,10 @@ class HierarchicalGaussianFilter:
                 if hasattr(self, "config")
                 else []
             )
-            level_timescale_ms = 50.0
+            default_timescale = self.config.get("default_timescale_ms", 50.0)
+            level_timescale_ms = default_timescale
             if level < len(level_configs):
-                level_timescale_ms = level_configs[level].get("timescale_ms", 50.0)
+                level_timescale_ms = level_configs[level].get("timescale_ms", default_timescale)
 
             alpha = min(0.5, dt_ms / level_timescale_ms)  # dt-normalized learning rate
             self.beliefs[level].precision = float((1 - alpha) * old + alpha * new_precision)
@@ -614,18 +615,22 @@ class HierarchicalGaussianFilter:
         projection_matrix = self._get_projection_matrix(from_level + 1, target_dim, source_dim)
 
         # Ensure numerical stability with enhanced checks
+        matrix_clip = self.config.get("clip_projection_matrix", 100.0)
+        state_clip = self.config.get("clip_state", 100.0)
+
         projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
         state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
 
         # Gradient clipping to prevent overflow
-        projection_matrix = np.clip(projection_matrix, -100, 100)
-        state = np.clip(state, -100, 100)
+        projection_matrix = np.clip(projection_matrix, -matrix_clip, matrix_clip)
+        state = np.clip(state, -state_clip, state_clip)
 
         # Check for divide by zero conditions
-        if np.any(np.abs(projection_matrix) < 1e-10):
+        eps = self.config.get("matrix_epsilon", 1e-10)
+        if np.any(np.abs(projection_matrix) < eps):
             projection_matrix = np.where(
-                np.abs(projection_matrix) < 1e-10,
-                np.sign(projection_matrix) * 1e-10,
+                np.abs(projection_matrix) < eps,
+                np.sign(projection_matrix) * eps,
                 projection_matrix,
             )
 
@@ -650,7 +655,8 @@ class HierarchicalGaussianFilter:
 
         # Final result stabilization
         result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
-        result = np.clip(result, -1000, 1000)  # Prevent extreme values
+        final_clip = self.config.get("clip_final_result", 1000.0)
+        result = np.clip(result, -final_clip, final_clip)  # Prevent extreme values
 
         return result
 

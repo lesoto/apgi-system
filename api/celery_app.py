@@ -13,7 +13,7 @@ celery_app = Celery(
     "apgi_tasks",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["api.tasks.experimental_tasks"],
+    include=["api.tasks.experimental_tasks", "api.tasks.webhook_tasks"],
 )
 
 # Configure Celery
@@ -34,6 +34,15 @@ celery_app.conf.update(
 # Task routing (optional - for future expansion)
 celery_app.conf.task_routes = {
     "api.tasks.experimental_tasks.*": {"queue": "experimental"},
+    "api.tasks.webhook_tasks.*": {"queue": "webhooks"},
+}
+
+# Configure periodic tasks mapping
+celery_app.conf.beat_schedule = {
+    "process_pending_webhooks_every_minute": {
+        "task": "api.tasks.webhook_tasks.process_webhooks",
+        "schedule": 60.0,
+    },
 }
 
 if __name__ == "__main__":

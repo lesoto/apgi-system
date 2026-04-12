@@ -77,7 +77,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=json:coverage.json",
     "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=85",
+    "--cov-fail-under=90",
 ]
 markers = [
     "unit: Unit tests for individual components",

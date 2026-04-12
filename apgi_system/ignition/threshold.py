@@ -364,18 +364,23 @@ class IgnitionThreshold:
         load_factor = 1.0 + self.allostatic_load * l_scalar
         theta *= load_factor
 
-        # Recent ignition frequency
-        # Frequent ignitions -> higher threshold (habituation)
+        habituation_window_ms = self.config.get("ignition", {}).get("habituation_window_ms", 1000.0)
         recent_count = len(
             [
                 ign
                 for ign in self.recent_ignitions
-                if (current_time - ign["time"]) < 1000.0  # Last second
+                if (current_time - ign["time"]) < habituation_window_ms
             ]
         )
 
-        if recent_count > 3:
-            frequency_factor = 1.0 + (recent_count - 3) * 0.1
+        habituation_threshold_count = self.config.get("ignition", {}).get(
+            "habituation_threshold_count", 3
+        )
+        if recent_count > habituation_threshold_count:
+            habituation_factor = self.config.get("ignition", {}).get("habituation_factor", 0.1)
+            frequency_factor = (
+                1.0 + (recent_count - habituation_threshold_count) * habituation_factor
+            )
             theta *= frequency_factor
 
         # Clamp to valid range

@@ -18,8 +18,22 @@ class Settings:
     """
     API configuration settings.
 
-    Settings can be overridden via environment variables.
+    Settings can be overridden via environment variables or AWS SSM.
     """
+
+    def _fetch_ssm_parameter(self, name: str) -> Optional[str]:
+        """Fetch parameter from AWS SSM."""
+        if os.getenv("USE_AWS_SSM", "false").lower() != "true":
+            return None
+        try:
+            import boto3  # type: ignore[import-not-found]
+
+            client = boto3.client("ssm", region_name=os.getenv("AWS_REGION", "us-east-1"))
+            response = client.get_parameter(Name=name, WithDecryption=True)
+            return response["Parameter"]["Value"]
+        except Exception as e:
+            warnings.warn(f"Failed to fetch {name} from AWS SSM: {str(e)}")
+            return None
 
     def __init__(self) -> None:
         # API Settings
@@ -38,8 +52,10 @@ class Settings:
         self.ssl_certfile: Optional[str] = os.getenv("SSL_CERTFILE")
 
         # Database Settings
-        self.database_url: str = os.getenv(
-            "DATABASE_URL", "postgresql://localhost/apgi_api?sslmode=require"
+        self.database_url: str = (
+            self._fetch_ssm_parameter("/apgi/database_url")
+            or os.getenv("DATABASE_URL")
+            or "postgresql://localhost/apgi_api?sslmode=require"
         )
         self.db_pool_size: int = int(os.getenv("DB_POOL_SIZE", "10"))
         self.db_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "20"))
@@ -55,9 +71,20 @@ class Settings:
         )
 
         # Authentication Settings
-        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.environment: str = os.getenv("ENVIRONMENT", "production")
-        self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+
+        # We now support AWS SSM for secrets to allow easy RS256 key management
+        self.jwt_secret_key: Optional[str] = self._fetch_ssm_parameter(
+            "/apgi/jwt_secret_key"
+        ) or os.getenv("JWT_SECRET_KEY")
+        self.jwt_private_key: Optional[str] = self._fetch_ssm_parameter(
+            "/apgi/jwt_private_key"
+        ) or os.getenv("JWT_PRIVATE_KEY")
+        self.jwt_public_key: Optional[str] = self._fetch_ssm_parameter(
+            "/apgi/jwt_public_key"
+        ) or os.getenv("JWT_PUBLIC_KEY")
+
+        self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "RS256")
         self.jwt_access_token_expire_minutes: int = 30
         self.jwt_refresh_token_expire_days: int = 7
 

@@ -191,6 +191,15 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=getattr(settings, "request_size_limit_enabled", True),
     )
 
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=settings.cors_allow_methods,
+        allow_headers=settings.cors_allow_headers,
+    )
+
     # Add HTTPS redirect middleware - skip in test mode
     if not test_mode:
         app.add_middleware(HTTPSRedirectMiddleware, https_enabled=settings.https_enabled)
@@ -240,14 +249,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=settings.rate_limit_enabled,
     )
 
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=settings.cors_allow_credentials,
-        allow_methods=settings.cors_allow_methods,
-        allow_headers=settings.cors_allow_headers,
-    )
+    # Ensure CORS is configured early to handle preflight before other middlewares
 
     # Add authentication middleware - skip in test mode
     if not test_mode:
@@ -283,6 +285,14 @@ def create_app(test_mode: bool = False) -> FastAPI:
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})
+
+    # Add OpenTelemetry Instrumentation
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+    except ImportError:
+        logger.warning("opentelemetry API not installed, skipping instrumentation")
 
     logger.info("APGI API application created successfully", version="1.0.0")
     return app

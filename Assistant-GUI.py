@@ -4461,7 +4461,9 @@ class APGIGUI:
                 labels_copy = list(self.state_labels.values())
                 if all(label.winfo_exists() for label in labels_copy):
                     state = response["cognitive_state"]
-                    self.state_labels["primary"].config(text=state["primary"].upper())
+                    self.state_labels["primary"].config(
+                        text=state.get("primary", "unknown").upper()
+                    )
                     self.state_labels["processing_mode"].config(
                         text=state.get("processing_mode", "N/A")
                     )
@@ -4475,11 +4477,15 @@ class APGIGUI:
                     conf_text = str(confidence)
                 self.state_labels["confidence"].config(text=conf_text)
 
-                self.state_labels["surprise_level"].config(text=state["surprise_level"])
+                self.state_labels["surprise_level"].config(
+                    text=state.get("surprise_level", "unknown")
+                )
 
-                osc = state["oscillatory_profile"]
-                self.state_labels["dominant_freq"].config(text=osc["dominant_frequency"])
-                self.state_labels["coherence"].config(text=f"{osc['coherence']:.3f}")
+                osc = state.get("oscillatory_profile", {})
+                self.state_labels["dominant_freq"].config(
+                    text=osc.get("dominant_frequency", "unknown")
+                )
+                self.state_labels["coherence"].config(text=f"{osc.get('coherence', 0.0):.3f}")
 
                 energy = response["processing_metadata"].get("energy_used", "unknown")
                 self.state_labels["energy_cost"].config(text=str(energy))
@@ -4552,13 +4558,13 @@ class APGIGUI:
     def add_to_history(self, user_query: str, user_response: dict[str, Any]) -> None:
         """Add query to history"""
         timestamp = time.strftime("%H:%M:%S")
-        state = user_response["cognitive_state"]["primary"]
+        state = user_response["cognitive_state"].get("primary", "unknown")
         confidence = (
             user_response["confidence"].get("level", "unknown")
             if isinstance(user_response["confidence"], dict)
             else str(user_response["confidence"])
         )
-        surprise = user_response["cognitive_state"]["surprise_level"]
+        surprise = user_response["cognitive_state"].get("surprise_level", "unknown")
 
         # Add to history displays (if created)
         if "Cognitive Monitoring" in self.tabs_created:
@@ -4694,11 +4700,11 @@ class APGIGUI:
         metrics_text = "Oscillatory Metrics:\n" + "=" * 30 + "\n\n"
 
         state = response["cognitive_state"]
-        osc = state["oscillatory_profile"]
+        osc = state.get("oscillatory_profile", {})
 
-        metrics_text += f"Dominant Frequency: {osc['dominant_frequency']}\n"
-        metrics_text += f"Coherence: {osc['coherence']:.3f}\n"
-        metrics_text += f"Entropy: {osc['entropy']:.3f}\n\n"
+        metrics_text += f"Dominant Frequency: {osc.get('dominant_frequency', 'unknown')}\n"
+        metrics_text += f"Coherence: {osc.get('coherence', 0.0):.3f}\n"
+        metrics_text += f"Entropy: {osc.get('entropy', 0.0):.3f}\n\n"
 
         metrics_text += "Power by Band:\n"
         for band, power in zip(bands, powers):
@@ -7308,12 +7314,10 @@ Energy Usage:
                         timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
                         mock_history.append(
                             {
-                                "time": timestamp,  # Changed from 'timestamp' to 'time'
-                                "primary": random.choice(
-                                    states
-                                ),  # Changed from 'primary_state' to 'primary'
+                                "timestamp": timestamp,
+                                "primary": random.choice(states).lower(),
                                 "confidence": random.uniform(0.6, 1.0),
-                                "surprise": random.uniform(0.0, 0.5),
+                                "surprise_level": random.uniform(0.0, 0.5),
                                 "coherence": random.uniform(0.5, 0.9),
                             }
                         )
@@ -7372,9 +7376,9 @@ Energy Usage:
                         timestamp = base_time + datetime.timedelta(minutes=i * 1.5)
                         mock_energy_history.append(
                             {
-                                "time": timestamp,  # Changed from 'timestamp' to 'time' to match APGIVisualizer
+                                "timestamp": timestamp,
                                 "energy_cost": random.uniform(0.2, 0.8),
-                                "battery_level": max(0.2, 1.0 - (i * 0.02)),  # Gradual drain
+                                "level": max(0.2, 1.0 - (i * 0.02)),  # Gradual drain
                                 "processing_mode": random.choice(["conscious", "unconscious"]),
                                 "query_count": random.randint(1, 5),
                             }

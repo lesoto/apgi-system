@@ -93,13 +93,16 @@ class FreeEnergyCalculator:
         >>> calc = FreeEnergyCalculator(config={'numerical_tolerance': 1e-8})
         """
         self.config = config or {}
-        self.eps = self.config.get("eps", 1e-10)  # Numerical stability, configurable
-        self.temperature = self.config.get("temperature", 1.0)  # Temperature for scaling
+        free_energy_config = self.config.get("free_energy", {})
+        self.eps = free_energy_config.get("eps", 1e-10)  # Numerical stability, configurable
+        self.temperature = free_energy_config.get("temperature", 1.0)  # Temperature for scaling
         self.stability_monitor = NumericalStabilityMonitor(config)
 
         # Precision bounds to prevent numerical instability
-        self.precision_min = 1e-6  # Minimum precision to prevent overflow
-        self.precision_max = 1e6  # Maximum precision to prevent underflow
+        self.precision_min = free_energy_config.get("precision_min", 1e-6)  # Minimum precision
+        self.precision_max = free_energy_config.get("precision_max", 1e6)  # Maximum precision
+        self.regularization_eps = free_energy_config.get("regularization_eps", 1e-6)
+        self.condition_number_threshold = free_energy_config.get("condition_number_threshold", 1e12)
 
     def compute_variational_free_energy(
         self,
@@ -456,9 +459,9 @@ class FreeEnergyCalculator:
 
             # Check condition number to detect near-singular matrices
             cond_num = np.linalg.cond(sigma_p)
-            if cond_num > 1e12:
+            if cond_num > self.condition_number_threshold:
                 # Matrix is ill-conditioned, use regularization
-                sigma_p_reg = sigma_p + 1e-6 * np.eye(d)
+                sigma_p_reg = sigma_p + self.regularization_eps * np.eye(d)
                 sigma_p_inv = linalg.pinv(sigma_p_reg)
 
             log_det_ratio = np.log(linalg.det(sigma_p) + self.eps) - np.log(

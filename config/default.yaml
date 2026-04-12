@@ -25,9 +25,16 @@ hierarchy:
 # Active inference parameters
 active_inference:
   learning_rate: 0.01
+  projection_learning_rate: 0.001
   precision_init: 1.0
   precision_range: [0.1, 10.0]
   free_energy_threshold: 100.0
+  projection_cache_size: 100
+  clip_projection_matrix: 100.0
+  clip_state: 100.0
+  clip_final_result: 1000.0
+  matrix_epsilon: 1e-10
+  default_timescale_ms: 50.0
 
 # Predictive processing
 predictive_processing:
@@ -53,6 +60,11 @@ ignition:
   amplification_duration_ms: 300
   refractory_period_ms: 200
   workspace_nodes: 1000
+  metabolic_scaling: 0.5
+  load_scaling: 0.3
+  habituation_window_ms: 1000.0
+  habituation_threshold_count: 3
+  habituation_factor: 0.1
 
 # Interoception
 interoception:
@@ -107,6 +119,15 @@ thermodynamic:
   recovery_rate: 5.0  # Energy/second
   depletion_threshold: 10.0  # Minimum reserve
   landauer_constant: 1.0  # Information erasure cost
+
+# Free Energy Configuration
+free_energy:
+  eps: 1e-10
+  temperature: 1.0
+  precision_min: 1e-6
+  precision_max: 1e6
+  regularization_eps: 1e-6
+  condition_number_threshold: 1e12
 
 # Validation and metrics
 validation:
