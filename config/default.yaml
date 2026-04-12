@@ -46,6 +46,7 @@ predictive_processing:
 precision:
   exteroceptive_baseline: 1.0
   interoceptive_baseline: 0.8
+  intero_somatic_beta: 1.0
   attention_gain_range: [0.5, 3.0]
   volatility_sensitivity: 0.1
   neuromodulator_effects:
@@ -57,6 +58,14 @@ ignition:
   baseline_threshold: 2.0
   threshold_range: [1.0, 5.0]
   sigmoid_alpha: 5.0
+  tau_S_ms: 500.0
+  sigma_S: 0.05
+  tau_theta_ms: 30000.0
+  sigma_theta: 0.02
+  theta_0_sleep: 0.3
+  theta_0_alert: 0.7
+  gamma_M: -0.3
+  lambda_S: 0.1
   amplification_duration_ms: 300
   refractory_period_ms: 200
   workspace_nodes: 1000

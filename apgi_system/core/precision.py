@@ -5,7 +5,6 @@ Implements dynamic precision modulation for attention, uncertainty,
 and neuromodulator effects.
 """
 
-import threading
 from collections import deque
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -321,10 +320,8 @@ class PrecisionWeighting:
             extero_unc = [w["extero_uncertainty"] for w in self.volatility_window]
             intero_unc = [w["intero_uncertainty"] for w in self.volatility_window]
 
-            # Thread-safe numpy operations
-            with threading.Lock():
-                self.extero_volatility = np.var(extero_unc) if len(extero_unc) > 1 else 0.0
-                self.intero_volatility = np.var(intero_unc) if len(intero_unc) > 1 else 0.0
+            self.extero_volatility = np.var(extero_unc) if len(extero_unc) > 1 else 0.0
+            self.intero_volatility = np.var(intero_unc) if len(intero_unc) > 1 else 0.0
 
     def _apply_attention(self, target: str) -> None:
         """

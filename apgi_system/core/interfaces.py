@@ -1,6 +1,7 @@
-from typing import Protocol, Dict, Any
+from typing import Any, Dict, Protocol, runtime_checkable
 
 
+@runtime_checkable
 class SubsystemProtocol(Protocol):
     def step(self, dt: float, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Perform one simulation step."""

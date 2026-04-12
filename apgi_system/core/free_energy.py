@@ -572,7 +572,8 @@ class FreeEnergyCalculator:
         Parameters
         ----------
         observation : np.ndarray
-            Observed data (not directly used in current implementation)
+            Observed data. If vector-valued, this is normalized and used as
+            weighting for observation-conditional surprise.
         generative_density : np.ndarray
             Probability density p(o|m) under the generative model
 
@@ -600,10 +601,25 @@ class FreeEnergyCalculator:
         >>> surprise = calc.compute_surprise(obs, prob_density)
         >>> print(f"Surprise: {surprise:.3f}")
         """
-        # Ensure probability is valid
+        InputValidator.validate_array(observation, "observation")
+        InputValidator.validate_array(generative_density, "generative_density")
+
+        if observation.shape != generative_density.shape:
+            raise ValueError(
+                f"observation and generative_density shapes must match: "
+                f"got {observation.shape} and {generative_density.shape}"
+            )
+
         prob = np.clip(generative_density, self.eps, 1.0)
-        surprise = -np.log(prob)
-        return float(np.mean(surprise))
+        obs_weights = np.abs(observation).astype(np.float64)
+        weight_sum = np.sum(obs_weights)
+        if weight_sum <= self.eps:
+            obs_weights = np.ones_like(prob, dtype=np.float64) / prob.size
+        else:
+            obs_weights = obs_weights / weight_sum
+
+        surprise = -np.sum(obs_weights * np.log(prob))
+        return float(surprise)
 
     def compute_accuracy(
         self,
@@ -672,9 +688,6 @@ class FreeEnergyCalculator:
         float
             Complexity value
         """
-        # Validate that means don't contain negative values (treated as invalid probabilities)
-        if np.any(posterior_mean < 0) or np.any(prior_mean < 0):
-            raise ValueError("Means cannot contain negative values")
         return self._kl_divergence_gaussian(posterior_mean, posterior_cov, prior_mean, prior_cov)
 
     def compute_epistemic_value(

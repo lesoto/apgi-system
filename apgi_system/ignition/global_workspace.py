@@ -121,7 +121,7 @@ class GlobalWorkspace:
     >>> print(f"Is reportable: {state['is_reportable']}")
     """
 
-    def __init__(self, config: ConfigDict) -> None:
+    def __init__(self, config: ConfigDict, rng: Optional[np.random.Generator] = None) -> None:
         """
         Initialize global workspace system.
 
@@ -165,6 +165,8 @@ class GlobalWorkspace:
         # Broadcast history
         self.broadcast_history: List[BroadcastContent] = []
         self.max_history = 100
+
+        self.rng = rng if rng is not None else np.random.default_rng()
 
     def update(
         self,
@@ -371,7 +373,7 @@ class GlobalWorkspace:
             return
 
         # Compute scores (priority + random noise for tie-breaking)
-        scores = [content.priority + 0.1 * np.random.rand() for content in self.competing_contents]
+        scores = [content.priority + 0.1 * float(self.rng.random()) for content in self.competing_contents]
 
         # Winner takes all
         winner_idx = np.argmax(scores)
@@ -408,7 +410,7 @@ class GlobalWorkspace:
 
         # Add noise for realism, scaled by the content magnitude properly
         signal_mean_abs = np.mean(np.abs(self.current_content.content)) + 1e-6
-        noise = np.random.randn(*self.current_content.content.shape) * (0.01 * signal_mean_abs)
+        noise = self.rng.normal(size=self.current_content.content.shape) * (0.01 * signal_mean_abs)
         self.current_content.content += noise
 
     def _broadcast_to_subscribers(self) -> None:

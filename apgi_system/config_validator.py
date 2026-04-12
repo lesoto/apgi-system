@@ -137,6 +137,11 @@ class ConfigValidator:
                         "required": True,
                         "range": (0.01, 100.0),
                     },
+                    "intero_somatic_beta": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.0, 10.0),
+                    },
                     "attention_gain_range": {"type": list, "required": True, "length": 2},
                     "volatility_sensitivity": {
                         "type": (int, float),
@@ -158,6 +163,46 @@ class ConfigValidator:
                         "type": (int, float),
                         "required": True,
                         "range": (0.1, 100.0),
+                    },
+                    "tau_S_ms": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (1.0, 60000.0),
+                    },
+                    "sigma_S": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.0, 10.0),
+                    },
+                    "tau_theta_ms": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (1.0, 600000.0),
+                    },
+                    "sigma_theta": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.0, 10.0),
+                    },
+                    "theta_0_sleep": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.01, 100.0),
+                    },
+                    "theta_0_alert": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.01, 100.0),
+                    },
+                    "gamma_M": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (-10.0, 10.0),
+                    },
+                    "lambda_S": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (-10.0, 10.0),
                     },
                     "amplification_duration_ms": {
                         "type": (int, float),
