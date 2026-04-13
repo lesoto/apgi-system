@@ -53,6 +53,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Import genetic data connector
+try:
+    from geno_states import PGCDataConnector
+
+    GENETIC_DATA_AVAILABLE = True
+except ImportError as e:
+    GENETIC_DATA_AVAILABLE = False
+    print(f"Warning: Genetic data connector not available: {e}")
 
 # GUI imports with graceful fallbacks
 try:
@@ -1469,6 +1477,211 @@ class APGIVisualizer:
             )
 
 
+class GeneticDataVisualizer:
+    """Visualizations for PGC GWAS genetic data"""
+
+    def __init__(self):
+        """Initialize genetic data visualizer"""
+        self.connector = None
+        self.df = None
+        self.renderer = EmbeddedVisualizationRenderer()
+
+    def load_dataset(self, dataset_key="MDD"):
+        """Load genetic dataset from Hugging Face
+
+        Args:
+            dataset_key: "MDD" or "Anxiety"
+
+        Returns:
+            DataFrame with genetic variants or None
+        """
+        if not GENETIC_DATA_AVAILABLE:
+            logger.error("Genetic data connector not available")
+            return None
+
+        try:
+            self.connector = PGCDataConnector(dataset_key)
+            self.df = self.connector.fetch_data(streaming=True)
+            logger.info(f"Loaded {len(self.df)} variants from {dataset_key}")
+            return self.df
+        except Exception as e:
+            logger.error(f"Failed to load genetic data: {e}")
+            return None
+
+    def get_column_names(self):
+        """Get available column names from loaded data"""
+        if self.df is None:
+            return []
+        return list(self.df.columns)
+
+    def plot_manhattan(self, p_col="p", chr_col="chr", bp_col="bp", snp_col="snp",
+                       threshold=5e-8, highlight_hits=True):
+        """Create Manhattan plot for GWAS data
+
+        Args:
+            p_col: Column name for p-values
+            chr_col: Column name for chromosome
+            bp_col: Column name for base pair position
+            snp_col: Column name for SNP identifiers
+            threshold: Genome-wide significance threshold
+            highlight_hits: Whether to highlight significant hits
+
+        Returns:
+            Plotly Figure or None
+        """
+        if not PLOTLY_AVAILABLE or self.df is None:
+            logger.warning("Plotly not available or no data loaded")
+            return None
+
+        try:
+            # Validate columns exist
+            required_cols = [p_col, chr_col, bp_col]
+            missing_cols = [c for c in required_cols if c not in self.df.columns]
+            if missing_cols:
+                logger.warning(f"Missing columns: {missing_cols}")
+                return None
+
+            # Calculate -log10(p)
+            df_plot = self.df.copy()
+            df_plot['neg_log_p'] = -np.log10(df_plot[p_col].replace(0, np.nan))
+
+            # Create figure
+            fig = go.Figure()
+
+            # Color by chromosome
+            chromosomes = sorted(df_plot[chr_col].unique())
+            colors = ['#1f77b4', '#ff7f0e']  # Alternating colors
+
+            for i, chrom in enumerate(chromosomes):
+                chrom_data = df_plot[df_plot[chr_col] == chrom]
+                color = colors[i % 2]
+
+                fig.add_trace(go.Scatter(
+                    x=chrom_data[bp_col],
+                    y=chrom_data['neg_log_p'],
+                    mode='markers',
+                    marker=dict(size=5, color=color, opacity=0.6),
+                    name=f'Chr {chrom}',
+                    text=chrom_data.get(snp_col, chrom_data.index),
+                    hovertemplate='<b>%{text}</b><br>Chr: ' + str(chrom) +
+                                  '<br>Position: %{x}<br>-log10(p): %{y:.2f}<extra></extra>'
+                ))
+
+            # Add significance threshold line
+            fig.add_hline(y=-np.log10(threshold), line_dash="dash",
+                          line_color="red", annotation_text=f"p = {threshold}")
+
+            # Highlight significant hits if requested
+            if highlight_hits:
+                sig_hits = df_plot[df_plot[p_col] < threshold]
+                if len(sig_hits) > 0:
+                    fig.add_trace(go.Scatter(
+                        x=sig_hits[bp_col],
+                        y=sig_hits['neg_log_p'],
+                        mode='markers',
+                        marker=dict(size=10, color='red', symbol='star'),
+                        name='Significant Hits',
+                        text=sig_hits.get(snp_col, sig_hits.index),
+                        hovertemplate='<b>%{text}</b><br>p-value: ' +
+                                      sig_hits[p_col].astype(str) +
+                                      '<br>-log10(p): %{y:.2f}<extra></extra>'
+                    ))
+
+            fig.update_layout(
+                title="GWAS Manhattan Plot",
+                xaxis_title="Chromosomal Position",
+                yaxis_title="-log10(p-value)",
+                template="plotly_white",
+                showlegend=False,
+                height=600
+            )
+
+            return fig
+        except Exception as e:
+            logger.error(f"Error creating Manhattan plot: {e}")
+            return None
+
+    def plot_qq(self, p_col="p"):
+        """Create Q-Q plot for p-values
+
+        Args:
+            p_col: Column name for p-values
+
+        Returns:
+            Plotly Figure or None
+        """
+        if not PLOTLY_AVAILABLE or self.df is None:
+            return None
+
+        try:
+            if p_col not in self.df.columns:
+                logger.warning(f"P-value column {p_col} not found")
+                return None
+
+            # Get sorted p-values
+            p_values = self.df[p_col].dropna().sort_values()
+            n = len(p_values)
+
+            # Expected p-values under null hypothesis
+            expected = np.arange(1, n + 1) / (n + 1)
+
+            # Create Q-Q plot
+            fig = go.Figure()
+
+            # Q-Q points
+            fig.add_trace(go.Scatter(
+                x=-np.log10(expected),
+                y=-np.log10(p_values),
+                mode='markers',
+                marker=dict(size=4, color='#1f77b4', opacity=0.6),
+                name='Observed vs Expected'
+            ))
+
+            # Diagonal line (y=x)
+            max_val = max(-np.log10(expected[-1]), -np.log10(p_values.iloc[0]))
+            fig.add_trace(go.Scatter(
+                x=[0, max_val],
+                y=[0, max_val],
+                mode='lines',
+                line=dict(color='red', dash='dash'),
+                name='Expected (y=x)'
+            ))
+
+            fig.update_layout(
+                title="Q-Q Plot",
+                xaxis_title="Expected -log10(p)",
+                yaxis_title="Observed -log10(p)",
+                template="plotly_white",
+                showlegend=True
+            )
+
+            return fig
+        except Exception as e:
+            logger.error(f"Error creating Q-Q plot: {e}")
+            return None
+
+    def get_summary_stats(self):
+        """Get summary statistics for loaded data"""
+        if self.df is None:
+            return {}
+
+        stats = {
+            'total_variants': len(self.df),
+            'columns': list(self.df.columns),
+            'memory_usage': f"{self.df.memory_usage(deep=True).sum() / 1024**2:.2f} MB"
+        }
+
+        # Count significant hits if p-value column exists
+        for p_col in ['p', 'P', 'pvalue', 'p_value']:
+            if p_col in self.df.columns:
+                sig_count = (self.df[p_col] < 5e-8).sum()
+                stats['significant_hits'] = int(sig_count)
+                stats['p_value_column'] = p_col
+                break
+
+        return stats
+
+
 # =============================================================================
 # ENHANCED GUI WITH EMBEDDED VISUALIZATION PANEL
 # =============================================================================
@@ -1607,20 +1820,40 @@ class APGIVisualizerGUI:
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.columnconfigure(0, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
 
         # Title
         title_label = ttk.Label(
             self.main_frame,
-            text="🧠 APGI Psychological States Visualizer",
+            text="🧠 APGI Psychological States & Genetic Data Visualizer",
             font=("Arial", 14, "bold"),
         )
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        title_label.grid(row=0, column=0, pady=(0, 15))
+
+        # Create Notebook for tabs
+        self.notebook = ttk.Notebook(self.main_frame)
+        self.notebook.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Tab 1: Psychological States
+        self.psych_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(self.psych_frame, text="Psychological States")
+        self._setup_psychological_states_tab()
+
+        # Tab 2: Genetic Data
+        self.genetic_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(self.genetic_frame, text="Genetic Data (GWAS)")
+        self._setup_genetic_data_tab()
+
+    def _setup_psychological_states_tab(self) -> None:
+        """Setup the Psychological States tab"""
+        # Configure grid
+        self.psych_frame.columnconfigure(1, weight=1)
+        self.psych_frame.rowconfigure(0, weight=1)
 
         # Control Panel (Left) - Enhanced
-        self.control_frame = ttk.LabelFrame(self.main_frame, text="Controls", padding="12")
-        self.control_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
+        self.control_frame = ttk.LabelFrame(self.psych_frame, text="Controls", padding="12")
+        self.control_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # Visualization Type
         ttk.Label(self.control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).grid(
@@ -1784,9 +2017,9 @@ class APGIVisualizerGUI:
 
         # Visualization Panel (Right) - Enhanced with embedded display
         self.visualization_frame = ttk.LabelFrame(
-            self.main_frame, text="Visualization Panel", padding="5"
+            self.psych_frame, text="Visualization Panel", padding="5"
         )
-        self.visualization_frame.grid(row=1, column=1, columnspan=2, sticky="nsew")
+        self.visualization_frame.grid(row=0, column=1, sticky="nsew")
         self.visualization_frame.columnconfigure(0, weight=1)
         self.visualization_frame.rowconfigure(0, weight=1)
 
@@ -1795,8 +2028,8 @@ class APGIVisualizerGUI:
         self.embedded_display.pack(fill=tk.BOTH, expand=True)
 
         # Info Panel (Bottom) - Smaller
-        info_frame = ttk.LabelFrame(self.main_frame, text="Information Panel", padding="8")
-        info_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
+        info_frame = ttk.LabelFrame(self.psych_frame, text="Information Panel", padding="8")
+        info_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
         info_frame.columnconfigure(0, weight=1)
         info_frame.rowconfigure(0, weight=1)
 
@@ -1807,7 +2040,7 @@ class APGIVisualizerGUI:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.info_text["yscrollcommand"] = scrollbar.set
 
-        # Status Bar
+        # Status Bar (at main frame level)
         self.status_var = tk.StringVar(value="Initializing...")
         status_bar = ttk.Label(
             self.main_frame,
@@ -1815,7 +2048,262 @@ class APGIVisualizerGUI:
             relief=tk.SUNKEN,
             font=("Arial", 9),
         )
-        status_bar.grid(row=3, column=0, columnspan=3, sticky="we", pady=(10, 0))
+        status_bar.grid(row=2, column=0, sticky="we", pady=(10, 0))
+
+    def _setup_genetic_data_tab(self) -> None:
+        """Setup the Genetic Data (GWAS) tab"""
+        # Configure grid
+        self.genetic_frame.columnconfigure(1, weight=1)
+        self.genetic_frame.rowconfigure(0, weight=1)
+
+        # Initialize genetic data visualizer
+        self.genetic_visualizer = GeneticDataVisualizer()
+        self.genetic_df = None
+
+        # Control Panel (Left)
+        control_frame = ttk.LabelFrame(self.genetic_frame, text="GWAS Controls", padding="12")
+        control_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        # Dataset Selection
+        ttk.Label(control_frame, text="Dataset:", font=("Arial", 10, "bold")).grid(
+            row=0, column=0, sticky=tk.W, pady=(5, 2)
+        )
+        self.genetic_dataset_var = tk.StringVar(value="MDD")
+        dataset_combo = ttk.Combobox(
+            control_frame,
+            textvariable=self.genetic_dataset_var,
+            values=["MDD", "Anxiety"],
+            state="readonly",
+            font=("Arial", 9),
+        )
+        dataset_combo.grid(row=1, column=0, sticky="we", pady=(0, 10))
+
+        # Load Data Button
+        load_btn = ttk.Button(
+            control_frame,
+            text="Load Genetic Data",
+            command=self._load_genetic_data,
+        )
+        load_btn.grid(row=2, column=0, sticky="we", pady=5)
+        if TOOLTIP_AVAILABLE:
+            ToolTip(load_btn, "Load GWAS data from Hugging Face (10,000 variants preview)")
+
+        # Visualization Type
+        ttk.Label(control_frame, text="Visualization:", font=("Arial", 10, "bold")).grid(
+            row=3, column=0, sticky=tk.W, pady=(10, 2)
+        )
+        self.genetic_viz_type = ttk.Combobox(
+            control_frame,
+            values=["Manhattan Plot", "Q-Q Plot", "Data Table"],
+            state="readonly",
+            font=("Arial", 9),
+        )
+        self.genetic_viz_type.set("Manhattan Plot")
+        self.genetic_viz_type.grid(row=4, column=0, sticky="we", pady=(0, 10))
+
+        # P-value threshold
+        ttk.Label(control_frame, text="Significance Threshold:", font=("Arial", 9)).grid(
+            row=5, column=0, sticky=tk.W, pady=(5, 2)
+        )
+        self.p_threshold_var = tk.StringVar(value="5e-8")
+        ttk.Entry(control_frame, textvariable=self.p_threshold_var, width=15).grid(
+            row=6, column=0, sticky="we", pady=(0, 10)
+        )
+
+        # Separator
+        ttk.Separator(control_frame, orient="horizontal").grid(
+            row=7, column=0, sticky="we", pady=10
+        )
+
+        # Generate Button
+        viz_btn = ttk.Button(
+            control_frame,
+            text="Generate Plot",
+            command=self._generate_genetic_visualization,
+        )
+        viz_btn.grid(row=8, column=0, sticky="we", pady=5)
+
+        # Summary Stats Button
+        stats_btn = ttk.Button(
+            control_frame,
+            text="Show Summary Stats",
+            command=self._show_genetic_stats,
+        )
+        stats_btn.grid(row=9, column=0, sticky="we", pady=5)
+
+        # Clear Button
+        clear_btn = ttk.Button(
+            control_frame, text="Clear Display", command=self._clear_genetic_display
+        )
+        clear_btn.grid(row=10, column=0, sticky="we", pady=5)
+
+        # Data Status Label
+        self.genetic_status_var = tk.StringVar(value="No data loaded")
+        status_label = ttk.Label(
+            control_frame, textvariable=self.genetic_status_var, foreground="gray"
+        )
+        status_label.grid(row=11, column=0, sticky="we", pady=(10, 0))
+
+        control_frame.columnconfigure(0, weight=1)
+
+        # Visualization Panel (Right)
+        self.genetic_viz_frame = ttk.LabelFrame(
+            self.genetic_frame, text="Genetic Visualization", padding="5"
+        )
+        self.genetic_viz_frame.grid(row=0, column=1, sticky="nsew")
+        self.genetic_viz_frame.columnconfigure(0, weight=1)
+        self.genetic_viz_frame.rowconfigure(0, weight=1)
+
+        # Create embedded display for genetic data
+        self.genetic_display = EmbeddedDisplayPanel(self.genetic_viz_frame)
+        self.genetic_display.pack(fill=tk.BOTH, expand=True)
+
+        # Info Panel (Bottom)
+        info_frame = ttk.LabelFrame(self.genetic_frame, text="Dataset Information", padding="8")
+        info_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        info_frame.columnconfigure(0, weight=1)
+        info_frame.rowconfigure(0, weight=1)
+
+        self.genetic_info_text = tk.Text(
+            info_frame, height=4, width=80, wrap=tk.WORD, font=("Arial", 9)
+        )
+        self.genetic_info_text.grid(row=0, column=0, sticky="nsew")
+
+        scrollbar = ttk.Scrollbar(
+            info_frame, orient=tk.VERTICAL, command=self.genetic_info_text.yview
+        )
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.genetic_info_text["yscrollcommand"] = scrollbar.set
+
+        # Initial message
+        self._update_genetic_info(
+            "Welcome to Genetic Data Visualization!\n\n"
+            "1. Select a dataset (MDD or Anxiety)\n"
+            "2. Click 'Load Genetic Data' to fetch from Hugging Face\n"
+            "3. Generate Manhattan plots, Q-Q plots, or view data tables\n\n"
+            "Data source: PGC (Psychiatric Genomics Consortium) via Hugging Face"
+        )
+
+    def _load_genetic_data(self) -> None:
+        """Load genetic data from selected dataset"""
+        dataset_key = self.genetic_dataset_var.get()
+        self.genetic_status_var.set(f"Loading {dataset_key}...")
+        self.genetic_frame.update()
+
+        try:
+            df = self.genetic_visualizer.load_dataset(dataset_key)
+            if df is not None:
+                self.genetic_df = df
+                self.genetic_status_var.set(f"✓ Loaded {len(df):,} variants")
+                self._update_genetic_info(
+                    f"Dataset: {dataset_key}\n"
+                    f"Total variants: {len(df):,}\n"
+                    f"Columns: {', '.join(df.columns[:5])}...\n"
+                    f"Memory: {df.memory_usage(deep=True).sum() / 1024**2:.1f} MB"
+                )
+            else:
+                self.genetic_status_var.set("✗ Failed to load")
+                self._update_genetic_info("Error: Failed to load genetic data. Check logs.")
+        except Exception as e:
+            self.genetic_status_var.set("✗ Error")
+            self._update_genetic_info(f"Error loading data: {str(e)}")
+            logger.error(f"Genetic data loading error: {e}")
+
+    def _generate_genetic_visualization(self) -> None:
+        """Generate selected genetic visualization"""
+        if self.genetic_visualizer.df is None:
+            self._update_genetic_info("Please load genetic data first!")
+            return
+
+        viz_type = self.genetic_viz_type.get()
+        self.genetic_status_var.set(f"Generating {viz_type}...")
+        self.genetic_frame.update()
+
+        try:
+            fig = None
+            if viz_type == "Manhattan Plot":
+                # Try to auto-detect column names
+                p_col = self._find_column(["p", "P", "pvalue", "p_value"])
+                chr_col = self._find_column(["chr", "CHR", "chromosome"])
+                bp_col = self._find_column(["bp", "BP", "pos", "position"])
+                snp_col = self._find_column(["snp", "SNP", "rsid", "variant"])
+
+                if p_col and chr_col and bp_col:
+                    fig = self.genetic_visualizer.plot_manhattan(
+                        p_col=p_col,
+                        chr_col=chr_col,
+                        bp_col=bp_col,
+                        snp_col=snp_col,
+                        threshold=float(self.p_threshold_var.get()),
+                    )
+                else:
+                    self._update_genetic_info(
+                        f"Could not find required columns. Available: {self.genetic_visualizer.get_column_names()[:10]}"
+                    )
+                    return
+            elif viz_type == "Q-Q Plot":
+                p_col = self._find_column(["p", "P", "pvalue", "p_value"])
+                if p_col:
+                    fig = self.genetic_visualizer.plot_qq(p_col=p_col)
+                else:
+                    self._update_genetic_info("P-value column not found")
+                    return
+            elif viz_type == "Data Table":
+                self._show_data_table()
+                self.genetic_status_var.set("✓ Table displayed")
+                return
+
+            if fig:
+                filepath = self.genetic_visualizer.renderer.render_figure_to_html(fig)
+                self.genetic_display.load_file(filepath)
+                self.genetic_status_var.set(f"✓ {viz_type} generated")
+        except Exception as e:
+            self.genetic_status_var.set("✗ Error")
+            self._update_genetic_info(f"Error: {str(e)}")
+            logger.error(f"Genetic visualization error: {e}")
+
+    def _find_column(self, candidates):
+        """Find first matching column name from candidates"""
+        available = self.genetic_visualizer.get_column_names()
+        for col in candidates:
+            if col in available:
+                return col
+        return None
+
+    def _show_data_table(self) -> None:
+        """Display data table in the info panel"""
+        if self.genetic_df is None:
+            return
+        # Show first 50 rows
+        preview = self.genetic_df.head(50).to_string()
+        self._update_genetic_info(f"Data Preview (first 50 rows):\n\n{preview}")
+
+    def _show_genetic_stats(self) -> None:
+        """Show summary statistics for genetic data"""
+        stats = self.genetic_visualizer.get_summary_stats()
+        if stats:
+            info = (
+                f"Dataset Summary:\n"
+                f"Total variants: {stats.get('total_variants', 'N/A'):,}\n"
+                f"Significant hits (p < 5e-8): {stats.get('significant_hits', 'N/A')}\n"
+                f"Memory usage: {stats.get('memory_usage', 'N/A')}\n"
+                f"Available columns: {', '.join(stats.get('columns', [])[:10])}..."
+            )
+            self._update_genetic_info(info)
+        else:
+            self._update_genetic_info("No data loaded")
+
+    def _clear_genetic_display(self) -> None:
+        """Clear the genetic visualization display"""
+        self.genetic_display.clear()
+        self._update_genetic_info("Display cleared")
+
+    def _update_genetic_info(self, text: str) -> None:
+        """Update the genetic info text area"""
+        self.genetic_info_text.config(state=tk.NORMAL)
+        self.genetic_info_text.delete("1.0", tk.END)
+        self.genetic_info_text.insert("1.0", text)
+        self.genetic_info_text.config(state=tk.DISABLED)
 
     def populate_state_dropdowns(self) -> None:
         """Populate state selection dropdowns"""
