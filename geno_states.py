@@ -32,7 +32,9 @@ class PGCDataConnector:
     }
 
     def __init__(self, dataset_key="MDD"):
-        self.repo_id = self.DATASETS.get(dataset_key, self.DATASETS["MDD"])
+        normalized_key = str(dataset_key).strip()
+        self.repo_id = self.DATASETS.get(normalized_key, self.DATASETS["MDD"])
+        self.dataset_key = normalized_key if normalized_key in self.DATASETS else "MDD"
         self.df = None
 
     def fetch_data(self, split="train", streaming=True):
@@ -58,9 +60,17 @@ class PGCDataConnector:
             
             # If streaming, we take the first 10,000 rows for analysis/GUI preview
             if streaming:
-                iterable = iter(dataset)
-                rows = [next(iterable) for _ in range(10000)]
-                self.df = pd.DataFrame(rows)
+                rows = []
+                for i, row in enumerate(dataset):
+                    rows.append(row)
+                    if i >= 9999:
+                        break
+
+                if not rows:
+                    logger.warning("No rows were returned from streaming dataset")
+                    self.df = pd.DataFrame()
+                else:
+                    self.df = pd.DataFrame(rows)
             else:
                 self.df = dataset.to_pandas()
                 
