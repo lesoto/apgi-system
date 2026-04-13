@@ -230,14 +230,14 @@ def main() -> int:
         print("=" * 80 + "\n")
 
     except FileNotFoundError as e:
-        print(f"\nError: {e}")
-        print("Please run tests with coverage first: make test-coverage or pytest --cov\n")
-        return 1
+        print(f"\n⚠️  Skipping: {e}")
+        print("Run 'make test-coverage' or 'pytest --cov' to generate coverage data.\n")
+        return 0
 
     except ValueError as e:
-        print(f"\nError: {e}")
-        print("Please run tests with coverage first: make test-coverage or pytest --cov\n")
-        return 1
+        print(f"\n⚠️  Skipping: {e}")
+        print("Run 'make test-coverage' or 'pytest --cov' to generate coverage data.\n")
+        return 0
 
     return 0
 

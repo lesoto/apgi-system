@@ -24,6 +24,9 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+import httpx
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 # Import theme manager
 try:
@@ -55,12 +58,38 @@ logger = logging.getLogger(__name__)
 
 # Import genetic data connector
 try:
-    from geno_states import PGCDataConnector
+    from utils.geno_states import PGCDataConnector
 
     GENETIC_DATA_AVAILABLE = True
 except ImportError as e:
     GENETIC_DATA_AVAILABLE = False
     print(f"Warning: Genetic data connector not available: {e}")
+
+# HF API Base
+HF_API_BASE = "https://huggingface.co/api"
+CACHE_FILE = "apgi_hf_cache.json"
+
+# State Keywords for HF Search (Integrated from load_geno_data.py)
+STATE_KEYWORDS = {
+    "flow": ["flow state", "attention control", "task performance", "cognitive control"],
+    "focus": ["attention", "selective attention", "executive control"],
+    "serenity": ["calm", "relaxation", "parasympathetic", "stress reduction"],
+    "mindfulness": ["mindfulness", "meditation", "awareness", "interoception"],
+    "joy": ["joy", "positive emotion", "reward", "dopamine"],
+    "amusement": ["humor", "laughter"],
+    "pride": ["self perception", "self evaluation"],
+    "love": ["attachment", "social bonding"],
+    "gratitude": ["gratitude", "prosocial"],
+    "hope": ["optimism", "future prediction"],
+    "curiosity": ["curiosity", "exploration", "intrinsic motivation"],
+    "creativity": ["creativity", "divergent thinking"],
+    "inspiration": ["insight", "a-ha"],
+    "hyperfocus": ["hyperfocus", "deep work"],
+    "fatigue": ["fatigue", "cognitive load"],
+    "anxiety": ["anxiety", "threat detection"],
+    "fear": ["fear", "amygdala"],
+    "depression": ["depression", "mood disorder"],
+}
 
 # GUI imports with graceful fallbacks
 try:
@@ -1718,6 +1747,147 @@ class GeneticDataVisualizer:
 
 
 # =============================================================================
+# HUGGING FACE MODEL DISCOVERY ENGINE (Integrated from load_geno_data.py)
+# =============================================================================
+
+
+class APGIHFMapper:
+    """Synchronous mapper for Hugging Face models using httpx"""
+
+    def __init__(self):
+        self.client = httpx.Client(headers={"User-Agent": "APGI-App/1.0"}, timeout=15.0)
+
+    def search_hf(self, query: str, limit: int = 8) -> List[Dict]:
+        """Search models on Hugging Face using httpx"""
+        url = f"{HF_API_BASE}/models"
+        params = {
+            "search": query,
+            "limit": limit,
+            "sort": "downloads",
+            "direction": "-1",
+        }
+        try:
+            resp = self.client.get(url, params=params)
+            if resp.status_code != 200:
+                logger.error(f"HF API error {resp.status_code} for query: {query}")
+                return []
+            return resp.json()
+        except Exception as e:
+            logger.error(f"HF Request failed: {e}")
+            return []
+
+    def score_repo(self, repo: Dict, keywords: List[str]) -> float:
+        """Improved scoring logic from load_geno_data.py"""
+        text = (
+            repo.get("id", "")
+            + " "
+            + " ".join(repo.get("tags", []))
+            + " "
+            + repo.get("pipeline_tag", "")
+            + " "
+            + str(repo.get("modelId", ""))
+        ).lower()
+
+        score = 0.0
+        matches = sum(1 for kw in keywords if kw.lower() in text)
+        score += matches * 10
+
+        relevant_tags = {
+            "text-classification",
+            "sentiment-analysis",
+            "feature-extraction",
+            "text-generation",
+            "zero-shot-classification",
+            "reinforcement-learning",
+        }
+        score += sum(3 for tag in repo.get("tags", []) if tag in relevant_tags)
+
+        score += repo.get("likes", 0) * 0.015
+        score += min(repo.get("downloads", 0) / 1000, 50)  # cap downloads bonus
+
+        return score
+
+    def build_repo_map_for_state(self, state: str, keywords: List[str]) -> List[Dict]:
+        """Build a list of top models for a specific state"""
+        all_repos = []
+        for kw in keywords:
+            repos = self.search_hf(kw, limit=6)
+            all_repos.extend(repos)
+
+        # Deduplicate
+        unique = {r["id"]: r for r in all_repos}
+
+        # Score & rank
+        scored = [(repo, self.score_repo(repo, keywords)) for repo in unique.values()]
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        # Build clean output
+        top_repos = []
+        for repo, score in scored[:6]:
+            top_repos.append(
+                {
+                    "repo_id": repo["id"],
+                    "likes": repo.get("likes", 0),
+                    "downloads": repo.get("downloads", 0),
+                    "tags": repo.get("tags", []),
+                    "pipeline_tag": repo.get("pipeline_tag"),
+                    "last_modified": repo.get("lastModified"),
+                    "score": round(score, 2),
+                }
+            )
+        return top_repos
+
+    def close(self):
+        self.client.close()
+
+
+class AIModelVisualizer:
+    """Management and visualization of recommended AI models"""
+
+    def __init__(self):
+        self.mapper = APGIHFMapper()
+        self.cache: Dict[str, List[Dict]] = {}
+        self._load_cache()
+
+    def _load_cache(self):
+        """Load from apgi_hf_cache.json if available"""
+        try:
+            if os.path.exists(CACHE_FILE):
+                with open(CACHE_FILE, "r") as f:
+                    cache_data = json.load(f)
+                    self.cache = cache_data.get("data", {})
+                logger.info(f"Loaded {len(self.cache)} states from HF model cache")
+        except Exception as e:
+            logger.warning(f"Could not load HF cache: {e}")
+
+    def get_models_for_state(self, state: str, refresh: bool = False) -> List[Dict]:
+        """Get models for a state, searching if not in cache or if refresh requested"""
+        # Normalize state name to match keywords
+        norm_state = state.lower().replace(" ", "_")
+
+        if not refresh and norm_state in self.cache:
+            return self.cache[norm_state]
+
+        keywords = STATE_KEYWORDS.get(norm_state, [state])
+        models = self.mapper.build_repo_map_for_state(norm_state, keywords)
+
+        if models:
+            self.cache[norm_state] = models
+            self._save_cache()
+
+        return models
+
+    def _save_cache(self):
+        """Save models to cache file"""
+        try:
+            cache_data = {"timestamp": time.time(), "data": self.cache}
+            with open(CACHE_FILE, "w") as f:
+                json.dump(cache_data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save HF cache: {e}")
+
+
+# =============================================================================
 # ENHANCED GUI WITH EMBEDDED VISUALIZATION PANEL
 # =============================================================================
 
@@ -1755,6 +1925,10 @@ class APGIVisualizerGUI:
             self.visualizer: APGIVisualizer = APGIVisualizer(PSYCHOLOGICAL_STATES, STATE_CATEGORIES)
             self.current_visualization: Optional[go.Figure] = None
             self.current_html_file: Optional[str] = None
+
+            # Initialize AI Model Visualizer
+            self.ai_visualizer = AIModelVisualizer()
+            self.executor = ThreadPoolExecutor(max_workers=2)
 
             # Setup GUI
             self.setup_gui()
@@ -1879,6 +2053,11 @@ class APGIVisualizerGUI:
         self.genetic_frame = ttk.Frame(self.notebook, padding="10")
         self.notebook.add(self.genetic_frame, text="Genetic Data (GWAS)")
         self._setup_genetic_data_tab()
+
+        # Tab 3: AI Model Recommendations
+        self.ai_models_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(self.ai_models_frame, text="Recommended AI Models")
+        self._setup_ai_models_tab()
 
     def _setup_psychological_states_tab(self) -> None:
         """Setup the Psychological States tab"""
@@ -2219,6 +2398,156 @@ class APGIVisualizerGUI:
             "Data source: PGC (Psychiatric Genomics Consortium) via Hugging Face"
         )
 
+    def _setup_ai_models_tab(self) -> None:
+        """Setup the AI Model Recommendations tab"""
+        # Configure grid
+        self.ai_models_frame.columnconfigure(0, weight=1)
+        self.ai_models_frame.rowconfigure(1, weight=1)
+
+        # Header section
+        header_frame = ttk.Frame(self.ai_models_frame, padding="5")
+        header_frame.grid(row=0, column=0, sticky="we")
+
+        ttk.Label(header_frame, text="Selected State:", font=("Arial", 10, "bold")).pack(
+            side=tk.LEFT, padx=5
+        )
+        self.ai_state_var = tk.StringVar()
+        self.ai_state_combo = ttk.Combobox(
+            header_frame, textvariable=self.ai_state_var, state="readonly", width=30
+        )
+        self.ai_state_combo.pack(side=tk.LEFT, padx=5)
+        self.ai_state_combo.bind("<<ComboboxSelected>>", lambda e: self._load_ai_models())
+
+        refresh_btn = ttk.Button(
+            header_frame,
+            text="Refresh Recommendations",
+            command=lambda: self._load_ai_models(refresh=True),
+        )
+        refresh_btn.pack(side=tk.LEFT, padx=10)
+
+        # Progress bar
+        self.ai_progress = ttk.Progressbar(self.ai_models_frame, mode="indeterminate", length=200)
+
+        # Content area with listbox/treeview
+        content_frame = ttk.LabelFrame(
+            self.ai_models_frame, text="Recommended Hugging Face Models", padding="10"
+        )
+        content_frame.grid(row=1, column=0, sticky="nsew", pady=10)
+        content_frame.columnconfigure(0, weight=1)
+        content_frame.rowconfigure(0, weight=1)
+
+        # Treeview for models
+        columns = ("repo_id", "likes", "downloads", "pipeline", "score")
+        self.model_tree = ttk.Treeview(content_frame, columns=columns, show="headings")
+
+        self.model_tree.heading("repo_id", text="Repository ID")
+        self.model_tree.heading("likes", text="Likes")
+        self.model_tree.heading("downloads", text="Downloads")
+        self.model_tree.heading("pipeline", text="Task / Pipeline")
+        self.model_tree.heading("score", text="Match Score")
+
+        self.model_tree.column("repo_id", width=400)
+        self.model_tree.column("likes", width=80, anchor=tk.CENTER)
+        self.model_tree.column("downloads", width=100, anchor=tk.CENTER)
+        self.model_tree.column("pipeline", width=150)
+        self.model_tree.column("score", width=100, anchor=tk.CENTER)
+
+        scrollbar = ttk.Scrollbar(content_frame, orient=tk.VERTICAL, command=self.model_tree.yview)
+        self.model_tree.configure(yscrollcommand=scrollbar.set)
+
+        self.model_tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Model details area (Bottom)
+        details_frame = ttk.LabelFrame(
+            self.ai_models_frame, text="Model Details & Tags", padding="8"
+        )
+        details_frame.grid(row=2, column=0, sticky="we", pady=(0, 5))
+
+        self.model_details_text = tk.Text(details_frame, height=6, wrap=tk.WORD, font=("Arial", 9))
+        self.model_details_text.pack(fill=tk.BOTH, expand=True)
+        self.model_details_text.config(state=tk.DISABLED)
+
+        self.model_tree.bind("<<TreeviewSelect>>", self._on_model_select)
+
+    def _load_ai_models(self, refresh: bool = False) -> None:
+        """Load models for the selected state in a background thread"""
+        state = self.ai_state_var.get()
+        if not state:
+            return
+
+        # Start loading indicator
+        self.ai_progress.grid(row=0, column=0, sticky="e", padx=5)
+        self.ai_progress.start(10)
+        self.status_var.set(f"Finding AI models for {state}...")
+
+        # Run search in background thread
+        def task():
+            try:
+                models = self.ai_visualizer.get_models_for_state(state, refresh=refresh)
+                # Update GUI from main thread
+                self.root.after(0, lambda: self._update_model_list(models))
+            except Exception as e:
+                logger.error(f"Error loading AI models: {e}")
+                self.root.after(0, lambda: self.status_var.set("Error loading models"))
+            finally:
+                self.root.after(0, self.ai_progress.stop)
+                self.root.after(0, lambda: self.ai_progress.grid_forget())
+
+        self.executor.submit(task)
+
+    def _update_model_list(self, models: List[Dict]) -> None:
+        """Update the model treeview with results"""
+        # Clear existing items
+        for item in self.model_tree.get_children():
+            self.model_tree.delete(item)
+
+        for model in models:
+            self.model_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    model["repo_id"],
+                    model["likes"],
+                    model["downloads"],
+                    model.get("pipeline_tag", "N/A"),
+                    model["score"],
+                ),
+                tags=(model["repo_id"],),
+            )
+
+        self.status_var.set(f"✓ Found {len(models)} model recommendations for state")
+
+    def _on_model_select(self, event) -> None:
+        """Show details for the selected model"""
+        selected = self.model_tree.selection()
+        if not selected:
+            return
+
+        item = self.model_tree.item(selected[0])
+        repo_id = item["values"][0]
+
+        # Find model data in cache
+        state = self.ai_state_var.get().lower().replace(" ", "_")
+        models = self.ai_visualizer.cache.get(state, [])
+        model_data = next((m for m in models if m["repo_id"] == repo_id), None)
+
+        if model_data:
+            self.model_details_text.config(state=tk.NORMAL)
+            self.model_details_text.delete("1.0", tk.END)
+
+            info = f"Repository: {model_data['repo_id']}\n"
+            info += f"Pipeline: {model_data.get('pipeline_tag', 'N/A')}\n"
+            info += (
+                f"Popularity: {model_data['likes']} likes, {model_data['downloads']} downloads\n"
+            )
+            info += f"Link: https://huggingface.co/{model_data['repo_id']}\n\n"
+            info += "Tags:\n"
+            info += ", ".join(model_data.get("tags", []))
+
+            self.model_details_text.insert("1.0", info)
+            self.model_details_text.config(state=tk.DISABLED)
+
     def _load_genetic_data(self) -> None:
         """Load genetic data from selected dataset"""
         dataset_key = self.genetic_dataset_var.get()
@@ -2355,6 +2684,12 @@ class APGIVisualizerGUI:
             self.state_combo.set(state_names[0])
             self.start_state_combo.set(state_names[0])
             self.end_state_combo.set(state_names[1] if len(state_names) > 1 else state_names[0])
+
+            # Also populate AI models dropdown
+            self.ai_state_combo["values"] = state_names
+            self.ai_state_combo.set(state_names[0])
+            # Initial load from cache if exists
+            self._load_ai_models()
 
         self.status_var.set("Ready - Select visualization type and click Generate")
 

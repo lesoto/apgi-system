@@ -5,7 +5,7 @@ Provides consistent theming support across all GUI applications.
 """
 
 import tkinter as tk
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, cast, Union, List
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -156,7 +156,7 @@ class ThemeManager:
         self.current_theme = theme_name
         return True
 
-    def get_available_themes(self) -> list[str]:
+    def get_available_themes(self) -> List[str]:
         """Get list of available theme names
 
         Returns:
@@ -181,7 +181,7 @@ class ThemeManager:
             pass
 
     def apply_theme_to_canvas(
-        self, canvas: tk.Canvas | FigureCanvasTkAgg, theme_name: Optional[str] = None
+        self, canvas: Union[tk.Canvas, FigureCanvasTkAgg], theme_name: Optional[str] = None
     ) -> None:
         """Apply current theme to a canvas
 
