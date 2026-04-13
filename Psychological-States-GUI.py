@@ -1502,6 +1502,16 @@ class GeneticDataVisualizer:
         try:
             self.connector = PGCDataConnector(dataset_key)
             self.df = self.connector.fetch_data(streaming=True)
+            if self.df is None:
+                logger.warning(
+                    f"Streaming load returned no data for {dataset_key}; retrying non-streaming mode"
+                )
+                self.df = self.connector.fetch_data(streaming=False)
+
+            if self.df is None:
+                logger.error(f"No data returned for dataset {dataset_key}")
+                return None
+
             logger.info(f"Loaded {len(self.df)} variants from {dataset_key}")
             return self.df
         except Exception as e:
