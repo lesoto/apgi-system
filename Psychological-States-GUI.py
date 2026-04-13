@@ -1524,8 +1524,15 @@ class GeneticDataVisualizer:
             return []
         return list(self.df.columns)
 
-    def plot_manhattan(self, p_col="p", chr_col="chr", bp_col="bp", snp_col="snp",
-                       threshold=5e-8, highlight_hits=True):
+    def plot_manhattan(
+        self,
+        p_col="p",
+        chr_col="chr",
+        bp_col="bp",
+        snp_col="snp",
+        threshold=5e-8,
+        highlight_hits=True,
+    ):
         """Create Manhattan plot for GWAS data
 
         Args:
@@ -1553,49 +1560,58 @@ class GeneticDataVisualizer:
 
             # Calculate -log10(p)
             df_plot = self.df.copy()
-            df_plot['neg_log_p'] = -np.log10(df_plot[p_col].replace(0, np.nan))
+            df_plot.loc[:, "neg_log_p"] = -np.log10(df_plot.loc[:, p_col].replace(0, np.nan))
 
             # Create figure
             fig = go.Figure()
 
             # Color by chromosome
             chromosomes = sorted(df_plot[chr_col].unique())
-            colors = ['#1f77b4', '#ff7f0e']  # Alternating colors
+            colors = ["#1f77b4", "#ff7f0e"]  # Alternating colors
 
             for i, chrom in enumerate(chromosomes):
                 chrom_data = df_plot[df_plot[chr_col] == chrom]
                 color = colors[i % 2]
 
-                fig.add_trace(go.Scatter(
-                    x=chrom_data[bp_col],
-                    y=chrom_data['neg_log_p'],
-                    mode='markers',
-                    marker=dict(size=5, color=color, opacity=0.6),
-                    name=f'Chr {chrom}',
-                    text=chrom_data.get(snp_col, chrom_data.index),
-                    hovertemplate='<b>%{text}</b><br>Chr: ' + str(chrom) +
-                                  '<br>Position: %{x}<br>-log10(p): %{y:.2f}<extra></extra>'
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=chrom_data[bp_col],
+                        y=chrom_data["neg_log_p"],
+                        mode="markers",
+                        marker=dict(size=5, color=color, opacity=0.6),
+                        name=f"Chr {chrom}",
+                        text=chrom_data.get(snp_col, chrom_data.index),
+                        hovertemplate="<b>%{text}</b><br>Chr: "
+                        + str(chrom)
+                        + "<br>Position: %{x}<br>-log10(p): %{y:.2f}<extra></extra>",
+                    )
+                )
 
             # Add significance threshold line
-            fig.add_hline(y=-np.log10(threshold), line_dash="dash",
-                          line_color="red", annotation_text=f"p = {threshold}")
+            fig.add_hline(
+                y=-np.log10(threshold),
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"p = {threshold}",
+            )
 
             # Highlight significant hits if requested
             if highlight_hits:
                 sig_hits = df_plot[df_plot[p_col] < threshold]
                 if len(sig_hits) > 0:
-                    fig.add_trace(go.Scatter(
-                        x=sig_hits[bp_col],
-                        y=sig_hits['neg_log_p'],
-                        mode='markers',
-                        marker=dict(size=10, color='red', symbol='star'),
-                        name='Significant Hits',
-                        text=sig_hits.get(snp_col, sig_hits.index),
-                        hovertemplate='<b>%{text}</b><br>p-value: ' +
-                                      sig_hits[p_col].astype(str) +
-                                      '<br>-log10(p): %{y:.2f}<extra></extra>'
-                    ))
+                    fig.add_trace(
+                        go.Scatter(
+                            x=sig_hits[bp_col],
+                            y=sig_hits["neg_log_p"],
+                            mode="markers",
+                            marker=dict(size=10, color="red", symbol="star"),
+                            name="Significant Hits",
+                            text=sig_hits.get(snp_col, sig_hits.index),
+                            hovertemplate="<b>%{text}</b><br>p-value: "
+                            + sig_hits[p_col].astype(str)
+                            + "<br>-log10(p): %{y:.2f}<extra></extra>",
+                        )
+                    )
 
             fig.update_layout(
                 title="GWAS Manhattan Plot",
@@ -1603,7 +1619,7 @@ class GeneticDataVisualizer:
                 yaxis_title="-log10(p-value)",
                 template="plotly_white",
                 showlegend=False,
-                height=600
+                height=600,
             )
 
             return fig
@@ -1632,6 +1648,11 @@ class GeneticDataVisualizer:
             p_values = self.df[p_col].dropna().sort_values()
             n = len(p_values)
 
+            # Check if we have any valid p-values
+            if n == 0:
+                logger.warning(f"No valid p-values found in column {p_col}")
+                return None
+
             # Expected p-values under null hypothesis
             expected = np.arange(1, n + 1) / (n + 1)
 
@@ -1639,30 +1660,34 @@ class GeneticDataVisualizer:
             fig = go.Figure()
 
             # Q-Q points
-            fig.add_trace(go.Scatter(
-                x=-np.log10(expected),
-                y=-np.log10(p_values),
-                mode='markers',
-                marker=dict(size=4, color='#1f77b4', opacity=0.6),
-                name='Observed vs Expected'
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=-np.log10(expected),
+                    y=-np.log10(p_values),
+                    mode="markers",
+                    marker=dict(size=4, color="#1f77b4", opacity=0.6),
+                    name="Observed vs Expected",
+                )
+            )
 
             # Diagonal line (y=x)
             max_val = max(-np.log10(expected[-1]), -np.log10(p_values.iloc[0]))
-            fig.add_trace(go.Scatter(
-                x=[0, max_val],
-                y=[0, max_val],
-                mode='lines',
-                line=dict(color='red', dash='dash'),
-                name='Expected (y=x)'
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, max_val],
+                    y=[0, max_val],
+                    mode="lines",
+                    line=dict(color="red", dash="dash"),
+                    name="Expected (y=x)",
+                )
+            )
 
             fig.update_layout(
                 title="Q-Q Plot",
                 xaxis_title="Expected -log10(p)",
                 yaxis_title="Observed -log10(p)",
                 template="plotly_white",
-                showlegend=True
+                showlegend=True,
             )
 
             return fig
@@ -1676,17 +1701,17 @@ class GeneticDataVisualizer:
             return {}
 
         stats = {
-            'total_variants': len(self.df),
-            'columns': list(self.df.columns),
-            'memory_usage': f"{self.df.memory_usage(deep=True).sum() / 1024**2:.2f} MB"
+            "total_variants": len(self.df),
+            "columns": list(self.df.columns),
+            "memory_usage": f"{self.df.memory_usage(deep=True).sum() / 1024**2:.2f} MB",
         }
 
         # Count significant hits if p-value column exists
-        for p_col in ['p', 'P', 'pvalue', 'p_value']:
+        for p_col in ["p", "P", "pvalue", "p_value"]:
             if p_col in self.df.columns:
                 sig_count = (self.df[p_col] < 5e-8).sum()
-                stats['significant_hits'] = int(sig_count)
-                stats['p_value_column'] = p_col
+                stats["significant_hits"] = int(sig_count)
+                stats["p_value_column"] = p_col
                 break
 
         return stats
@@ -2068,7 +2093,7 @@ class APGIVisualizerGUI:
 
         # Initialize genetic data visualizer
         self.genetic_visualizer = GeneticDataVisualizer()
-        self.genetic_df = None
+        self.genetic_df: Optional["pd.DataFrame"] = None
 
         # Control Panel (Left)
         control_frame = ttk.LabelFrame(self.genetic_frame, text="GWAS Controls", padding="12")
@@ -2233,10 +2258,10 @@ class APGIVisualizerGUI:
             fig = None
             if viz_type == "Manhattan Plot":
                 # Try to auto-detect column names
-                p_col = self._find_column(["p", "P", "pvalue", "p_value"])
+                p_col = self._find_column(["p", "P", "pvalue", "p_value", "P.value"])
                 chr_col = self._find_column(["chr", "CHR", "chromosome"])
                 bp_col = self._find_column(["bp", "BP", "pos", "position"])
-                snp_col = self._find_column(["snp", "SNP", "rsid", "variant"])
+                snp_col = self._find_column(["snp", "SNP", "rsid", "variant", "SNPID"])
 
                 if p_col and chr_col and bp_col:
                     fig = self.genetic_visualizer.plot_manhattan(
@@ -2252,7 +2277,7 @@ class APGIVisualizerGUI:
                     )
                     return
             elif viz_type == "Q-Q Plot":
-                p_col = self._find_column(["p", "P", "pvalue", "p_value"])
+                p_col = self._find_column(["p", "P", "pvalue", "p_value", "P.value"])
                 if p_col:
                     fig = self.genetic_visualizer.plot_qq(p_col=p_col)
                 else:
@@ -2265,7 +2290,7 @@ class APGIVisualizerGUI:
 
             if fig:
                 filepath = self.genetic_visualizer.renderer.render_figure_to_html(fig)
-                self.genetic_display.load_file(filepath)
+                self.genetic_display.load_html_file(filepath)
                 self.genetic_status_var.set(f"✓ {viz_type} generated")
         except Exception as e:
             self.genetic_status_var.set("✗ Error")

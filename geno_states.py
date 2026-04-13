@@ -7,13 +7,15 @@ Supports Major Depressive Disorder (MDD) and Anxiety disorder GWAS summary stati
 """
 
 import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # Optional imports with graceful fallback
 try:
     import pandas as pd
-    from datasets import load_dataset
+    from datasets import load_dataset  # type: ignore[import-untyped]
+
     DATASETS_AVAILABLE = True
 except ImportError:
     DATASETS_AVAILABLE = False
@@ -22,42 +24,39 @@ except ImportError:
 
 class PGCDataConnector:
     """
-    Connects to Hugging Face datasets for PGC Major Depressive Disorder (MDD) 
+    Connects to Hugging Face datasets for PGC Major Depressive Disorder (MDD)
     and Anxiety GWAS summary statistics.
     """
-    
-    DATASETS = {
-        "MDD": "introvoyz041/pgc-mdd",
-        "Anxiety": "introvoyz041/pgc-anxiety"
-    }
 
-    def __init__(self, dataset_key="MDD"):
+    DATASETS = {"MDD": "introvoyz041/pgc-mdd", "Anxiety": "introvoyz041/pgc-anxiety"}
+
+    def __init__(self, dataset_key: str = "MDD") -> None:
         normalized_key = str(dataset_key).strip()
         self.repo_id = self.DATASETS.get(normalized_key, self.DATASETS["MDD"])
         self.dataset_key = normalized_key if normalized_key in self.DATASETS else "MDD"
-        self.df = None
+        self.df: Optional["pd.DataFrame"] = None
 
-    def fetch_data(self, split="train", streaming=True):
+    def fetch_data(self, split: str = "train", streaming: bool = True) -> Optional["pd.DataFrame"]:
         """
         Loads the dataset from Hugging Face.
         Using streaming=True is recommended for genetic data due to large file sizes.
-        
+
         Args:
             split: Dataset split to load (default: "train")
             streaming: Whether to use streaming mode (default: True)
-            
+
         Returns:
             pd.DataFrame: Genetic variants data or None if failed
         """
         if not DATASETS_AVAILABLE:
             logger.error("datasets library not available. Install with: pip install datasets")
             return None
-            
+
         try:
             logger.info(f"Connecting to Hugging Face: {self.repo_id}...")
             # Load dataset
             dataset = load_dataset(self.repo_id, split=split, streaming=streaming)
-            
+
             # If streaming, we take the first 10,000 rows for analysis/GUI preview
             if streaming:
                 rows = []
@@ -73,21 +72,22 @@ class PGCDataConnector:
                     self.df = pd.DataFrame(rows)
             else:
                 self.df = dataset.to_pandas()
-                
-            logger.info(f"Successfully loaded {len(self.df)} genetic variants.")
+
+            if self.df is not None:
+                logger.info(f"Successfully loaded {len(self.df)} genetic variants.")
             return self.df
         except Exception as e:
             logger.error(f"Failed to fetch genetic data: {e}")
             return None
 
-    def get_top_hits(self, p_value_col="p", threshold=5e-8):
+    def get_top_hits(self, p_value_col: str = "p", threshold: float = 5e-8) -> "pd.DataFrame":
         """
         Filters the data for genome-wide significant hits.
-        
+
         Args:
             p_value_col: Column name containing p-values
             threshold: Significance threshold (default: 5e-8)
-            
+
         Returns:
             pd.DataFrame: Significant hits or empty DataFrame
         """
@@ -95,27 +95,27 @@ class PGCDataConnector:
             return self.df[self.df[p_value_col] < threshold]
         return pd.DataFrame()
 
-    def get_column_info(self):
+    def get_column_info(self) -> Dict[str, Any]:
         """Get information about available columns in the dataset."""
         if self.df is None:
             return {}
         return {
             "columns": list(self.df.columns),
             "dtypes": self.df.dtypes.to_dict(),
-            "shape": self.df.shape
+            "shape": self.df.shape,
         }
 
-    def summary_stats(self):
+    def summary_stats(self) -> Dict[str, Any]:
         """Get summary statistics for the loaded dataset."""
         if self.df is None:
             return {}
-        
+
         stats = {
             "total_variants": len(self.df),
             "columns": list(self.df.columns),
-            "memory_mb": self.df.memory_usage(deep=True).sum() / 1024**2
+            "memory_mb": self.df.memory_usage(deep=True).sum() / 1024**2,
         }
-        
+
         # Count significant hits if p-value column exists
         for p_col in ["p", "P", "pvalue", "p_value"]:
             if p_col in self.df.columns:
@@ -123,5 +123,5 @@ class PGCDataConnector:
                 stats["significant_hits"] = int(sig_count)
                 stats["p_value_column"] = p_col
                 break
-                
+
         return stats
