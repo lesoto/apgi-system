@@ -2109,7 +2109,9 @@ class APGIVisualizer:
             return None
 
         states = [s["primary"] for s in state_history]
-        times = [s["timestamp"] - state_history[0]["timestamp"] for s in state_history]
+        times = [
+            (s["timestamp"] - state_history[0]["timestamp"]).total_seconds() for s in state_history
+        ]
         surprises = [s.get("surprise_level", "low") for s in state_history]
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
@@ -2194,7 +2196,21 @@ class APGIVisualizer:
             return None
 
         if times is None:
-            times = [e["time"] - energy_history[0]["time"] for e in energy_history]
+            # Use 'timestamp' if 'time' is not available
+            if energy_history and "time" in energy_history[0]:
+                times = [e["time"] - energy_history[0]["time"] for e in energy_history]
+            elif energy_history and "timestamp" in energy_history[0]:
+                # Handle both datetime objects and float timestamps
+                ts0 = energy_history[0]["timestamp"]
+                if hasattr(ts0, "total_seconds"):
+                    # datetime or timedelta object
+                    times = [(e["timestamp"] - ts0).total_seconds() for e in energy_history]  # type: ignore
+                else:
+                    # Float timestamp (unix time)
+                    times = [e["timestamp"] - ts0 for e in energy_history]
+            else:
+                # Fallback to simple index-based timing
+                times = list(range(len(energy_history)))
         levels = [e["level"] for e in energy_history]
 
         fig, ax = plt.subplots(figsize=(10, 4))

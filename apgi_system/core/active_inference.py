@@ -5,16 +5,61 @@ Implements the core active inference loop using variational message passing
 and hierarchical Bayesian filtering.
 """
 
+import logging
 import threading
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
 from apgi_system.core.free_energy import FreeEnergyCalculator
+from apgi_system.core.motor_planning import MotorPlanner
+from apgi_system.core.temporal_dynamics import TemporalDynamics
 from apgi_system.types import ConfigDict, FloatArray
 from apgi_system.validation import InputValidator
+
+logger = logging.getLogger(__name__)
+
+
+class MultiModalInputLayer:
+    """
+    Handles heterogeneous input streams and fuses them into a combined sensory representation.
+    Supports Vision, NLP, and Audio modalities.
+    """
+
+    def __init__(self, config: ConfigDict) -> None:
+        self.config = config.get("multi_modal", {})
+        self.modalities = self.config.get("modalities", {"vision": 256, "nlp": 128, "audio": 64})
+        self.combined_dim = sum(self.modalities.values())
+
+        # Projection matrices to a shared sensory space if needed
+        # For now, we simple concatenate or use a weighted fusion
+        self.weights = self.config.get("fusion_weights", {k: 1.0 for k in self.modalities})
+
+    def fuse(self, inputs: Dict[str, FloatArray]) -> FloatArray:
+        """
+        Fuse multiple modalities into a single vector.
+        If a modality is missing, it's padded with zeros.
+        """
+        fused_parts = []
+        for name, dim in self.modalities.items():
+            if name in inputs:
+                val = inputs[name]
+                if val.shape[0] != dim:
+                    # Reshape or pad if dimension mismatch
+                    if val.size >= dim:
+                        val = val[:dim]
+                    else:
+                        val = np.pad(val, (0, dim - val.size))
+                fused_parts.append(val * self.weights.get(name, 1.0))
+            else:
+                fused_parts.append(np.zeros(dim))
+
+        return np.concatenate(fused_parts)
+
+    def get_combined_dim(self) -> int:
+        return self.combined_dim
 
 
 @dataclass
@@ -136,6 +181,26 @@ class HierarchicalGaussianFilter:
         self._projection_cache: Dict[Tuple[int, int, int], np.ndarray] = {}
         self._cache_access_order: Deque[Tuple[int, int, int]] = deque()
         self._cache_lock = threading.Lock()  # Thread safety for cache access
+
+    def reset_beliefs(self) -> None:
+        """Reset beliefs to initial state."""
+        for belief in self.beliefs:
+            belief.mean = np.zeros_like(belief.mean)
+            belief.covariance = np.eye(len(belief.mean))
+            belief.precision = 1.0
+            belief.prediction = np.zeros_like(belief.prediction)
+            belief.prediction_error = np.zeros_like(belief.prediction_error)
+
+    def _layer_norm(self, x: FloatArray, eps: float = 1e-6) -> FloatArray:
+        """Apply layer normalization to stabilize hidden states."""
+        mu = np.mean(x)
+        sigma = np.std(x)
+        return (x - mu) / (sigma + eps)
+
+    def _variational_dropout(self, x: FloatArray, p: float = 0.1) -> FloatArray:
+        """Apply variational dropout for regularization."""
+        mask = np.random.binomial(1, 1 - p, size=x.shape)
+        return x * mask / (1 - p)
 
     def update(self, observation: FloatArray, dt: float = 0.001) -> Tuple[List[BeliefState], float]:
         """
@@ -355,6 +420,9 @@ class HierarchicalGaussianFilter:
                 precision_below * error_below - precision_above * error_above
             )
 
+            # Apply layer normalization and dropout to the update vector to ensure stability
+            update = self._variational_dropout(self._layer_norm(update), p=0.01)
+
             self.beliefs[level].mean += dt * update
 
             # Update prediction for next iteration
@@ -530,9 +598,9 @@ class HierarchicalGaussianFilter:
                 rng = np.random.default_rng(seed=hash((source_dim, target_dim)) % 2**32)
                 raw = rng.standard_normal((target_dim, source_dim))
                 U, S, Vt = np.linalg.svd(raw, full_matrices=False)
-                # Reconstruct projection matrix with proper (target_dim, source_dim) shape
-                projection_matrix = (U * S) @ Vt
-                projection_matrix *= np.sqrt(source_dim / target_dim)  # Preserve variance
+                # Use pure orthonormal matrix via SVD (singular values = 1)
+                # This ensures unity gain across layers, preventing numerical explosion
+                projection_matrix = U @ Vt
 
             # Add to cache
             self._projection_cache[key] = projection_matrix
@@ -561,48 +629,58 @@ class HierarchicalGaussianFilter:
         ----------
         from_level : int
             Source level (higher in hierarchy)
+
+        Notes
+        -----
+        Only the **input state vector** is layer-normalised before the
+        multiplication.  The projection matrix must *not* be normalised
+        because that would destroy the orthonormality property established
+        by the deterministic SVD initialisation (``_get_projection_matrix``).
+        The shared ``_cache_lock`` is used for thread-safe matrix access
+        instead of a locally-created ``Lock`` (which provides no exclusion).
         """
         target_dim = self.beliefs[from_level - 1].mean.shape[0]
         source_dim = state.shape[0]
 
-        # Get projection matrix from cache
+        # Get projection matrix from cache (already orthonormal — do NOT normalise it)
         projection_matrix = self._get_projection_matrix(from_level, target_dim, source_dim)
 
-        # Ensure numerical stability
-        projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
-        state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
+        # Normalise the input state vector only
+        state = self._layer_norm(state)
 
-        # Check for valid inputs before multiplication
-        if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
-            import logging
-
-            logging.warning(
-                f"_map_down: Non-finite inputs detected at from_level {from_level}, returning zeros"
-            )
-            return np.zeros(target_dim)
-
-        # Thread-safe matrix multiplication with error handling
+        # Thread-safe matrix multiplication using the shared instance-level lock
         try:
-            with threading.Lock():
-                # Suppress numpy warnings for this operation
+            with self._cache_lock:
                 with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                     result = projection_matrix @ state
         except (FloatingPointError, ValueError):
-            # Fallback to safe computation
+            logger.warning("_map_down: matmul failed at level %d; returning zeros.", from_level)
             result = np.zeros(target_dim)
 
-        return np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
+        return self._layer_norm(result)
 
     def _project_up(self, from_level: int, state: FloatArray) -> FloatArray:
         """
         Map state representation up one level in the hierarchy.
 
-        Args:
-            from_level: Source level (lower in hierarchy)
-            state: State vector to map up
+        Parameters
+        ----------
+        from_level : int
+            Source level (lower in hierarchy)
+        state : np.ndarray
+            State vector to map up
 
-        Returns:
+        Returns
+        -------
+        np.ndarray
             Mapped state vector at higher level
+
+        Notes
+        -----
+        Only the **input state vector** is layer-normalised and dropout-regularised
+        before the multiplication.  The projection matrix must *not* be normalised
+        for the same reason as ``_map_down``.  Thread-safety relies on the shared
+        ``_cache_lock`` rather than a locally-created ``Lock``.
         """
         if from_level >= self.num_levels - 1:
             # Already at top level
@@ -611,54 +689,22 @@ class HierarchicalGaussianFilter:
         target_dim = self.beliefs[from_level + 1].mean.shape[0]
         source_dim = state.shape[0]
 
-        # Get projection matrix from cache
+        # Get projection matrix from cache (already orthonormal — do NOT normalise it)
         projection_matrix = self._get_projection_matrix(from_level + 1, target_dim, source_dim)
 
-        # Ensure numerical stability with enhanced checks
-        matrix_clip = self.config.get("clip_projection_matrix", 100.0)
-        state_clip = self.config.get("clip_state", 100.0)
+        # Normalise and regularise the input state vector only
+        state = self._variational_dropout(self._layer_norm(state), p=0.05)
 
-        projection_matrix = np.nan_to_num(projection_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
-        state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
-
-        # Gradient clipping to prevent overflow
-        projection_matrix = np.clip(projection_matrix, -matrix_clip, matrix_clip)
-        state = np.clip(state, -state_clip, state_clip)
-
-        # Check for divide by zero conditions
-        eps = float(self.config.get("matrix_epsilon", 1e-10))
-        if np.any(np.abs(projection_matrix) < eps):
-            projection_matrix = np.where(
-                np.abs(projection_matrix) < eps,
-                np.sign(projection_matrix) * eps,
-                projection_matrix,
-            )
-
-        # Check for valid inputs before multiplication
-        if not np.all(np.isfinite(projection_matrix)) or not np.all(np.isfinite(state)):
-            import logging
-
-            logging.warning(
-                f"_project_up: Non-finite inputs detected at from_level {from_level}, returning zeros"
-            )
-            return np.zeros(target_dim)
-
-        # Thread-safe matrix multiplication with error handling
+        # Thread-safe matrix multiplication using the shared instance-level lock
         try:
-            with threading.Lock():
-                # Suppress numpy warnings for this operation
+            with self._cache_lock:
                 with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                     result = projection_matrix @ state
         except (FloatingPointError, ValueError):
-            # Fallback to safe computation
+            logger.warning("_project_up: matmul failed at level %d; returning zeros.", from_level)
             result = np.zeros(target_dim)
 
-        # Final result stabilization
-        result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
-        final_clip = self.config.get("clip_final_result", 1000.0)
-        result = np.clip(result, -final_clip, final_clip)  # Prevent extreme values
-
-        return result
+        return self._layer_norm(result)
 
     def _compute_total_free_energy(self, observation: FloatArray) -> float:
         """
@@ -804,70 +850,53 @@ class ActiveInferenceEngine:
         # Initialize free energy calculator
         self.fe_calc = FreeEnergyCalculator(config)
 
-        # Policy evaluation
-        self.num_policies = config.get("num_policies", 10)
-        self.planning_horizon = config.get("planning_horizon", 3)
+        # Initialize Multi-Modal Layer
+        self.input_layer = MultiModalInputLayer(config)
+
+        # Initialize Motor Planner
+        self.motor_planner = MotorPlanner(config)
+
+        # Initialize Temporal Dynamics with seeded RNG for full reproducibility
+        _engine_seed = config.get("system", {}).get("random_seed", None)
+        self.temporal_dynamics = TemporalDynamics(config, rng=np.random.default_rng(_engine_seed))
+
+        # Planning parameters
+        planning_config = config.get("active_inference", {}).get("planning", {})
+        self.planning_horizon = planning_config.get("horizon", 3)
+        self.num_policies = planning_config.get("num_policies", 10)
 
         # State tracking
+
         self.time = 0.0
         self.timestep = config.get("system", {}).get("timestep_ms", 1.0) / 1000.0
 
     def step(
-        self, observation: FloatArray, available_actions: Optional[List[FloatArray]] = None
+        self,
+        observation: Union[FloatArray, Dict[str, FloatArray]],
+        available_actions: Optional[List[FloatArray]] = None,
     ) -> Tuple[FloatArray, Dict[str, Any]]:
         """
         Execute single step of active inference loop.
-
-        Performs the complete perception-action cycle:
-        1. Perceptual inference: Update beliefs to explain observation
-        2. Policy evaluation: Simulate outcomes of available actions
-        3. Action selection: Choose action minimizing expected free energy
-
-        Parameters
-        ----------
-        observation : np.ndarray
-            Current sensory observation vector of shape (observation_dim,)
-        available_actions : List[np.ndarray], optional
-            List of available action vectors. If None or empty, returns null action.
-
-        Returns
-        -------
-        selected_action : np.ndarray
-            Chosen action vector that minimizes expected free energy
-        info : Dict[str, Any]
-            Diagnostic information containing:
-            - 'time': Current simulation time
-            - 'free_energy': Variational free energy
-            - 'beliefs': Current belief states at all levels
-            - 'efe_components': Expected free energy breakdown
-            - 'precisions': Precision values at each level
-            - 'prediction_errors': Prediction errors at each level
-
-        Notes
-        -----
-        The action selection implements:
-        π* = argmin_π G(π)
-
-        where G(π) is the expected free energy under policy π, balancing
-        epistemic value (information gain) and pragmatic value (goal achievement).
-
-        Examples
-        --------
-        >>> engine = ActiveInferenceEngine(config)
-        >>> obs = np.random.randn(256)
-        >>> actions = [np.array([0.0]), np.array([1.0]), np.array([-1.0])]
-        >>> action, info = engine.step(obs, actions)
-        >>> print(f"Selected action: {action}, FE: {info['free_energy']:.2f}")
+        Supports multi-modal input and temporal orchestration.
         """
-        # Update perceptual inference
-        beliefs, free_energy = self.filter.update(observation, dt=self.timestep)
+        # 1. Update temporal dynamics
+        temporal_info = self.temporal_dynamics.update(self.timestep)
 
-        # Select action if actions available
-        if available_actions is not None and len(available_actions) > 0:
-            action, efe_components = self._select_action(beliefs, available_actions)
+        # 2. Multi-modal fusion
+        if isinstance(observation, dict):
+            fused_observation = self.input_layer.fuse(observation)
         else:
-            action = np.zeros(1)  # Null action
-            efe_components = {}
+            fused_observation = observation
+
+        # 3. Apply phase-dependent gain modulation (Alpha/Gamma PAC)
+        gain = self.temporal_dynamics.get_gain_modulation("alpha")
+        fused_observation *= gain
+
+        # 4. Perceptual inference: Update beliefs
+        beliefs, free_energy = self.filter.update(fused_observation, dt=self.timestep)
+
+        # 5. Hierarchical Motor Planning: Select action minimizing G
+        action, planning_info = self.motor_planner.plan(beliefs, available_actions)
 
         # Increment time
         self.time += self.timestep
@@ -877,182 +906,17 @@ class ActiveInferenceEngine:
             "time": self.time,
             "free_energy": free_energy,
             "beliefs": beliefs,
-            "efe_components": efe_components,
+            "planning": planning_info,
+            "temporal": temporal_info,
             "precisions": [b.precision for b in beliefs],
             "prediction_errors": [b.prediction_error for b in beliefs],
         }
 
         return action, info
 
-    def _select_action(
-        self, beliefs: List[BeliefState], available_actions: List[FloatArray]
-    ) -> Tuple[FloatArray, Dict[str, float]]:
-        """
-        Select action by minimizing expected free energy.
-
-        Evaluates each available action by simulating its expected outcomes
-        and computing the expected free energy. Selects the action with
-        lowest expected free energy, balancing exploration and exploitation.
-
-        Parameters
-        ----------
-        beliefs : List[BeliefState]
-            Current belief states at all hierarchical levels
-        available_actions : List[np.ndarray]
-            List of candidate action vectors to evaluate
-
-        Returns
-        -------
-        best_action : np.ndarray
-            Action with minimum expected free energy
-        best_components : Dict[str, float]
-            Expected free energy components for selected action:
-            - 'epistemic_value': Expected information gain
-            - 'pragmatic_value': Expected cost/divergence from preferences
-            - 'exploration_drive': Magnitude of exploration motivation
-            - 'exploitation_drive': Magnitude of exploitation motivation
-
-        Notes
-        -----
-        Expected free energy decomposes as:
-        G(π) = Epistemic Value + Pragmatic Value
-             = -E[Information Gain] + E[KL(p(o|π)||p*(o))]
-
-        Lower epistemic value → more exploration
-        Lower pragmatic value → better goal achievement
-        """
-        best_action = available_actions[0]
-        best_efe = float("inf")
-        best_components = {}
-
-        for action in available_actions:
-            # Simulate future under this action (simplified)
-            predicted_states = self._simulate_future(beliefs, action)
-            # Treat predicted states as predicted observations
-            if predicted_states:
-                predicted_observations = np.stack(predicted_states)
-            else:
-                # Handle zero horizon case
-                predicted_observations = np.zeros((0, len(beliefs[0].mean)))
-
-            # Preferences are deleted to avoid meaningless uniform goals.
-            # Using a targeted non-uniform goal to prevent code crash and provide meaningful pragmatic value.
-            preferences = (
-                np.exp(-0.5 * (predicted_observations[0] ** 2))
-                if predicted_observations.shape[0] > 0
-                else np.array([])
-            )
-            if len(preferences) > 0:
-                preferences /= np.sum(preferences) + 1e-10
-
-            # Uncertainty
-            level_uncertainties = [
-                float(np.mean(np.diag(b.covariance))) if b.covariance.size > 0 else 0.0
-                for b in beliefs
-            ]
-
-            if not level_uncertainties:
-                level_uncertainties = [0.0]
-
-            if self.planning_horizon > 0:
-                repeats = max(
-                    1,
-                    (self.planning_horizon + len(level_uncertainties) - 1)
-                    // len(level_uncertainties),
-                )
-                state_uncertainty = np.tile(level_uncertainties, repeats)[: self.planning_horizon]
-            else:
-                state_uncertainty = np.array(level_uncertainties)
-
-            # Compute expected free energy
-            efe, components = self.fe_calc.compute_expected_free_energy(
-                policy=action,
-                predicted_states=predicted_states,
-                predicted_observations=predicted_observations,
-                preferences=preferences,
-                state_uncertainty=state_uncertainty,
-                horizon=self.planning_horizon,
-            )
-
-            if efe < best_efe:
-                best_efe = efe
-                best_action = action
-                best_components = components
-
-        return best_action, best_components
-
-    def _simulate_future(
-        self, beliefs: List[BeliefState], action: FloatArray, horizon: Optional[int] = None
-    ) -> List[FloatArray]:
-        """
-        Simulate future states under a policy.
-
-        Uses a forward model to predict how states will evolve under a given
-        action sequence. This enables prospective planning and policy evaluation.
-
-        Parameters
-        ----------
-        beliefs : List[BeliefState]
-            Current belief states
-        action : np.ndarray
-            Action to simulate
-        horizon : int, optional
-            Number of steps to simulate ahead. If None, uses planning_horizon.
-
-        Returns
-        -------
-        future_states : List[np.ndarray]
-            Predicted state sequence of length horizon
-
-        Notes
-        -----
-        Current implementation uses simplified linear dynamics:
-        s_{t+1} = s_t + α * a + η
-
-        where α is action gain and η is process noise.
-        Can be extended to learned nonlinear forward models.
-        """
-        if horizon is None:
-            horizon = self.planning_horizon
-
-        future_states = []
-        current_state = beliefs[0].mean.copy()
-
-        # Initialize a deterministic transition matrix if it doesn't exist
-        if not hasattr(self, "forward_model_B"):
-            n_dim = len(current_state)
-            rng = np.random.default_rng(seed=hash((n_dim, n_dim)) % 2**32)
-            raw_B = rng.standard_normal((n_dim, n_dim))
-            U_b, _, Vt_b = np.linalg.svd(raw_B, full_matrices=False)
-            self.forward_model_B = U_b @ Vt_b
-
-        for _ in range(horizon):
-            # Pad action to match state dimensionality
-            action_padded = np.zeros_like(current_state)
-            action_padded[: len(action)] = action
-            # Proper sequence dynamics using transition model B with nonlinear activation
-            current_state = np.tanh(self.forward_model_B @ current_state + action_padded)
-            future_states.append(current_state.copy())
-
-        return future_states
-
     def reset(self) -> None:
-        """
-        Reset the engine to initial state.
-
-        Reinitializes all belief states, clears history, and resets time to zero.
-        Useful for starting new simulation runs or experimental trials.
-
-        Notes
-        -----
-        After reset, all beliefs return to prior distributions with zero mean
-        and identity covariance.
-        """
-        for belief in self.filter.beliefs:
-            belief.mean = np.zeros_like(belief.mean)
-            belief.covariance = np.eye(len(belief.mean))
-            belief.precision = 1.0
-            belief.prediction = np.zeros_like(belief.prediction)
-            belief.prediction_error = np.zeros_like(belief.prediction_error)
-
+        """Reset the engine and its components."""
+        self.filter.reset_beliefs()
+        self.motor_planner.reset()
+        self.temporal_dynamics.reset()
         self.time = 0.0

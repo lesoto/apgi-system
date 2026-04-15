@@ -1524,17 +1524,17 @@ class APGIGui:
                 noise_level = params["noise"]
 
                 if pattern == "constant":
-                    base = np.full(256, intensity)
+                    base = np.full(448, intensity)
                 elif pattern == "pulse":
                     # Create a pulse in the middle of the step
-                    base = np.zeros(256)
+                    base = np.zeros(448)
                     base[intensity > 0.5] = intensity  # Simplified pulse
                 elif pattern == "sine":
-                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(256)
+                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(448)
                 else:  # random
-                    base = np.random.randn(256) * intensity
+                    base = np.random.randn(448) * intensity
 
-                noise = np.random.randn(256) * noise_level
+                noise = np.random.randn(448) * noise_level
                 input_signal = base + noise
 
                 self.custom_input_steps_remaining -= 1
@@ -1545,8 +1545,8 @@ class APGIGui:
                 return input_signal
 
         # Default sinusoidal with noise
-        base = np.sin(2 * np.pi * t / 5.0) * np.ones(256)
-        noise = np.random.randn(256) * 0.2
+        base = np.sin(2 * np.pi * t / 5.0) * np.ones(448)
+        noise = np.random.randn(448) * 0.2
         return base + noise
 
     def _safe_update_fps(self, fps: float) -> None:

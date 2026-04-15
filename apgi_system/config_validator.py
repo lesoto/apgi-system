@@ -274,7 +274,29 @@ class ConfigValidator:
                 },
             },
             "self_model": {"required": False, "fields": {}},
-            "oscillations": {"required": False, "fields": {}},
+            "oscillations": {
+                "required": False,
+                "fields": {
+                    "bands": {"type": dict, "required": False},
+                    "coupling_strength": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.0, 1.0),
+                    },
+                    "criticality_parameter": {
+                        "type": (int, float),
+                        "required": False,
+                        "range": (0.1, 10.0),
+                    },
+                },
+            },
+            "multi_modal": {
+                "required": False,
+                "fields": {
+                    "fusion_method": {"type": str, "required": False},
+                    "modalities": {"type": dict, "required": False},
+                },
+            },
             "validation": {"required": False, "fields": {}},
             "visualization": {"required": False, "fields": {}},
             "free_energy": {"required": False, "fields": {}},

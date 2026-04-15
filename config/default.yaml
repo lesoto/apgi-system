@@ -4,13 +4,16 @@ system:
   name: "APGI-v0.1"
   timestep_ms: 1.0  # Microscale timestep
   random_seed: 42
+  max_history_size: 10000
+  conflict_divisor: 20.0
+  accuracy_divisor: 10.0
 
 # Hierarchical structure
 hierarchy:
   num_levels: 4
   level_configs:
     - name: "sensory"
-      nodes: 256
+      nodes: 448
       timescale_ms: 10
     - name: "feature"
       nodes: 128
@@ -35,6 +38,22 @@ active_inference:
   clip_final_result: 1000.0
   matrix_epsilon: 1e-10
   default_timescale_ms: 50.0
+  planning:
+    horizon: 5
+    num_policies: 12
+    precision: 1.5
+
+# Multi-modal configuration
+multi_modal:
+  modalities:
+    vision: 256
+    nlp: 128
+    audio: 64
+  fusion_weights:
+    vision: 1.0
+    nlp: 1.2
+    audio: 0.8
+
 
 # Predictive processing
 predictive_processing:
@@ -96,6 +115,7 @@ somatic_markers:
   decay_rate: 0.001
   retrieval_threshold: 0.3
   gain_modulation_range: [0.5, 2.0]
+  learning_prob: 0.1
 
 # Self model
 self_model:

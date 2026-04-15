@@ -78,41 +78,56 @@ class NarrativeSelf:
     def update(self, experience: Dict[str, Any], dt: float = 1.0) -> Dict[str, Any]:
         """
         Update narrative self with new experience.
-
-        Processes new experiences for potential storage in episodic memory
-        and gradually consolidates identity representation. Uses selective
-        encoding to store only significant experiences.
-
-        Parameters
-        ----------
-        experience : Dict[str, Any]
-            Dictionary containing experience information (event type, context,
-            outcome, etc.)
-        dt : float, optional
-            Timestep in milliseconds, by default 1.0
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary containing:
-            - 'identity_strength': Magnitude of identity vector (measure of self-definition)
-            - 'memory_count': Number of stored episodic memories
-            - 'narrative_coherence': Coherence of self-narrative (0-1)
+        Processes new experiences for potential storage using importance-weighting
+        based on surprise magnitude (Free Energy).
         """
-        # Store significant experiences
-        if np.random.rand() < 0.01:  # Selective encoding
-            self.episodic_memory.append(experience)
+        # 1. Importance-weighted selective encoding
+        # Use Free Energy as Surprise Magnitude
+        surprise = experience.get("free_energy", 0.0)
 
-        # Gradual identity consolidation
-        if len(self.episodic_memory) > 0:
-            self.identity_vector *= 1 - self.consolidation_rate * dt / 1000.0
+        # Scaling surprise to a probability
+        # High surprise -> High probability of encoding
+        # k=1.5, x0=50 can be tuned via config
+        threshold = self.config.get("encoding_threshold", 50.0)
+        encoding_prob = 1.0 / (1.0 + np.exp(-0.1 * (surprise - threshold)))
 
-        coherence = 1.0 - 0.1 * np.random.rand()  # Simplified
+        # Always store extreme surprises, otherwise probabilistic
+        if surprise > threshold * 2 or np.random.rand() < encoding_prob:
+            self.episodic_memory.append(
+                {
+                    "time": experience.get("time", 0.0),
+                    "surprise": surprise,
+                    "content": experience.get("beliefs", []),  # Store belief state as memory
+                    "type": "significant_event" if surprise > threshold else "routine",
+                }
+            )
+
+        # 2. Gradual identity consolidation
+        # Identity vector rotates towards significant experiences
+        if len(self.episodic_memory) > 0 and surprise > threshold:
+            # Simplified: Use a portion of the top-level belief to influence identity
+            beliefs = experience.get("beliefs", [])
+            if beliefs:
+                top_belief = beliefs[-1].mean
+                # Project or pad to identity dim (64)
+                if len(top_belief) >= 64:
+                    update_vec = top_belief[:64]
+                else:
+                    update_vec = np.pad(top_belief, (0, 64 - len(top_belief)))
+
+                # Update identity: slow moving average towards current significant state
+                alpha = self.consolidation_rate * dt / 1000.0
+                self.identity_vector = (1 - alpha) * self.identity_vector + alpha * update_vec
+
+        # 3. Compute Coherence
+        # Coherence is high if current surprise is low, and if identity is stable
+        coherence = 1.0 / (1.0 + 0.01 * surprise)
 
         return {
             "identity_strength": float(np.linalg.norm(self.identity_vector)),
             "memory_count": len(self.episodic_memory),
             "narrative_coherence": float(coherence),
+            "encoded_this_step": surprise > threshold or (np.random.rand() < encoding_prob),
         }
 
     def get_current_state(self) -> Dict[str, Any]:

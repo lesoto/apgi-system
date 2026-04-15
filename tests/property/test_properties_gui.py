@@ -342,7 +342,7 @@ def test_property_intervention_application(
     applier = MockInterventionApplier(system)
 
     # Get initial state
-    initial_obs = np.random.randn(256) * 0.5
+    initial_obs = np.random.randn(448) * 0.5
     system.step(initial_obs)
 
     # Apply intervention
@@ -351,7 +351,7 @@ def test_property_intervention_application(
         assert success
 
         # Verify arousal and stress were increased (should affect next state)
-        next_obs = np.random.randn(256) * 0.5
+        next_obs = np.random.randn(448) * 0.5
         system.step(next_obs)
 
         # The intervention should have some effect on the system state
@@ -363,7 +363,7 @@ def test_property_intervention_application(
         assert success
 
         # Verify stressor was applied (should affect allostatic load)
-        next_obs = np.random.randn(256) * 0.5
+        next_obs = np.random.randn(448) * 0.5
         system.step(next_obs)
 
         # Allostatic load should be affected by the stressor

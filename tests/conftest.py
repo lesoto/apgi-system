@@ -119,14 +119,14 @@ def random_observation() -> NDArray[np.float64]:
     Returns
     -------
     np.ndarray
-        Random observation vector of shape (256,) with values ~ N(0, 0.5^2).
+        Random observation vector of shape (448,) with values ~ N(0, 0.5^2).
 
     Notes
     -----
     The observation is scaled to have moderate variance (0.5) to represent
     typical sensory input magnitudes.
     """
-    return np.random.randn(256) * 0.5
+    return np.random.randn(448) * 0.5
 
 
 @pytest.fixture

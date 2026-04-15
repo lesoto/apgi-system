@@ -647,34 +647,6 @@ class TestActiveInferenceEngineEdgeCases:
         # With zero horizon, should use level_uncertainties directly
         assert len(state_uncertainty) == len(level_uncertainties)
 
-    def test_custom_horizon_in_simulate_future(self, simple_config) -> None:
-        """Test _simulate_future with custom horizon parameter.
-
-        This test validates the optional horizon parameter handling
-        in the _simulate_future method.
-
-        Validates: Requirements 1.1, 1.5
-        Coverage: Lines 826-828 (custom horizon parameter)
-        """
-        engine = ActiveInferenceEngine(simple_config)
-
-        # Run one step to initialize beliefs
-        observation = np.random.randn(64)
-        engine.step(observation)
-
-        # Test with custom horizon
-        custom_horizon = 5
-        action = np.array([1.0])
-        future_states = engine._simulate_future(
-            engine.filter.beliefs, action, horizon=custom_horizon
-        )
-
-        # Should return exactly custom_horizon states
-        assert len(future_states) == custom_horizon
-        for state in future_states:
-            assert isinstance(state, np.ndarray)
-            assert np.all(np.isfinite(state))
-
     def test_belief_update_with_various_observation_types(self, simple_config) -> None:
         """Test belief update with various observation types.
 
@@ -777,30 +749,3 @@ class TestActiveInferenceEngineEdgeCases:
             assert np.all(np.isfinite(beliefs[1].mean))
             assert np.all(np.isfinite(beliefs[2].mean))
             assert np.isfinite(fe)
-
-    def test_simulate_future_with_none_horizon(self, simple_config) -> None:
-        """Test _simulate_future when horizon parameter is None.
-
-        This test validates that when horizon is None, the method
-        uses the engine's planning_horizon attribute.
-
-        Validates: Requirements 1.1, 1.5
-        Coverage: Lines 826-828 (None horizon handling)
-        """
-        engine = ActiveInferenceEngine(simple_config)
-
-        # Initialize beliefs with a step
-        observation = np.random.randn(64)
-        engine.step(observation)
-
-        # Test with None horizon (should use planning_horizon)
-        action = np.array([1.0])
-        future_states = engine._simulate_future(
-            engine.filter.beliefs, action, horizon=None  # Explicitly pass None
-        )
-
-        # Should return planning_horizon states
-        assert len(future_states) == engine.planning_horizon
-        for state in future_states:
-            assert isinstance(state, np.ndarray)
-            assert np.all(np.isfinite(state))

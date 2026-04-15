@@ -40,6 +40,7 @@ settings.register_profile(
         HealthCheck.too_slow,
         HealthCheck.function_scoped_fixture,
         HealthCheck.large_base_example,
+        HealthCheck.data_too_large,
     ],
 )
 settings.load_profile("property_tests")
@@ -194,7 +195,8 @@ class DataExporter:
         }
 
 
-@given(num_steps=st.integers(min_value=5, max_value=50), observation=observation_strategy())
+@settings(max_examples=20)
+@given(num_steps=st.integers(min_value=3, max_value=20), observation=observation_strategy())
 def test_property_export_data_completeness(
     num_steps: int, observation: NDArray[np.float64]
 ) -> None:

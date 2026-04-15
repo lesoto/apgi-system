@@ -616,7 +616,10 @@ class APGISystemGUI:
         try:
             self.system = APGISystem()
             self.is_initialized = True
-            self.logger.info("APGI system initialized successfully")
+            # Update settings UI to reflect actual config
+            input_dim = self.system.config["hierarchy"]["level_configs"][0]["nodes"]
+            self.input_dim_var.set(input_dim)
+            self.logger.info(f"APGI system initialized successfully (input_dim={input_dim})")
             self.status_mgr.set_status("System initialized", "success")
         except Exception as e:
             self.logger.error(f"Failed to initialize system: {e}")
@@ -649,11 +652,13 @@ class APGISystemGUI:
 
         try:
             with self.system_lock:
-                # Generate 256-dimensional extero_input (sensory input)
-                # Use sinusoidal pattern with noise similar to APGI-GUI.py
+                # Get input dimension from system config (sensory level nodes)
+                input_dim = self.system.config["hierarchy"]["level_configs"][0]["nodes"]
+
+                # Generate extero_input with correct dimension
                 t = self.system.time / 1000.0  # Convert to seconds
-                base = np.sin(2 * np.pi * t / 5.0) * np.ones(256)
-                noise = np.random.randn(256) * 0.2
+                base = np.sin(2 * np.pi * t / 5.0) * np.ones(input_dim)
+                noise = np.random.randn(input_dim) * 0.2
                 extero_input = (base + noise).astype(np.float64)
 
                 self.system.step(extero_input)

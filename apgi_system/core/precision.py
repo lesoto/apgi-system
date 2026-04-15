@@ -239,12 +239,12 @@ class PrecisionWeighting:
         # Validate inputs
         if extero_error_variance is not None:
             InputValidator.validate_scalar(
-                extero_error_variance, "extero_error_variance", value_range=(0.0, 1e6)
+                extero_error_variance, "extero_error_variance", value_range=(0.0, 1e9)
             )
 
         if intero_error_variance is not None:
             InputValidator.validate_scalar(
-                intero_error_variance, "intero_error_variance", value_range=(0.0, 1e6)
+                intero_error_variance, "intero_error_variance", value_range=(0.0, 1e9)
             )
 
         if attention_target is not None:

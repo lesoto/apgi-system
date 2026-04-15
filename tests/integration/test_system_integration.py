@@ -326,7 +326,7 @@ class TestExtendedSimulation:
 
         # Custom input that varies over time
         def varying_input(t):
-            return np.sin(t / 100.0) * np.random.randn(256) * 0.5
+            return np.sin(t / 100.0) * np.random.randn(448) * 0.5
 
         duration_ms = 500.0
         result = apgi_system.run(duration_ms=duration_ms, extero_input_fn=varying_input)

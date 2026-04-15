@@ -21,8 +21,6 @@ RUN apt-get update && apt-get install -y \
     tcl8.6-dev \
     tk8.6-dev \
     python3-tk \
-    rustc \
-    cargo \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies

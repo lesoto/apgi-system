@@ -27,6 +27,7 @@ import numpy as np
 import httpx
 import time
 from concurrent.futures import ThreadPoolExecutor
+from apgi_system.self_model.state_classifier import StateClassifier
 
 # Import theme manager
 try:
@@ -1849,7 +1850,7 @@ class AIModelVisualizer:
         self.cache: Dict[str, List[Dict]] = {}
         self._load_cache()
 
-    def _load_cache(self):
+    def _load_cache(self) -> None:
         """Load from apgi_hf_cache.json if available"""
         try:
             if os.path.exists(CACHE_FILE):
@@ -1923,6 +1924,7 @@ class APGIVisualizerGUI:
 
         try:
             self.visualizer: APGIVisualizer = APGIVisualizer(PSYCHOLOGICAL_STATES, STATE_CATEGORIES)
+            self.classifier = StateClassifier(PSYCHOLOGICAL_STATES)
             self.current_visualization: Optional[go.Figure] = None
             self.current_html_file: Optional[str] = None
 
@@ -4009,6 +4011,13 @@ for name, category, Pi_e, Pi_i_baseline, M_ca, beta, z_e, z_i, theta_t in STATE_
     except ValueError as e:
         logger.warning(f"Skipping invalid state '{name}': {e}")
         continue
+
+
+def identify_emergent_state(params: Dict[str, float]) -> Tuple[str, float]:
+    """Identify the psychological state that emerges from given params."""
+    temp_classifier = StateClassifier(PSYCHOLOGICAL_STATES)
+    return temp_classifier.classify(params)
+
 
 # =============================================================================
 # UTILITY FUNCTIONS

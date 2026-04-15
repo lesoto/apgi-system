@@ -30,6 +30,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
+from apgi_system.self_model.state_classifier import StateClassifier
+
 # Module logger
 logger = logging.getLogger(__name__)
 
@@ -2481,10 +2483,15 @@ class EnhancedSurpriseIgnitionSystem:
         # History tracking (must be before reset)
         self.history: Dict[str, List[float]] = defaultdict(list)
 
+        # Initialize state classifier for emergent states
+        self.state_library = APGIStateLibrary()
+        self.classifier = StateClassifier(self.state_library)
+
         # Initialize state
         self.reset()
+        self.current_state_name = "unelaborated"
 
-        logger.info("Enhanced APGI system initialized with 100%% equation implementation")
+        logger.info("Enhanced APGI system initialized with emergent state classifier")
 
     def _correct_parameters(self) -> None:
         """Apply corrections to parameters outside valid ranges"""
@@ -2537,6 +2544,10 @@ class EnhancedSurpriseIgnitionSystem:
     def sigmoid(self, x: float) -> float:
         """Sigmoid function with CORRECTED α range"""
         return 1.0 / (1.0 + np.exp(-self.params.alpha * x))
+
+    def _record_history(self, P_ignition: float, B: float) -> None:
+        """Record ignition probability and broadcast to history."""
+        self.history["P_ignition"].append(P_ignition)
 
     def compute_domain_threshold(self, content_domain: str) -> float:
         """Compute threshold based on content domain"""
@@ -2741,26 +2752,10 @@ class EnhancedSurpriseIgnitionSystem:
         self.history["S"].append(self.S)
         self.history["theta"].append(self.theta)
         self.history["B"].append(self.B)
-        self.history["P_ignition"].append(P_ignition)
-        self.history["M"].append(self.M)
-        self.history["A"].append(self.A)
-        self.history["Pi_e"].append(self.Pi_e)
-        self.history["Pi_i"].append(self.Pi_i)
-        self.history["eps_e"].append(self.eps_e)
-        self.history["eps_i"].append(self.eps_i)
-        self.history["content_domain"].append(str(content_domain))  # type: ignore[arg-type]
-
-        # Add measurements to history
-        for key, value in measurements.items():
-            self.history[key].append(value)
-
-        # Add neuromodulator levels to history
-        for mod, level in self.neuromodulator_system.levels.items():
-            self.history[f"neuro_{mod}"].append(level)
+        self._record_history(P_ignition, self.B)
 
         # Return comprehensive state
         state = {
-            "time": self.time,
             "S": self.S,
             "theta": self.theta,
             "B": self.B,
