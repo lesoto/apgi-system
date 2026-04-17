@@ -1,19 +1,18 @@
 # APGI System Default Configuration
 
 system:
-  name: "APGI-v0.1"
-  timestep_ms: 1.0  # Microscale timestep
+  name: "APGI-v1"
+  timestep_ms: 1.0
   random_seed: 42
   max_history_size: 10000
   conflict_divisor: 20.0
   accuracy_divisor: 10.0
 
-# Hierarchical structure
 hierarchy:
   num_levels: 4
   level_configs:
     - name: "sensory"
-      nodes: 448
+      nodes: 256
       timescale_ms: 10
     - name: "feature"
       nodes: 128

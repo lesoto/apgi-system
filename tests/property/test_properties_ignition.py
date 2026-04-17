@@ -80,7 +80,7 @@ class TestIgnitionDynamicsProperties:
         intero_precision = error_data["intero_precision"] * 2.0  # High precision
 
         # Ensure we're outside refractory period
-        threshold_system.last_ignition_time = current_time - 1000.0  # 1 second ago
+        threshold_system.last_ignition_time = np.array([current_time - 1000.0])  # 1 second ago
 
         # Compute ignition signal
         ignited, components = threshold_system.compute_ignition_signal(
@@ -88,7 +88,7 @@ class TestIgnitionDynamicsProperties:
             extero_precision=extero_precision,
             intero_error=intero_error,
             intero_precision=intero_precision,
-            somatic_marker_gain=somatic_gain,
+            somatic_marker_gain=np.array([somatic_gain]),
             current_time=current_time,
         )
 
@@ -143,10 +143,9 @@ class TestIgnitionDynamicsProperties:
 
         # Trigger ignition
         state = workspace.update(
-            ignition_occurred=True,
-            candidate_content=candidate_content,
-            source="test_source",
-            priority=1.5,
+            ignition_mask=np.array([True]),
+            candidates=candidate_content,
+            priorities=np.array([1.5]),
             dt=1.0,
         )
 
@@ -156,7 +155,7 @@ class TestIgnitionDynamicsProperties:
         total_time = 0.0
 
         for i in range(num_updates):
-            state = workspace.update(ignition_occurred=False, dt=1.0)
+            state = workspace.update(ignition_mask=np.array([False]), dt=1.0)
             total_time += 1.0
 
             if state["is_broadcasting"] and broadcast_start_time is None:
@@ -209,25 +208,27 @@ class TestIgnitionDynamicsProperties:
 
         # Test with high reserves
         threshold_high_reserves = IgnitionThreshold(config)
-        threshold_high_reserves.update_metabolic_state(reserves_high, 0.0)
+        threshold_high_reserves.update_metabolic_state(np.array([reserves_high]), np.array([0.0]))
 
         _, components_high = threshold_high_reserves.compute_ignition_signal(
             extero_error=error_data["extero_error"],
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
+            somatic_marker_gain=np.array([1.0]),
             current_time=0.0,
         )
 
         # Test with low reserves
         threshold_low_reserves = IgnitionThreshold(config)
-        threshold_low_reserves.update_metabolic_state(reserves_low, 0.0)
+        threshold_low_reserves.update_metabolic_state(np.array([reserves_low]), np.array([0.0]))
 
         _, components_low = threshold_low_reserves.compute_ignition_signal(
             extero_error=error_data["extero_error"],
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
+            somatic_marker_gain=np.array([1.0]),
             current_time=0.0,
         )
 
@@ -266,25 +267,31 @@ class TestIgnitionDynamicsProperties:
 
         # Test with low allostatic load
         threshold_low_load = IgnitionThreshold(config)
-        threshold_low_load.update_metabolic_state(1.0, load_low)  # Full reserves, low load
+        threshold_low_load.update_metabolic_state(
+            np.array([1.0]), np.array([load_low])
+        )  # Full reserves, low load
 
         _, components_low = threshold_low_load.compute_ignition_signal(
             extero_error=error_data["extero_error"],
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
+            somatic_marker_gain=np.array([1.0]),
             current_time=0.0,
         )
 
         # Test with high allostatic load
         threshold_high_load = IgnitionThreshold(config)
-        threshold_high_load.update_metabolic_state(1.0, load_high)  # Full reserves, high load
+        threshold_high_load.update_metabolic_state(
+            np.array([1.0]), np.array([load_high])
+        )  # Full reserves, high load
 
         _, components_high = threshold_high_load.compute_ignition_signal(
             extero_error=error_data["extero_error"],
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
+            somatic_marker_gain=np.array([1.0]),
             current_time=0.0,
         )
 
@@ -331,7 +338,7 @@ class TestIgnitionDynamicsProperties:
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
-            somatic_marker_gain=gain_low,
+            somatic_marker_gain=np.array([gain_low]),
             current_time=0.0,
         )
 
@@ -344,7 +351,7 @@ class TestIgnitionDynamicsProperties:
             extero_precision=error_data["extero_precision"],
             intero_error=error_data["intero_error"],
             intero_precision=error_data["intero_precision"],
-            somatic_marker_gain=gain_high,
+            somatic_marker_gain=np.array([gain_high]),
             current_time=0.0,
         )
 

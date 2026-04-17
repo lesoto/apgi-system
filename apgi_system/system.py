@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 from apgi_system.config_validator import ConfigValidationError, ConfigValidator
 from apgi_system.core import ActiveInferenceEngine, HierarchicalPredictor, PrecisionWeighting
 from apgi_system.core.interfaces import SubsystemProtocol
+from apgi_system.core.vp15 import VP15ValidationProtocol
 from apgi_system.ignition import GlobalWorkspace, IgnitionThreshold
 from apgi_system.interoception import AllostaticRegulator, BodyModel, SomaticMarkerSystem
 from apgi_system.monitoring import PerformanceMonitor
@@ -133,6 +134,9 @@ class APGISystem:
                 subsystem, SubsystemProtocol
             ), f"Subsystem '{name}' does not satisfy SubsystemProtocol at runtime."
 
+        # Initialize VP-15 validation protocol
+        self.vp15 = VP15ValidationProtocol(self.config)
+
     def _build_subsystem_protocol_adapters(self) -> Dict[str, SubsystemProtocol]:
         """Wrap heterogeneous subsystem APIs behind the SubsystemProtocol contract."""
 
@@ -209,7 +213,19 @@ class APGISystem:
         intero_vector = self.body_model.get_interoceptive_vector()
 
         # 2. Allostatic regulation
-        allostasis_info = self.allostasis.update(body_info["current"], dt)
+        # Convert body state dict back to array format for allostasis compatibility
+        # Handle both scalar (batch_size=1) and array (batch_size>1) cases
+        body_state_values = [
+            body_info["current"]["heart_rate"],
+            body_info["current"]["respiration"],
+            body_info["current"]["temperature"],
+            body_info["current"]["glucose"],
+            body_info["current"]["cortisol"],
+            body_info["current"]["blood_pressure"],
+        ]
+        # Convert to 2D array (1, 6) for batch_size=1 compatibility
+        body_state_array = np.array(body_state_values).reshape(1, -1)
+        allostasis_info = self.allostasis.update(body_state_array, dt)
 
         # 3. Multi-modal fusion and Predictive processing
         # Use simple fusion if vector provided, otherwise let active_inference handle dict
@@ -232,12 +248,22 @@ class APGISystem:
         extero_stats: Any = errors.get("exteroceptive_stats", {})
         intero_stats: Any = errors.get("interoceptive_stats", {})
 
-        extero_variance = (
-            extero_stats.get("mean_error", 1.0) ** 2 if isinstance(extero_stats, dict) else 1.0
+        # Extract scalar variance from stats (handle both scalar and array returns)
+        extero_mean_error = (
+            extero_stats.get("mean_error", 1.0) if isinstance(extero_stats, dict) else 1.0
         )
-        intero_variance = (
-            intero_stats.get("mean_error", 1.0) ** 2 if isinstance(intero_stats, dict) else 1.0
+        intero_mean_error = (
+            intero_stats.get("mean_error", 1.0) if isinstance(intero_stats, dict) else 1.0
         )
+
+        # Convert to scalar if array
+        if isinstance(extero_mean_error, np.ndarray):
+            extero_mean_error = float(np.mean(extero_mean_error))
+        if isinstance(intero_mean_error, np.ndarray):
+            intero_mean_error = float(np.mean(intero_mean_error))
+
+        extero_variance = extero_mean_error**2
+        intero_variance = intero_mean_error**2
 
         precision_info = self.precision.update(
             extero_error_variance=extero_variance,
@@ -297,9 +323,15 @@ class APGISystem:
             current_time=self.time,
         )
 
+        # Convert array to scalar for boolean checks
+        ignition_scalar = bool(np.any(ignition_occurred))
+
+        # Add ignition_occurred to ignition_info (keep as numpy array for internal use)
+        ignition_info["ignition_occurred"] = ignition_occurred
+
         # Update threshold with metabolic state
         metabolic_info = self.metabolism.update(
-            ignition_occurred=ignition_occurred,
+            ignition_occurred=ignition_scalar,
             task_active=True,
             dt=dt,
             broadcast_content=predictor_input,
@@ -311,10 +343,25 @@ class APGISystem:
         )
 
         # 8. Global workspace update
+        ignition_mask = ignition_occurred
+        if ignition_scalar:
+            # Reshape predictor_input to match workspace content dimensions
+            workspace_dim = self.global_workspace.content_dim
+            if predictor_input.shape[0] > workspace_dim:
+                # Truncate or project to workspace dimension
+                candidate = predictor_input[:workspace_dim]
+            elif predictor_input.shape[0] < workspace_dim:
+                # Pad with zeros
+                candidate = np.zeros(workspace_dim)
+                candidate[: predictor_input.shape[0]] = predictor_input
+            else:
+                candidate = predictor_input
+            candidates = np.array([candidate])
+        else:
+            candidates = None
         workspace_info = self.global_workspace.update(
-            ignition_occurred=ignition_occurred,
-            candidate_content=predictor_input,
-            source="sensory",
+            ignition_mask=ignition_mask,
+            candidates=candidates,
             dt=dt,
         )
 
@@ -330,11 +377,12 @@ class APGISystem:
         conflict_signal = float(min(1.0, (extero_variance + intero_variance) / conflict_divisor))
 
         # 10. Large-scale networks
+        batch_size = self.config.get("active_inference", {}).get("batch_size", 1)
         network_info = self.networks.update(
             extero_input=predictor_input,
             intero_input=intero_vector,
-            ignition_signal=ignition_occurred,
-            conflict_signal=conflict_signal,
+            ignition_signal=np.full(batch_size, 1.0 if ignition_scalar else 0.0),
+            conflict_signal=np.full(batch_size, conflict_signal),
             dt=dt,
         )
 
@@ -346,30 +394,40 @@ class APGISystem:
         coherence_info = self.coherence.update(minimal_info, narrative_info)
 
         # 12. Oscillations
-        osc_modulation = {"gamma": 2.0 if ignition_occurred else 1.0}
+        osc_modulation = {"gamma": 2.0 if ignition_scalar else 1.0}
         osc_info = self.oscillations.generate(modulation=osc_modulation)
 
         # 13. Entropy tracking
-        entropy_info = self.entropy.update(num_spikes=0, ignition=ignition_occurred, dt=dt)
+        entropy_info = self.entropy.update(num_spikes=0, ignition=ignition_scalar, dt=dt)
 
         # 14. Learn from experience (somatic markers)
         learning_prob = self.config.get("somatic_markers", {}).get("learning_prob", 0.1)
-        if ignition_occurred and float(self._rng.random()) < learning_prob:
+        if ignition_scalar and float(self._rng.random()) < learning_prob:
             outcome = -allostasis_info["allostatic_load"]  # Negative load is good
             self.somatic_markers.learn(predictor_input, ai_action, outcome, self.time)
 
         # Record history
         self._record_history(
-            ignition_occurred, ai_info["free_energy"], precision_info, metabolic_info
+            ignition_scalar, ai_info["free_energy"], precision_info, metabolic_info
         )
 
         # End performance monitoring and record metrics
+        # Extract scalar precision for performance monitor
+        precision_scalar = precision_info.get("exteroceptive", 1.0)
+        if isinstance(precision_scalar, np.ndarray):
+            precision_scalar = float(np.mean(precision_scalar))
         perf_metrics = self.performance_monitor.end_step(
             system_time_ms=self.time,
-            ignition_occurred=ignition_occurred,
+            ignition_occurred=ignition_scalar,
             free_energy=ai_info["free_energy"],
-            precision=precision_info["exteroceptive"],
+            precision=precision_scalar,
         )
+
+        # Convert precision to scalars if batch_size is 1 for test compatibility
+        precision_info_scalar = {
+            k: float(v[0]) if isinstance(v, np.ndarray) and v.ndim > 0 else float(v)
+            for k, v in precision_info.items()
+        }
 
         # Compile complete state
         state = {
@@ -380,7 +438,7 @@ class APGISystem:
             "timeline": timeline_info,
             "body": body_info,
             "allostasis": allostasis_info,
-            "precision": precision_info,
+            "precision": precision_info_scalar,
             "prediction": prediction_results,
             "networks": network_info,
             "active_inference": ai_info,
@@ -395,6 +453,14 @@ class APGISystem:
             "reportable": workspace_info["is_reportable"],
         }
 
+        # 15. VP-15 Validation
+        is_valid, vp15_metrics = self.vp15.validate_step(state)
+        state["vp15"] = {
+            "is_valid": is_valid,
+            "metrics": vp15_metrics.__dict__,
+            "report": self.vp15.get_violation_report() if not is_valid else "",
+        }
+
         # Add performance metrics if available
         if perf_metrics is not None:
             state["performance"] = {
@@ -404,6 +470,230 @@ class APGISystem:
             }
 
         return state
+
+    async def step_async(
+        self,
+        extero_input: Union[NDArray[np.float64], Dict[str, NDArray[np.float64]]],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Asynchronous version of system step utilizing concurrent subsystem updates.
+        """
+        import asyncio
+
+        # Start performance monitoring
+        self.performance_monitor.start_step()
+
+        dt = self.timestep_ms
+        self.time += dt
+
+        # 1 & 12 Parallel: Body model and Neural Oscillations
+        results = await asyncio.gather(
+            asyncio.to_thread(self.body_model.update, dt),
+            asyncio.to_thread(self.oscillations.generate),
+        )
+        body_info, osc_info = results
+
+        # 2. Allostatic regulation
+        # Convert body state dict back to array format for allostasis compatibility
+        # Handle both scalar (batch_size=1) and array (batch_size>1) cases
+        body_state_values = [
+            body_info["current"]["heart_rate"],
+            body_info["current"]["respiration"],
+            body_info["current"]["temperature"],
+            body_info["current"]["glucose"],
+            body_info["current"]["cortisol"],
+            body_info["current"]["blood_pressure"],
+        ]
+        # Convert to 2D array (1, 6) for batch_size=1 compatibility
+        body_state_array = np.array(body_state_values).reshape(1, -1)
+        allostasis_info = self.allostasis.update(body_state_array, dt)
+
+        # 3, 4, 5. Core Sequential (Inference & Action)
+        # We run these in a single thread to avoid overhead, but could thread specific matrix ops
+        state_sync = await asyncio.to_thread(
+            self._step_core_sequential, extero_input, body_info, allostasis_info, dt, context
+        )
+
+        # 8, 10, 11, 13 Parallel: Post-ignition updates
+        ignition_mask = np.full(
+            self.global_workspace.batch_size, state_sync["ignition_occurred"], dtype=bool
+        )
+        if state_sync["ignition_occurred"]:
+            # Reshape predictor_input to match workspace content dimensions
+            workspace_dim = self.global_workspace.content_dim
+            predictor_input_sync = state_sync["predictor_input"]
+            if predictor_input_sync.shape[0] > workspace_dim:
+                candidate = predictor_input_sync[:workspace_dim]
+            elif predictor_input_sync.shape[0] < workspace_dim:
+                candidate = np.zeros(workspace_dim)
+                candidate[: predictor_input_sync.shape[0]] = predictor_input_sync
+            else:
+                candidate = predictor_input_sync
+            candidates = np.array([candidate])
+        else:
+            candidates = None
+        batch_size = self.config.get("active_inference", {}).get("batch_size", 1)
+        post_results = await asyncio.gather(
+            asyncio.to_thread(self.global_workspace.update, ignition_mask, candidates, None, dt),
+            asyncio.to_thread(
+                self.networks.update,
+                state_sync["predictor_input"],
+                self.body_model.get_interoceptive_vector(),
+                np.full(batch_size, float(state_sync["ignition_occurred"])),
+                np.full(batch_size, state_sync["conflict_signal"]),
+                dt,
+            ),
+            asyncio.to_thread(
+                self.metabolism.update,
+                state_sync["ignition_occurred"],
+                True,
+                dt,
+                state_sync["predictor_input"],
+            ),
+            asyncio.to_thread(self.entropy.update, 0, state_sync["ignition_occurred"], dt),
+        )
+        workspace_info, network_info, metabolic_info, entropy_info = post_results
+
+        # Self-model needs sequential minimal -> coherence
+        minimal_info = self.minimal_self.update(
+            self.body_model.get_interoceptive_vector(), state_sync["prediction_accuracy"], dt
+        )
+        narrative_info = self.narrative_self.update({"time": self.time}, dt)
+        self.coherence.update(minimal_info, narrative_info)
+
+        # Record history
+        self._record_history(
+            state_sync["ignition_occurred"],
+            state_sync["ai_info"]["free_energy"],
+            state_sync["precision_info"],
+            metabolic_info,
+        )
+
+        perf_metrics = self.performance_monitor.end_step(
+            system_time_ms=self.time,
+            ignition_occurred=state_sync["ignition_occurred"],
+            free_energy=state_sync["ai_info"]["free_energy"],
+            precision=state_sync["precision_info"]["exteroceptive"],
+        )
+
+        state = {
+            "time": self.time,
+            "free_energy": state_sync["ai_info"]["free_energy"],
+            "ignition": state_sync["ignition_info"],
+            "workspace": workspace_info,
+            "timeline": state_sync["ai_info"].get("temporal", {}),
+            "body": body_info,
+            "allostasis": allostasis_info,
+            "precision": state_sync["precision_info"],
+            "prediction": state_sync["prediction_results"],
+            "networks": network_info,
+            "active_inference": state_sync["ai_info"],
+            "self_model": {
+                "minimal": minimal_info,
+                "narrative": narrative_info,
+                "coherence": self.coherence.get_coherence_metrics(),
+            },
+            "metabolism": metabolic_info,
+            "entropy": entropy_info,
+            "oscillations": osc_info,
+            "reportable": workspace_info["is_reportable"],
+        }
+
+        # VP-15 Validation
+        is_valid, vp15_metrics = self.vp15.validate_step(state)
+        state["vp15"] = {"is_valid": is_valid, "metrics": vp15_metrics.__dict__}
+
+        if perf_metrics is not None:
+            state["performance"] = {"step_time_ms": perf_metrics.step_time_ms}
+
+        return state
+
+    def _step_core_sequential(
+        self,
+        extero_input: Any,
+        body_info: Dict[str, Any],
+        allostasis_info: Dict[str, Any],
+        dt: float,
+        context: Any,
+    ) -> Dict[str, Any]:
+        """Hidden helper for sequential core of the step."""
+        intero_vector = self.body_model.get_interoceptive_vector()
+        if isinstance(extero_input, dict):
+            predictor_input = self.active_inference.input_layer.fuse(extero_input)
+            predictor_input = extero_input.get("vision", predictor_input)
+        else:
+            predictor_input = extero_input.astype(np.float64)
+
+        prediction_results = self.predictor.predict(
+            extero_input=predictor_input, intero_input=intero_vector, dt_ms=dt
+        )
+        errors = self.predictor.get_prediction_errors()
+        extero_stats = errors.get("exteroceptive_stats", {})
+        intero_stats = errors.get("interoceptive_stats", {})
+
+        # Extract scalar variance from stats (handle both scalar and array returns)
+        extero_mean_error = (
+            extero_stats.get("mean_error", 1.0) if isinstance(extero_stats, dict) else 1.0
+        )
+        intero_mean_error = (
+            intero_stats.get("mean_error", 1.0) if isinstance(intero_stats, dict) else 1.0
+        )
+
+        # Convert to scalar if array
+        if isinstance(extero_mean_error, np.ndarray):
+            extero_mean_error = float(np.mean(extero_mean_error))
+        if isinstance(intero_mean_error, np.ndarray):
+            intero_mean_error = float(np.mean(intero_mean_error))
+
+        extero_variance = extero_mean_error**2
+        intero_variance = intero_mean_error**2
+
+        # Convert scalar variances to arrays for precision.update type compatibility
+        extero_variance_array = np.full(self.precision.batch_size, extero_variance)
+        intero_variance_array = np.full(self.precision.batch_size, intero_variance)
+
+        precision_info = self.precision.update(
+            extero_error_variance=extero_variance_array,
+            intero_error_variance=intero_variance_array,
+            context=context,
+        )
+
+        ai_action, ai_info = self.active_inference.step(
+            observation=extero_input, available_actions=None
+        )
+
+        somatic_gain, _ = self.somatic_markers.retrieve(context=predictor_input, action=ai_action)
+        beta = self.config.get("precision", {}).get("intero_somatic_beta", 1.0)
+        sigmoid_M = 1.0 / (1.0 + np.exp(-(somatic_gain)))
+        effective_intero_precision = precision_info["interoceptive"] * (1.0 + beta * sigmoid_M)
+
+        extero_error = errors.get("exteroceptive", np.zeros(len(extero_input)))
+        ignition_occurred, ignition_info = self.ignition_threshold.compute_ignition_signal(
+            extero_error=extero_error,
+            extero_precision=precision_info["exteroceptive"],
+            intero_error=body_info["prediction_error"],
+            intero_precision=effective_intero_precision,
+            somatic_marker_gain=somatic_gain,
+            current_time=self.time,
+        )
+
+        conflict_divisor = self.config.get("system", {}).get("conflict_divisor", 20.0)
+        conflict_signal = float(min(1.0, (extero_variance + intero_variance) / conflict_divisor))
+
+        accuracy_divisor = self.config.get("system", {}).get("accuracy_divisor", 10.0)
+        prediction_accuracy = 1.0 - min(1.0, extero_variance / accuracy_divisor)
+
+        return {
+            "predictor_input": predictor_input,
+            "prediction_results": prediction_results,
+            "precision_info": precision_info,
+            "ai_info": ai_info,
+            "ignition_occurred": ignition_occurred,
+            "ignition_info": ignition_info,
+            "conflict_signal": conflict_signal,
+            "prediction_accuracy": prediction_accuracy,
+        }
 
     def run(
         self,
@@ -452,6 +742,7 @@ class APGISystem:
             "ignition_count": sum([1 for r in results if r["ignition"]["ignition_occurred"]]),
             "final_state": results[-1] if results else {},
             "history": self.history,
+            "ignition_occurred": results[-1]["ignition"]["ignition_occurred"] if results else False,
         }
 
     def _record_history(

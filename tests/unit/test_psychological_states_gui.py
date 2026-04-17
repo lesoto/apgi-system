@@ -8,7 +8,9 @@ adjustments without launching the full GUI.
 Tests focus on the backend logic that powers the Psychological States GUI functionality.
 """
 
+import importlib.util
 import json
+import sys
 import tempfile
 import tkinter as tk
 from pathlib import Path
@@ -17,11 +19,32 @@ from unittest.mock import patch
 
 import pytest
 
+
+def load_module_from_file(module_name: str, file_path: Path):
+    """Load a Python module from a file path, handling hyphenated filenames."""
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 # Import the GUI class with error handling
 try:
-    from Psychological_States_GUI import APGIVisualizer, APGIVisualizerGUI  # type: ignore[import-not-found, no-redef]
+    # Load from hyphenated filename using importlib
+    psych_gui_path = Path(__file__).parent.parent.parent / "Psychological-States-GUI.py"
+    if psych_gui_path.exists():
+        Psychological_States_GUI = load_module_from_file("Psychological_States_GUI", psych_gui_path)
+        APGIVisualizer = Psychological_States_GUI.APGIVisualizer
+        APGIVisualizerGUI = Psychological_States_GUI.APGIVisualizerGUI
+        HAS_PSYCHOLOGICAL_GUI = True
+    else:
+        # Fallback to standard import if file renamed
+        from Psychological_States_GUI import APGIVisualizer, APGIVisualizerGUI  # type: ignore[import-not-found, no-redef]
 
-    HAS_PSYCHOLOGICAL_GUI = True
+        HAS_PSYCHOLOGICAL_GUI = True
 except ImportError as e:
     HAS_PSYCHOLOGICAL_GUI = False
     APGIVisualizerGUI: Any = None  # type: ignore[assignment, no-redef]

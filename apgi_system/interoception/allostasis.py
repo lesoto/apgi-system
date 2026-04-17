@@ -4,10 +4,9 @@ Allostatic Regulation
 Maintains homeostatic set points and manages allostatic load.
 """
 
+import numpy as np
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
-
-from apgi_system.validation import InputValidator
+from typing import Any, Dict, Tuple
 
 
 @dataclass
@@ -36,66 +35,40 @@ class AllostaticRegulator:
 
     Allostatic load accumulates when physiological variables remain outside
     their acceptable ranges, representing the cumulative cost of adaptation.
-    High allostatic load indicates chronic stress and can modulate other
-    system processes (e.g., raising ignition thresholds).
 
     The regulator tracks four key variables:
-    - Heart rate: Target 70 bpm, acceptable range (65-75)
-    - Temperature: Target 37.0°C, acceptable range (36.8-37.2)
-    - Glucose: Target 5.0 mmol/L, acceptable range (4.5-5.5)
-    - Cortisol: Target 10 μg/dL, acceptable range (8-12)
+    - Heart rate: Index 0
+    - Temperature: Index 2
+    - Glucose: Index 3
+    - Cortisol: Index 4
 
     Parameters
     ----------
     config : Dict[str, Any]
         Configuration dictionary containing:
         - interoception.allostatic_ranges: Range factors for regulation
-
-    Attributes
-    ----------
-    set_points : List[AllostaticSetPoint]
-        Set points for tracked physiological variables
-    total_load : float
-        Cumulative allostatic load (0-1), representing wear-and-tear
-    load_decay_rate : float
-        Rate at which load decays over time (per ms)
-    load_accumulation_rate : float
-        Rate at which deviations contribute to load
-
-    Examples
-    --------
-    >>> config = {'interoception': {'allostatic_ranges': {}}}
-    >>> regulator = AllostaticRegulator(config)
-    >>> body_state = {'heart_rate': 85, 'temperature': 37.0}
-    >>> result = regulator.update(body_state, dt=1.0)
-    >>> print(result['allostatic_load'])
-    0.05
     """
 
     def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize allostatic regulator with configuration.
-
-        Parameters
-        ----------
-        config : Dict[str, Any]
-            Configuration dictionary containing allostatic range settings
-        """
+        """Initialize vectorized allostatic regulator."""
         self.config = config
+        self.batch_size = config.get("active_inference", {}).get("batch_size", 1)
         intero_config = config.get("interoception", {})
         ranges_config = intero_config.get("allostatic_ranges", {})
 
-        # Define set points for key variables
-        self.set_points = [
-            AllostaticSetPoint(name="heart_rate", target=70.0, acceptable_range=(65, 75)),
-            AllostaticSetPoint(name="temperature", target=37.0, acceptable_range=(36.8, 37.2)),
-            AllostaticSetPoint(name="glucose", target=5.0, acceptable_range=(4.5, 5.5)),
-            AllostaticSetPoint(name="cortisol", target=10.0, acceptable_range=(8, 12)),
-        ]
+        # Define set points for key variables (4,)
+        # heart_rate, temperature, glucose, cortisol
+        self.num_vars = 4
+        self.targets = np.array([70.0, 37.0, 5.0, 10.0])
+        self.lower_range = np.array([65.0, 36.8, 4.5, 8.0])
+        self.upper_range = np.array([75.0, 37.2, 5.5, 12.0])
+        self.range_widths = self.upper_range - self.lower_range
 
-        # Allostatic load tracking
-        self.total_load = 0.0
-        self.load_decay_rate = 0.001  # per ms
+        # State tracking (B, 4)
+        self.current_deviations = np.zeros((self.batch_size, self.num_vars))
+        self.total_load = np.zeros(self.batch_size)
+
+        self.load_decay_rate = 0.001
         self.load_accumulation_rate = 0.01
 
         # Regulation parameters
@@ -103,209 +76,58 @@ class AllostaticRegulator:
         self.moderate_range_factor = ranges_config.get("moderate", 0.2)
         self.wide_range_factor = ranges_config.get("wide", 0.3)
 
-    def update(self, body_state: Dict[str, float], dt: float = 1.0) -> Dict[str, Any]:
+    def update(self, body_state: np.ndarray, dt: float = 1.0) -> Dict[str, np.ndarray]:
         """
-        Update allostatic regulation and compute load.
+        Update allostasis for batch.
 
-        Performs a complete regulation cycle:
-        1. Computes deviation from set points for each tracked variable
-        2. Determines if variables are within acceptable ranges
-        3. Accumulates allostatic load for out-of-range variables
-        4. Generates proportional regulatory signals
-        5. Applies decay to existing load
-
-        Load accumulation is proportional to the magnitude of deviation
-        normalized by the acceptable range width. Larger deviations contribute
-        more to cumulative load.
-
-        Parameters
-        ----------
-        body_state : Dict[str, float]
-            Current physiological state with keys matching set point names
-            (e.g., 'heart_rate', 'temperature', 'glucose', 'cortisol')
-        dt : float, optional
-            Timestep in milliseconds, by default 1.0
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary containing:
-            - 'regulation_signals': Dict mapping variable names to regulatory
-              signals (proportional to deviation)
-            - 'allostatic_load': Current cumulative load (0-1)
-            - 'total_deviation': Sum of absolute deviations across all variables
-            - 'set_points_status': List of status dicts for each set point
-            - 'homeostatic_stability': Overall stability metric (0-1)
-
-        Examples
-        --------
-        >>> regulator = AllostaticRegulator(config)
-        >>> body_state = {'heart_rate': 90, 'temperature': 37.5}
-        >>> result = regulator.update(body_state, dt=1.0)
-        >>> print(result['regulation_signals']['heart_rate'])
-        -2.0  # Negative signal to reduce heart rate
-        >>> print(result['homeostatic_stability'])
-        0.75
+        Args:
+            body_state: State array (B, D) where D includes indices 0, 2, 3, 4
+            dt: Timestep in ms
         """
-        # Validate inputs
-        if not isinstance(body_state, dict):
-            raise TypeError(f"body_state must be dict, got {type(body_state)}")
+        # heart_rate (0), temp (2), gluc (3), cort (4)
+        selected_indices = [0, 2, 3, 4]
+        current_vars = body_state[:, selected_indices]
 
-        InputValidator.validate_scalar(dt, "dt", value_range=(0.0, 10000.0), positive=True)
+        # Calculate deviations (B, 4)
+        self.current_deviations = current_vars - self.targets
 
-        # Validate body_state values
-        for key, value in body_state.items():
-            InputValidator.validate_scalar(
-                value,
-                f"body_state['{key}']",
-                value_range=(-1000.0, 1000.0),  # Reasonable physiological range
-            )
+        # Calculate load contributions (B, 4)
+        outside_lower = current_vars < self.lower_range
+        outside_upper = current_vars > self.upper_range
 
-        regulation_signals = {}
-        total_deviation = 0.0
+        normalized_deviations = np.zeros_like(current_vars)
+        load_masks = outside_lower | outside_upper
 
-        # Check each set point
-        for set_point in self.set_points:
-            if set_point.name in body_state:
-                current_value = body_state[set_point.name]
+        # Avoid division by zero, though range_widths > 0 for these variables
+        normalized_deviations[load_masks] = (
+            np.abs(self.current_deviations[load_masks])
+            / np.broadcast_to(self.range_widths, (self.batch_size, self.num_vars))[load_masks]
+        )
 
-                # Compute deviation from target
-                deviation = current_value - set_point.target
-                set_point.current_deviation = deviation
+        # Accumulate load (B,)
+        total_normalized_dev = np.sum(normalized_deviations, axis=1)
+        # Scale accumulation by dt/1000 to convert to seconds if needed, or just stay in ms
+        self.total_load += self.load_accumulation_rate * total_normalized_dev * (dt / 1000.0)
 
-                # Check if within acceptable range (strictly inside boundaries per Friston's formulation)
-                in_range = (
-                    set_point.acceptable_range[0] < current_value < set_point.acceptable_range[1]
-                )
+        # Decay load
+        self.total_load *= 1.0 - self.load_decay_rate * (dt / 1000.0)
+        self.total_load = np.clip(self.total_load, 0.0, 1.0)
 
-                if not in_range:
-                    # Compute load contribution
-                    # Larger deviations contribute more to load
-                    range_width = set_point.acceptable_range[1] - set_point.acceptable_range[0]
-
-                    normalized_deviation = abs(deviation) / range_width
-                    set_point.load_contribution = normalized_deviation
-
-                    # Accumulate total load
-                    self.total_load += (
-                        self.load_accumulation_rate * normalized_deviation * dt / 1000.0
-                    )
-                else:
-                    set_point.load_contribution = 0.0
-
-                # Generate regulatory signal (proportional to deviation)
-                regulation_signals[set_point.name] = -0.1 * deviation
-
-                total_deviation += abs(deviation)
-
-        # Decay load over time
-        self.total_load *= 1.0 - self.load_decay_rate * dt / 1000.0
-        self.total_load = max(0.0, self.total_load)
-
-        # Clamp load to [0, 1]
-        self.total_load = min(1.0, self.total_load)
+        # Regulatory signals (B, 4) - proportional drive
+        regulation_signals = -0.1 * self.current_deviations
 
         return {
             "regulation_signals": regulation_signals,
-            "allostatic_load": float(self.total_load),
-            "total_deviation": float(total_deviation),
-            "set_points_status": self._get_set_points_status(),
-            "homeostatic_stability": self._compute_stability(),
+            "allostatic_load": self.total_load.copy(),
+            "total_deviation": np.sum(np.abs(self.current_deviations), axis=1),
+            "stability": np.clip(1.0 - np.mean(normalized_deviations, axis=1), 0.0, 1.0),
         }
 
-    def _get_set_points_status(self) -> List[Dict[str, Any]]:
-        """
-        Get status of all set points.
-
-        Returns
-        -------
-        List[Dict[str, Any]]
-            List of status dictionaries, one per set point, containing:
-            - 'name': Variable name
-            - 'target': Target value
-            - 'deviation': Current deviation from target
-            - 'load_contribution': Contribution to allostatic load
-            - 'in_range': Boolean indicating if within acceptable range
-        """
-        status = []
-        for sp in self.set_points:
-            status.append(
-                {
-                    "name": sp.name,
-                    "target": sp.target,
-                    "deviation": sp.current_deviation,
-                    "load_contribution": sp.load_contribution,
-                    "in_range": abs(sp.current_deviation)
-                    < (sp.acceptable_range[1] - sp.acceptable_range[0]) / 2,
-                }
-            )
-        return status
-
-    def _compute_stability(self) -> float:
-        """
-        Compute overall homeostatic stability.
-
-        Stability is computed as 1 minus the average normalized deviation
-        across all set points. Higher values indicate greater stability
-        (all variables near their set points).
-
-        Returns
-        -------
-        float
-            Stability metric in range [0, 1], where:
-            - 1.0 = perfect stability (all variables at set points)
-            - 0.0 = maximum instability (all variables far from set points)
-        """
-        total_normalized_deviation = 0.0
-
-        for sp in self.set_points:
-            range_width = sp.acceptable_range[1] - sp.acceptable_range[0]
-            normalized_dev = abs(sp.current_deviation) / range_width
-            total_normalized_deviation += normalized_dev
-
-        # Average across set points
-        avg_deviation = total_normalized_deviation / len(self.set_points)
-
-        # Convert to stability (1 - deviation)
-        stability = max(0.0, 1.0 - avg_deviation)
-
-        return float(stability)
-
-    def get_allostatic_load(self) -> float:
-        """
-        Get current allostatic load.
-
-        Returns
-        -------
-        float
-            Current cumulative allostatic load in range [0, 1]
-        """
-        return self.total_load
-
-    def trigger_stressor(self, intensity: float = 0.5) -> None:
-        """
-        Simulate an acute stressor event.
-
-        Immediately increases allostatic load to simulate the impact of
-        an acute stressor (e.g., threat, challenge, or perturbation).
-
-        Parameters
-        ----------
-        intensity : float, optional
-            Stressor intensity in range [0, 1], by default 0.5
-            Higher intensity produces larger load increase
-        """
-        self.total_load += intensity * 0.2
-        self.total_load = min(1.0, self.total_load)
+    def get_allostatic_load(self) -> np.ndarray:
+        """Get current load (B,)."""
+        return self.total_load.copy()
 
     def reset(self) -> None:
-        """
-        Reset to baseline state.
-
-        Clears all allostatic load and resets all set point deviations
-        and load contributions to zero.
-        """
-        self.total_load = 0.0
-        for sp in self.set_points:
-            sp.current_deviation = 0.0
-            sp.load_contribution = 0.0
+        """Reset for all agents in batch."""
+        self.total_load.fill(0.0)
+        self.current_deviations.fill(0.0)

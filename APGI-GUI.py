@@ -2619,27 +2619,31 @@ class APGIGui:
         current_extero = self.apgi_system.precision.extero_baseline
         current_intero = self.apgi_system.precision.intero_baseline
 
-        ttk.Label(frame, text=f"Current Exteroceptive Precision: {current_extero:.2f}").pack(pady=5)
-        ttk.Label(frame, text=f"Current Interoceptive Precision: {current_intero:.2f}").pack(pady=5)
+        ttk.Label(frame, text=f"Current Exteroceptive Precision: {float(current_extero):.2f}").pack(
+            pady=5
+        )
+        ttk.Label(frame, text=f"Current Interoceptive Precision: {float(current_intero):.2f}").pack(
+            pady=5
+        )
 
         # New value inputs
         ttk.Label(frame, text="New Exteroceptive Precision:").pack(pady=(20, 5))
-        extero_var = tk.DoubleVar(value=current_extero)
+        extero_var = tk.DoubleVar(value=float(current_extero))
         extero_scale = ttk.Scale(
             frame, from_=0.1, to=5.0, variable=extero_var, orient=tk.HORIZONTAL, length=300
         )
         extero_scale.pack(pady=5)
-        extero_label = ttk.Label(frame, text=f"{current_extero:.2f}")
+        extero_label = ttk.Label(frame, text=f"{float(current_extero):.2f}")
         extero_label.pack()
         extero_var.trace("w", lambda *args: extero_label.config(text=f"{extero_var.get():.2f}"))
 
         ttk.Label(frame, text="New Interoceptive Precision:").pack(pady=(20, 5))
-        intero_var = tk.DoubleVar(value=current_intero)
+        intero_var = tk.DoubleVar(value=float(current_intero))
         intero_scale = ttk.Scale(
             frame, from_=0.1, to=5.0, variable=intero_var, orient=tk.HORIZONTAL, length=300
         )
         intero_scale.pack(pady=5)
-        intero_label = ttk.Label(frame, text=f"{current_intero:.2f}")
+        intero_label = ttk.Label(frame, text=f"{float(current_intero):.2f}")
         intero_label.pack()
         intero_var.trace("w", lambda *args: intero_label.config(text=f"{intero_var.get():.2f}"))
 

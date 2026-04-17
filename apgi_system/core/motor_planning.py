@@ -81,64 +81,62 @@ class GenerativeLikelihood:
         initial_state: FloatArray,
         action: FloatArray,
         horizon: int,
-    ) -> Tuple[List[FloatArray], np.ndarray]:
+    ) -> Tuple[List[FloatArray], FloatArray]:
         """
-        Roll-out latent states and predicted observations for one action.
+        Roll-out latent states and predicted observations for a batch of actions.
 
         Parameters
         ----------
-        initial_state : np.ndarray, shape (state_dim,)
-            Current top-level belief mean ``μ_top``.
-        action : np.ndarray, shape (action_dim,) or smaller
-            Candidate action vector.  Padded / truncated to ``action_dim``
-            automatically.
+        initial_state : np.ndarray, shape (batch_size, state_dim)
+            Current top-level belief means for each agent.
+        action : np.ndarray, shape (batch_size, action_dim)
+            Candidate action vectors for each agent.
         horizon : int
             Number of steps to simulate ahead.
 
         Returns
         -------
         predicted_states : list of np.ndarray
-            Latent state sequence ``s_1, …, s_T`` (length ``horizon``).
-        predicted_observations : np.ndarray, shape (horizon, obs_dim)
-            Probability distributions ``ô_1, …, ô_T`` from softmax
-            ``A @ s_t``.
-
-        Notes
-        -----
-        Transition:  ``s_{t+1} = tanh(B @ s_t + C @ a)``
-        Observation: ``ô_t     = softmax(A @ s_t)``
-
-        The ``tanh`` nonlinearity bounds latent states to ``[-1, 1]``
-        preventing unbounded growth over long horizons.
-        Softmax ensures predicted observations form a valid distribution.
+            Latent state sequence s_1, …, s_T (each element (batch_size, state_dim)).
+        predicted_observations : np.ndarray, shape (batch_size, horizon, obs_dim)
+            Probability distributions ô_1, …, ô_T.
         """
+        batch_size = initial_state.shape[0]
+
+        # Ensure action has correct dimension
+        if action.ndim == 1:
+            action = action.reshape(1, -1)
+
         # Pad or truncate action to match expected action_dim
-        action_padded = np.zeros(self.action_dim)
-        action_padded[: min(len(action), self.action_dim)] = action[: self.action_dim]
+        action_padded = np.zeros((batch_size, self.action_dim))
+        cols = min(action.shape[1], self.action_dim)
+        action_padded[:, :cols] = action[:, :cols]
 
         state = initial_state.copy()
         predicted_states: List[FloatArray] = []
         predicted_obs_list: List[FloatArray] = []
 
-        C_a = self.C @ action_padded  # precompute; constant across steps
+        # Vectorized transition part: (B, action_dim) @ (state_dim, action_dim).T -> (B, state_dim)
+        C_a = (self.C @ action_padded.T).T
 
         for _ in range(horizon):
-            # State transition: stable tanh dynamics
-            state = np.tanh(self.B @ state + C_a)
+            # State transition: (state_dim, state_dim) @ (B, state_dim).T -> (state_dim, B) -> (B, state_dim)
+            state = np.tanh((self.B @ state.T).T + C_a)
             predicted_states.append(state.copy())
 
-            # Likelihood: softmax(A @ s_t)
-            logits = self.A @ state
-            logits -= logits.max()  # numerical stability before exp
+            # Likelihood: softmax( (obs_dim, state_dim) @ (B, state_dim).T )
+            logits = (self.A @ state.T).T
+            logits -= logits.max(axis=1, keepdims=True)
             probs = np.exp(logits)
-            probs /= probs.sum() + 1e-10
+            probs /= probs.sum(axis=1, keepdims=True) + 1e-10
             predicted_obs_list.append(probs)
 
-        # Guard: np.stack raises on an empty sequence; return shaped empty array instead.
         if predicted_obs_list:
-            predicted_observations = np.stack(predicted_obs_list)  # (horizon, obs_dim)
+            # (H, B, D) -> (B, H, D)
+            predicted_observations = np.transpose(np.stack(predicted_obs_list), (1, 0, 2))
         else:
-            predicted_observations = np.empty((0, self.obs_dim), dtype=np.float64)
+            predicted_observations = np.empty((batch_size, 0, self.obs_dim), dtype=np.float64)
+
         return predicted_states, predicted_observations
 
 
@@ -220,91 +218,93 @@ class MotorPlanner:
         self, current_beliefs: List[Any], available_actions: Optional[List[FloatArray]] = None
     ) -> Tuple[FloatArray, Dict[str, Any]]:
         """
-        Select the best action by evaluating policies over a temporal horizon.
+        Select the best actions for a batch of agents.
 
-        Candidate actions are evaluated by rolling out predicted states and
-        observations through the generative model ``p(o|s)``, then computing
-        EFE for each candidate.  The action with the lowest EFE is selected
-        via a precision-weighted softmax ``p(π) ∝ exp(−γ·G(π))``.
-
-        Parameters
-        ----------
-        current_beliefs : list of BeliefState
-            Belief states at all hierarchical levels (bottom → top).
-        available_actions : list of np.ndarray, optional
-            Candidate actions.  If *None*, ``num_policies`` actions are
-            sampled from a standard normal via the seeded internal RNG.
-
-        Returns
-        -------
-        best_action : np.ndarray
-        planning_info : dict
-            Keys: ``best_idx``, ``policy_probs``, ``policy_efes``,
-            ``selected_efe``, ``components``.
+        Evaluates multiple candidates for ALL agents in parallel using
+        broadcasting and vectorized rollouts.
         """
         top_belief = current_beliefs[-1]
-        state_dim = top_belief.mean.shape[0]
+        batch_size, state_dim = top_belief.mean.shape
         self._ensure_generative_model(state_dim)
 
         if available_actions is None:
-            # Reproducible candidate action sampling via seeded RNG
-            available_actions = [
-                self._rng.standard_normal(self.action_dim) for _ in range(self.num_policies)
-            ]
+            # Sample independent candidates for each agent: (num_policies, batch_size, action_dim)
+            candidates = self._rng.standard_normal((self.num_policies, batch_size, self.action_dim))
+        else:
+            # Assume available_actions is a list of num_policies arrays, each (batch_size, D)
+            candidates = np.stack(available_actions)
 
         # Normalised preference distribution (proper probability distribution)
         pref = np.clip(self.preferences, 1e-10, None)
         pref = pref / (pref.sum() + 1e-10)
 
-        policy_efes: List[float] = []
-        policy_info: List[Dict[str, float]] = []
+        best_actions = np.zeros((batch_size, self.action_dim))
 
-        assert self._generative_model is not None  # guaranteed by _ensure_generative_model
+        assert self._generative_model is not None
 
-        for action in available_actions:
-            # ── Generative rollout via p(s|s,a) and p(o|s) ─────────────────
+        # We evaluate each 'policy candidate index' across all agents
+        # Index 0 evaluated for all agents, Index 1 for all agents...
+        # This allows vectorizing the ROLLOUT.
+
+        per_policy_batch_efes = []  # List of (batch_size,)
+
+        for p_idx in range(self.num_policies):
+            action_batch = candidates[p_idx]  # (batch_size, action_dim)
+
+            # Vectorized rollout
             predicted_states, predicted_observations = self._generative_model.rollout(
                 initial_state=top_belief.mean,
-                action=action,
+                action=action_batch,
                 horizon=self.horizon,
             )
 
-            # State uncertainty: reciprocal of belief precision
-            # (higher precision → lower per-element uncertainty)
-            per_step_uncertainty = np.ones(state_dim) / (top_belief.precision + 1e-10)
-            state_uncertainty = np.stack([per_step_uncertainty] * self.horizon)
+            # state_uncertainty: (batch_size, horizon, state_dim)
+            # top_belief.precision: (batch_size,)
+            prec = top_belief.precision.reshape(-1, 1, 1) + 1e-10
+            state_uncertainty = np.ones((batch_size, self.horizon, state_dim)) / prec
 
-            # ── Expected Free Energy ─────────────────────────────────────────
-            efe, components = self.fe_calc.compute_expected_free_energy(
-                policy=action,
-                predicted_states=predicted_states,
-                predicted_observations=predicted_observations,
-                preferences=pref,
-                state_uncertainty=state_uncertainty,
-                horizon=self.horizon,
-            )
+            # Calculate EFE for each agent for this policy index
+            # EFE computation might need vectorization too
+            efes = []
+            for b in range(batch_size):
+                # We can vectorize this further if compute_expected_free_energy supports it
+                efe, _ = self.fe_calc.compute_expected_free_energy(
+                    policy=action_batch[b],
+                    predicted_states=[s[b] for s in predicted_states],
+                    predicted_observations=predicted_observations[b],
+                    preferences=pref,
+                    state_uncertainty=state_uncertainty[b],
+                    horizon=self.horizon,
+                )
+                efes.append(efe)
+            per_policy_batch_efes.append(np.array(efes))
 
-            policy_efes.append(efe)
-            policy_info.append(components)
+        # (num_policies, batch_size)
+        policy_efes_matrix = np.stack(per_policy_batch_efes)
 
-        # ── Precision-weighted softmax over negative EFE ─────────────────────
-        policy_efes_arr = np.array(policy_efes)
-        shifted_efes = -self.gamma * (policy_efes_arr - policy_efes_arr.min())
+        # Softmax over policies for each agent
+        # min_efes: (batch_size,)
+        min_efes = np.min(policy_efes_matrix, axis=0)
+        shifted_efes = -self.gamma * (policy_efes_matrix - min_efes)
         probs = np.exp(shifted_efes)
-        probs /= probs.sum()
+        probs /= probs.sum(axis=0) + 1e-10  # (num_policies, batch_size)
 
-        best_idx = int(np.argmax(probs))
-        best_action = available_actions[best_idx]
+        # Best action index for each agent
+        best_indices = np.argmax(probs, axis=0)  # (batch_size,)
 
-        planning_info: Dict[str, Any] = {
-            "best_idx": best_idx,
-            "policy_probs": probs.tolist(),
-            "policy_efes": policy_efes_arr.tolist(),
-            "selected_efe": float(policy_efes_arr[best_idx]),
-            "components": policy_info[best_idx],
+        for b in range(batch_size):
+            best_actions[b] = candidates[best_indices[b], b]
+
+        planning_info = {
+            "best_indices": best_indices.tolist(),
+            "avg_efe": float(np.mean(policy_efes_matrix)),
+            "batch_size": batch_size,
         }
 
-        return best_action, planning_info
+        # For backward compatibility if batch_size=1, return squeeze
+        if batch_size == 1:
+            return best_actions[0], planning_info
+        return best_actions, planning_info
 
     def reset(self) -> None:
         """Reset planner state.  Generative model weights are retained."""

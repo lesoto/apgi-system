@@ -59,6 +59,12 @@ class DataExporter:
         """Initialize data exporter."""
         self.log_data: list[dict] = []
 
+    def _to_scalar(self, value):
+        """Convert array to scalar if needed for CSV/JSON export."""
+        if isinstance(value, np.ndarray):
+            return float(value.item()) if value.size == 1 else float(value[0])
+        return value
+
     def record_state(self, state: Dict[str, Any]) -> None:
         """
         Record state data from simulation step.
@@ -71,20 +77,21 @@ class DataExporter:
         current_time = state["time"] / 1000.0  # Convert to seconds
 
         # Extract and record metrics (matches GUI logic)
+        # Convert arrays to scalars for export
         data_entry = {
             "time": current_time,
             "ignition": 1 if state["ignition"]["ignition_occurred"] else 0,
-            "free_energy": state["ignition"]["total_signal"],
-            "extero_precision": state["precision"]["exteroceptive"],
-            "intero_precision": state["precision"]["interoceptive"],
-            "metabolic_reserves": state["metabolism"]["reserves"],
-            "allostatic_load": state["allostasis"]["allostatic_load"],
-            "heart_rate": state["body"]["current"]["heart_rate"],
-            "cortisol": state["body"]["current"]["cortisol"],
-            "workspace_active": 1 if state["workspace"]["is_broadcasting"] else 0,
-            "gamma_power": state["oscillations"]["band_powers"].get("gamma", 0),
-            "beta_power": state["oscillations"]["band_powers"].get("beta", 0),
-            "minimal_self_coherence": state["self_model"]["minimal"]["coherence"],
+            "free_energy": self._to_scalar(state["ignition"]["total_signal"]),
+            "extero_precision": self._to_scalar(state["precision"]["exteroceptive"]),
+            "intero_precision": self._to_scalar(state["precision"]["interoceptive"]),
+            "metabolic_reserves": self._to_scalar(state["metabolism"]["reserves"]),
+            "allostatic_load": self._to_scalar(state["allostasis"]["allostatic_load"]),
+            "heart_rate": self._to_scalar(state["body"]["current"]["heart_rate"]),
+            "cortisol": self._to_scalar(state["body"]["current"]["cortisol"]),
+            "workspace_active": 1 if state["workspace"]["is_reportable"] else 0,
+            "gamma_power": self._to_scalar(state["oscillations"]["band_powers"].get("gamma", 0)),
+            "beta_power": self._to_scalar(state["oscillations"]["band_powers"].get("beta", 0)),
+            "minimal_self_coherence": self._to_scalar(state["self_model"]["minimal"]["coherence"]),
         }
 
         self.log_data.append(data_entry)

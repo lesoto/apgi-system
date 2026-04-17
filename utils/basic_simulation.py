@@ -154,8 +154,8 @@ def run_simulation(
     # Get final state summary
     summary = system.get_state_summary()
     print("\nFinal State:")
-    print(f"  Allostatic load: {summary['allostatic_load']:.3f}")
-    print(f"  Metabolic reserves: {summary['metabolic_reserves']:.1f}")
+    print(f"  Allostatic load: {float(np.mean(summary['allostatic_load'])):.3f}")
+    print(f"  Metabolic reserves: {float(np.mean(summary['metabolic_reserves'])):.1f}")
     print(f"  Somatic markers: {summary['somatic_markers']['num_markers']}")
 
     return results, system, elapsed_ms

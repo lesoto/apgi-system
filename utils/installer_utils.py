@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class InstallerError(Exception):
@@ -308,7 +308,7 @@ def generate_inno_setup_script(
     version: str,
     source_dir: str,
     output_dir: str,
-    executable_name: str | None = None,
+    executable_name: Optional[str] = None,
 ) -> str:
     """Generate Inno Setup script for Windows installer.
 

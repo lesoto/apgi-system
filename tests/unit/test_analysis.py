@@ -60,15 +60,9 @@ def test_compute_ignition_statistics_with_data(config: dict) -> None:
     system = APGISystem()
 
     # Simulate some ignition events
-    system.ignition_threshold.recent_ignitions.append(
-        {"time": 100.0, "signal": 3.0, "threshold": 2.0}
-    )
-    system.ignition_threshold.recent_ignitions.append(
-        {"time": 500.0, "signal": 3.5, "threshold": 2.0}
-    )
-    system.ignition_threshold.recent_ignitions.append(
-        {"time": 1000.0, "signal": 3.2, "threshold": 2.0}
-    )
+    system.ignition_threshold.recent_ignitions.append(100.0)
+    system.ignition_threshold.recent_ignitions.append(500.0)
+    system.ignition_threshold.recent_ignitions.append(1000.0)
 
     # Add time history
     system.history["time"] = [0.0, 100.0, 500.0, 1000.0, 1500.0]
@@ -121,8 +115,8 @@ def test_compute_somatic_marker_statistics(config: dict) -> None:
     # Add some markers
     context = np.random.randn(10)
     action = np.random.randn(5)
-    system.somatic_markers.learn(context, action, body_outcome=0.5, current_time=0.0)
-    system.somatic_markers.learn(context, action, body_outcome=0.7, current_time=100.0)
+    system.somatic_markers.learn(context, action, body_outcome=np.array([0.5]), current_time=0.0)
+    system.somatic_markers.learn(context, action, body_outcome=np.array([0.7]), current_time=100.0)
 
     stats = analyzer.compute_somatic_marker_statistics(system.somatic_markers)
 
@@ -157,8 +151,9 @@ def test_extract_temporal_dynamics(config: dict) -> None:
     system.history["metabolic_reserves"] = [1.0, 0.99, 0.98, 0.97]
 
     # Add signal history
-    system.ignition_threshold.signal_history.extend([2.0, 2.5, 3.0, 2.8])
-    system.ignition_threshold.threshold_history.extend([2.0, 2.0, 2.0, 2.0])
+    system.ignition_threshold.signal_history.extend(
+        [np.array([2.0]), np.array([2.5]), np.array([3.0]), np.array([2.8])]
+    )
 
     dynamics = analyzer.extract_temporal_dynamics(system.history, system.ignition_threshold)
 

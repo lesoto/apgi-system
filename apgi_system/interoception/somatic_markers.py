@@ -7,11 +7,9 @@ then uses these to bias decision-making.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
-
-from apgi_system.validation import InputValidator
 
 
 @dataclass
@@ -100,15 +98,9 @@ class SomaticMarkerSystem:
     """
 
     def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize somatic marker system with configuration.
-
-        Parameters
-        ----------
-        config : Dict[str, Any]
-            Configuration dictionary containing somatic marker settings
-        """
+        """Initialize vectorized somatic marker system."""
         self.config = config
+        self.batch_size = config.get("active_inference", {}).get("batch_size", 1)
         marker_config = config.get("somatic_markers", {})
 
         # System parameters
@@ -118,11 +110,12 @@ class SomaticMarkerSystem:
         self.retrieval_threshold = marker_config.get("retrieval_threshold", 0.3)
         self.gain_range = marker_config.get("gain_modulation_range", [0.5, 2.0])
 
-        # Storage
-        self.markers: List[SomaticMarker] = []
-
-        # Retrieval cache
-        self.last_retrieved_marker: Optional[SomaticMarker] = None
+        # Storage: use parallel arrays for vectorized similarity search
+        self.context_patterns: Optional[np.ndarray] = None  # (N, D_ctx)
+        self.action_patterns: Optional[np.ndarray] = None  # (N, D_act)
+        self.outcomes: Optional[np.ndarray] = None  # (N,)
+        self.strengths: Optional[np.ndarray] = None  # (N,)
+        self.num_markers = 0
 
         # Statistics
         self.total_retrievals = 0
@@ -130,324 +123,150 @@ class SomaticMarkerSystem:
 
     def learn(
         self,
-        context: np.ndarray[Any, np.dtype[Any]],
-        action: np.ndarray[Any, np.dtype[Any]],
-        body_outcome: float,
+        context: np.ndarray,
+        action: np.ndarray,
+        body_outcome: np.ndarray,
         current_time: float = 0.0,
     ) -> None:
-        """
-        Learn or update a somatic marker.
+        """Learn or update markers for a batch (B, D)."""
+        # Sequential update for each agent in batch (learning is less frequent)
+        for i in range(self.batch_size):
+            c = context[i] if context.ndim > 1 else context
+            a = action[i] if action.ndim > 1 else action
+            o = body_outcome[i] if hasattr(body_outcome, "__len__") else body_outcome
+            self._learn_single_marker(c, a, o, current_time)
 
-        If a similar marker already exists (based on cosine similarity of
-        context and action patterns), updates its body outcome using the
-        learning rate. Otherwise, creates a new marker (or replaces the
-        weakest marker if at capacity).
-
-        The body outcome is updated using exponential moving average:
-        new_outcome = (1 - lr) * old_outcome + lr * observed_outcome
-
-        Parameters
-        ----------
-        context : np.ndarray
-            Context pattern (state representation) when outcome occurred
-        action : np.ndarray
-            Action pattern that was taken
-        body_outcome : float
-            Valence of resulting body state, in range [-1, 1]:
-            - +1: Very positive outcome (good body state)
-            - 0: Neutral outcome
-            - -1: Very negative outcome (bad body state)
-        current_time : float, optional
-            Current simulation time in milliseconds, by default 0.0
-
-        Examples
-        --------
-        >>> sm_system = SomaticMarkerSystem(config)
-        >>> context = np.array([1.0, 0.5, -0.3])
-        >>> action = np.array([0.8, -0.2])
-        >>> sm_system.learn(context, action, body_outcome=0.7, current_time=100.0)
-        >>> print(len(sm_system.markers))
-        1
-        """
-        # Validate inputs
-        InputValidator.validate_array(context, "context")
-        InputValidator.validate_array(action, "action")
-        InputValidator.validate_scalar(body_outcome, "body_outcome", value_range=(-1.0, 1.0))
-        InputValidator.validate_scalar(current_time, "current_time", value_range=(0.0, 1e10))
-
-        # Check if similar marker exists
-        existing_marker = self._find_similar_marker(context, action)
-
-        if existing_marker is not None:
-            # Update existing marker
-            existing_marker.body_outcome = (
-                1 - self.learning_rate
-            ) * existing_marker.body_outcome + self.learning_rate * body_outcome
-            existing_marker.strength = min(1.0, existing_marker.strength + 0.1)
-            existing_marker.last_update_time = current_time
-
-        else:
-            # Create new marker
-            if len(self.markers) < self.capacity:
-                marker = SomaticMarker(
-                    context_pattern=context.copy(),
-                    action_pattern=action.copy(),
-                    body_outcome=body_outcome,
-                    strength=0.5,  # Start with moderate strength
-                    last_update_time=current_time,
-                )
-                self.markers.append(marker)
-            else:
-                # Replace weakest marker
-                weakest_idx = np.argmin([m.strength for m in self.markers])
-                self.markers[weakest_idx] = SomaticMarker(
-                    context_pattern=context.copy(),
-                    action_pattern=action.copy(),
-                    body_outcome=body_outcome,
-                    strength=0.5,
-                    last_update_time=current_time,
-                )
-
-    def retrieve(
-        self, context: np.ndarray[Any, np.dtype[Any]], action: np.ndarray[Any, np.dtype[Any]]
-    ) -> Tuple[float, bool]:
-        """
-        Retrieve somatic marker for a context-action pair.
-
-        Searches for a marker matching the given context-action pair using
-        cosine similarity. If a sufficiently strong marker is found, converts
-        its body outcome to a gain modulation factor:
-
-        - Positive outcome -> gain > 1.0 (enhance interoceptive signal)
-        - Neutral outcome -> gain = 1.0 (no modulation)
-        - Negative outcome -> gain < 1.0 (suppress interoceptive signal)
-
-        The gain is computed as:
-        normalized_outcome = (body_outcome + 1) / 2  # Map [-1,1] to [0,1]
-        gain = min_gain + normalized_outcome * (max_gain - min_gain)
-
-        Parameters
-        ----------
-        context : np.ndarray
-            Current context pattern
-        action : np.ndarray
-            Proposed action pattern
-
-        Returns
-        -------
-        gain_modulation : float
-            Gain factor in range [0.5, 2.0] (configurable):
-            - Values > 1.0 enhance interoceptive precision
-            - Values < 1.0 suppress interoceptive precision
-            - 1.0 returned if no marker found (neutral)
-        marker_found : bool
-            True if a matching marker was retrieved, False otherwise
-
-        Examples
-        --------
-        >>> sm_system = SomaticMarkerSystem(config)
-        >>> context = np.array([1.0, 0.5])
-        >>> action = np.array([0.8])
-        >>> sm_system.learn(context, action, body_outcome=0.6, current_time=0.0)
-        >>> gain, found = sm_system.retrieve(context, action)
-        >>> print(f"Gain: {gain:.2f}, Found: {found}")
-        Gain: 1.45, Found: True
-        """
-        # Validate inputs
-        InputValidator.validate_array(context, "context")
-        InputValidator.validate_array(action, "action")
-
-        self.total_retrievals += 1
-
-        # Find matching marker
-        marker = self._find_similar_marker(context, action)
-
-        if marker is not None and marker.strength > self.retrieval_threshold:
-            # Successful retrieval
-            self.successful_retrievals += 1
-            marker.access_count += 1
-            self.last_retrieved_marker = marker
-
-            # Convert body outcome to gain modulation
-            # Positive outcome -> increase gain (enhance interoceptive precision)
-            # Negative outcome -> decrease gain (suppress interoceptive signal)
-            normalized_outcome = (marker.body_outcome + 1.0) / 2.0  # Map [-1,1] to [0,1]
-            gain = self.gain_range[0] + normalized_outcome * (
-                self.gain_range[1] - self.gain_range[0]
-            )
-
-            return float(gain), True
-
-        else:
-            # No marker found - neutral gain
-            self.last_retrieved_marker = None
-            return 1.0, False
-
-    def _find_similar_marker(
+    def _learn_single_marker(
         self,
-        context: np.ndarray[Any, np.dtype[Any]],
-        action: np.ndarray[Any, np.dtype[Any]],
-        similarity_threshold: float = 0.8,
-    ) -> Optional[SomaticMarker]:
-        """
-        Find marker similar to given context-action pair.
+        context: np.ndarray,
+        action: np.ndarray,
+        outcome: Union[np.ndarray, float],
+        current_time: float,
+    ) -> None:
+        # Initialize storage if needed
+        if (
+            self.context_patterns is None
+            or self.action_patterns is None
+            or self.outcomes is None
+            or self.strengths is None
+        ):
+            self.context_patterns = np.zeros((self.capacity, len(context)))
+            self.action_patterns = np.zeros((self.capacity, len(action)))
+            self.outcomes = np.zeros(self.capacity)
+            self.strengths = np.zeros(self.capacity)
 
-        Uses cosine similarity for pattern matching. Computes combined
-        similarity as weighted average: 0.7 * context_sim + 0.3 * action_sim
-        (context weighted more heavily than action).
+        # Check for similar
+        idx = self._find_best_match_idx(context, action)
+        if idx is not None:
+            self.outcomes[idx] = (1 - self.learning_rate) * self.outcomes[
+                idx
+            ] + self.learning_rate * outcome
+            self.strengths[idx] = min(1.0, self.strengths[idx] + 0.1)
+        elif self.num_markers < self.capacity:
+            idx = self.num_markers
+            self.context_patterns[idx] = context
+            self.action_patterns[idx] = action
+            self.outcomes[idx] = outcome
+            self.strengths[idx] = 0.5
+            self.num_markers += 1
+        else:
+            weakest = np.argmin(self.strengths[: self.num_markers])
+            self.context_patterns[weakest] = context
+            self.action_patterns[weakest] = action
+            self.outcomes[weakest] = outcome
+            self.strengths[weakest] = 0.5
 
-        Parameters
-        ----------
-        context : np.ndarray
-            Context pattern to match
-        action : np.ndarray
-            Action pattern to match
-        similarity_threshold : float, optional
-            Minimum similarity required for match, by default 0.8
+    def retrieve(self, context: np.ndarray, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Retrieve markers for a batch (B, D)."""
+        if (
+            self.num_markers == 0
+            or self.context_patterns is None
+            or self.action_patterns is None
+            or self.strengths is None
+            or self.outcomes is None
+        ):
+            return np.ones(self.batch_size), np.zeros(self.batch_size, dtype=bool)
 
-        Returns
-        -------
-        Optional[SomaticMarker]
-            Best matching marker if similarity exceeds threshold, None otherwise
-        """
-        if len(self.markers) == 0:
+        # Vectorized similarity search
+        # Context sim (B, N)
+        if context.ndim == 1:
+            context = context[np.newaxis, :]
+        if action.ndim == 1:
+            action = action[np.newaxis, :]
+
+        ctx_norms = np.linalg.norm(context, axis=1, keepdims=True)
+        marker_ctx_norms = np.linalg.norm(self.context_patterns[: self.num_markers], axis=1)
+        sim_ctx = (context @ self.context_patterns[: self.num_markers].T) / (
+            ctx_norms @ marker_ctx_norms[np.newaxis, :] + 1e-9
+        )
+
+        act_norms = np.linalg.norm(action, axis=1, keepdims=True)
+        marker_act_norms = np.linalg.norm(self.action_patterns[: self.num_markers], axis=1)
+        sim_act = (action @ self.action_patterns[: self.num_markers].T) / (
+            act_norms @ marker_act_norms[np.newaxis, :] + 1e-9
+        )
+
+        sim = 0.7 * sim_ctx + 0.3 * sim_act
+
+        best_marker_indices = np.argmax(sim, axis=1)
+        best_sims = np.max(sim, axis=1)
+
+        found_mask = (best_sims > 0.8) & (
+            self.strengths[best_marker_indices] > self.retrieval_threshold
+        )
+
+        gains = np.ones(self.batch_size)
+        marker_outcomes = self.outcomes[best_marker_indices]
+        normalized_outcomes = (marker_outcomes + 1.0) / 2.0
+        calculated_gains = self.gain_range[0] + normalized_outcomes * (
+            self.gain_range[1] - self.gain_range[0]
+        )
+
+        gains[found_mask] = calculated_gains[found_mask]
+
+        return gains, found_mask
+
+    def _find_best_match_idx(
+        self, context: np.ndarray, action: np.ndarray, similarity_threshold: float = 0.8
+    ) -> Optional[int]:
+        if self.num_markers == 0 or self.context_patterns is None or self.action_patterns is None:
             return None
 
-        best_similarity = 0.0
-        best_marker = None
+        ctx_norm = np.linalg.norm(context)
+        marker_ctx_norms = np.linalg.norm(self.context_patterns[: self.num_markers], axis=1)
+        sim_ctx = (self.context_patterns[: self.num_markers] @ context) / (
+            marker_ctx_norms * ctx_norm + 1e-9
+        )
 
-        for marker in self.markers:
-            # Compute similarity
-            context_sim = self._cosine_similarity(context, marker.context_pattern)
-            action_sim = self._cosine_similarity(action, marker.action_pattern)
+        act_norm = np.linalg.norm(action)
+        marker_act_norms = np.linalg.norm(self.action_patterns[: self.num_markers], axis=1)
+        sim_act = (self.action_patterns[: self.num_markers] @ action) / (
+            marker_act_norms * act_norm + 1e-9
+        )
 
-            # Combined similarity (weighted average)
-            combined_sim = 0.7 * context_sim + 0.3 * action_sim
-
-            if combined_sim > best_similarity and combined_sim > similarity_threshold:
-                best_similarity = combined_sim
-                best_marker = marker
-
-        return best_marker
-
-    def _cosine_similarity(
-        self, a: np.ndarray[Any, np.dtype[Any]], b: np.ndarray[Any, np.dtype[Any]]
-    ) -> float:
-        """
-        Compute cosine similarity between two vectors.
-
-        Handles vectors of different lengths by truncating to the shorter
-        length. Returns 0.0 if either vector has zero norm.
-
-        Parameters
-        ----------
-        a : np.ndarray
-            First vector
-        b : np.ndarray
-            Second vector
-
-        Returns
-        -------
-        float
-            Cosine similarity in range [-1, 1], where:
-            - 1.0 = identical direction
-            - 0.0 = orthogonal
-            - -1.0 = opposite direction
-        """
-        # Handle different sizes
-        min_len = min(len(a), len(b))
-        a_trunc = a[:min_len]
-        b_trunc = b[:min_len]
-
-        norm_a = np.linalg.norm(a_trunc)
-        norm_b = np.linalg.norm(b_trunc)
-
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-
-        return float(np.dot(a_trunc, b_trunc) / (norm_a * norm_b))
+        sim = 0.7 * sim_ctx + 0.3 * sim_act
+        best_idx = int(np.argmax(sim))
+        if sim[best_idx] > similarity_threshold:
+            return best_idx
+        return None
 
     def decay_markers(self, dt: float) -> None:
-        """
-        Apply decay to unused markers.
-
-        Reduces the strength of all markers proportionally to time elapsed.
-        Markers with very low strength (< 0.1) are removed from storage.
-        This implements forgetting of rarely-used associations.
-
-        Parameters
-        ----------
-        dt : float
-            Timestep in milliseconds
-        """
-        for marker in self.markers:
-            # Decay strength of infrequently accessed markers
-            marker.strength *= 1.0 - self.decay_rate * dt / 1000.0
-            marker.strength = max(0.0, marker.strength)
-
-        # Remove very weak markers
-        self.markers = [m for m in self.markers if m.strength > 0.1]
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """
-        Get system statistics.
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary containing:
-            - 'num_markers': Number of stored markers
-            - 'capacity_used': Fraction of capacity used (0-1)
-            - 'total_retrievals': Total retrieval attempts
-            - 'successful_retrievals': Number of successful retrievals
-            - 'retrieval_success_rate': Fraction of successful retrievals
-            - 'avg_strength': Average marker strength
-            - 'avg_outcome': Average body outcome across markers
-        """
-        if len(self.markers) == 0:
-            return {"num_markers": 0, "retrieval_success_rate": 0.0, "avg_strength": 0.0}
-
-        return {
-            "num_markers": len(self.markers),
-            "capacity_used": len(self.markers) / self.capacity,
-            "total_retrievals": self.total_retrievals,
-            "successful_retrievals": self.successful_retrievals,
-            "retrieval_success_rate": (self.successful_retrievals / max(1, self.total_retrievals)),
-            "avg_strength": float(np.mean([m.strength for m in self.markers])),
-            "avg_outcome": float(np.mean([m.body_outcome for m in self.markers])),
-        }
-
-    def consolidate(self) -> None:
-        """
-        Consolidate markers (simulate sleep/offline processing).
-
-        Simulates memory consolidation during sleep or offline periods:
-        - Strengthens frequently accessed markers (access_count > 5)
-        - Weakens rarely accessed markers
-        - Resets access counts
-
-        This implements the principle that important associations (frequently
-        retrieved) are strengthened during consolidation, while unimportant
-        associations decay.
-        """
-        for marker in self.markers:
-            if marker.access_count > 5:
-                # Strengthen frequently used markers
-                marker.strength = min(1.0, marker.strength + 0.1)
-            else:
-                # Weaken rarely used markers
-                marker.strength *= 0.9
-
-            # Reset access count
-            marker.access_count = 0
+        """Apply decay for all markers."""
+        if self.num_markers > 0 and self.strengths is not None:
+            self.strengths[: self.num_markers] *= 1.0 - self.decay_rate * dt / 1000.0
+            self.strengths[: self.num_markers] = np.maximum(0.0, self.strengths[: self.num_markers])
 
     def reset(self) -> None:
-        """
-        Clear all markers and reset statistics.
+        """Reset storage."""
+        self.num_markers = 0
+        if self.strengths is not None:
+            self.strengths.fill(0.0)
 
-        Removes all stored markers and resets retrieval statistics to zero.
-        """
-        self.markers.clear()
-        self.last_retrieved_marker = None
-        self.total_retrievals = 0
-        self.successful_retrievals = 0
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get statistics about the somatic marker system."""
+        return {
+            "num_markers": self.num_markers,
+            "total_retrievals": self.total_retrievals,
+            "successful_retrievals": self.successful_retrievals,
+            "capacity": self.capacity,
+        }

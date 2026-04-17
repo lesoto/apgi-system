@@ -174,7 +174,7 @@ class TestBeliefState:
         """Test BeliefState initializes correctly."""
         mean = np.array([1.0, 2.0])
         covariance = np.eye(2)
-        precision = 2.0
+        precision = np.array([2.0])
         prediction = np.array([0.5, 1.5])
         prediction_error = np.array([0.5, 0.5])
 
@@ -278,7 +278,7 @@ class TestHierarchicalGaussianFilter:
         manual_fe = 0.0
         for belief in beliefs:
             error_sq = np.sum(belief.prediction_error**2)
-            manual_fe += 0.5 * belief.precision * error_sq
+            manual_fe += 0.5 * np.mean(belief.precision) * error_sq
 
         # Should be approximately equal (allowing for numerical differences)
         # Use larger tolerance for numerical stability and projection learning dynamics
@@ -330,6 +330,7 @@ class TestHierarchicalGaussianFilter:
         mismatches between levels.
 
         Validates: Requirements 1.1, 1.5
+        Verifies alignment with APGI Eq. 5.3 (Hierarchical Level Dynamics).
         Coverage: Lines 271, 283 (dimension mismatch projection)
         """
         # Create filter with varying dimensions

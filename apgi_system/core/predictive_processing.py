@@ -12,7 +12,6 @@ import numpy as np
 
 from apgi_system.stability import NumericalStabilityMonitor
 from apgi_system.types import ConfigDict, FloatArray
-from apgi_system.validation import InputValidator
 
 
 class PredictionErrorChannel:
@@ -60,119 +59,87 @@ class PredictionErrorChannel:
     """
 
     def __init__(
-        self, name: str, dimension: int, window_size_ms: float = 100.0, timestep_ms: float = 1.0
+        self,
+        name: str,
+        dimension: int,
+        batch_size: int = 1,
+        window_size_ms: float = 100.0,
+        timestep_ms: float = 1.0,
     ) -> None:
         """
-        Initialize prediction error channel.
+        Initialize prediction error channel with batch support.
 
         Parameters
         ----------
         name : str
-            Channel name (e.g., 'exteroceptive', 'interoceptive')
+            Channel name
         dimension : int
             Dimensionality of prediction error vectors
-        window_size_ms : float, default=100.0
-            Sliding window duration in milliseconds
-        timestep_ms : float, default=1.0
-            Time step duration in milliseconds
-
-        Examples
-        --------
-        >>> channel = PredictionErrorChannel(
-        ...     name='exteroceptive',
-        ...     dimension=256,
-        ...     window_size_ms=100.0,
-        ...     timestep_ms=1.0
-        ... )
+        batch_size : int
+            Number of parallel agent simulations
+        window_size_ms : float
+            Sliding window duration
         """
         self.name = name
         self.dimension = dimension
+        self.batch_size = batch_size
         self.window_size = int(window_size_ms / timestep_ms)
         self.timestep_ms = timestep_ms
 
-        # Sliding window buffer
+        # Sliding window buffer: list of deques, one per agent
+        # Or a single deque of (B, D) arrays
         self.error_buffer: deque[np.ndarray] = deque(maxlen=self.window_size)
 
-        # Current state
-        self.current_error = np.zeros(dimension)
-        self.accumulated_error = 0.0
-        self.precision = 1.0
+        # Current state: (B, D)
+        self.current_error = np.zeros((batch_size, dimension))
+        self.accumulated_error = np.zeros(batch_size)
+        self.precision = np.ones(batch_size)
 
     def update(
-        self, observation: FloatArray, prediction: FloatArray, precision: float = 1.0
+        self, observation: FloatArray, prediction: FloatArray, precision: np.ndarray
     ) -> FloatArray:
         """
-        Update prediction error with new observation.
-
-        Computes prediction error, adds it to the sliding window buffer,
-        and updates accumulated error statistics.
+        Update prediction error for batch.
 
         Parameters
         ----------
         observation : np.ndarray
-            Observed signal vector
+            Observed signals (B, D)
         prediction : np.ndarray
-            Predicted signal vector
-        precision : float, default=1.0
-            Precision weight (inverse variance)
-
-        Returns
-        -------
-        current_error : np.ndarray
-            Computed prediction error (observation - prediction)
-
-        Notes
-        -----
-        Prediction error: ε = o - μ̂
-
-        The error is added to a circular buffer, automatically discarding
-        the oldest error when the buffer is full.
-
-        Examples
-        --------
-        >>> channel = PredictionErrorChannel('extero', 256)
-        >>> obs = np.random.randn(256)
-        >>> pred = np.zeros(256)
-        >>> error = channel.update(obs, pred, precision=1.5)
-        >>> print(f"Error magnitude: {np.linalg.norm(error):.3f}")
+            Predicted signals (B, D)
+        precision : np.ndarray
+            Precision weights (B,)
         """
+        # Ensure correct shapes
+        if observation.ndim == 1:
+            observation = observation[np.newaxis, :]
+        if prediction.ndim == 1:
+            prediction = prediction[np.newaxis, :]
+
         self.current_error = observation - prediction
         self.precision = precision
 
-        # Add to sliding window
+        # Add (B, D) snapshot to sliding window
         self.error_buffer.append(self.current_error.copy())
 
-        # Update accumulated error
+        # Update accumulated error (B,)
         self._update_accumulated_error()
 
         return self.current_error
 
     def _update_accumulated_error(self) -> None:
-        """Update accumulated error over sliding window."""
+        """Update accumulated error (B,) over sliding window."""
         if len(self.error_buffer) == 0:
-            self.accumulated_error = 0.0
+            self.accumulated_error.fill(0.0)
         else:
-            # Sum of squared errors over window
-            errors = np.array(self.error_buffer)
-            self.accumulated_error = np.sum(errors**2)
+            # error_buffer is deque of (B, D) arrays
+            # Stack into (Window, B, D)
+            errors = np.stack(list(self.error_buffer))
+            # Sum of squares over (Window, D) dimensions -> (B,)
+            self.accumulated_error = np.sum(errors**2, axis=(0, 2))
 
-    def get_accumulated_signal(self) -> float:
-        """
-        Get precision-weighted accumulated signal.
-
-        Computes the precision-weighted magnitude of accumulated prediction
-        errors, providing a scalar measure of prediction failure.
-
-        Returns
-        -------
-        signal : float
-            Precision-weighted signal: S = Π * √(Σ ε²)
-
-        Notes
-        -----
-        This signal is used for ignition threshold computation. High signal
-        indicates sustained prediction errors that may warrant conscious access.
-        """
+    def get_accumulated_signal(self) -> np.ndarray:
+        """Get precision-weighted accumulated signal (B,)."""
         return self.precision * np.sqrt(self.accumulated_error)
 
     def get_statistics(self) -> Dict[str, float]:
@@ -207,14 +174,10 @@ class PredictionErrorChannel:
         }
 
     def reset(self) -> None:
-        """
-        Reset channel to initial state.
-
-        Clears error buffer and resets all accumulated statistics.
-        """
+        """Reset channel for all agents."""
         self.error_buffer.clear()
-        self.current_error = np.zeros(self.dimension)
-        self.accumulated_error = 0.0
+        self.current_error.fill(0.0)
+        self.accumulated_error.fill(0.0)
 
 
 class HierarchicalPredictor:
@@ -317,17 +280,18 @@ class HierarchicalPredictor:
         self.prediction_horizon_ms = pp_config.get("prediction_horizon_ms", 200)
         self.temporal_discount = pp_config.get("temporal_discount", 0.95)
 
-        # Initialize levels
+        # Initialize levels with batch support
+        self.batch_size = config.get("active_inference", {}).get("batch_size", 1)
         self.levels = []
         for i, level_config in enumerate(level_configs):
             level = {
                 "name": level_config["name"],
                 "nodes": level_config["nodes"],
                 "timescale_ms": level_config["timescale_ms"],
-                "state": np.zeros(level_config["nodes"]),
-                "prediction": np.zeros(level_config["nodes"]),
-                "error": np.zeros(level_config["nodes"]),
-                "precision": 1.0,
+                "state": np.zeros((self.batch_size, level_config["nodes"])),
+                "prediction": np.zeros((self.batch_size, level_config["nodes"])),
+                "error": np.zeros((self.batch_size, level_config["nodes"])),
+                "precision": np.ones(self.batch_size),
                 "update_counter": 0,
                 "update_interval": int(level_config["timescale_ms"]),
             }
@@ -340,15 +304,15 @@ class HierarchicalPredictor:
         self.exteroceptive_channel = PredictionErrorChannel(
             name="exteroceptive",
             dimension=self.levels[0]["nodes"],
+            batch_size=self.batch_size,
             window_size_ms=window_size,
             timestep_ms=timestep_ms,
         )
 
-        # Interoceptive dimension is 6 (body state vector size)
-        # heart_rate, respiration, temperature, glucose, cortisol, blood_pressure
         self.interoceptive_channel = PredictionErrorChannel(
             name="interoceptive",
-            dimension=6,  # Body state vector size
+            dimension=6,
+            batch_size=self.batch_size,
             window_size_ms=window_size,
             timestep_ms=timestep_ms,
         )
@@ -356,8 +320,8 @@ class HierarchicalPredictor:
         # Learning rates per level
         self.learning_rates = [0.01 / (i + 1) for i in range(self.num_levels)]
 
-        # Interoceptive prediction (separate from hierarchical levels)
-        self.intero_prediction = np.zeros(6)
+        # Interoceptive prediction (B, 6)
+        self.intero_prediction = np.zeros((self.batch_size, 6))
 
         # Stability monitoring
         self.stability_monitor = NumericalStabilityMonitor(config)
@@ -420,14 +384,14 @@ class HierarchicalPredictor:
         """
         # Validate inputs
         if extero_input is not None:
-            InputValidator.validate_array(
-                extero_input, "extero_input", expected_shape=(self.levels[0]["nodes"],)
-            )
+            # extero_input should be (B, D)
+            if extero_input.ndim == 1:
+                extero_input = extero_input[np.newaxis, :]
 
         if intero_input is not None:
-            InputValidator.validate_array(intero_input, "intero_input", expected_shape=(6,))
-
-        InputValidator.validate_scalar(dt_ms, "dt_ms", positive=True, value_range=(0.001, 1000.0))
+            # intero_input should be (B, 6)
+            if intero_input.ndim == 1:
+                intero_input = intero_input[np.newaxis, :]
 
         results: Dict[str, Any] = {
             "exteroceptive": {},
@@ -437,8 +401,15 @@ class HierarchicalPredictor:
 
         # Process exteroceptive stream
         if extero_input is not None:
+            # Project extero_input to match level 0 dimension if needed
+            level0_dim = self.levels[0]["nodes"]
+            if extero_input.shape[1] != level0_dim:
+                extero_input_projected = self._map_up(extero_input, level0_dim)
+            else:
+                extero_input_projected = extero_input
+
             extero_error = self.exteroceptive_channel.update(
-                observation=extero_input,
+                observation=extero_input_projected,
                 prediction=self.levels[0]["prediction"],
                 precision=self.levels[0]["precision"],
             )
@@ -488,7 +459,7 @@ class HierarchicalPredictor:
                 {
                     "level": level["name"],
                     "error": level["error"].copy(),
-                    "magnitude": float(np.linalg.norm(level["error"])),
+                    "magnitude": np.linalg.norm(level["error"], axis=1),
                     "precision": level["precision"],
                 }
             )
@@ -552,35 +523,37 @@ class HierarchicalPredictor:
                 )
 
     def _map_down(self, state: FloatArray, target_dim: int) -> FloatArray:
-        """Map state from higher to lower level."""
-        if len(state) == target_dim:
+        """Map state from higher to lower level (B, D_high) -> (B, D_low)."""
+        b_size, source_dim = state.shape
+        if source_dim == target_dim:
             return state.copy()
-        elif len(state) < target_dim:
+        elif source_dim < target_dim:
             # Upsample
-            result = np.zeros(target_dim)
-            result[: len(state)] = state
+            result = np.zeros((b_size, target_dim))
+            result[:, :source_dim] = state
             return result
         else:
             # Downsample
-            return state[:target_dim]
+            return state[:, :target_dim]
 
     def _map_up(self, state: FloatArray, target_dim: int) -> FloatArray:
-        """Map state from lower to higher level."""
-        if len(state) == target_dim:
+        """Map state from lower to higher level (B, D_low) -> (B, D_high)."""
+        b_size, source_dim = state.shape
+        if source_dim == target_dim:
             return state.copy()
-        elif len(state) > target_dim:
+        elif source_dim > target_dim:
             # Pool/compress
-            ratio = len(state) // target_dim
-            result = np.zeros(target_dim)
+            ratio = source_dim // target_dim
+            result = np.zeros((b_size, target_dim))
             for i in range(target_dim):
                 start = i * ratio
-                end = min((i + 1) * ratio, len(state))
-                result[i] = np.mean(state[start:end])
+                end = min((i + 1) * ratio, source_dim)
+                result[:, i] = np.mean(state[:, start:end], axis=1)
             return result
         else:
             # Expand
-            result = np.zeros(target_dim)
-            result[: len(state)] = state
+            result = np.zeros((b_size, target_dim))
+            result[:, :source_dim] = state
             return result
 
     def get_prediction_errors(self) -> Dict[str, Any]:
@@ -611,18 +584,13 @@ class HierarchicalPredictor:
         }
 
     def reset(self) -> None:
-        """
-        Reset all hierarchical levels and prediction error channels.
-
-        Clears all state, predictions, errors, and temporal buffers.
-        Useful for starting new simulation runs or experimental trials.
-        """
+        """Reset all hierarchical levels and prediction error channels."""
         for level in self.levels:
-            level["state"] = np.zeros(level["nodes"])
-            level["prediction"] = np.zeros(level["nodes"])
-            level["error"] = np.zeros(level["nodes"])
+            level["state"].fill(0.0)
+            level["prediction"].fill(0.0)
+            level["error"].fill(0.0)
             level["update_counter"] = 0
 
         self.exteroceptive_channel.reset()
         self.interoceptive_channel.reset()
-        self.intero_prediction = np.zeros(6)
+        self.intero_prediction.fill(0.0)

@@ -37,16 +37,19 @@ class TestPrecisionWeighting:
     """Test PrecisionWeighting functionality."""
 
     def test_initialization(self, simple_config: dict[str, Any]) -> None:
-        """Test precision weighting initializes correctly."""
+        """
+        Test precision weighting initializes correctly.
+        Verifies alignment with APGI Eq. 1.3 (Precision).
+        """
         precision = PrecisionWeighting(simple_config)
 
-        assert precision.extero_baseline == 1.0
-        assert precision.intero_baseline == 0.8
-        assert precision.extero_precision == 1.0
-        assert precision.intero_precision == 0.8
-        assert precision.attention_focus is None
-        assert precision.fatigue_level == 0.0
-        assert precision.cognitive_load == 0.0
+        assert np.all(precision.extero_baseline == 1.0)
+        assert np.all(precision.intero_baseline == 0.8)
+        assert np.all(precision.extero_precision == 1.0)
+        assert np.all(precision.intero_precision == 0.8)
+        assert all(x is None for x in precision.attention_focus)
+        assert np.all(precision.fatigue_level == 0.0)
+        assert np.all(precision.cognitive_load == 0.0)
 
     def test_update_basic(self, simple_config: dict[str, Any]) -> None:
         """Test basic precision update."""
@@ -85,13 +88,17 @@ class TestPrecisionWeighting:
 
         # Test exteroceptive attention
         result_extero = precision.update(
-            extero_error_variance=1.0, intero_error_variance=1.0, attention_target="extero"
+            extero_error_variance=1.0,
+            intero_error_variance=1.0,
+            attention_target=np.array(["extero"]),
         )
 
         # Reset for interoceptive attention
         precision = PrecisionWeighting(simple_config)
         result_intero = precision.update(
-            extero_error_variance=1.0, intero_error_variance=1.0, attention_target="intero"
+            extero_error_variance=1.0,
+            intero_error_variance=1.0,
+            attention_target=np.array(["intero"]),
         )
 
         # Attended stream should have higher precision
@@ -126,7 +133,7 @@ class TestPrecisionWeighting:
         result_tired = precision.update(extero_error_variance=1.0)
 
         # Fatigue should reduce precision
-        assert result_fresh["exteroceptive"] > result_tired["exteroceptive"]
+        assert np.all(result_fresh["exteroceptive"] > result_tired["exteroceptive"])
 
     def test_cognitive_load_effects(self, simple_config: dict[str, Any]) -> None:
         """Test cognitive load effects on precision."""
@@ -141,7 +148,7 @@ class TestPrecisionWeighting:
         result_high_load = precision.update(extero_error_variance=1.0)
 
         # High load should reduce precision
-        assert result_low_load["exteroceptive"] > result_high_load["exteroceptive"]
+        assert np.all(result_low_load["exteroceptive"] > result_high_load["exteroceptive"])
 
     def test_context_modulation(self, simple_config: dict[str, Any]) -> None:
         """Test context-dependent precision modulation."""
@@ -159,7 +166,7 @@ class TestPrecisionWeighting:
         )
 
         # Threat should increase interoceptive precision
-        assert result_threat["interoceptive"] > result_safe["interoceptive"]
+        assert np.all(result_threat["interoceptive"] > result_safe["interoceptive"])
 
     def test_precision_bounds(self, simple_config: dict[str, Any]) -> None:
         """Test precision stays within configured bounds."""
@@ -192,7 +199,7 @@ class TestPrecisionWeighting:
         precision = PrecisionWeighting(simple_config)
 
         # Modify state
-        precision.update(extero_error_variance=5.0, attention_target="extero")
+        precision.update(extero_error_variance=5.0, attention_target=np.array(["extero"]))
         precision.set_fatigue(0.8)
         precision.set_neuromodulator(NeuromodulatorType.NOREPINEPHRINE, 0.9)
 
@@ -200,11 +207,11 @@ class TestPrecisionWeighting:
         precision.reset()
 
         # Should return to baseline
-        assert precision.extero_precision == precision.extero_baseline
-        assert precision.intero_precision == precision.intero_baseline
-        assert precision.attention_focus is None
-        assert precision.fatigue_level == 0.0
-        assert precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 0.5
+        assert np.all(precision.extero_precision == precision.extero_baseline)
+        assert np.all(precision.intero_precision == precision.intero_baseline)
+        assert all(x is None for x in precision.attention_focus)
+        assert np.all(precision.fatigue_level == 0.0)
+        assert np.all(precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 0.5)
 
     def test_invalid_error_variance(self, simple_config: dict[str, Any]) -> None:
         """Test error handling for invalid error variance."""
@@ -227,7 +234,7 @@ class TestPrecisionWeighting:
         precision = PrecisionWeighting(simple_config)
 
         with pytest.raises(ValueError):
-            precision.update(attention_target="invalid")
+            precision.update(attention_target=np.array(["invalid"]))
 
     def test_neuromodulator_clamping(self, simple_config: dict[str, Any]) -> None:
         """Test neuromodulator level clamping."""
@@ -235,30 +242,30 @@ class TestPrecisionWeighting:
 
         # Set extreme values
         precision.set_neuromodulator(NeuromodulatorType.NOREPINEPHRINE, -1.0)
-        assert precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 0.0
+        assert np.all(precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 0.0)
 
         precision.set_neuromodulator(NeuromodulatorType.NOREPINEPHRINE, 2.0)
-        assert precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 1.0
+        assert np.all(precision.neuromodulators[NeuromodulatorType.NOREPINEPHRINE] == 1.0)
 
     def test_fatigue_clamping(self, simple_config: dict[str, Any]) -> None:
         """Test fatigue level clamping."""
         precision = PrecisionWeighting(simple_config)
 
         precision.set_fatigue(-0.5)
-        assert precision.fatigue_level == 0.0
+        assert np.all(precision.fatigue_level == 0.0)
 
         precision.set_fatigue(1.5)
-        assert precision.fatigue_level == 1.0
+        assert np.all(precision.fatigue_level == 1.0)
 
     def test_cognitive_load_clamping(self, simple_config: dict[str, Any]) -> None:
         """Test cognitive load clamping."""
         precision = PrecisionWeighting(simple_config)
 
         precision.set_cognitive_load(-0.5)
-        assert precision.cognitive_load == 0.0
+        assert np.all(precision.cognitive_load == 0.0)
 
         precision.set_cognitive_load(1.5)
-        assert precision.cognitive_load == 1.0
+        assert np.all(precision.cognitive_load == 1.0)
 
     def test_volatility_tracking(self, simple_config: dict[str, Any]) -> None:
         """Test volatility tracking over time."""
@@ -347,8 +354,8 @@ class TestPrecisionWeighting:
         result = precision.update(extero_error_variance=1.0, intero_error_variance=1.0)
 
         # Attention gain should be neutral (1.0)
-        assert result["attention_gain"] == 1.0
-        assert precision.attention_focus is None
+        assert np.all(result["attention_gain"] == 1.0)
+        assert all(x is None for x in precision.attention_focus)
 
     def test_task_demand_context(self, simple_config: dict[str, Any]) -> None:
         """Test task demand context modulation."""
@@ -366,7 +373,7 @@ class TestPrecisionWeighting:
         )
 
         # High task demand should increase exteroceptive precision
-        assert result_high["exteroceptive"] > result_low["exteroceptive"]
+        assert np.all(result_high["exteroceptive"] > result_low["exteroceptive"])
 
     def test_apply_attention_else_branch(self, simple_config: dict[str, Any]) -> None:
         """Test the else branch in _apply_attention for neutral attention."""
@@ -377,5 +384,5 @@ class TestPrecisionWeighting:
         precision._apply_attention(None)  # type: ignore[arg-type]
 
         # Should set neutral attention gain
-        assert precision.attention_gain == 1.0
-        assert precision.attention_focus is None
+        assert np.all(precision.attention_gain == 1.0)
+        assert all(x is None for x in precision.attention_focus)

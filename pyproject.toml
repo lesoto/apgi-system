@@ -37,13 +37,18 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.4.0",
     "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "hypothesis>=6.82.0",
+    "mutmut>=2.4.0",
     "types-requests>=2.28.0",
 ]
 testing = [
     "hypothesis>=6.82.0",
     "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "sqlalchemy>=2.0.0",
+    "redis>=4.0.0",
 ]
 
 [tool.setuptools]
@@ -176,3 +181,29 @@ extend-ignore = ["E203", "W503"]
 per-file-ignores = [
     "__init__.py: F401"
 ]
+
+# ---------------------------------------------------------------------------
+# mutmut – mutation testing
+# ---------------------------------------------------------------------------
+# Run with:  mutmut run
+# Report:    mutmut results
+# HTML:      mutmut html
+#
+# We scope mutations to the three modules with the highest mathematical risk:
+#   • active_inference.py  – HGF update equations & free-energy gradient
+#   • free_energy.py       – VFE / EFE calculations
+#   • vp15.py              – allostatic correction formulae
+#
+# Tests that must survive mutation are in tests/unit/ (fast, deterministic).
+# ---------------------------------------------------------------------------
+[tool.mutmut]
+paths_to_mutate = [
+    "apgi_system/core/active_inference.py",
+    "apgi_system/core/free_energy.py",
+    "apgi_system/core/vp15.py",
+    "apgi_system/ignition/threshold.py",
+    "apgi_system/interoception/allostasis.py",
+]
+test_command = "python -m pytest tests/unit/test_active_inference.py tests/unit/test_vp15_protocol.py tests/unit/test_free_energy.py tests/unit/test_ignition_dynamics.py tests/unit/test_allostasis.py -x -q --no-header"
+no_progress_bar = false
+use_coverage = false

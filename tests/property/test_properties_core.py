@@ -133,7 +133,7 @@ class TestCoreSystemProperties:
         precision_system_low = PrecisionWeighting(config)
         # Disable neuromodulator effects for pure test
         for modulator in precision_system_low.neuromodulators:
-            precision_system_low.neuromodulators[modulator] = 0.0
+            precision_system_low.neuromodulators[modulator] = np.array([0.0])
 
         result_low = precision_system_low.update(
             extero_error_variance=error_variance_low, intero_error_variance=1.0
@@ -143,7 +143,7 @@ class TestCoreSystemProperties:
         precision_system_high = PrecisionWeighting(config)
         # Disable neuromodulator effects for pure test
         for modulator in precision_system_high.neuromodulators:
-            precision_system_high.neuromodulators[modulator] = 0.0
+            precision_system_high.neuromodulators[modulator] = np.array([0.0])
 
         result_high = precision_system_high.update(
             extero_error_variance=error_variance_high, intero_error_variance=1.0
@@ -246,9 +246,10 @@ class TestCoreSystemProperties:
         ignition_state = state["ignition"]
         assert isinstance(ignition_state, dict), "Ignition state should be dict"
         assert "ignition_occurred" in ignition_state, "Missing ignition_occurred"
+        # ignition_occurred can be either bool or numpy array
         assert isinstance(
-            ignition_state["ignition_occurred"], bool
-        ), "ignition_occurred should be boolean"
+            ignition_state["ignition_occurred"], (bool, np.ndarray)
+        ), "ignition_occurred should be boolean or numpy array"
 
         # Check metabolic reserves are within bounds
         metabolism_state = state["metabolism"]
@@ -288,9 +289,9 @@ class TestCoreSystemProperties:
         body_model = BodyModel(config)
 
         # Set initial state based on generated body state
-        body_model.set_arousal(min(1.0, body_state["heart_rate"] / 120.0))
-        body_model.set_activity(min(1.0, body_state["respiration"] / 30.0))
-        body_model.set_stress(min(1.0, body_state["cortisol"] / 30.0))
+        body_model.set_arousal(np.minimum(1.0, body_state["heart_rate"] / 120.0))
+        body_model.set_activity(np.minimum(1.0, body_state["respiration"] / 30.0))
+        body_model.set_stress(np.minimum(1.0, body_state["cortisol"] / 30.0))
 
         # Update for several steps
         for _ in range(10):

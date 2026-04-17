@@ -9,7 +9,7 @@ Implements macroscale brain networks:
 
 import threading
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -80,22 +80,28 @@ class FrontoparietalNetwork:
     Broadcasting: True
     """
 
-    def __init__(self, num_nodes: int = 1000, config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, num_nodes: int = 1000, batch_size: int = 1, config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize frontoparietal network.
 
         Args:
             num_nodes: Number of workspace nodes
+            batch_size: Number of parallel agent simulations
             config: Configuration dictionary
         """
         self.num_nodes = num_nodes
+        self.batch_size = batch_size
         self.config = config or {}
+        self._lock = threading.Lock()
 
-        # Network state
-        self.activity = np.zeros(num_nodes)
-        self.broadcast_state: Optional[np.ndarray] = np.zeros(num_nodes)
+        # Network state: (B, D)
+        self.activity = np.zeros((batch_size, num_nodes))
+        self.broadcast_state = np.zeros((batch_size, num_nodes))
 
-        # Connectivity (sparse long-range)
+        # Connectivity (sparse long-range) - Shared across agents?
+        # Yes, usually the architecture is the same.
         self.connection_density = 0.05  # 5% connectivity
         self.weights = self._initialize_weights()
 
@@ -104,10 +110,10 @@ class FrontoparietalNetwork:
         self.amplification_gain = 2.0  # Recurrent amplification
         self.competition_strength = 0.5  # Winner-take-all
 
-        # Broadcasting
-        self.is_broadcasting = False
-        self.broadcast_content: Optional[np.ndarray] = None
-        self.broadcast_start_time: Optional[float] = None
+        # Broadcasting state for each agent
+        self.is_broadcasting = np.zeros(batch_size, dtype=bool)
+        self.broadcast_content = np.zeros((batch_size, num_nodes))
+        self.broadcast_start_time = np.zeros(batch_size)
 
     def _initialize_weights(self) -> np.ndarray:
         """Initialize sparse connectivity."""
@@ -119,143 +125,71 @@ class FrontoparietalNetwork:
         return weights
 
     def update(
-        self, external_input: np.ndarray, ignition_signal: bool = False, dt: float = 1.0
+        self, external_input: np.ndarray, ignition_signal: np.ndarray, dt: float = 1.0
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """
-        Update network activity.
+        """Update workspace activity for all agents in batch (B, D)."""
+        with self._lock:
+            # recurrent_input: (B, D)
+            recurrent_input = self.activity @ self.weights.T
 
-        Args:
-            external_input: Input from other networks
-            ignition_signal: Whether ignition occurred
-            dt: Timestep in ms
+            # Mean-field competition (B, 1)
+            competition = -self.competition_strength * np.mean(self.activity, axis=1, keepdims=True)
 
-        Returns:
-            activity: Current workspace activity
-            info: Diagnostic information
-        """
-        with threading.Lock():
-            # Recurrent input with enhanced overflow protection
-            # Check weights and activity for numerical stability before computation
-            self.weights = np.nan_to_num(self.weights, nan=0.0, posinf=1.0, neginf=-1.0)
-            self.activity = np.nan_to_num(self.activity, nan=0.0, posinf=1.0, neginf=-1.0)
-
-            # Apply gradient clipping to prevent extreme values
-            self.weights = np.clip(self.weights, -10, 10)
-            self.activity = np.clip(self.activity, 0, 5)
-
-            # Check for valid inputs before multiplication
-            if not np.all(np.isfinite(self.weights)) or not np.all(np.isfinite(self.activity)):
-                recurrent_input = np.zeros(self.activity.shape[0])
-            else:
-                # Thread-safe matrix multiplication with error handling
-                try:
-                    with threading.Lock():
-                        # Suppress numpy warnings for this operation
-                        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-                            recurrent_input = self.weights @ self.activity
-                except (FloatingPointError, ValueError):
-                    # Fallback to safe computation
-                    recurrent_input = np.zeros(self.activity.shape[0])
-
-            # Enhanced numerical stability checks
-            if not np.all(np.isfinite(recurrent_input)):
-                # Reset to safe values if overflow occurs
-                self.weights = np.clip(self.weights, -5, 5)
-                self.activity = np.clip(self.activity, 0.1, 2)
-                # Thread-safe matrix multiplication in recovery path
-                with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-                    recurrent_input = self.weights @ self.activity
-
-                # Log warning for debugging
-                import warnings
-
-                warnings.warn(
-                    "Numerical instability detected in recurrent computation, values reset",
-                    RuntimeWarning,
-                )
-
-            # Competition (soft winner-take-all)
-            competition = -self.competition_strength * np.mean(self.activity)
-
-            # Total input with bounds checking
+            # Total input: (B, D)
             total_input = external_input + self.amplification_gain * recurrent_input + competition
 
-            # Check total input for numerical issues
-            if not np.all(np.isfinite(total_input)):
-                total_input = np.clip(total_input, -100, 100)
-
-            # Update activity
+            # Update activity (Euler integration)
             dactivity = (dt / self.tau) * (-self.activity + total_input)
-
-            # Check derivative for numerical issues
-            if not np.all(np.isfinite(dactivity)):
-                dactivity = np.clip(dactivity, -10, 10)
-
             self.activity += dactivity
 
-            # Apply nonlinearity
-            self.activity = np.maximum(0, self.activity)  # ReLU
+            # Apply nonlinearity and clipping for stability
+            self.activity = np.clip(self.activity, 0.0, 10.0)
 
-            # Normalization to prevent explosion
-            max_activity = np.max(self.activity)
-            if max_activity > 10.0:
-                self.activity *= 10.0 / max_activity
+            # Initiate broadcasts (B,)
+            ignition_bool = np.asarray(ignition_signal, dtype=bool)
+            initiate_mask = ignition_bool & ~self.is_broadcasting
+            if np.any(initiate_mask):
+                self.is_broadcasting[initiate_mask] = True
+                self.broadcast_content[initiate_mask] = self.activity[initiate_mask].copy()
+                self.broadcast_start_time[initiate_mask] = 0.0
 
-        # Handle broadcasting
-        if ignition_signal and not self.is_broadcasting:
-            with threading.Lock():
-                self._initiate_broadcast()
-        elif self.is_broadcasting:
-            with threading.Lock():
-                self._maintain_broadcast(dt)
+            # Maintain existing broadcasts
+            if np.any(self.is_broadcasting):
+                self.broadcast_start_time[self.is_broadcasting] += dt
 
-        with threading.Lock():
+                # Expiry check
+                broadcast_duration = 300.0
+                expired_mask = self.is_broadcasting & (
+                    self.broadcast_start_time > broadcast_duration
+                )
+                if np.any(expired_mask):
+                    self.is_broadcasting[expired_mask] = False
+                    self.broadcast_content[expired_mask] = 0.0
+
+                # Update broadcast state
+                self.broadcast_state.fill(0.0)
+                active_mask = self.is_broadcasting
+                if np.any(active_mask):
+                    self.broadcast_state[active_mask] = self.broadcast_content[active_mask]
+
             info = {
                 "mean_activity": float(np.mean(self.activity)),
-                "max_activity": float(np.max(self.activity)),
-                "active_nodes": int(np.sum(self.activity > 0.1)),
-                "is_broadcasting": self.is_broadcasting,
+                "is_broadcasting": self.is_broadcasting.copy(),
             }
 
             return self.activity.copy(), info
 
-    def _initiate_broadcast(self) -> None:
-        """Initiate global broadcast."""
-        self.is_broadcasting = True
-        # Winner pattern becomes broadcast content
-        self.broadcast_content = self.activity.copy()
-        if self.broadcast_content is not None:
-            self.broadcast_state = self.broadcast_content
-        self.broadcast_start_time = 0.0
-
-    def _maintain_broadcast(self, dt: float) -> None:
-        """Maintain broadcast for sustained period."""
-        broadcast_duration = 300.0  # ms
-
-        if self.broadcast_start_time is not None:
-            self.broadcast_start_time += dt
-
-            if self.broadcast_start_time > broadcast_duration:
-                # End broadcast
-                self.is_broadcasting = False
-                self.broadcast_content = None
-                self.broadcast_start_time = None
-            else:
-                # Maintain broadcast state
-                self.broadcast_state = self.broadcast_content
-
-    def get_broadcast(self) -> Optional[np.ndarray]:
-        """Get current broadcast content."""
-        if self.is_broadcasting and self.broadcast_state is not None:
-            return self.broadcast_state.copy()
-        return None
+    def get_broadcast(self) -> np.ndarray:
+        """Get current broadcast content for all agents (B, D)."""
+        return self.broadcast_state.copy()
 
     def reset(self) -> None:
-        """Reset network."""
-        self.activity = np.zeros(self.num_nodes)
-        self.broadcast_state = np.zeros(self.num_nodes)
-        self.is_broadcasting = False
-        self.broadcast_content = None
+        """Reset network for all agents in batch."""
+        self.activity.fill(0.0)
+        self.broadcast_state.fill(0.0)
+        self.is_broadcasting.fill(False)
+        self.broadcast_content.fill(0.0)
+        self.broadcast_start_time.fill(0.0)
 
 
 class SalienceNetwork:
@@ -318,123 +252,162 @@ class SalienceNetwork:
     Attention target: interoceptive
     """
 
-    def __init__(self, num_nodes: int = 200, config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, num_nodes: int = 200, batch_size: int = 1, config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize salience network.
 
         Args:
             num_nodes: Number of nodes
+            batch_size: Number of parallel agent simulations
             config: Configuration dictionary
         """
         self.num_nodes = num_nodes
+        self.batch_size = batch_size
         self.config = config or {}
+        self._lock = threading.Lock()
 
         # Subregions
         self.insula_nodes = num_nodes // 2  # Interoceptive processing
         self.acc_nodes = num_nodes // 2  # Conflict/salience detection
 
-        self.insula_activity = np.zeros(self.insula_nodes)
-        self.acc_activity = np.zeros(self.acc_nodes)
+        self.insula_activity = np.zeros((batch_size, self.insula_nodes))
+        self.acc_activity = np.zeros((batch_size, self.acc_nodes))
 
         # Parameters
         self.tau = 30.0  # ms
         self.salience_threshold = 1.0
 
         # Switching state
-        self.current_attention: Optional[str] = None  # Which network is prioritized
+        self.current_attention = np.array([None] * batch_size)  # Which network is prioritized
 
     def update(
         self,
-        interoceptive_input: np.ndarray,
-        exteroceptive_input: np.ndarray,
-        conflict_signal: float = 0.0,
+        interoceptive_input: Union[np.ndarray, float],
+        exteroceptive_input: Union[np.ndarray, float],
+        conflict_signal: Union[np.ndarray, float],
         dt: float = 1.0,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         """
-        Update salience network.
+        Update salience network for all agents.
 
         Args:
-            interoceptive_input: Body state signals
-            exteroceptive_input: External signals
-            conflict_signal: Conflict/uncertainty signal
+            interoceptive_input: Body state signals (B, D_intero)
+            exteroceptive_input: External signals (B, D_extero)
+            conflict_signal: Conflict/uncertainty signal (B,)
             dt: Timestep in ms
 
         Returns:
-            activity: Dictionary with subregion activities
+            activity: Dictionary with subregion activities (B, D)
             info: Diagnostic information
         """
-        # Insula processes interoceptive signals
-        # Pad interoceptive input to match insula nodes
-        intero_padded = np.zeros(self.insula_nodes)
-        intero_padded[: min(len(interoceptive_input), self.insula_nodes)] = interoceptive_input[
-            : min(len(interoceptive_input), self.insula_nodes)
-        ]
+        with self._lock:
+            # 1. Insula processes interoceptive signals
+            # Ensure input shape compatibility (B, D)
+            if not isinstance(interoceptive_input, np.ndarray):
+                interoceptive_input = np.array([interoceptive_input])
 
-        target_insula = intero_padded
-        dinsula = (dt / self.tau) * (target_insula - self.insula_activity)
-        self.insula_activity += dinsula
-        self.insula_activity = np.maximum(0, self.insula_activity)
+            if interoceptive_input.ndim == 1:
+                # If batch_size is 1, it might be (D,). If batch_size > 1 and it's (D,), something is wrong.
+                # Assume (D,) represents a single agent if batch_size=1, or needs broadcast if batch_size > 1.
+                if self.batch_size == 1:
+                    interoceptive_input = interoceptive_input[np.newaxis, :]
+                else:
+                    # Broadcast to match batch_size
+                    interoceptive_input = np.tile(interoceptive_input, (self.batch_size, 1))
 
-        # ACC processes conflict and prediction errors
-        # Pad interoceptive input for ACC processing
-        intero_acc_padded = np.zeros(self.acc_nodes // 2)
-        intero_acc_padded[: min(len(interoceptive_input), self.acc_nodes // 2)] = (
-            interoceptive_input[: min(len(interoceptive_input), self.acc_nodes // 2)]
-        )
+            b_size = interoceptive_input.shape[0]
+            # Map interoceptive input to insular nodes (B, D_insula)
+            target_insula = np.zeros((b_size, self.insula_nodes))
+            d_min = min(interoceptive_input.shape[1], self.insula_nodes)
+            target_insula[:, :d_min] = interoceptive_input[:, :d_min]
 
-        combined_signal = np.concatenate(
-            [exteroceptive_input[: self.acc_nodes // 2], intero_acc_padded]
-        )[: self.acc_nodes]
+            dinsula = (dt / self.tau) * (target_insula - self.insula_activity)
+            self.insula_activity += dinsula
+            self.insula_activity = np.maximum(0, self.insula_activity)
 
-        # Add conflict signal
-        conflict_component = conflict_signal * np.ones(self.acc_nodes)
-        target_acc = combined_signal + conflict_component
+            # 2. ACC processes conflict and prediction errors
+            if not isinstance(exteroceptive_input, np.ndarray):
+                exteroceptive_input = np.array([exteroceptive_input])
 
-        dacc = (dt / self.tau) * (target_acc - self.acc_activity)
-        self.acc_activity += dacc
-        self.acc_activity = np.maximum(0, self.acc_activity)
+            if exteroceptive_input.ndim == 1:
+                if self.batch_size == 1:
+                    exteroceptive_input = exteroceptive_input[np.newaxis, :]
+                else:
+                    exteroceptive_input = np.tile(exteroceptive_input, (self.batch_size, 1))
 
-        # Compute overall salience
-        salience = np.mean(self.acc_activity) + 0.5 * np.mean(self.insula_activity)
+            # Ensure conflict_signal is a batch array (B,)
+            if not isinstance(conflict_signal, np.ndarray):
+                conflict_signal = np.full(b_size, float(conflict_signal))
+            elif conflict_signal.shape != (b_size,):
+                conflict_signal = np.full(b_size, float(np.mean(conflict_signal)))
 
-        # Attention switching
-        if salience > self.salience_threshold:
-            # High interoceptive activity -> attend inward
-            if np.mean(self.insula_activity) > np.mean(exteroceptive_input[: self.num_nodes]):
-                self.current_attention = "interoceptive"
-            else:
-                self.current_attention = "exteroceptive"
+            # Hybrid signal: exteroceptive + interoceptive
+            acc_half = self.acc_nodes // 2
+            combined_signal = np.zeros((b_size, self.acc_nodes))
 
-        activity = {"insula": self.insula_activity.copy(), "acc": self.acc_activity.copy()}
+            d_extero = min(exteroceptive_input.shape[1], acc_half)
+            combined_signal[:, :d_extero] = exteroceptive_input[:, :d_extero]
 
-        info = {
-            "salience": float(salience),
-            "attention_target": self.current_attention,
-            "insula_activity": float(np.mean(self.insula_activity)),
-            "acc_activity": float(np.mean(self.acc_activity)),
-        }
+            d_intero = min(interoceptive_input.shape[1], acc_half)
+            combined_signal[:, acc_half : acc_half + d_intero] = interoceptive_input[:, :d_intero]
 
-        return activity, info
+            # Multiply by conflict signal (B,) broadcasted to (B, D_acc)
+            target_acc = combined_signal + conflict_signal[:, np.newaxis]
 
-    def get_precision_modulation(self) -> Dict[str, float]:
+            dacc = (dt / self.tau) * (target_acc - self.acc_activity)
+            self.acc_activity += dacc
+            self.acc_activity = np.maximum(0, self.acc_activity)
+
+            # 3. Compute overall salience (B,)
+            salience = np.mean(self.acc_activity, axis=1) + 0.5 * np.mean(
+                self.insula_activity, axis=1
+            )
+
+            # 4. Attention switching (B,)
+            high_salience_mask = salience > self.salience_threshold
+            if np.any(high_salience_mask):
+                insula_mean = np.mean(self.insula_activity, axis=1)
+                extero_mean = np.mean(exteroceptive_input, axis=1)
+
+                inward_mask = high_salience_mask & (insula_mean > extero_mean)
+                outward_mask = high_salience_mask & ~inward_mask
+
+                self.current_attention[inward_mask] = "interoceptive"
+                self.current_attention[outward_mask] = "exteroceptive"
+
+            activity = {"insula": self.insula_activity.copy(), "acc": self.acc_activity.copy()}
+
+            info = {
+                "salience": float(np.mean(salience)),
+                "insula_activity": float(np.mean(self.insula_activity)),
+                "acc_activity": float(np.mean(self.acc_activity)),
+            }
+
+            return activity, info
+
+    def get_precision_modulation(self) -> Dict[str, np.ndarray]:
         """
-        Get precision modulation signals.
+        Get precision modulation signals for all agents.
 
-        Returns modulation factors for different channels.
+        Returns:
+            Dictionary with modulation factors (B,)
         """
-        intero_modulation = 1.0 + 0.5 * np.mean(self.insula_activity)
-        extero_modulation = 1.0 + 0.3 * np.mean(self.acc_activity)
+        # (B,)
+        intero_modulation = 1.0 + 0.5 * np.mean(self.insula_activity, axis=1)
+        extero_modulation = 1.0 + 0.3 * np.mean(self.acc_activity, axis=1)
 
         return {
-            "interoceptive": float(intero_modulation),
-            "exteroceptive": float(extero_modulation),
+            "interoceptive": intero_modulation,
+            "exteroceptive": extero_modulation,
         }
 
     def reset(self) -> None:
         """Reset network."""
-        self.insula_activity = np.zeros(self.insula_nodes)
-        self.acc_activity = np.zeros(self.acc_nodes)
-        self.current_attention = None
+        self.insula_activity.fill(0.0)
+        self.acc_activity.fill(0.0)
+        self.current_attention.fill(None)
 
 
 class DefaultModeNetwork:
@@ -501,104 +474,121 @@ class DefaultModeNetwork:
     DMN suppression: 0.86
     """
 
-    def __init__(self, num_nodes: int = 300, config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, num_nodes: int = 300, batch_size: int = 1, config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize default mode network.
 
         Args:
             num_nodes: Number of nodes
+            batch_size: Number of agents
             config: Configuration dictionary
         """
         self.num_nodes = num_nodes
+        self.batch_size = batch_size
         self.config = config or {}
+        self._lock = threading.Lock()
 
-        # Activity
-        self.activity = np.zeros(num_nodes)
-
-        # Subregions
-        self.mpfc_activity = np.zeros(num_nodes // 3)  # Self-referential
-        self.pcc_activity = np.zeros(num_nodes // 3)  # Memory integration
-        self.tpj_activity = np.zeros(num_nodes // 3)  # Perspective-taking
+        # Activity subregions (B, D)
+        self.mpfc_activity = np.zeros((batch_size, num_nodes // 3))
+        self.pcc_activity = np.zeros((batch_size, num_nodes // 3))
+        self.tpj_activity = np.zeros((batch_size, num_nodes // 3))
+        self.activity = np.zeros((batch_size, num_nodes))
 
         # Parameters
         self.tau = 100.0  # Slow dynamics
         self.self_coupling = 0.8  # Strong recurrent connections
 
         # Self-model state
-        self.self_representation = np.zeros(num_nodes)
-        self.narrative_buffer: list[str] = []
+        self.self_representation = np.zeros((batch_size, num_nodes))
+        self.narrative_buffer: List[List[str]] = [[] for _ in range(batch_size)]
 
     def update(
         self,
-        self_related_input: np.ndarray,
-        memory_input: np.ndarray,
-        task_activity: float = 0.0,
+        self_related_input: Union[np.ndarray, float],
+        memory_input: Union[np.ndarray, float],
+        task_activity: Union[np.ndarray, float],
         dt: float = 1.0,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
-        Update default mode network.
+        Update default mode network for all agents.
 
         Args:
-            self_related_input: Self-referential signals
-            memory_input: Episodic memory signals
-            task_activity: External task demands (suppresses DMN)
+            self_related_input: Self-referential signals (B, D)
+            memory_input: Episodic memory signals (B, D)
+            task_activity: External task demands (B,) - suppresses DMN
             dt: Timestep in ms
-
-        Returns:
-            activity: DMN activity
-            info: Diagnostic information
         """
-        # DMN is anti-correlated with task activity
-        suppression = 1.0 - 0.7 * task_activity
+        with self._lock:
+            # DMN is anti-correlated with task activity
+            if not isinstance(task_activity, np.ndarray):
+                task_activity = np.full(self.batch_size, float(task_activity))
 
-        # Update subregions
-        # Pad self-related input to match mpfc size
-        self_padded = np.zeros(len(self.mpfc_activity))
-        self_padded[: min(len(self_related_input), len(self.mpfc_activity))] = self_related_input[
-            : min(len(self_related_input), len(self.mpfc_activity))
-        ]
+            suppression = (1.0 - 0.7 * task_activity)[:, np.newaxis]  # (B, 1)
 
-        target_mpfc = self_padded * suppression
-        dmpfc = (dt / self.tau) * (target_mpfc - self.mpfc_activity)
-        self.mpfc_activity += dmpfc
+            # Ensure inputs are arrays
+            if not isinstance(self_related_input, np.ndarray):
+                self_related_input = np.array([self_related_input])
+            if self_related_input.ndim == 1:
+                self_related_input = (
+                    self_related_input[np.newaxis, :]
+                    if self.batch_size == 1
+                    else np.tile(self_related_input, (self.batch_size, 1))
+                )
 
-        # Pad memory input to match pcc size
-        memory_padded = np.zeros(len(self.pcc_activity))
-        memory_padded[: min(len(memory_input), len(self.pcc_activity))] = memory_input[
-            : min(len(memory_input), len(self.pcc_activity))
-        ]
+            if not isinstance(memory_input, np.ndarray):
+                memory_input = np.array([memory_input])
+            if memory_input.ndim == 1:
+                memory_input = (
+                    memory_input[np.newaxis, :]
+                    if self.batch_size == 1
+                    else np.tile(memory_input, (self.batch_size, 1))
+                )
 
-        target_pcc = memory_padded * suppression
-        dpcc = (dt / self.tau) * (target_pcc - self.pcc_activity)
-        self.pcc_activity += dpcc
+            # mPFC (Self)
+            n_mpfc = self.mpfc_activity.shape[1]
+            target_mpfc = np.zeros_like(self.mpfc_activity)
+            d_self = min(self_related_input.shape[1], n_mpfc)
+            target_mpfc[:, :d_self] = self_related_input[:, :d_self] * suppression
 
-        # TPJ integrates
-        target_tpj = 0.5 * (
-            self.mpfc_activity[: len(self.tpj_activity)]
-            + self.pcc_activity[: len(self.tpj_activity)]
-        )
-        dtpj = (dt / self.tau) * (target_tpj - self.tpj_activity)
-        self.tpj_activity += dtpj
+            dmpfc = (dt / self.tau) * (target_mpfc - self.mpfc_activity)
+            self.mpfc_activity += dmpfc
 
-        # Combine into overall activity
-        self.activity[: len(self.mpfc_activity)] = self.mpfc_activity
-        self.activity[len(self.mpfc_activity) : 2 * len(self.mpfc_activity)] = self.pcc_activity
-        self.activity[2 * len(self.mpfc_activity) :] = self.tpj_activity
+            # PCC (Memory)
+            n_pcc = self.pcc_activity.shape[1]
+            target_pcc = np.zeros_like(self.pcc_activity)
+            d_mem = min(memory_input.shape[1], n_pcc)
+            target_pcc[:, :d_mem] = memory_input[:, :d_mem] * suppression
 
-        # Apply nonlinearity
-        self.activity = np.maximum(0, self.activity)
+            dpcc = (dt / self.tau) * (target_pcc - self.pcc_activity)
+            self.pcc_activity += dpcc
 
-        # Update self-representation (slow integration)
-        self.self_representation = 0.99 * self.self_representation + 0.01 * self.activity
+            # TPJ (Integration)
+            target_tpj = 0.5 * (self.mpfc_activity + self.pcc_activity)
+            dtpj = (dt / self.tau) * (target_tpj - self.tpj_activity)
+            self.tpj_activity += dtpj
 
-        info = {
-            "mean_activity": float(np.mean(self.activity)),
-            "mpfc_activity": float(np.mean(self.mpfc_activity)),
-            "pcc_activity": float(np.mean(self.pcc_activity)),
-            "suppression_factor": float(suppression),
-        }
+            # Combine into overall activity: (B, D)
+            off0 = 0
+            off1 = n_mpfc
+            off2 = off1 + self.pcc_activity.shape[1]
 
-        return self.activity.copy(), info
+            self.activity[:, off0:off1] = self.mpfc_activity
+            self.activity[:, off1:off2] = self.pcc_activity
+            self.activity[:, off2:] = self.tpj_activity
+
+            self.activity = np.maximum(0, self.activity)
+
+            # Update slowly-evolving self-representation
+            self.self_representation = 0.99 * self.self_representation + 0.01 * self.activity
+
+            info = {
+                "mean_activity": float(np.mean(self.activity)),
+                "suppression_factor": float(np.mean(suppression)),
+            }
+
+            return self.activity.copy(), info
 
     def get_self_representation(self) -> np.ndarray:
         """Get current self-model representation."""
@@ -606,163 +596,100 @@ class DefaultModeNetwork:
 
     def reset(self) -> None:
         """Reset network."""
-        self.activity = np.zeros(self.num_nodes)
-        self.mpfc_activity = np.zeros(self.num_nodes // 3)
-        self.pcc_activity = np.zeros(self.num_nodes // 3)
-        self.tpj_activity = np.zeros(self.num_nodes // 3)
-        self.self_representation = np.zeros(self.num_nodes)
+        self.activity = np.zeros((self.batch_size, self.num_nodes))
+        self.mpfc_activity = np.zeros((self.batch_size, self.num_nodes // 3))
+        self.pcc_activity = np.zeros((self.batch_size, self.num_nodes // 3))
+        self.tpj_activity = np.zeros((self.batch_size, self.num_nodes // 3))
+        self.self_representation = np.zeros((self.batch_size, self.num_nodes))
 
 
 class LargeScaleNetworkManager:
-    """
-    Coordinates interactions between large-scale brain networks.
+    """Coordinates interactions between large-scale brain networks."""
 
-    Manages the dynamic interactions between three major brain networks
-    that are crucial for consciousness and cognitive function:
-
-    **Network Interactions**:
-    - **Frontoparietal ↔ Salience**: Salience network activates workspace
-      for conscious access when salient events are detected
-    - **Frontoparietal ↔ Default Mode**: Task-positive frontoparietal
-      activity suppresses default mode network (anti-correlation)
-    - **Salience ↔ Default Mode**: Salience network can activate default
-      mode during introspective attention
-
-    **Coordination Functions**:
-    - Routes information between networks based on attention state
-    - Implements network switching for different cognitive modes
-    - Manages competition and cooperation between networks
-    - Coordinates global brain states (focused vs. introspective)
-
-    The manager implements known principles of large-scale brain organization:
-    - Anti-correlation between task-positive and default networks
-    - Salience network as attention switch between networks
-    - Dynamic reconfiguration based on cognitive demands
-
-    Parameters
-    ----------
-    config : Dict[str, Any]
-        Configuration dictionary containing network parameters
-
-    Attributes
-    ----------
-    frontoparietal : FrontoparietalNetwork
-        Workspace network for conscious access
-    salience : SalienceNetwork
-        Salience detection and attention switching
-    default_mode : DefaultModeNetwork
-        Self-referential and simulation network
-    fp_to_dmn : float
-        Interaction strength from frontoparietal to default mode (negative)
-    sal_to_fp : float
-        Interaction strength from salience to frontoparietal (positive)
-    dmn_to_sal : float
-        Interaction strength from default mode to salience (weak positive)
-
-    Examples
-    --------
-    >>> config = {'ignition': {'workspace_nodes': 500}}
-    >>> manager = LargeScaleNetworkManager(config)
-    >>> extero = np.random.randn(100) * 0.1
-    >>> intero = np.random.randn(6) * 0.1
-    >>> result = manager.update(extero, intero, ignition_signal=True, conflict_signal=0.3)
-    >>> print(f"Broadcasting: {result['frontoparietal']['info']['is_broadcasting']}")
-    Broadcasting: True
-    """
-
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], batch_size: int = 1):
         """
         Initialize network manager.
 
         Args:
             config: Configuration dictionary
+            batch_size: Number of agents
         """
         self.config = config
+        self.batch_size = batch_size
+        self._lock = threading.Lock()
 
-        # Initialize networks
+        # Initialize networks with batch support
         ignition_config = config.get("ignition", {})
         workspace_nodes = ignition_config.get("workspace_nodes", 1000)
 
-        self.frontoparietal = FrontoparietalNetwork(num_nodes=workspace_nodes, config=config)
-        self.salience = SalienceNetwork(num_nodes=200, config=config)
-        self.default_mode = DefaultModeNetwork(num_nodes=300, config=config)
+        self.frontoparietal = FrontoparietalNetwork(
+            num_nodes=workspace_nodes, batch_size=batch_size, config=config
+        )
+        self.salience = SalienceNetwork(num_nodes=200, batch_size=batch_size, config=config)
+        self.default_mode = DefaultModeNetwork(num_nodes=300, batch_size=batch_size, config=config)
 
         # Interaction strengths
-        self.fp_to_dmn = -0.5  # Frontoparietal suppresses DMN
         self.sal_to_fp = 0.8  # Salience activates frontoparietal
-        self.dmn_to_sal = 0.3  # DMN weakly activates salience
+        self.fp_to_dmn = -0.5  # Frontoparietal suppresses DMN
 
     def update(
         self,
         extero_input: np.ndarray,
         intero_input: np.ndarray,
-        ignition_signal: bool,
-        conflict_signal: float,
+        ignition_signal: np.ndarray,
+        conflict_signal: np.ndarray,
         dt: float = 1.0,
     ) -> Dict[str, Any]:
-        """
-        Update all networks and their interactions.
+        """Update all networks for batch."""
+        with self._lock:
+            # 1. Salience (Attention switching)
+            sal_activity, sal_info = self.salience.update(
+                interoceptive_input=intero_input,
+                exteroceptive_input=extero_input,
+                conflict_signal=conflict_signal,
+                dt=dt,
+            )
 
-        Args:
-            extero_input: Exteroceptive input
-            intero_input: Interoceptive input
-            ignition_signal: Whether ignition occurred
-            conflict_signal: Conflict/uncertainty
-            dt: Timestep
+            # 2. FP input (B, D_fp)
+            # From ACC mean activity (B, 1) to FP nodes (B, D_fp)
+            sal_acc_mean = np.mean(sal_activity["acc"], axis=1, keepdims=True)
+            fp_drive = sal_acc_mean * self.sal_to_fp
+            # Sparse project drive? For now use scalar drive
+            fp_activity, fp_info = self.frontoparietal.update(
+                external_input=fp_drive, ignition_signal=ignition_signal, dt=dt
+            )
 
-        Returns:
-            Dictionary with all network states
-        """
-        # Update salience network
-        sal_activity, sal_info = self.salience.update(
-            interoceptive_input=intero_input,
-            exteroceptive_input=extero_input,
-            conflict_signal=conflict_signal,
-            dt=dt,
-        )
+            # 3. DMN suppression
+            task_engagement = np.mean(fp_activity, axis=1)
+            dmn_activity, dmn_info = self.default_mode.update(
+                self_related_input=intero_input,
+                memory_input=extero_input,
+                task_activity=task_engagement,
+                dt=dt,
+            )
 
-        # Frontoparietal input (from salience)
-        sal_mean = np.mean(sal_activity["acc"])
-        fp_input = sal_mean * self.sal_to_fp * np.random.rand(self.frontoparietal.num_nodes)
-
-        # Update frontoparietal network
-        fp_activity, fp_info = self.frontoparietal.update(
-            external_input=fp_input, ignition_signal=ignition_signal, dt=dt
-        )
-
-        # Default mode (suppressed by task/frontoparietal activity)
-        task_activity = np.mean(fp_activity)
-        dmn_activity, dmn_info = self.default_mode.update(
-            self_related_input=intero_input,
-            memory_input=extero_input,
-            task_activity=task_activity,
-            dt=dt,
-        )
-
-        return {
-            "frontoparietal": {"activity": fp_activity, "info": fp_info},
-            "salience": {"activity": sal_activity, "info": sal_info},
-            "default_mode": {"activity": dmn_activity, "info": dmn_info},
-            "broadcast": self.frontoparietal.get_broadcast(),
-        }
+            return {
+                "frontoparietal": fp_info,
+                "broadcast": self.frontoparietal.get_broadcast(),
+                "salience": sal_info,
+                "default_mode": dmn_info,
+            }
 
     def get_network_states(self) -> Dict[str, Any]:
         """Get current states of all networks."""
         return {
             "frontoparietal": {
                 "activity": self.frontoparietal.activity.copy(),
-                "is_broadcasting": self.frontoparietal.is_broadcasting,
-                "mean_activity": float(np.mean(self.frontoparietal.activity)),
+                "is_broadcasting": self.frontoparietal.is_broadcasting.copy(),
             },
             "salience": {
                 "insula_activity": self.salience.insula_activity.copy(),
                 "acc_activity": self.salience.acc_activity.copy(),
-                "current_attention": self.salience.current_attention,
+                "current_attention": self.salience.current_attention.copy(),
             },
             "default_mode": {
                 "activity": self.default_mode.activity.copy(),
                 "self_representation": self.default_mode.self_representation.copy(),
-                "mean_activity": float(np.mean(self.default_mode.activity)),
             },
         }
 

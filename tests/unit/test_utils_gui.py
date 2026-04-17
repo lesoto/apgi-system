@@ -8,30 +8,63 @@ configuration management without launching the full GUI.
 Tests focus on the backend logic that powers the Utils GUI functionality.
 """
 
+import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import tkinter as tk
+from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
 
+
+def load_module_from_file(module_name: str, file_path: Path):
+    """Load a Python module from a file path, handling hyphenated filenames."""
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 # Import GUI class with error handling
 try:
-    from Utils_GUI import UtilsRunnerGUI  # type: ignore
+    # Utils-GUI.py is a thin wrapper that imports from utils.script_runner_gui
+    # Import directly from script_runner_gui for testing
+    from utils.script_runner_gui import ScriptRunnerGUI  # type: ignore
 
     HAS_UTILS_GUI = True
 except ImportError as e:
     HAS_UTILS_GUI = False
-    UtilsRunnerGUI = None
-    print(f"Warning: Could not import UtilsRunnerGUI: {e}")
+    ScriptRunnerGUI = None  # type: ignore
+    print(f"Warning: Could not import ScriptRunnerGUI: {e}")
+
+
+def create_utils_runner_gui(root):
+    """Create a ScriptRunnerGUI instance with utils configuration."""
+    if ScriptRunnerGUI is None:
+        raise ImportError("ScriptRunnerGUI not available")
+    return ScriptRunnerGUI(
+        root,
+        script_dir_name="utils",
+        title="APGI Utils Scripts Runner",
+        script_list_label="Available Scripts",
+        run_all_text="Run All Scripts",
+        tooltip_selected="Run the currently selected script",
+        tooltip_all="Run all scripts in sequence",
+        tooltip_stop="Stop the currently running script",
+    )
 
 
 class TestUtilsGUIInitialization:
     """Test Utils GUI initialization and setup."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_gui_launches_without_errors(self: Any) -> None:
         """
         Test that Utils GUI can be initialized without errors.
@@ -42,7 +75,7 @@ class TestUtilsGUIInitialization:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Verify GUI was created
             assert app is not None
@@ -65,7 +98,7 @@ class TestUtilsGUIInitialization:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_gui_initializes_with_available_utilities(self: Any) -> None:
         """
         Test that GUI initializes with list of available utilities.
@@ -73,7 +106,7 @@ class TestUtilsGUIInitialization:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Verify utilities list exists
             assert hasattr(app, "utilities")
@@ -88,7 +121,7 @@ class TestUtilsGUIInitialization:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_output_display_widgets_created(self: Any) -> None:
         """
         Test that output display widgets are properly created.
@@ -96,7 +129,7 @@ class TestUtilsGUIInitialization:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Verify output text widget
             assert app.output_text.winfo_exists()
@@ -117,7 +150,7 @@ class TestUtilsGUIInitialization:
 class TestUtilityExecution:
     """Test utility execution functionality."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_utility_selection_validation(self: Any) -> None:
         """
         Test that utility selection validation works correctly.
@@ -125,7 +158,7 @@ class TestUtilityExecution:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Test valid utility selection
             if app.utilities:
@@ -140,7 +173,7 @@ class TestUtilityExecution:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_utility_execution_with_mock_subprocess(self: Any) -> None:
         """
         Test utility execution with mocked subprocess calls.
@@ -148,7 +181,7 @@ class TestUtilityExecution:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Mock subprocess.run
             with patch("subprocess.run") as mock_run:
@@ -166,7 +199,7 @@ class TestUtilityExecution:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_utility_execution_error_handling(self: Any) -> None:
         """
         Test error handling during utility execution.
@@ -174,7 +207,7 @@ class TestUtilityExecution:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Mock subprocess.run to simulate error
             with patch("subprocess.run") as mock_run:
@@ -196,7 +229,7 @@ class TestUtilityExecution:
 class TestOutputDisplay:
     """Test output display and formatting."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_output_text_display(self: Any) -> None:
         """
         Test displaying text output in the GUI.
@@ -204,7 +237,7 @@ class TestOutputDisplay:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Display some test output
             test_output = "Test utility output\nLine 2\nLine 3"
@@ -218,7 +251,7 @@ class TestOutputDisplay:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_output_clearing(self: Any) -> None:
         """
         Test clearing output display.
@@ -226,7 +259,7 @@ class TestOutputDisplay:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Add some output
             app._display_output("Test output")
@@ -241,7 +274,7 @@ class TestOutputDisplay:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_status_updates(self: Any) -> None:
         """
         Test status label updates during execution.
@@ -249,7 +282,7 @@ class TestOutputDisplay:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Update status
             test_status = "Running utility..."
@@ -266,7 +299,7 @@ class TestOutputDisplay:
 class TestConfigurationManagement:
     """Test configuration and settings management."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_configuration_loading(self: Any) -> None:
         """
         Test loading utility configurations.
@@ -274,7 +307,7 @@ class TestConfigurationManagement:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Verify configuration was loaded
             assert hasattr(app, "config")
@@ -288,7 +321,7 @@ class TestConfigurationManagement:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_configuration_validation(self: Any) -> None:
         """
         Test configuration parameter validation.
@@ -296,7 +329,7 @@ class TestConfigurationManagement:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Test valid configuration
             valid_config = {"timeout": 30, "working_directory": "/tmp", "environment_vars": {}}
@@ -313,7 +346,7 @@ class TestConfigurationManagement:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_configuration_save_and_load(self: Any) -> None:
         """
         Test saving and loading configuration files.
@@ -321,7 +354,7 @@ class TestConfigurationManagement:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Modify configuration
             app.config["timeout"] = 60
@@ -350,7 +383,7 @@ class TestConfigurationManagement:
 class TestDataExport:
     """Test data export functionality."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_export_output_to_file(self: Any) -> None:
         """
         Test exporting utility output to file.
@@ -358,7 +391,7 @@ class TestDataExport:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Set some output
             test_output = "Utility execution output\nResult: Success"
@@ -386,7 +419,7 @@ class TestDataExport:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_export_execution_log_to_json(self: Any) -> None:
         """
         Test exporting execution log to JSON.
@@ -394,7 +427,7 @@ class TestDataExport:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Simulate some execution history
             app.execution_history = [
@@ -434,7 +467,7 @@ class TestDataExport:
 class TestErrorHandling:
     """Test error handling and recovery."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_utility_not_found_handling(self: Any) -> None:
         """
         Test handling when selected utility is not found.
@@ -442,7 +475,7 @@ class TestErrorHandling:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Try to execute non-existent utility
             app._execute_utility("nonexistent_utility")
@@ -454,7 +487,7 @@ class TestErrorHandling:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_timeout_handling(self: Any) -> None:
         """
         Test handling of utility execution timeouts.
@@ -462,7 +495,7 @@ class TestErrorHandling:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Mock subprocess.run to simulate timeout
             with patch("subprocess.run") as mock_run:
@@ -480,7 +513,7 @@ class TestErrorHandling:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_file_operation_error_handling(self: Any) -> None:
         """
         Test handling of file operation errors.
@@ -488,7 +521,7 @@ class TestErrorHandling:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Try to export to invalid path
             app._export_output("/invalid/path/file.txt")
@@ -504,7 +537,7 @@ class TestErrorHandling:
 class TestThreadingAndAsync:
     """Test threading and asynchronous operations."""
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_utility_execution_threading(self: Any) -> None:
         """
         Test that utility execution runs in separate thread.
@@ -512,7 +545,7 @@ class TestThreadingAndAsync:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Mock the execution method
             with patch.object(app, "_execute_utility"):
@@ -528,7 +561,7 @@ class TestThreadingAndAsync:
             root.quit()
             root.destroy()
 
-    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="UtilsRunnerGUI not available")
+    @pytest.mark.skipif(not HAS_UTILS_GUI, reason="ScriptRunnerGUI not available")
     def test_ui_update_threading(self: Any) -> None:
         """
         Test UI updates from background threads.
@@ -536,7 +569,7 @@ class TestThreadingAndAsync:
         root = tk.Tk()
 
         try:
-            app = UtilsRunnerGUI(root)
+            app = create_utils_runner_gui(root)
 
             # Test thread-safe UI updates
             initial_status = app.status_label.cget("text")

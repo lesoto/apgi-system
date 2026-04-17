@@ -7,12 +7,11 @@ and neuromodulator effects.
 
 from collections import deque
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Deque, Dict, Optional, Union
 
 import numpy as np
 
 from apgi_system.types import ConfigDict, FloatArray
-from apgi_system.validation import InputValidator
 
 
 class NeuromodulatorType(Enum):
@@ -124,24 +123,31 @@ class PrecisionWeighting:
         self.config = config
         precision_config = config.get("precision", {})
 
-        # Baseline precisions
-        self.extero_baseline = precision_config.get("exteroceptive_baseline", 1.0)
-        self.intero_baseline = precision_config.get("interoceptive_baseline", 0.8)
+        # Batch support
+        self.batch_size = config.get("active_inference", {}).get("batch_size", 1)
 
-        # Current precisions
-        self.extero_precision = self.extero_baseline
-        self.intero_precision = self.intero_baseline
+        # Baseline precisions (B,)
+        self.extero_baseline = np.full(
+            self.batch_size, precision_config.get("exteroceptive_baseline", 1.0)
+        )
+        self.intero_baseline = np.full(
+            self.batch_size, precision_config.get("interoceptive_baseline", 0.8)
+        )
+
+        # Current precisions (B,)
+        self.extero_precision = self.extero_baseline.copy()
+        self.intero_precision = self.intero_baseline.copy()
 
         # Precision parameters
         self.gain_range = precision_config.get("attention_gain_range", [0.5, 3.0])
         self.volatility_sensitivity = precision_config.get("volatility_sensitivity", 0.1)
 
-        # Neuromodulator levels (0-1 normalized)
+        # Neuromodulator levels (B, 4) - mapped to dictionary of (B,) for internal use
         self.neuromodulators = {
-            NeuromodulatorType.NOREPINEPHRINE: 0.5,
-            NeuromodulatorType.ACETYLCHOLINE: 0.5,
-            NeuromodulatorType.DOPAMINE: 0.5,
-            NeuromodulatorType.SEROTONIN: 0.5,
+            NeuromodulatorType.NOREPINEPHRINE: np.full(self.batch_size, 0.5),
+            NeuromodulatorType.ACETYLCHOLINE: np.full(self.batch_size, 0.5),
+            NeuromodulatorType.DOPAMINE: np.full(self.batch_size, 0.5),
+            NeuromodulatorType.SEROTONIN: np.full(self.batch_size, 0.5),
         }
 
         # Neuromodulator effects from config
@@ -154,58 +160,31 @@ class PrecisionWeighting:
         }
 
         # Attention state
-        self.attention_focus = None  # Which stream is attended
-        self.attention_gain = 1.0
+        self.attention_focus = np.array([None] * self.batch_size)
+        self.attention_gain = np.ones(self.batch_size)
 
         # Resource tracking
-        self.fatigue_level = 0.0  # 0 = fresh, 1 = exhausted
-        self.cognitive_load = 0.0  # Current task demands
+        self.fatigue_level = np.zeros(self.batch_size)
+        self.cognitive_load = np.zeros(self.batch_size)
 
-        # Uncertainty tracking
-        self.extero_uncertainty = 1.0
-        self.intero_uncertainty = 1.0
+        # Uncertainty tracking (B,)
+        self.extero_uncertainty = np.ones(self.batch_size)
+        self.intero_uncertainty = np.ones(self.batch_size)
 
         # Volatility tracking
-        self.extero_volatility = 0.0
-        self.intero_volatility = 0.0
-        self.volatility_window: deque = deque(maxlen=10)  # type: ignore[type-arg]
+        self.extero_volatility: Union[float, np.ndarray] = 0.0
+        self.intero_volatility: Union[float, np.ndarray] = 0.0
+        self.volatility_window: Deque[Dict[str, np.ndarray]] = deque(maxlen=10)
 
     def update(
         self,
-        extero_error_variance: Optional[float] = None,
-        intero_error_variance: Optional[float] = None,
-        attention_target: Optional[str] = None,
+        extero_error_variance: Optional[Union[float, FloatArray]] = None,
+        intero_error_variance: Optional[Union[float, FloatArray]] = None,
+        attention_target: Optional[FloatArray] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, float]:
+    ) -> Dict[str, np.ndarray]:
         """
-        Update precision estimates based on error statistics and modulatory factors.
-
-        Integrates multiple sources of information to compute current precision
-        values for both exteroceptive and interoceptive streams. Precision is
-        updated based on prediction error variance, attention, neuromodulators,
-        resources, and context.
-
-        Parameters
-        ----------
-        extero_error_variance : float, optional
-            Variance of exteroceptive prediction errors
-        intero_error_variance : float, optional
-            Variance of interoceptive prediction errors
-        attention_target : str, optional
-            Target of attention: 'extero' or 'intero'
-        context : Dict[str, Any], optional
-            Contextual information that may modulate precision:
-            - 'threat_level': Threat level (0-1)
-            - 'task_demand': Task demand level (0-1)
-
-        Returns
-        -------
-        precisions : Dict[str, float]
-            Dictionary containing:
-            - 'exteroceptive': Current exteroceptive precision
-            - 'interoceptive': Current interoceptive precision
-            - 'attention_gain': Current attention gain
-            - 'fatigue_penalty': Current fatigue level
+        Update precision estimates for batch.
 
         Raises
         ------
@@ -236,16 +215,34 @@ class PrecisionWeighting:
         ... )
         >>> print(f"Extero: {precisions['exteroceptive']:.2f}")
         """
-        # Validate inputs
+        # Ensure variants are arrays (B,)
         if extero_error_variance is not None:
-            InputValidator.validate_scalar(
-                extero_error_variance, "extero_error_variance", value_range=(0.0, 1e9)
-            )
+            if not isinstance(extero_error_variance, np.ndarray):
+                extero_error_variance = np.full(self.batch_size, float(extero_error_variance))
+            elif extero_error_variance.shape == ():
+                extero_error_variance = np.full(self.batch_size, float(extero_error_variance))
 
         if intero_error_variance is not None:
-            InputValidator.validate_scalar(
-                intero_error_variance, "intero_error_variance", value_range=(0.0, 1e9)
-            )
+            if not isinstance(intero_error_variance, np.ndarray):
+                intero_error_variance = np.full(self.batch_size, float(intero_error_variance))
+            elif intero_error_variance.shape == ():
+                intero_error_variance = np.full(self.batch_size, float(intero_error_variance))
+        # Validate inputs - check array elements are valid
+        if extero_error_variance is not None:
+            if np.any(np.isnan(extero_error_variance)) or np.any(np.isinf(extero_error_variance)):
+                raise ValueError("extero_error_variance contains NaN or Inf values")
+            if np.any(extero_error_variance < 0):
+                raise ValueError(
+                    f"extero_error_variance must be non-negative, got min {np.min(extero_error_variance)}"
+                )
+
+        if intero_error_variance is not None:
+            if np.any(np.isnan(intero_error_variance)) or np.any(np.isinf(intero_error_variance)):
+                raise ValueError("intero_error_variance contains NaN or Inf values")
+            if np.any(intero_error_variance < 0):
+                raise ValueError(
+                    f"intero_error_variance must be non-negative, got min {np.min(intero_error_variance)}"
+                )
 
         if attention_target is not None:
             if attention_target not in ["extero", "intero"]:
@@ -281,23 +278,17 @@ class PrecisionWeighting:
         self._clamp_precisions()
 
         return {
-            "exteroceptive": self.extero_precision,
-            "interoceptive": self.intero_precision,
-            "attention_gain": self.attention_gain,
-            "fatigue_penalty": self.fatigue_level,
+            "exteroceptive": self.extero_precision.copy(),
+            "interoceptive": self.intero_precision.copy(),
+            "attention_gain": self.attention_gain.copy(),
+            "fatigue_penalty": self.fatigue_level.copy(),
         }
 
-    def _update_uncertainty(self, stream: str, error_variance: float) -> None:
-        """
-        Update uncertainty estimate from prediction error variance.
-
-        Precision ∝ 1 / uncertainty
-        """
-        # Smooth update
+    def _update_uncertainty(self, stream: str, error_variance: np.ndarray) -> None:
+        """Update uncertainty estimate from prediction error variance (B,)."""
         alpha = 0.1
         if stream == "extero":
             self.extero_uncertainty = (1 - alpha) * self.extero_uncertainty + alpha * error_variance
-            # Update precision (inverse uncertainty)
             self.extero_precision = self.extero_baseline / (self.extero_uncertainty + 1e-6)
         else:
             self.intero_uncertainty = (1 - alpha) * self.intero_uncertainty + alpha * error_variance
@@ -323,24 +314,27 @@ class PrecisionWeighting:
             self.extero_volatility = np.var(extero_unc) if len(extero_unc) > 1 else 0.0
             self.intero_volatility = np.var(intero_unc) if len(intero_unc) > 1 else 0.0
 
-    def _apply_attention(self, target: str) -> None:
-        """
-        Apply attention-based gain modulation.
+    def _apply_attention(self, target: Any) -> None:
+        """Apply attention modulation (B,)."""
+        if not isinstance(target, np.ndarray):
+            target = np.array([target] * self.batch_size)
 
-        Attended stream gets increased precision.
-        """
-        self.attention_focus = target  # type: ignore[assignment]
+        self.attention_focus = target
 
-        if target == "extero":
-            self.attention_gain = self.gain_range[1]  # High gain
-            self.extero_precision *= self.attention_gain
-            self.intero_precision *= 0.5  # Reduce unattended
-        elif target == "intero":
-            self.attention_gain = self.gain_range[1]
-            self.intero_precision *= self.attention_gain
-            self.extero_precision *= 0.5
-        else:
-            self.attention_gain = 1.0  # Neutral
+        # Vectorized attention mask
+        extero_mask = target == "extero"
+        intero_mask = target == "intero"
+
+        high_gain = self.gain_range[1]
+
+        self.extero_precision[extero_mask] *= high_gain
+        self.intero_precision[extero_mask] *= 0.5
+
+        self.intero_precision[intero_mask] *= high_gain
+        self.extero_precision[intero_mask] *= 0.5
+
+        self.attention_gain[:] = 1.0
+        self.attention_gain[extero_mask | intero_mask] = high_gain
 
     def _apply_neuromodulators(self) -> None:
         """
@@ -510,18 +504,13 @@ class PrecisionWeighting:
         return precision * np.eye(dimension)
 
     def reset(self) -> None:
-        """
-        Reset precision system to baseline state.
-
-        Restores all precisions to baseline values, clears attention state,
-        resets neuromodulators to 0.5, and clears resource constraints.
-        """
-        self.extero_precision = self.extero_baseline
-        self.intero_precision = self.intero_baseline
-        self.attention_focus = None
-        self.attention_gain = 1.0
-        self.fatigue_level = 0.0
-        self.cognitive_load = 0.0
+        """Reset precision system for all agents."""
+        self.extero_precision = self.extero_baseline.copy()
+        self.intero_precision = self.intero_baseline.copy()
+        self.attention_focus = np.array([None] * self.batch_size)
+        self.attention_gain.fill(1.0)
+        self.fatigue_level.fill(0.0)
+        self.cognitive_load.fill(0.0)
 
         for modulator in self.neuromodulators:
-            self.neuromodulators[modulator] = 0.5
+            self.neuromodulators[modulator].fill(0.5)

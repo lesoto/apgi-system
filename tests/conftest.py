@@ -14,7 +14,6 @@ import pytest
 import yaml
 from hypothesis import HealthCheck, settings
 from numpy.typing import NDArray
-from sqlalchemy.orm import Session
 
 from apgi_system.interoception.body_model import BodyModel
 from apgi_system.system import APGISystem
@@ -162,7 +161,7 @@ def random_body_state() -> Dict[str, float]:
 
 # Database fixtures for API tests
 @pytest.fixture
-def db() -> Generator[Session, None, None]:
+def db() -> Generator[Any, None, None]:
     """
     Provide a test database session.
 

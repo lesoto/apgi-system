@@ -46,7 +46,7 @@ def test_precision_weighting(config: Dict[str, Any]) -> None:
 
     # Update with error variance
     result = precision.update(
-        extero_error_variance=1.0, intero_error_variance=0.5, attention_target="extero"
+        extero_error_variance=1.0, intero_error_variance=0.5, attention_target=np.array(["extero"])
     )
 
     assert "exteroceptive" in result

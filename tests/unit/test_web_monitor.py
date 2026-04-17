@@ -7,7 +7,6 @@ WebSocket communication, and dashboard features.
 
 import threading
 import time
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 from apgi_system.visualization.simple_monitor import MonitoringIntegration, SimpleMonitor
@@ -465,10 +464,6 @@ class TestMonitoringIntegration:
 
 class TestWebMonitorIntegration:
     """Integration tests for web monitor functionality."""
-
-    def __init__(self, monitor: Any) -> None:
-        """Test complete monitoring cycle."""
-        self.monitor = monitor
 
     def test_full_monitoring_cycle(self) -> None:
         """Test complete monitoring cycle."""
