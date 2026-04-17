@@ -1,9 +1,6 @@
-# Git
 .git
 .gitignore
 .gitattributes
-
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,55 +24,35 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 .nox/
 .hypothesis/
-
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
-
-# Documentation build
 docs/_build/
 site/
-
-# Logs
 logs/
 *.log
-
-# Local environment
 .env
 .env.local
 .env.*.local
-
-# Docker
 Dockerfile
 docker-compose.yml
 .dockerignore
-
-# Kubernetes
 k8s/
-
-# CI/CD
 .github/
-
-# Temporary files
 *.tmp
 *.bak
 *.cache
 .mypy_cache/
 .dmypy.json
-
-# Project specific
 APGI-GUI.py
 APGI-Simulation-GUI.py
 Assistant-GUI.py
@@ -85,7 +62,5 @@ Utils-GUI.py
 *.ico
 *.icns
 *.iconset/
-
-# Allow resources needed by the app
 !resources/
 !config/

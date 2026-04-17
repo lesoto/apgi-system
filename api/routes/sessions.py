@@ -29,7 +29,11 @@ from api.services.authorization import (
     require_permission,
     verify_session_owner,
 )
-from api.services.session_manager import SessionLifecycleState, SessionManager, get_session_manager
+from api.services.session_manager import (
+    SessionLifecycleState,
+    SessionManager,
+    get_session_manager,
+)
 
 logger = logging.getLogger(__name__)
 

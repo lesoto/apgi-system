@@ -274,6 +274,7 @@ class TestPlotUpdateMechanisms:
 
             # Generate a state
             obs = np.random.randn(256) * 0.5
+            assert app.apgi_simulation is not None
             state = app.apgi_simulation.step(obs)
 
             # Record the state
@@ -342,6 +343,7 @@ class TestParameterAdjustments:
             app._apply_parameters()
 
             # Verify parameters were applied
+            assert app.apgi_simulation is not None
             assert app.apgi_simulation.precision.extero_baseline == 2.5
             assert app.apgi_simulation.precision.intero_baseline == 1.5
             assert app.apgi_simulation.ignition_threshold.baseline_threshold == 3.0
@@ -369,6 +371,7 @@ class TestParameterAdjustments:
             root.update()  # Process trace callbacks
             app._apply_parameters()
 
+            assert app.apgi_simulation is not None
             assert app.apgi_simulation.precision.extero_baseline == 0.1
             assert app.apgi_simulation.precision.intero_baseline == 0.1
             assert app.apgi_simulation.ignition_threshold.baseline_threshold == 1.0
@@ -380,6 +383,7 @@ class TestParameterAdjustments:
             root.update()  # Process trace callbacks
             app._apply_parameters()
 
+            assert app.apgi_simulation is not None
             assert app.apgi_simulation.precision.extero_baseline == 8.0
             assert app.apgi_simulation.precision.intero_baseline == 8.0
             assert app.apgi_simulation.ignition_threshold.baseline_threshold == 5.0
@@ -499,6 +503,7 @@ class TestManualInterventions:
 
             # Step the system to see the effect
             obs = np.random.randn(256) * 0.5
+            assert app.apgi_simulation is not None
             app.apgi_simulation.step(obs)
 
             # Verify stressor was applied (method should execute without errors)
@@ -544,6 +549,7 @@ class TestManualInterventions:
             app = APGIGui(root)
 
             # Run some simulation steps
+            assert app.apgi_simulation is not None
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
                 state = app.apgi_simulation.step(obs)
@@ -562,6 +568,7 @@ class TestManualInterventions:
                 assert len(buffer) == 0
 
             # Verify system was reset
+            assert app.apgi_simulation is not None
             assert app.apgi_simulation.time == 0
 
         finally:
@@ -585,6 +592,7 @@ class TestDataExport:
             app = APGIGui(root)
 
             # Generate some data
+            assert app.apgi_simulation is not None
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
                 state = app.apgi_simulation.step(obs)
@@ -651,6 +659,7 @@ class TestDataExport:
             app = APGIGui(root)
 
             # Generate some data
+            assert app.apgi_simulation is not None
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
                 state = app.apgi_simulation.step(obs)

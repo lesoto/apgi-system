@@ -4,13 +4,39 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apgi-simulation"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Allostatic Precision-Gated Ignition Framework"
-readme = "APGI-Simulation-README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "APGI Team"}
+]
+keywords = [
+    "active-inference",
+    "free-energy-principle",
+    "predictive-processing",
+    "computational-neuroscience",
+    "cognitive-modeling",
+    "neural-simulation",
+    "allostasis",
+    "interoception"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Natural Language :: English",
+    "Typing :: Typed",
 ]
 dependencies = [
     "numpy>=1.24.0",
@@ -26,7 +52,30 @@ dependencies = [
     "psutil>=5.9.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/lesoto/apgi-simulation"
+Documentation = "https://github.com/lesoto/apgi-simulation/blob/main/docs/README.md"
+Repository = "https://github.com/lesoto/apgi-simulation"
+"Bug Tracker" = "https://github.com/lesoto/apgi-simulation/issues"
+Changelog = "https://github.com/lesoto/apgi-simulation/blob/main/CHANGELOG.md"
+
+[project.scripts]
+apgi-simulate = "apgi_simulation.cli:main"
+apgi-analysis = "apgi_simulation.analysis:cli_main"
+
+[project.gui-scripts]
+apgi-gui = "apgi_gui.cli:main"
+
 [project.optional-dependencies]
+gui = [
+    "Pillow>=9.0.0",
+]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "starlette>=0.36.3",
+    "pydantic>=2.8.0",
+]
 ml = [
     "jax>=0.4.13",
     "jaxlib>=0.4.13",
@@ -52,8 +101,16 @@ testing = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "."}
-packages = ["apgi_simulation"]
+packages = ["apgi_simulation", "apgi_gui", "api"]
+zip-safe = false
+
+[tool.setuptools.package-data]
+apgi_simulation = ["py.typed"]
+apgi_gui = ["py.typed", "resources/**/*"]
+api = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = {attr = "apgi_simulation.__version__"}
 
 [tool.black]
 line-length = 100
@@ -153,7 +210,7 @@ module = ["scipy.*", "h5py.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["APGI-GUI", "APGI-Simulation-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI"]
+module = ["APGI-GUI", "APGI-Simulation-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI", "apgi_gui.*"]
 disallow_untyped_defs = false
 disallow_any_generics = false
 disallow_untyped_calls = false
@@ -174,6 +231,7 @@ disallow_untyped_calls = false
 disallow_incomplete_defs = false
 check_untyped_defs = false
 warn_unused_ignores = false
+disable_error_code = ["union-attr", "call-arg"]
 
 [tool.flake8]
 max-line-length = 100
