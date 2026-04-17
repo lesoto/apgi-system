@@ -51,7 +51,7 @@ The **APGI (Allostatic Precision-Gated Ignition) System** is a computational fra
 
 ```bash
 git clone <repository-url>
-cd apgi-system
+cd apgi-simulation
 ```
 
 ### Step 2: Install Dependencies
@@ -68,7 +68,7 @@ pip install -r requirements.txt
 
 ```bash
 # Test core system
-python -c "from apgi_system.system import APGISystem; print('✅ Core system OK')"
+python -c "from apgi_simulation.system import APGISystem; print('✅ Core system OK')"
 
 # Test GUI
 python -c "import tkinter; print('✅ Tkinter available')"
@@ -110,7 +110,7 @@ python -m api.main
 #### Option 3: Programmatic Usage (for Developers)
 
 ```python
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 
 system = APGISystem(config_path="config/default.yaml")
 results = system.run(duration_ms=10000.0)
@@ -431,7 +431,7 @@ curl "http://localhost:8000/system/status" \
 ### Basic System Initialization
 
 ```python
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 
 # Initialize with default configuration
 system = APGISystem()
@@ -549,7 +549,7 @@ df.to_csv("simulation_results.csv", index=False)
 ### Running Tasks Programmatically
 
 ```python
-from apgi_system.experiments.tasks import AttentionalBlinkTask
+from apgi_simulation.experiments.tasks import AttentionalBlinkTask
 
 # Initialize task
 task = AttentionalBlinkTask(system=system)
@@ -565,7 +565,7 @@ metrics = results["metrics"]
 ### Custom Task Creation
 
 ```python
-from apgi_system.experiments.base import BaseTask
+from apgi_simulation.experiments.base import BaseTask
 
 class CustomTask(BaseTask):
     def __init__(self, system, **kwargs):
@@ -935,7 +935,7 @@ system.disable_feature("detailed_logging")
 ```python
 # In Jupyter notebook
 %matplotlib inline
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 import matplotlib.pyplot as plt
 
 # Run simulation and plot results

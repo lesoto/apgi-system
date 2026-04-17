@@ -28,7 +28,7 @@ class ReleaseManager:
             Project root directory, by default None
         """
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.version_file = self.project_root / "apgi_system" / "__init__.py"
+        self.version_file = self.project_root / "apgi_simulation" / "__init__.py"
         self.changelog_file = self.project_root / "CHANGELOG.md"
         self.pyproject_file = self.project_root / "pyproject.toml"
         self.build_dir = self.project_root / "build"

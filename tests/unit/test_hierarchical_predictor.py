@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from apgi_system.core.predictive_processing import HierarchicalPredictor, PredictionErrorChannel
+from apgi_simulation.core.predictive_processing import HierarchicalPredictor, PredictionErrorChannel
 
 
 @pytest.fixture

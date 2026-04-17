@@ -159,7 +159,7 @@ class ProductionLogger:
                     "propagate": False,
                 },
                 # APGI system loggers
-                "apgi_system": {
+                "apgi_simulation": {
                     "level": "INFO",  # Reduce system verbosity in production
                     "handlers": ["file"],
                     "propagate": False,
@@ -230,7 +230,7 @@ class ProductionLogger:
         config = self.get_production_config(log_level)
 
         # Enable more verbose logging for development
-        config["loggers"]["apgi_system"]["level"] = "DEBUG"
+        config["loggers"]["apgi_simulation"]["level"] = "DEBUG"
         config["loggers"]["api"]["level"] = "DEBUG"
         config["loggers"]["api.database"]["level"] = "INFO"
 

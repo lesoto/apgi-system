@@ -25,12 +25,12 @@ def test_imports() -> bool:
         return False
 
 
-def test_apgi_system() -> bool:
+def test_apgi_simulation() -> bool:
     """Test APGI system initialization."""
     print("\nTesting APGI System...")
     try:
-        from apgi_system.platform_utils import get_resource_path
-        from apgi_system.system import APGISystem
+        from apgi_simulation.platform_utils import get_resource_path
+        from apgi_simulation.system import APGISystem
 
         APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         print("[OK] APGI System initialized successfully")
@@ -47,8 +47,8 @@ def test_system_step() -> bool:
     try:
         import numpy as np
 
-        from apgi_system.platform_utils import get_resource_path
-        from apgi_system.system import APGISystem
+        from apgi_simulation.platform_utils import get_resource_path
+        from apgi_simulation.system import APGISystem
 
         system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
         extero_input = np.random.randn(256)
@@ -107,7 +107,7 @@ def test_config_file() -> bool:
 
         import yaml  # noqa: F401
 
-        from apgi_system.platform_utils import get_resource_path
+        from apgi_simulation.platform_utils import get_resource_path
 
         config_path = get_resource_path("config/default.yaml")
         if not config_path.exists():
@@ -138,7 +138,7 @@ def test_experimental_tasks() -> bool:
     """Test experimental task imports."""
     print("\nTesting experimental tasks...")
     try:
-        from apgi_system.experiments.tasks import (  # noqa: F401
+        from apgi_simulation.experiments.tasks import (  # noqa: F401
             AttentionalBlinkTask,
             BinocularRivalryTask,
             ChangeBlindnessTask,
@@ -196,7 +196,7 @@ def main() -> int:
     tests = [
         test_imports,
         test_config_file,
-        test_apgi_system,
+        test_apgi_simulation,
         test_system_step,
         test_gui_imports,
         test_gui_launch,

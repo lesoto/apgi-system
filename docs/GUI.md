@@ -368,7 +368,7 @@ time, ignition, free_energy, extero_precision, intero_precision,...
 pip install matplotlib tkinter
 
 # Verify system installation
-python -c "from apgi_system.system import APGISystem; print('OK')"
+python -c "from apgi_simulation.system import APGISystem; print('OK')"
 ```
 
 ### Slow Performance
@@ -450,7 +450,7 @@ Planned features:
 
 ## Support & Resources
 
-- **Documentation**: See main APGI-System-README.md
+- **Documentation**: See main APGI-Simulation-README.md
 - **Examples**: /examples directory
 - **Tests**: /tests directory
 - **Configuration**: /config directory

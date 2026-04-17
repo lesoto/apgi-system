@@ -1,5 +1,5 @@
 """
-Unit tests for apgi_system package initialization.
+Unit tests for apgi_simulation package initialization.
 
 This module tests that the package can be imported and that
 all expected classes are available from the package level.
@@ -7,8 +7,8 @@ all expected classes are available from the package level.
 
 
 def test_package_imports() -> None:
-    """Test that main classes can be imported from apgi_system package."""
-    from apgi_system import (
+    """Test that main classes can be imported from apgi_simulation package."""
+    from apgi_simulation import (
         ActiveInferenceEngine,
         FreeEnergyCalculator,
         HierarchicalPredictor,
@@ -24,24 +24,24 @@ def test_package_imports() -> None:
 
 def test_package_version() -> None:
     """Test that package version is defined."""
-    import apgi_system
+    import apgi_simulation
 
-    assert hasattr(apgi_system, "__version__")
-    assert isinstance(apgi_system.__version__, str)
-    assert len(apgi_system.__version__) > 0
+    assert hasattr(apgi_simulation, "__version__")
+    assert isinstance(apgi_simulation.__version__, str)
+    assert len(apgi_simulation.__version__) > 0
 
 
 def test_package_all() -> None:
     """Test that __all__ is properly defined."""
-    import apgi_system
+    import apgi_simulation
 
-    assert hasattr(apgi_system, "__all__")
-    assert isinstance(apgi_system.__all__, list)
-    assert len(apgi_system.__all__) == 4
+    assert hasattr(apgi_simulation, "__all__")
+    assert isinstance(apgi_simulation.__all__, list)
+    assert len(apgi_simulation.__all__) == 4
     expected = [
         "ActiveInferenceEngine",
         "FreeEnergyCalculator",
         "HierarchicalPredictor",
         "PrecisionWeighting",
     ]
-    assert apgi_system.__all__ == expected
+    assert apgi_simulation.__all__ == expected

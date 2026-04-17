@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import pytest
 
-from apgi_system.stability import (
+from apgi_simulation.stability import (
     NumericalInstabilityError,
     NumericalStabilityMonitor,
     NumericalStabilityWarning,

@@ -52,7 +52,7 @@ except ImportError as e:
     print(f"Warning: Could not import APGIVisualizerGUI: {e}")
 
 try:
-    from apgi_system.system import APGISystem
+    from apgi_simulation.system import APGISystem
 
     HAS_SYSTEM = True
 except ImportError:

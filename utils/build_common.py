@@ -57,7 +57,7 @@ def get_build_config() -> Dict[str, Any]:
         Build configuration
     """
     return {
-        "project_name": "apgi-system",
+        "project_name": "apgi-simulation",
         "version": "0.1.0",
         "python_requires": ">=3.8",
         "dependencies": [

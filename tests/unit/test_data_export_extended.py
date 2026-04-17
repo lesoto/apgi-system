@@ -13,8 +13,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from apgi_system.analysis import AnalysisResults
-from apgi_system.data_export import AdvancedAnalytics, DataExporter
+from apgi_simulation.analysis import AnalysisResults
+from apgi_simulation.data_export import AdvancedAnalytics, DataExporter
 
 
 class TestDataExporter:

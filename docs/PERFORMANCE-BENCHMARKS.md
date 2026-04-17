@@ -115,7 +115,7 @@ class SimulationBenchmarks:
 class NeuralBenchmarks:
     def benchmark_oscillation_generation(self):
         """Benchmark neural oscillation generation."""
-        from apgi_system.neural.oscillations import OscillationEngine
+        from apgi_simulation.neural.oscillations import OscillationEngine
 
         config = {
             "oscillations": {
@@ -144,7 +144,7 @@ class NeuralBenchmarks:
 
     def benchmark_neural_column_processing(self):
         """Benchmark neural column processing."""
-        from apgi_system.neural.mesoscale.neural_columns import NeuralColumn
+        from apgi_simulation.neural.mesoscale.neural_columns import NeuralColumn
 
         config = {
             "mesoscale": {
@@ -320,7 +320,7 @@ class GUIBenchmarks:
         # Generate test data
         for i in range(1000):
             obs = np.random.randn(256)
-            state = app.apgi_system.step(obs)
+            state = app.apgi_simulation.step(obs)
             app._record_state(state)
 
         # Benchmark plot update

@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from apgi_system.self_model.state_classifier import StateClassifier
+from apgi_simulation.self_model.state_classifier import StateClassifier
 
 # Module logger
 logger = logging.getLogger(__name__)

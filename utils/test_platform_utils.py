@@ -1,6 +1,6 @@
 """Quick test of platform utilities."""
 
-from apgi_system.platform_utils import (
+from apgi_simulation.platform_utils import (
     get_config_dir,
     get_data_dir,
     get_platform,

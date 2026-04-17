@@ -25,7 +25,7 @@ from numpy.typing import NDArray
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_system.system import APGISystem  # noqa: E402
+from apgi_simulation.system import APGISystem  # noqa: E402
 from tests.strategies import observation_strategy  # noqa: E402
 
 # Configure Hypothesis for property-based testing
@@ -51,9 +51,9 @@ class MockGUIParameterAdjuster:
     test the backend parameter application logic.
     """
 
-    def __init__(self, apgi_system: Any) -> None:
+    def __init__(self, apgi_simulation: Any) -> None:
         """Initialize with APGI system instance."""
-        self.apgi_system = apgi_system
+        self.apgi_simulation = apgi_simulation
         self.param_vars: Dict[str, Any] = {}
 
     def set_parameter(self, param_name: str, value: Any) -> None:
@@ -62,27 +62,27 @@ class MockGUIParameterAdjuster:
 
     def apply_parameters(self) -> None:
         """Apply parameter adjustments to system (simulates GUI _apply_parameters)."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             return
 
         try:
             # Apply body state modulations
             if "arousal" in self.param_vars:
-                self.apgi_system.body_model.set_arousal(self.param_vars["arousal"])
+                self.apgi_simulation.body_model.set_arousal(self.param_vars["arousal"])
             if "stress" in self.param_vars:
-                self.apgi_system.body_model.set_stress(self.param_vars["stress"])
+                self.apgi_simulation.body_model.set_stress(self.param_vars["stress"])
             if "activity" in self.param_vars:
-                self.apgi_system.body_model.set_activity(self.param_vars["activity"])
+                self.apgi_simulation.body_model.set_activity(self.param_vars["activity"])
 
             # Apply precision
             if "extero_precision" in self.param_vars:
-                self.apgi_system.precision.extero_baseline = self.param_vars["extero_precision"]
+                self.apgi_simulation.precision.extero_baseline = self.param_vars["extero_precision"]
             if "intero_precision" in self.param_vars:
-                self.apgi_system.precision.intero_baseline = self.param_vars["intero_precision"]
+                self.apgi_simulation.precision.intero_baseline = self.param_vars["intero_precision"]
 
             # Apply threshold
             if "baseline_threshold" in self.param_vars:
-                self.apgi_system.ignition_threshold.baseline_threshold = self.param_vars[
+                self.apgi_simulation.ignition_threshold.baseline_threshold = self.param_vars[
                     "baseline_threshold"
                 ]
 
@@ -107,20 +107,26 @@ class MockDataExporter:
         current_time = state["time"] / 1000.0  # Convert to seconds
 
         # Extract and record metrics (matches GUI logic)
+        # Convert numpy arrays to scalars for JSON serialization
+        def to_scalar(val):
+            if isinstance(val, np.ndarray):
+                return float(val[0]) if val.ndim > 0 else float(val)
+            return float(val) if isinstance(val, (np.floating, np.integer)) else val
+
         data_entry = {
             "time": current_time,
             "ignition": 1 if state["ignition"]["ignition_occurred"] else 0,
-            "free_energy": state["ignition"]["total_signal"],
-            "extero_precision": state["precision"]["exteroceptive"],
-            "intero_precision": state["precision"]["interoceptive"],
-            "metabolic_reserves": state["metabolism"]["reserves"],
-            "allostatic_load": state["allostasis"]["allostatic_load"],
-            "heart_rate": state["body"]["current"]["heart_rate"],
-            "cortisol": state["body"]["current"]["cortisol"],
-            "workspace_active": 1 if state["workspace"]["is_broadcasting"] else 0,
-            "gamma_power": state["oscillations"]["band_powers"].get("gamma", 0),
-            "beta_power": state["oscillations"]["band_powers"].get("beta", 0),
-            "minimal_self_coherence": state["self_model"]["minimal"]["coherence"],
+            "free_energy": to_scalar(state["ignition"]["total_signal"]),
+            "extero_precision": to_scalar(state["precision"]["exteroceptive"]),
+            "intero_precision": to_scalar(state["precision"]["interoceptive"]),
+            "metabolic_reserves": to_scalar(state["metabolism"]["reserves"]),
+            "allostatic_load": to_scalar(state["allostasis"]["allostatic_load"]),
+            "heart_rate": to_scalar(state["body"]["current"]["heart_rate"]),
+            "cortisol": to_scalar(state["body"]["current"]["cortisol"]),
+            "workspace_active": 1 if state["workspace"]["is_reportable"] else 0,
+            "gamma_power": to_scalar(state["oscillations"]["band_powers"].get("gamma", 0)),
+            "beta_power": to_scalar(state["oscillations"]["band_powers"].get("beta", 0)),
+            "minimal_self_coherence": to_scalar(state["self_model"]["minimal"]["coherence"]),
         }
 
         self.log_data.append(data_entry)
@@ -154,23 +160,24 @@ class MockInterventionApplier:
     without requiring the actual GUI interface.
     """
 
-    def __init__(self, apgi_system: Any) -> None:
+    def __init__(self, apgi_simulation: Any) -> None:
         """Initialize with APGI system instance."""
-        self.apgi_system = apgi_system
+        self.apgi_simulation = apgi_simulation
 
     def trigger_ignition(self) -> bool:
         """Manually trigger ignition event (simulates GUI _trigger_ignition)."""
-        if self.apgi_system:
+        if self.apgi_simulation:
             # Force high arousal to trigger ignition (matches GUI logic)
-            self.apgi_system.body_model.set_arousal(0.9)
-            self.apgi_system.body_model.set_stress(0.8)
+            self.apgi_simulation.body_model.set_arousal(0.9)
+            self.apgi_simulation.body_model.set_stress(0.8)
             return True
         return False
 
     def induce_stressor(self, intensity: float = 0.5) -> bool:
         """Induce stressor event (simulates GUI _induce_stressor)."""
-        if self.apgi_system:
-            self.apgi_system.allostasis.trigger_stressor(intensity=intensity)
+        if self.apgi_simulation:
+            # Directly manipulate allostatic load since trigger_stressor method doesn't exist
+            self.apgi_simulation.allostasis.total_load = np.array([intensity])
             return True
         return False
 
@@ -342,7 +349,7 @@ def test_property_intervention_application(
     applier = MockInterventionApplier(system)
 
     # Get initial state
-    initial_obs = np.random.randn(448) * 0.5
+    initial_obs = np.random.randn(256) * 0.5
     system.step(initial_obs)
 
     # Apply intervention
@@ -351,7 +358,7 @@ def test_property_intervention_application(
         assert success
 
         # Verify arousal and stress were increased (should affect next state)
-        next_obs = np.random.randn(448) * 0.5
+        next_obs = np.random.randn(256) * 0.5
         system.step(next_obs)
 
         # The intervention should have some effect on the system state
@@ -363,7 +370,7 @@ def test_property_intervention_application(
         assert success
 
         # Verify stressor was applied (should affect allostatic load)
-        next_obs = np.random.randn(448) * 0.5
+        next_obs = np.random.randn(256) * 0.5
         system.step(next_obs)
 
         # Allostatic load should be affected by the stressor

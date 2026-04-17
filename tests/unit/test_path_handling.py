@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from apgi_system.platform_utils import get_config_dir, get_data_dir, get_resource_path
-from apgi_system.system import APGISystem
+from apgi_simulation.platform_utils import get_config_dir, get_data_dir, get_resource_path
+from apgi_simulation.system import APGISystem
 
 
 class TestConfigLoading:
@@ -155,7 +155,7 @@ class TestDataExport:
 class TestGUIPathHandling:
     """Test GUI-specific path handling."""
 
-    @patch("apgi_system.platform_utils.get_resource_path")
+    @patch("apgi_simulation.platform_utils.get_resource_path")
     def test_gui_uses_get_resource_path_for_config(self, mock_get_resource: MagicMock) -> None:
         """Test that GUI uses get_resource_path for config loading."""
         # Mock the return value

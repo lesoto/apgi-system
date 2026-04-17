@@ -9,8 +9,8 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-from apgi_system.visualization.simple_monitor import MonitoringIntegration, SimpleMonitor
-from apgi_system.visualization.web_monitor import WebMonitor
+from apgi_simulation.visualization.simple_monitor import MonitoringIntegration, SimpleMonitor
+from apgi_simulation.visualization.web_monitor import WebMonitor
 
 
 class TestSimpleMonitor:
@@ -328,7 +328,7 @@ class TestSimpleMonitor:
         # Should limit alerts to prevent memory issues
         assert len(monitor.alerts) <= 100
 
-    @patch("apgi_system.visualization.web_monitor.SocketIO")
+    @patch("apgi_simulation.visualization.web_monitor.SocketIO")
     def test_socketio_emit(self, mock_socketio: MagicMock) -> None:
         """Test WebSocket data emission."""
         monitor = WebMonitor()

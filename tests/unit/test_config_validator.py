@@ -4,7 +4,7 @@ Unit tests for configuration validator.
 
 import pytest
 
-from apgi_system.config_validator import (
+from apgi_simulation.config_validator import (
     ConfigValidationError,
     ConfigValidator,
     validate_config_file,

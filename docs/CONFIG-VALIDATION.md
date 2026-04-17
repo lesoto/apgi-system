@@ -7,7 +7,7 @@ The APGI system includes a comprehensive configuration validation tool to help c
 ### Validate a Configuration File
 
 ```python
-from apgi_system.config_validator import validate_config_file
+from apgi_simulation.config_validator import validate_config_file
 
 # Validate the default configuration
 validate_config_file("config/default.yaml")
@@ -16,7 +16,7 @@ validate_config_file("config/default.yaml")
 ### Validate a Configuration Dictionary
 
 ```python
-from apgi_system.config_validator import ConfigValidator
+from apgi_simulation.config_validator import ConfigValidator
 
 validator = ConfigValidator()
 config = {
@@ -224,8 +224,8 @@ ignition_cost: 30.0
 The configuration validator can be integrated into the APGI system initialization:
 
 ```python
-from apgi_system.system import APGISystem
-from apgi_system.config_validator import validate_config_file, ConfigValidationError
+from apgi_simulation.system import APGISystem
+from apgi_simulation.config_validator import validate_config_file, ConfigValidationError
 
 try:
     # Validate before loading

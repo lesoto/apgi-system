@@ -11,7 +11,7 @@ from api.database.connection import get_db
 from typing import Any
 from api.services.webhook_manager import WebhookManager
 import yaml
-from apgi_system.platform_utils import get_resource_path
+from apgi_simulation.platform_utils import get_resource_path
 
 logger = logging.getLogger(__name__)
 

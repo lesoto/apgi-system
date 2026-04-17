@@ -3,10 +3,10 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "apgi-system"
+name = "apgi-simulation"
 version = "0.1.0"
 description = "Allostatic Precision-Gated Ignition Framework"
-readme = "APGI-System-README.md"
+readme = "APGI-Simulation-README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
@@ -53,7 +53,7 @@ testing = [
 
 [tool.setuptools]
 package-dir = {"" = "."}
-packages = ["apgi_system"]
+packages = ["apgi_simulation"]
 
 [tool.black]
 line-length = 100
@@ -82,7 +82,7 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
-    "--cov=apgi_system",
+    "--cov=apgi_simulation",
     "--cov=api",
     "--cov-report=html:htmlcov",
     "--cov-report=term-missing",
@@ -103,7 +103,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["apgi_system", "api"]
+source = ["apgi_simulation", "api"]
 omit = [
     "**/apgi_gui.py",
     "**/*_GUI.py",
@@ -153,7 +153,7 @@ module = ["scipy.*", "h5py.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["APGI-GUI", "APGI-System-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI"]
+module = ["APGI-GUI", "APGI-Simulation-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI"]
 disallow_untyped_defs = false
 disallow_any_generics = false
 disallow_untyped_calls = false
@@ -198,11 +198,11 @@ per-file-ignores = [
 # ---------------------------------------------------------------------------
 [tool.mutmut]
 paths_to_mutate = [
-    "apgi_system/core/active_inference.py",
-    "apgi_system/core/free_energy.py",
-    "apgi_system/core/vp15.py",
-    "apgi_system/ignition/threshold.py",
-    "apgi_system/interoception/allostasis.py",
+    "apgi_simulation/core/active_inference.py",
+    "apgi_simulation/core/free_energy.py",
+    "apgi_simulation/core/vp15.py",
+    "apgi_simulation/ignition/threshold.py",
+    "apgi_simulation/interoception/allostasis.py",
 ]
 test_command = "python -m pytest tests/unit/test_active_inference.py tests/unit/test_vp15_protocol.py tests/unit/test_free_energy.py tests/unit/test_ignition_dynamics.py tests/unit/test_allostasis.py -x -q --no-header"
 no_progress_bar = false

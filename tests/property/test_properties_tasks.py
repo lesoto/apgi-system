@@ -36,10 +36,10 @@ Total runtime for all tests: ~5-10 minutes
 import numpy as np
 import pytest
 
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_system.system import APGISystem
+from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_simulation.experiments.tasks.iowa_gambling import IowaGamblingTask
+from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask
+from apgi_simulation.system import APGISystem
 
 # Mark all tests in this module as slow
 pytestmark = pytest.mark.slow
@@ -65,10 +65,10 @@ class TestIowaGamblingTaskProperties:
         task = IowaGamblingTask(num_trials=5, deck_selection_strategy="participant_choice")
 
         # Create APGI system
-        apgi_system = APGISystem()
+        apgi_simulation = APGISystem()
 
         # Run all trials
-        analysis = task.run_all_trials(apgi_system)
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify task completed successfully
         assert analysis["total_trials"] == 5, f"Expected 5 trials, got {analysis['total_trials']}"
@@ -139,10 +139,10 @@ class TestMaskingParadigmProperties:
         )
 
         # Create APGI system
-        apgi_system = APGISystem()
+        apgi_simulation = APGISystem()
 
         # Run all trials
-        analysis = task.run_all_trials(apgi_system)
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify task completed successfully
         expected_trials = len(sorted_soas) * 5
@@ -205,10 +205,10 @@ class TestAttentionalBlinkProperties:
         )
 
         # Create APGI system
-        apgi_system = APGISystem()
+        apgi_simulation = APGISystem()
 
         # Run all trials
-        analysis = task.run_all_trials(apgi_system)
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify task completed successfully
         expected_trials = len(sorted_lags) * 5
@@ -275,8 +275,8 @@ class TestTaskResultCompletenessProperties:
         # Create and run Iowa Gambling Task with minimal trials
         num_trials = 20
         task = IowaGamblingTask(num_trials=num_trials)
-        apgi_system = APGISystem()
-        analysis = task.run_all_trials(apgi_system)
+        apgi_simulation = APGISystem()
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify completeness of analysis results
         required_fields = [
@@ -345,8 +345,8 @@ class TestTaskResultCompletenessProperties:
         task = MaskingParadigmTask(
             soas=[float(s) for s in soas], num_trials_per_condition=num_trials_per_condition
         )
-        apgi_system = APGISystem()
-        analysis = task.run_all_trials(apgi_system)
+        apgi_simulation = APGISystem()
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify completeness of analysis results
         required_fields = [
@@ -406,8 +406,8 @@ class TestTaskResultCompletenessProperties:
         lags = [1, 2, 3, 8]
         num_trials_per_lag = 5
         task = AttentionalBlinkTask(lags=lags, num_trials_per_lag=num_trials_per_lag)
-        apgi_system = APGISystem()
-        analysis = task.run_all_trials(apgi_system)
+        apgi_simulation = APGISystem()
+        analysis = task.run_all_trials(apgi_simulation)
 
         # Verify completeness of analysis results
         required_fields = [

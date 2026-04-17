@@ -38,7 +38,7 @@ class TestSimulationSession:
         assert simulation_session.state == SessionLifecycleState.CREATED
         assert simulation_session.is_running is False
         assert simulation_session.is_paused is False
-        assert simulation_session.apgi_system is not None
+        assert simulation_session.apgi_simulation is not None
 
     @pytest.mark.asyncio
     async def test_start_session(self, simulation_session: SimulationSession) -> None:
@@ -101,7 +101,7 @@ class TestSimulationSession:
         assert result["status"] == "created"
         assert simulation_session.state == SessionLifecycleState.CREATED
         assert simulation_session.is_running is False
-        assert simulation_session.apgi_system.time == 0.0
+        assert simulation_session.apgi_simulation.time == 0.0
 
     @pytest.mark.asyncio
     async def test_reset_idempotence(self, simulation_session: SimulationSession) -> None:

@@ -173,7 +173,7 @@ def body_state_strategy(draw):
 
 
 @st.composite
-def observation_strategy(draw, dim=448):
+def observation_strategy(draw, dim=256):
     """
     Generate valid observation vectors.
 
@@ -182,7 +182,7 @@ def observation_strategy(draw, dim=448):
     draw : callable
         Hypothesis draw function for sampling from strategies.
     dim : int, optional
-        Dimensionality of observation vector, by default 448.
+        Dimensionality of observation vector, by default 256.
 
     Returns
     -------
@@ -331,7 +331,7 @@ def precision_weighted_error_strategy(draw):
     -------
     dict
         Dictionary containing:
-        - 'extero_error': np.ndarray of shape (448,)
+        - 'extero_error': np.ndarray of shape (256,)
         - 'extero_precision': float > 0
         - 'intero_error': np.ndarray of shape (6,)
         - 'intero_precision': float > 0
@@ -344,8 +344,8 @@ def precision_weighted_error_strategy(draw):
     extero_error_values = draw(
         st.lists(
             st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False),
-            min_size=448,
-            max_size=448,
+            min_size=256,
+            max_size=256,
         )
     )
     intero_error_values = draw(

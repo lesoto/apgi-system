@@ -96,7 +96,7 @@ class CircuitBreaker:
 
 - `utils/stability.py`: Core circuit breaker implementation
 - `api/middleware/circuit_breaker.py`: API-level circuit breakers
-- `apgi_system/core/`: Component-level circuit breakers
+- `apgi_simulation/core/`: Component-level circuit breakers
 
 ### Retry Mechanisms
 

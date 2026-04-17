@@ -77,7 +77,7 @@ k8s/
 
 # Project specific
 APGI-GUI.py
-APGI-System-GUI.py
+APGI-Simulation-GUI.py
 Assistant-GUI.py
 Psychological-States-GUI.py
 Tests-GUI.py

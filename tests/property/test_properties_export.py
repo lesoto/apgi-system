@@ -28,7 +28,7 @@ from numpy.typing import NDArray
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_system.system import APGISystem  # noqa
+from apgi_simulation.system import APGISystem  # noqa
 from tests.strategies import observation_strategy  # noqa
 
 # Configure Hypothesis for property-based testing

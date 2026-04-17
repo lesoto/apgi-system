@@ -738,7 +738,7 @@
                 <span class="step-number">1</span>
                 <strong>Clone Repository</strong>
                 <div class="code-block"><pre>git clone &lt;repository-url&gt;
-cd apgi-system</pre></div>
+cd apgi-simulation</pre></div>
             </div>
 
             <div class="step">
@@ -755,7 +755,7 @@ pip install -r requirements.txt</pre></div>
                 <span class="step-number">3</span>
                 <strong>Verify Installation</strong>
                 <div class="code-block"><pre># Test core system
-python -c "from apgi_system.system import APGISystem; print('✅ Core system OK')"
+python -c "from apgi_simulation.system import APGISystem; print('✅ Core system OK')"
 
 # Test GUI
 python -c "import tkinter; print('✅ Tkinter available')"
@@ -794,7 +794,7 @@ cp .env.example .env
 
             <div class="info">
                 <strong>Option 3: Programmatic Usage (for Developers)</strong>
-                <div class="code-block"><pre>from apgi_system.system import APGISystem
+                <div class="code-block"><pre>from apgi_simulation.system import APGISystem
 
 system = APGISystem(config_path="config/default.yaml")
 results = system.run(duration_ms=10000.0)</pre></div>

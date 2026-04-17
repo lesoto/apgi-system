@@ -62,32 +62,32 @@ jobs:
       
       - name: Run black formatter check
         run: |
-          black --check --diff apgi_system api tests
+          black --check --diff apgi_simulation api tests
           
       - name: Run isort check
         run: |
-          isort --check-only --diff apgi_system/ api/
+          isort --check-only --diff apgi_simulation/ api/
           
       - name: Run pydocstyle check
         run: |
-          pydocstyle apgi_system/ --convention=google
+          pydocstyle apgi_simulation/ --convention=google
       
       - name: Run flake8 linter
         run: |
-          flake8 apgi_system api tests --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 apgi_system api tests --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+          flake8 apgi_simulation api tests --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 apgi_simulation api tests --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
       
       - name: Run mypy type checker
         run: |
-          mypy apgi_system api --ignore-missing-imports --no-strict-optional --allow-untyped-calls --allow-untyped-defs
+          mypy apgi_simulation api --ignore-missing-imports --no-strict-optional --allow-untyped-calls --allow-untyped-defs
 
       - name: Run Bandit (SAST)
         run: |
-          bandit -r apgi_system/ api/ -ll -ii
+          bandit -r apgi_simulation/ api/ -ll -ii
           
       - name: Run mutmut (Mutation Testing)
         run: |
-          mutmut run --paths-to-mutate apgi_system/
+          mutmut run --paths-to-mutate apgi_simulation/
       
       - name: Run unit tests
         env:
@@ -97,7 +97,7 @@ jobs:
           CELERY_RESULT_BACKEND: redis://localhost:6379/2
           HYPOTHESIS_PROFILE: ci
         run: |
-          pytest tests/unit/ -v --cov=apgi_system --cov=api --cov-report=xml --cov-report=html --cov-report=term-missing --ignore=tests/unit/test_gui.py
+          pytest tests/unit/ -v --cov=apgi_simulation --cov=api --cov-report=xml --cov-report=html --cov-report=term-missing --ignore=tests/unit/test_gui.py
       
       - name: Run property-based tests
         env:

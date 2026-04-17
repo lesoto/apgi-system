@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from apgi_system.core import ActiveInferenceEngine, FreeEnergyCalculator, PrecisionWeighting
+from apgi_simulation.core import ActiveInferenceEngine, FreeEnergyCalculator, PrecisionWeighting
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_active_inference_engine(config: Dict[str, Any]) -> None:
 
 def test_system_initialization(config: Dict[str, Any]) -> None:
     """Test that system can be initialized."""
-    from apgi_system.system import APGISystem
+    from apgi_simulation.system import APGISystem
 
     system = APGISystem()
     assert system is not None
@@ -78,7 +78,7 @@ def test_system_initialization(config: Dict[str, Any]) -> None:
 
 def test_system_step(config: Dict[str, Any]) -> None:
     """Test single system step."""
-    from apgi_system.system import APGISystem
+    from apgi_simulation.system import APGISystem
 
     system = APGISystem()
     extero_input = np.random.randn(256)

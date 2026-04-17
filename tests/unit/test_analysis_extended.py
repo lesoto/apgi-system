@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from apgi_system.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
+from apgi_simulation.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
 
 
 class TestAnalysisResults:
@@ -220,13 +220,19 @@ class TestSystemAnalyzer:
             temporal_dynamics={"time": [1000.0, 2000.0], "ignition_signal": [1.0, 2.0]},
         )
 
+        # Mock ignition_threshold object with required attributes
+        mock_ignition_threshold = MagicMock()
+        mock_ignition_threshold.signal_history = [1.0, 2.0]
+        mock_ignition_threshold.threshold_history = [1.5, 1.5]
+
         # Test temporal pattern analysis
         temporal_patterns = analyzer.extract_temporal_dynamics(
-            results.temporal_dynamics, ignition_threshold=0.5
+            results.temporal_dynamics, ignition_threshold=mock_ignition_threshold
         )
 
         assert isinstance(temporal_patterns, dict)
-        assert "temporal_patterns" in temporal_patterns
+        assert "time" in temporal_patterns
+        assert "ignition_signal" in temporal_patterns
 
     def test_export_results(self) -> None:
         """Test exporting results to different formats."""
@@ -302,20 +308,17 @@ class TestAnalysisIntegration:
         mock_system = MagicMock()
         mock_system.config = config
 
-        # Mock ignition_threshold with recent_ignitions
+        # Mock ignition_threshold with recent_ignitions (list of time values)
         mock_ignition_threshold = MagicMock()
-        mock_ignition_threshold.recent_ignitions = [
-            {"time": 1000.0, "duration": 80.0},
-            {"time": 2500.0, "duration": 120.0},
-            {"time": 4200.0, "duration": 100.0},
-            {"time": 6800.0, "duration": 90.0},
-        ]
+        mock_ignition_threshold.recent_ignitions = [1000.0, 2500.0, 4200.0, 6800.0]
         mock_ignition_threshold.signal_history = [1.0 + 0.5 * np.sin(i * 0.2) for i in range(50)]
         mock_ignition_threshold.threshold_history = [2.0] * 50
         mock_system.ignition_threshold = mock_ignition_threshold
 
-        # Mock metabolism
+        # Mock metabolism with proper energy history
         mock_metabolism = MagicMock()
+        mock_metabolism.energy_history = [0.1 + 0.05 * np.random.randn() for _ in range(50)]
+        mock_metabolism.reserve_history = [1.0 - i * 0.02 for i in range(50)]
         mock_system.metabolism = mock_metabolism
 
         # Mock somatic_markers

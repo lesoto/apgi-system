@@ -27,7 +27,7 @@ import numpy as np
 import httpx
 import time
 from concurrent.futures import ThreadPoolExecutor
-from apgi_system.self_model.state_classifier import StateClassifier
+from apgi_simulation.self_model.state_classifier import StateClassifier
 
 # Import theme manager
 try:
@@ -1845,7 +1845,7 @@ class APGIHFMapper:
 class AIModelVisualizer:
     """Management and visualization of recommended AI models"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.mapper = APGIHFMapper()
         self.cache: Dict[str, List[Dict]] = {}
         self._load_cache()

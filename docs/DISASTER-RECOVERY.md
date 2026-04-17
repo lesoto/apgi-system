@@ -323,6 +323,7 @@ fi
 **Trigger**: Complete system failure
 
 **Steps**:
+
 1. Assess damage and determine recovery scope
 2. Activate backup infrastructure (AWS/GCP)
 3. Restore system from latest backups:
@@ -339,6 +340,7 @@ fi
 **Trigger**: Significant data loss or corruption
 
 **Steps**:
+
 1. Stop all write operations to prevent further corruption
 2. Identify extent of data loss using backup verification
 3. Restore data from appropriate backup level:
@@ -400,7 +402,7 @@ gcloud compute backend-services add-backend apgi-backend \
 ### Internal Communication
 
 1. **Immediate Response Team**: Slack channel #incident-response
-2. **Engineering Team**: Email distribution list <engineering@apgi-system.com>
+2. **Engineering Team**: Email distribution list <engineering@apgi-simulation.com>
 3. **Management**: SMS and email alerts to on-call managers
 4. **Documentation**: Internal wiki updates with recovery progress
 
@@ -427,7 +429,7 @@ Estimated Resolution: [Time estimate or "Resolved"]
 Impact: [Description of impact]
 
 We apologize for any inconvenience this may cause. For real-time updates,
-please visit our status page at https://status.apgi-system.com.
+please visit our status page at https://status.apgi-simulation.com.
 
 Best regards,
 APGI Operations Team

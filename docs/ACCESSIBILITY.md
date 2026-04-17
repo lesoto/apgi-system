@@ -8,8 +8,8 @@ The APGI System aims to comply with [Web Content Accessibility Guidelines (WCAG)
 
 ### Success Criteria Implementation
 
-| Success Criterion | Level | Implementation Status |
-| ------------------ | ------- | --------------------- |
+|Success Criterion|Level|Implementation Status|
+|------------------|-------|---------------------|
 |1.1.1 Non-text Content|A|✅ Labels and descriptions for all interactive elements|
 |1.3.1 Info and Relationships|A|✅ Logical heading structure and semantic groupings|
 |1.3.2 Meaningful Sequence|A|✅ Logical tab order and content flow|
@@ -87,8 +87,8 @@ def announce_to_screen_reader(message: str, priority: str = "polite"):
 
 ### Enhanced Global Shortcuts
 
-|Shortcut|Function|Context|Available In|
-|----------|----------|---------|-------------|
+| Shortcut | Function | Context | Available In |
+| ---------- | ---------- | --------- | ------------- |
 | `Ctrl/Cmd + Q` | Quit application | Global | All GUIs |
 | `Ctrl/Cmd + N` | New session | Global | apgi_gui.py, Assistant-GUI.py |
 | `Ctrl/Cmd + O` | Open configuration | Global | All GUIs |
@@ -242,7 +242,6 @@ TRITANOPIA_THEME = {
 
 ## Font Scaling and Typography
 
-
 ### Responsive Font Scaling
 
 ```python
@@ -294,7 +293,6 @@ accessibility:
 
 ## GUI-Specific Accessibility Features
 
-
 ### APGI Main GUI (apgi_gui.py)
 
 #### Keyboard Navigation Features
@@ -304,7 +302,7 @@ accessibility:
 - **Parameter Adjustment**: Up/Down arrows for slider controls
 - **Simulation Control**: Dedicated function keys for simulation lifecycle
 
-#### Screen Reader Support
+#### Dynamic Content Announcements
 
 - **Live Regions**: Status updates announced automatically
 - **Chart Descriptions**: Alt-text equivalents for plots and visualizations
@@ -356,7 +354,6 @@ class AccessibleFocusFrame(ttk.Frame):
 
 ### Psychological States GUI (Psychological-States-GUI.py)
 
-
 #### Visualization Accessibility
 
 - **Alternative Representations**: Text descriptions of visual states
@@ -371,7 +368,6 @@ class AccessibleFocusFrame(ttk.Frame):
 
 ### Utils GUI (Utils-GUI.py)
 
-
 #### Utility Execution Feedback
 
 - **Progress Announcements**: Step-by-step execution feedback
@@ -380,9 +376,7 @@ class AccessibleFocusFrame(ttk.Frame):
 
 ## Testing Procedures
 
-
 ### Automated Accessibility Testing
-
 
 ```python
 class AccessibilityTestSuite:
@@ -446,7 +440,6 @@ class AccessibilityTestSuite:
 
 ### Manual Testing Checklist
 
-
 #### Keyboard Navigation Testing
 
 - [ ] All interactive elements reachable via keyboard
@@ -481,7 +474,6 @@ class AccessibilityTestSuite:
 
 ## Future Accessibility Roadmap
 
-
 ### Phase 1: Core Improvements (Next Release)
 
 - [ ] Complete WCAG 2.1 AA compliance audit
@@ -508,9 +500,7 @@ class AccessibilityTestSuite:
 
 ## Configuration
 
-
 ### Accessibility Configuration File
-
 
 ```yaml
 # accessibility.yaml
@@ -555,20 +545,17 @@ accessibility:
 
 ## Support and Resources
 
-
 ### Getting Help
-
 
 - **Documentation**: This accessibility guide and inline help (F1)
 - **Community**: GitHub discussions for accessibility topics
-- **Professional Support**: Contact accessibility@apgi-system.com
+- **Professional Support**: Contact <accessibility@apgi-simulation.com>
 - **Standards References**:
   - [WCAG 2.1 Guidelines](https://www.w3.org/TR/WCAG21/)
   - [Section 508 Standards](https://www.section508.gov/)
   - [EN 301 549](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf)
 
 ### Contributing to Accessibility
-
 
 We welcome contributions that improve accessibility:
 
@@ -579,7 +566,6 @@ We welcome contributions that improve accessibility:
 
 ### Accessibility Metrics
 
-
 We track accessibility compliance through automated metrics:
 
 - **Keyboard Navigation Coverage**: Target >95%
@@ -588,7 +574,3 @@ We track accessibility compliance through automated metrics:
 - **Focus Indicator Visibility**: Target 100%
 - **Alt-text Coverage**: Target >90%
 - **WCAG Success Criteria**: Target 100% AA compliance
-
----
-
-*This accessibility guide is continuously updated. Last reviewed: February 2024*

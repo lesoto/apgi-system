@@ -33,10 +33,10 @@ def test_config_fixture(config: Any) -> None:
     assert "ignition" in config
 
 
-def test_apgi_system_fixture(apgi_system: Any) -> None:
-    """Test that apgi_system fixture initializes correctly."""
-    assert apgi_system is not None
-    assert apgi_system.time == 0.0
+def test_apgi_simulation_fixture(apgi_simulation: Any) -> None:
+    """Test that apgi_simulation fixture initializes correctly."""
+    assert apgi_simulation is not None
+    assert apgi_simulation.time == 0.0
 
 
 def test_body_model_fixture(body_model: Any) -> None:

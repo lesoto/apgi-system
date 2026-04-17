@@ -4,8 +4,8 @@ This script demonstrates how to use the analysis module to examine
 APGI system behavior after a simulation run.
 """
 
-from apgi_system.analysis import analyze_simulation_run
-from apgi_system.system import APGISystem
+from apgi_simulation.analysis import analyze_simulation_run
+from apgi_simulation.system import APGISystem
 
 
 def main() -> None:

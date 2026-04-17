@@ -309,7 +309,7 @@ class TestUIInteractions:
 
             # Create a progress dialog and test it
             progress = CancellableProgress(root, timeout_seconds=30)
-            progress.show("Test progress", "Testing...")
+            progress.show("Test progress")
 
             # Verify progress bar was created
             assert hasattr(progress, "progress_bar")

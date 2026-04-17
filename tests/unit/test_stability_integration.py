@@ -8,9 +8,9 @@ from typing import Any, Dict
 import numpy as np
 import pytest
 
-from apgi_system.core.free_energy import FreeEnergyCalculator
-from apgi_system.core.predictive_processing import HierarchicalPredictor
-from apgi_system.stability import NumericalInstabilityError
+from apgi_simulation.core.free_energy import FreeEnergyCalculator
+from apgi_simulation.core.predictive_processing import HierarchicalPredictor
+from apgi_simulation.stability import NumericalInstabilityError
 
 
 class TestStabilityIntegrationFreeEnergy:

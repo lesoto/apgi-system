@@ -105,19 +105,19 @@ class GapAnalyzer:
                 missing_lines = file_data.get("missing_lines", [])
 
                 # Determine module category
-                if "apgi_system/core" in filename:
+                if "apgi_simulation/core" in filename:
                     module = "core"
-                elif "apgi_system/experiments" in filename:
+                elif "apgi_simulation/experiments" in filename:
                     module = "experiments"
-                elif "apgi_system/neural" in filename:
+                elif "apgi_simulation/neural" in filename:
                     module = "neural"
-                elif "apgi_system/ignition" in filename:
+                elif "apgi_simulation/ignition" in filename:
                     module = "ignition"
-                elif "apgi_system/interoception" in filename:
+                elif "apgi_simulation/interoception" in filename:
                     module = "interoception"
-                elif "apgi_system/self_model" in filename:
+                elif "apgi_simulation/self_model" in filename:
                     module = "self_model"
-                elif "apgi_system/visualization" in filename:
+                elif "apgi_simulation/visualization" in filename:
                     module = "visualization"
                 elif "api/routes" in filename:
                     module = "api_routes"

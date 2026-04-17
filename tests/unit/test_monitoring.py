@@ -9,7 +9,7 @@ import time
 import numpy as np
 import pytest
 
-from apgi_system.monitoring import PerformanceMetrics, PerformanceMonitor
+from apgi_simulation.monitoring import PerformanceMetrics, PerformanceMonitor
 
 
 class TestPerformanceMetrics:

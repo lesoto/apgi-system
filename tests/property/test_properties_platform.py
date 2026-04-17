@@ -17,7 +17,7 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from apgi_system.platform_utils import (
+from apgi_simulation.platform_utils import (
     get_config_dir,
     get_data_dir,
     get_platform,

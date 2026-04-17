@@ -24,19 +24,19 @@ Before pushing, you can run the same checks locally:
 
 ```bash
 # Format check
-black --check apgi_system tests
+black --check apgi_simulation tests
 
 # Auto-format
-black apgi_system tests
+black apgi_simulation tests
 
 # Linting
-flake8 apgi_system tests
+flake8 apgi_simulation tests
 
 # Type checking
-mypy apgi_system --ignore-missing-imports
+mypy apgi_simulation --ignore-missing-imports
 
 # Run tests with coverage
-pytest tests/ -v --cov=apgi_system --cov-report=html --cov-report=term-missing
+pytest tests/ -v --cov=apgi_simulation --cov-report=html --cov-report=term-missing
 ```
 
 ## Configuration Files

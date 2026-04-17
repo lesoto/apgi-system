@@ -18,7 +18,7 @@ import yaml
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from apgi_system.platform_utils import (
+from apgi_simulation.platform_utils import (
     get_config_dir,
     get_data_dir,
     get_platform,
@@ -69,7 +69,7 @@ class TestExecutableLaunchProperties:
             # Verify that the GUI was created successfully
             assert gui is not None, "GUI should be initialized"
             assert gui.root is not None, "GUI root window should exist"
-            assert gui.apgi_system is not None, "APGI system should be initialized"
+            assert gui.apgi_simulation is not None, "APGI system should be initialized"
 
             # Verify critical components exist
             assert hasattr(gui, "start_btn"), "Start button should exist"
@@ -119,7 +119,9 @@ class TestExecutableLaunchProperties:
 
                 # Verify successful initialization
                 assert gui is not None, f"Launch {i + 1}: GUI should be initialized"
-                assert gui.apgi_system is not None, f"Launch {i + 1}: System should be initialized"
+                assert (
+                    gui.apgi_simulation is not None
+                ), f"Launch {i + 1}: System should be initialized"
 
             except Exception as e:
                 pytest.fail(f"Launch {i + 1} failed: {str(e)}")

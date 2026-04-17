@@ -28,9 +28,9 @@ from numpy.typing import NDArray
 
 # Import theme manager
 from apgi_gui.theme_manager import get_theme_manager
-from apgi_system.config_validator import ConfigValidationError, validate_config_file
-from apgi_system.platform_utils import get_data_dir, get_resource_path
-from apgi_system.system import APGISystem
+from apgi_simulation.config_validator import ConfigValidationError, validate_config_file
+from apgi_simulation.platform_utils import get_data_dir, get_resource_path
+from apgi_simulation.system import APGISystem
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)
@@ -99,7 +99,7 @@ class APGIGui:
         self._apply_theme_to_root()
 
         # System state
-        self.apgi_system: Optional[APGISystem] = None
+        self.apgi_simulation: Optional[APGISystem] = None
         self.is_running: bool = False
         self.is_paused: bool = False
         self.simulation_thread: Optional[threading.Thread] = None
@@ -821,7 +821,7 @@ class APGIGui:
         """Clean up and close all toplevel windows."""
         try:
             for child in self.root.winfo_children():
-                if isinstance(child, tk.Toplevel):
+                if isinstance(child, tk.Toplevel):  # type: ignore
                     try:
                         child.destroy()
                     except Exception as e:
@@ -1268,8 +1268,8 @@ class APGIGui:
     def _initialize_system(self) -> None:
         """Initialize APGI system with proper error handling."""
         try:
-            self.apgi_system = APGISystem(config_path=str(self.config_path))
-            if self.apgi_system is None:
+            self.apgi_simulation = APGISystem(config_path=str(self.config_path))
+            if self.apgi_simulation is None:
                 raise RuntimeError("APGI system initialization returned None")
 
             self._log_event("System initialized successfully")
@@ -1279,7 +1279,7 @@ class APGIGui:
             self._enable_system_controls(True)
 
         except Exception as e:
-            self.apgi_system = None
+            self.apgi_simulation = None
             import traceback
 
             error_details = (
@@ -1296,7 +1296,7 @@ class APGIGui:
                 "3. Check system resources (memory, disk space)\n"
                 "4. Try resetting to default configuration\n"
                 "5. Restart the application\n\n"
-                "For detailed help, see APGI-System-README.md"
+                "For detailed help, see APGI-Simulation-README.md"
             )
 
             messagebox.showerror("Initialization Error", troubleshooting_msg)
@@ -1366,7 +1366,7 @@ class APGIGui:
         if self.is_running:
             return
 
-        if self.apgi_system is None:
+        if self.apgi_simulation is None:
             messagebox.showerror(
                 "System Not Available",
                 "Cannot start simulation: APGI system is not initialized.\n\n"
@@ -1426,7 +1426,7 @@ class APGIGui:
         if was_running:
             self._stop_simulation()
 
-        if self.apgi_system is None:
+        if self.apgi_simulation is None:
             self._log_event("Cannot reset: System not initialized")
             messagebox.showwarning(
                 "System Not Available",
@@ -1436,7 +1436,7 @@ class APGIGui:
             return
 
         try:
-            self.apgi_system.reset()
+            self.apgi_simulation.reset()
         except Exception as e:
             self._log_event(f"Error resetting system: {str(e)}")
             messagebox.showerror("Reset Error", f"Failed to reset system:\n{str(e)}")
@@ -1468,7 +1468,7 @@ class APGIGui:
             if not self.is_paused:
                 try:
                     # Validate system before each step
-                    if self.apgi_system is None:
+                    if self.apgi_simulation is None:
                         self._log_event("Simulation stopped: System not available")
                         self.is_running = False
                         # Schedule GUI update to disable controls
@@ -1476,14 +1476,14 @@ class APGIGui:
                         break
 
                     # Generate input
-                    current_time = self.apgi_system.time / 1000.0  # Convert to seconds
+                    current_time = self.apgi_simulation.time / 1000.0  # Convert to seconds
                     extero_input = self._generate_input(current_time)
 
                     # Apply parameter adjustments
                     self._apply_parameters()
 
                     # Step simulation
-                    state = self.apgi_system.step(extero_input)
+                    state = self.apgi_simulation.step(extero_input)
 
                     # Record data
                     self._record_state(state)
@@ -1524,17 +1524,17 @@ class APGIGui:
                 noise_level = params["noise"]
 
                 if pattern == "constant":
-                    base = np.full(448, intensity)
+                    base = np.full(256, intensity)
                 elif pattern == "pulse":
                     # Create a pulse in the middle of the step
-                    base = np.zeros(448)
+                    base = np.zeros(256)
                     base[intensity > 0.5] = intensity  # Simplified pulse
                 elif pattern == "sine":
-                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(448)
+                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(256)
                 else:  # random
-                    base = np.random.randn(448) * intensity
+                    base = np.random.randn(256) * intensity
 
-                noise = np.random.randn(448) * noise_level
+                noise = np.random.randn(256) * noise_level
                 input_signal = base + noise
 
                 self.custom_input_steps_remaining -= 1
@@ -1545,8 +1545,8 @@ class APGIGui:
                 return input_signal
 
         # Default sinusoidal with noise
-        base = np.sin(2 * np.pi * t / 5.0) * np.ones(448)
-        noise = np.random.randn(448) * 0.2
+        base = np.sin(2 * np.pi * t / 5.0) * np.ones(256)
+        noise = np.random.randn(256) * 0.2
         return base + noise
 
     def _safe_update_fps(self, fps: float) -> None:
@@ -1578,7 +1578,7 @@ class APGIGui:
 
     def _apply_parameters(self) -> None:
         """Apply parameter adjustments to system with validation and rollback."""
-        if self.apgi_system is None:
+        if self.apgi_simulation is None:
             self._log_event("Cannot apply parameters: System not initialized")
             return
 
@@ -1658,25 +1658,25 @@ class APGIGui:
         try:
             # Save current values
             old_values = {
-                "arousal": self.apgi_system.body_model.arousal_level,
-                "stress": self.apgi_system.body_model.stress_level,
-                "activity": self.apgi_system.body_model.activity_level,
-                "extero_precision": self.apgi_system.precision.extero_baseline,
-                "intero_precision": self.apgi_system.precision.intero_baseline,
-                "baseline_threshold": self.apgi_system.ignition_threshold.baseline_threshold,
+                "arousal": self.apgi_simulation.body_model.arousal_level,
+                "stress": self.apgi_simulation.body_model.stress_level,
+                "activity": self.apgi_simulation.body_model.activity_level,
+                "extero_precision": self.apgi_simulation.precision.extero_baseline,
+                "intero_precision": self.apgi_simulation.precision.intero_baseline,
+                "baseline_threshold": self.apgi_simulation.ignition_threshold.baseline_threshold,
             }
 
             # Apply body state modulations
-            self.apgi_system.body_model.set_arousal(self._param_cache["arousal"])
-            self.apgi_system.body_model.set_stress(self._param_cache["stress"])
-            self.apgi_system.body_model.set_activity(self._param_cache["activity"])
+            self.apgi_simulation.body_model.set_arousal(self._param_cache["arousal"])
+            self.apgi_simulation.body_model.set_stress(self._param_cache["stress"])
+            self.apgi_simulation.body_model.set_activity(self._param_cache["activity"])
 
             # Apply precision
-            self.apgi_system.precision.extero_baseline = self._param_cache["extero_precision"]
-            self.apgi_system.precision.intero_baseline = self._param_cache["intero_precision"]
+            self.apgi_simulation.precision.extero_baseline = self._param_cache["extero_precision"]
+            self.apgi_simulation.precision.intero_baseline = self._param_cache["intero_precision"]
 
             # Apply threshold
-            self.apgi_system.ignition_threshold.baseline_threshold = self._param_cache[
+            self.apgi_simulation.ignition_threshold.baseline_threshold = self._param_cache[
                 "baseline_threshold"
             ]
 
@@ -1687,12 +1687,12 @@ class APGIGui:
             # Rollback to previous values
             try:
                 if old_values:
-                    self.apgi_system.body_model.set_arousal(old_values["arousal"])
-                    self.apgi_system.body_model.set_stress(old_values["stress"])
-                    self.apgi_system.body_model.set_activity(old_values["activity"])
-                    self.apgi_system.precision.extero_baseline = old_values["extero_precision"]
-                    self.apgi_system.precision.intero_baseline = old_values["intero_precision"]
-                    self.apgi_system.ignition_threshold.baseline_threshold = old_values[
+                    self.apgi_simulation.body_model.set_arousal(old_values["arousal"])
+                    self.apgi_simulation.body_model.set_stress(old_values["stress"])
+                    self.apgi_simulation.body_model.set_activity(old_values["activity"])
+                    self.apgi_simulation.precision.extero_baseline = old_values["extero_precision"]
+                    self.apgi_simulation.precision.intero_baseline = old_values["intero_precision"]
+                    self.apgi_simulation.ignition_threshold.baseline_threshold = old_values[
                         "baseline_threshold"
                     ]
                     self._log_event("Parameters rolled back to previous values")
@@ -1717,7 +1717,7 @@ class APGIGui:
             self.data_buffers["heart_rate"].append(state["body"]["current"]["heart_rate"])
             self.data_buffers["cortisol"].append(state["body"]["current"]["cortisol"])
             self.data_buffers["workspace_active"].append(
-                1 if state["workspace"]["is_broadcasting"] else 0
+                1 if state["workspace"]["is_reportable"] else 0
             )
             # Extract oscillation data safely
             oscillations = state.get("oscillations", {})
@@ -1743,12 +1743,12 @@ class APGIGui:
 
             # Count somatic markers
             if (
-                self.apgi_system is not None
-                and hasattr(self.apgi_system, "somatic_markers")
-                and hasattr(self.apgi_system.somatic_markers, "markers")
+                self.apgi_simulation is not None
+                and hasattr(self.apgi_simulation, "somatic_markers")
+                and hasattr(self.apgi_simulation.somatic_markers, "markers")
             ):
                 self.data_buffers["somatic_markers"].append(
-                    len(self.apgi_system.somatic_markers.markers)
+                    len(self.apgi_simulation.somatic_markers.markers)
                 )
             else:
                 self.data_buffers["somatic_markers"].append(0)
@@ -1804,7 +1804,7 @@ class APGIGui:
         # Ensure status_labels are initialized before trying to update them
         if not hasattr(self, "status_labels") or not self.status_labels:
             return
-        if self.apgi_system is None:
+        if self.apgi_simulation is None:
             # Show disabled status when system is not available
             self.status_labels["Time"].config(text="--.-- s")
             self.status_labels["Ignition Events"].config(text="--")
@@ -1814,7 +1814,7 @@ class APGIGui:
             return
 
         try:
-            summary = self.apgi_system.get_state_summary()
+            summary = self.apgi_simulation.get_state_summary()
 
             self.status_labels["Time"].config(text=f"{summary['time_ms'] / 1000.0:.2f} s")
 
@@ -2491,7 +2491,7 @@ class APGIGui:
         """Clean up all toplevel windows to prevent Tkinter warnings."""
         try:
             for widget in self.root.winfo_children():
-                if isinstance(widget, tk.Toplevel):
+                if isinstance(widget, tk.Toplevel):  # type: ignore
                     try:
                         widget.destroy()
                     except Exception as e:
@@ -2595,7 +2595,7 @@ class APGIGui:
 
     def _edit_precision(self) -> None:
         """Edit precision settings."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning(
                 "Warning", "No active APGI system found. Please initialize the system first."
             )
@@ -2616,8 +2616,8 @@ class APGIGui:
         ttk.Label(frame, text="Precision Parameters", font=("Arial", 12, "bold")).pack(pady=10)
 
         # Current values display
-        current_extero = self.apgi_system.precision.extero_baseline
-        current_intero = self.apgi_system.precision.intero_baseline
+        current_extero = self.apgi_simulation.precision.extero_baseline
+        current_intero = self.apgi_simulation.precision.intero_baseline
 
         ttk.Label(frame, text=f"Current Exteroceptive Precision: {float(current_extero):.2f}").pack(
             pady=5
@@ -2669,7 +2669,7 @@ class APGIGui:
 
     def _edit_threshold(self) -> None:
         """Edit ignition threshold."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning(
                 "Warning", "No active APGI system found. Please initialize the system first."
             )
@@ -2690,7 +2690,7 @@ class APGIGui:
         ttk.Label(frame, text="Ignition Threshold", font=("Arial", 12, "bold")).pack(pady=10)
 
         # Current value display
-        current_threshold = self.apgi_system.ignition_threshold.baseline_threshold
+        current_threshold = self.apgi_simulation.ignition_threshold.baseline_threshold
         ttk.Label(frame, text=f"Current Baseline Threshold: {current_threshold:.2f}").pack(pady=5)
 
         # Info label
@@ -2828,7 +2828,7 @@ class APGIGui:
 
     def _run_attentional_blink_task(self, num_trials: int = 20) -> None:
         """Run the Attentional Blink experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -2842,7 +2842,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import AttentionalBlinkTask
+            from apgi_simulation.experiments.tasks import AttentionalBlinkTask
 
             # Create task with specified parameters
             task = AttentionalBlinkTask(
@@ -2896,7 +2896,7 @@ class APGIGui:
 
                     # Run trial with system lock
                     with self.system_lock:
-                        result = task.run_trial(self.apgi_system, trial)
+                        result = task.run_trial(self.apgi_simulation, trial)
 
                     # Log result
                     if trial_idx % 10 == 0:
@@ -2994,7 +2994,7 @@ class APGIGui:
 
     def _run_change_blindness_task(self, num_trials: int = 10) -> None:
         """Run the Change Blindness experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3008,7 +3008,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import ChangeBlindnessTask
+            from apgi_simulation.experiments.tasks import ChangeBlindnessTask
 
             # Create task with specified parameters
             task = ChangeBlindnessTask(
@@ -3062,7 +3062,7 @@ class APGIGui:
 
                     # Run trial with system lock
                     with self.system_lock:
-                        result = task.run_trial(self.apgi_system, trial)
+                        result = task.run_trial(self.apgi_simulation, trial)
 
                     # Log result
                     if trial_idx % 10 == 0:
@@ -3165,7 +3165,7 @@ class APGIGui:
 
     def _run_binocular_rivalry_task(self, num_trials: int = 10):
         """Run the Binocular Rivalry experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3179,7 +3179,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import BinocularRivalryTask
+            from apgi_simulation.experiments.tasks import BinocularRivalryTask
 
             # Create task with specified parameters
             task = BinocularRivalryTask(
@@ -3232,7 +3232,7 @@ class APGIGui:
 
                     # Run trial with system lock
                     with self.system_lock:
-                        result = task.run_trial(self.apgi_system, trial)
+                        result = task.run_trial(self.apgi_simulation, trial)
 
                     # Log result
                     if trial_idx % 5 == 0:
@@ -3340,7 +3340,7 @@ class APGIGui:
 
     def _run_masking_paradigm_task(self, trials_per_condition: int = 20):
         """Run the Masking Paradigm experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3352,7 +3352,7 @@ class APGIGui:
         self._update_status("Running Masking Paradigm task...")
 
         try:
-            from apgi_system.experiments.tasks import MaskingParadigmTask
+            from apgi_simulation.experiments.tasks import MaskingParadigmTask
 
             task = MaskingParadigmTask(num_trials_per_condition=trials_per_condition)
 
@@ -3395,7 +3395,7 @@ class APGIGui:
 
                     # Run trial with system lock
                     with self.system_lock:
-                        result = task.run_trial(self.apgi_system, trial)
+                        result = task.run_trial(self.apgi_simulation, trial)
 
                     if trial_idx % 10 == 0:
                         detected = "Yes" if result.target_detected else "No"
@@ -3488,7 +3488,7 @@ class APGIGui:
 
     def _run_iowa_gambling_task(self, num_trials: int = 100):
         """Run the Iowa Gambling Task experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3502,7 +3502,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import IowaGamblingTask
+            from apgi_simulation.experiments.tasks import IowaGamblingTask
 
             # Create task with specified parameters
             task = IowaGamblingTask(
@@ -3558,7 +3558,7 @@ class APGIGui:
 
                     # Run trial with system lock
                     with self.system_lock:
-                        result = task.run_trial(self.apgi_system, trial)
+                        result = task.run_trial(self.apgi_simulation, trial)
 
                     # Log result
                     if trial_idx % 10 == 0:
@@ -3671,7 +3671,7 @@ class APGIGui:
 
     def _run_stroop_task(self, num_trials: int = 60) -> None:
         """Run the Stroop Task experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3685,7 +3685,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import StroopTask
+            from apgi_simulation.experiments.tasks import StroopTask
 
             # Create task with specified parameters
             task = StroopTask(
@@ -3717,7 +3717,7 @@ class APGIGui:
             def run_task_thread() -> None:
                 """Run task in separate thread to keep GUI responsive."""
                 try:
-                    results = task.run_all_trials(self.apgi_system)
+                    results = task.run_all_trials(self.apgi_simulation)
 
                     # Update progress and status
                     for i, result in enumerate(results):
@@ -3865,7 +3865,7 @@ class APGIGui:
 
     def _run_nback_task(self, num_trials: int = 30):
         """Run the N-Back Task experimental task."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
             return
 
@@ -3879,7 +3879,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_system.experiments.tasks import NBackTask
+            from apgi_simulation.experiments.tasks import NBackTask
 
             # Create task with specified parameters
             task = NBackTask(
@@ -3912,7 +3912,7 @@ class APGIGui:
             def run_task_thread() -> None:
                 """Run task in separate thread to keep GUI responsive."""
                 try:
-                    results = task.run_all_trials(self.apgi_system)
+                    results = task.run_all_trials(self.apgi_simulation)
 
                     # Update progress and status
                     for i, result in enumerate(results):
@@ -4153,7 +4153,7 @@ class APGIGui:
 
     def _trigger_ignition(self):
         """Manually trigger ignition event."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showinfo("No System", "Please initialize the system first.")
             return
 
@@ -4168,7 +4168,7 @@ class APGIGui:
 
     def _induce_stressor(self):
         """Induce stressor event with configurable intensity."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showinfo("No System", "Please initialize the system first.")
             return
 
@@ -4210,7 +4210,7 @@ class APGIGui:
 
         def apply_stressor():
             intensity = intensity_var.get()
-            self.apgi_system.allostasis.trigger_stressor(intensity=intensity)
+            self.apgi_simulation.allostasis.trigger_stressor(intensity=intensity)
             self._log_event(f"Stressor induced (intensity: {intensity:.2f})")
             messagebox.showinfo("Success", f"Stressor induced with intensity {intensity:.2f}")
             dialog.destroy()
@@ -4261,7 +4261,7 @@ class APGIGui:
 
     def _inject_input(self):
         """Inject custom sensory input."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning(
                 "Warning", "No active APGI system found. Please initialize the system first."
             )
@@ -4430,7 +4430,7 @@ class APGIGui:
 
     def _set_body_state(self):
         """Set body state manually."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning(
                 "Warning", "No active APGI system found. Please initialize the system first."
             )
@@ -4456,11 +4456,11 @@ class APGIGui:
         current_frame.pack(fill=tk.X, pady=5)
 
         current_values = {
-            "Heart Rate": f"{self.apgi_system.body_model.heart_rate:.1f} bpm",
-            "Cortisol": f"{self.apgi_system.body_model.cortisol:.3f} μg/dL",
-            "Arousal": f"{self.apgi_system.body_model.arousal_level:.3f}",
-            "Stress": f"{self.apgi_system.body_model.stress_level:.3f}",
-            "Activity": f"{self.apgi_system.body_model.activity_level:.3f}",
+            "Heart Rate": f"{self.apgi_simulation.body_model.heart_rate:.1f} bpm",
+            "Cortisol": f"{self.apgi_simulation.body_model.cortisol:.3f} μg/dL",
+            "Arousal": f"{self.apgi_simulation.body_model.arousal_level:.3f}",
+            "Stress": f"{self.apgi_simulation.body_model.stress_level:.3f}",
+            "Activity": f"{self.apgi_simulation.body_model.activity_level:.3f}",
         }
 
         for label, value in current_values.items():
@@ -4475,31 +4475,37 @@ class APGIGui:
 
         # Define adjustable parameters
         params = [
-            ("Arousal Level", "arousal", 0.0, 1.0, self.apgi_system.body_model.arousal_level),
-            ("Stress Level", "stress", 0.0, 1.0, self.apgi_system.body_model.stress_level),
-            ("Activity Level", "activity", 0.0, 1.0, self.apgi_system.body_model.activity_level),
-            ("Heart Rate", "heart_rate", 60.0, 180.0, self.apgi_system.body_model.heart_rate),
-            ("Cortisol", "cortisol", 0.0, 2.0, self.apgi_system.body_model.cortisol),
+            ("Arousal Level", "arousal", 0.0, 1.0, self.apgi_simulation.body_model.arousal_level),
+            ("Stress Level", "stress", 0.0, 1.0, self.apgi_simulation.body_model.stress_level),
+            (
+                "Activity Level",
+                "activity",
+                0.0,
+                1.0,
+                self.apgi_simulation.body_model.activity_level,
+            ),
+            ("Heart Rate", "heart_rate", 60.0, 180.0, self.apgi_simulation.body_model.heart_rate),
+            ("Cortisol", "cortisol", 0.0, 2.0, self.apgi_simulation.body_model.cortisol),
             (
                 "Temperature",
                 "temperature",
                 36.0,
                 40.0,
-                getattr(self.apgi_system.body_model, "temperature", 37.0),
+                getattr(self.apgi_simulation.body_model, "temperature", 37.0),
             ),
             (
                 "Respiration",
                 "respiration",
                 8.0,
                 30.0,
-                getattr(self.apgi_system.body_model, "respiration_rate", 12.0),
+                getattr(self.apgi_simulation.body_model, "respiration_rate", 12.0),
             ),
             (
                 "Glucose",
                 "glucose",
                 70.0,
                 200.0,
-                getattr(self.apgi_system.body_model, "glucose_level", 90.0),
+                getattr(self.apgi_simulation.body_model, "glucose_level", 90.0),
             ),
         ]
 
@@ -4532,18 +4538,20 @@ class APGIGui:
             try:
                 # Set the parameters
                 if "arousal" in param_vars:
-                    self.apgi_system.body_model.set_arousal(param_vars["arousal"].get())
+                    self.apgi_simulation.body_model.set_arousal(param_vars["arousal"].get())
                 if "stress" in param_vars:
-                    self.apgi_system.body_model.set_stress(param_vars["stress"].get())
+                    self.apgi_simulation.body_model.set_stress(param_vars["stress"].get())
                 if "activity" in param_vars:
-                    self.apgi_system.body_model.set_activity(param_vars["activity"].get())
+                    self.apgi_simulation.body_model.set_activity(param_vars["activity"].get())
 
                 # For other parameters, try to set them if the body_model supports it
                 for key in ["heart_rate", "cortisol", "temperature", "respiration", "glucose"]:
-                    if hasattr(self.apgi_system.body_model, f"set_{key}"):
-                        getattr(self.apgi_system.body_model, f"set_{key}")(param_vars[key].get())
-                    elif hasattr(self.apgi_system.body_model, key):
-                        setattr(self.apgi_system.body_model, key, param_vars[key].get())
+                    if hasattr(self.apgi_simulation.body_model, f"set_{key}"):
+                        getattr(self.apgi_simulation.body_model, f"set_{key}")(
+                            param_vars[key].get()
+                        )
+                    elif hasattr(self.apgi_simulation.body_model, key):
+                        setattr(self.apgi_simulation.body_model, key, param_vars[key].get())
 
                 self._log_event("Body state manually adjusted")
                 messagebox.showinfo("Success", "Body state updated successfully!")
@@ -4555,14 +4563,14 @@ class APGIGui:
         def reset_to_current():
             """Reset sliders to current values."""
             for key, var in param_vars.items():
-                if hasattr(self.apgi_system.body_model, key):
-                    var.set(getattr(self.apgi_system.body_model, key))
+                if hasattr(self.apgi_simulation.body_model, key):
+                    var.set(getattr(self.apgi_simulation.body_model, key))
                 elif key == "arousal":
-                    var.set(self.apgi_system.body_model.arousal_level)
+                    var.set(self.apgi_simulation.body_model.arousal_level)
                 elif key == "stress":
-                    var.set(self.apgi_system.body_model.stress_level)
+                    var.set(self.apgi_simulation.body_model.stress_level)
                 elif key == "activity":
-                    var.set(self.apgi_system.body_model.activity_level)
+                    var.set(self.apgi_simulation.body_model.activity_level)
 
         ttk.Button(button_frame, text="Apply", command=apply_body_state).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset to Current", command=reset_to_current).pack(
@@ -4572,11 +4580,11 @@ class APGIGui:
 
     def _show_diagnostics(self):
         """Show system diagnostics."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning("No System", "System not initialized")
             return
 
-        summary = self.apgi_system.get_state_summary()
+        summary = self.apgi_simulation.get_state_summary()
 
         # Extract values with validation
         ignition_stats = summary.get("ignition_stats", {})
@@ -4610,10 +4618,10 @@ Somatic Markers:
 
     def _show_ignition_stats(self):
         """Show detailed ignition statistics."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             return
 
-        stats = self.apgi_system.ignition_threshold.get_statistics()
+        stats = self.apgi_simulation.ignition_threshold.get_statistics()
 
         text = f"""Ignition Statistics
 
@@ -4631,28 +4639,28 @@ Current Probability: {stats['current_probability']:.3f}
 
     def _show_energy_report(self):
         """Show energy budget report."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             return
 
         text = f"""Energy Budget Report
 
-Current Reserves: {self.apgi_system.metabolism.current_reserves:.1f}
-Total Consumed: {self.apgi_system.metabolism.total_consumed:.1f}
+Current Reserves: {self.apgi_simulation.metabolism.current_reserves:.1f}
+Total Consumed: {self.apgi_simulation.metabolism.total_consumed:.1f}
 
-Baseline Rate: {self.apgi_system.metabolism.baseline_rate:.1f}/s
-Ignition Cost: {self.apgi_system.metabolism.ignition_cost:.1f} per event
+Baseline Rate: {self.apgi_simulation.metabolism.baseline_rate:.1f}/s
+Ignition Cost: {self.apgi_simulation.metabolism.ignition_cost:.1f} per event
 
-Reserve Fraction: {self.apgi_system.metabolism.current_reserves / self.apgi_system.metabolism.total_budget * 100:.1f}%
+Reserve Fraction: {self.apgi_simulation.metabolism.current_reserves / self.apgi_simulation.metabolism.total_budget * 100:.1f}%
 """
 
         messagebox.showinfo("Energy Budget", text)
 
     def _analyze_markers(self):
         """Analyze somatic markers."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             return
 
-        stats = self.apgi_system.somatic_markers.get_statistics()
+        stats = self.apgi_simulation.somatic_markers.get_statistics()
 
         text = f"""Somatic Marker Analysis
 
@@ -4671,7 +4679,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _analyze_coherence(self):
         """Analyze self-model coherence."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning("No System", "Please start the simulation first")
             return
 
@@ -4886,9 +4894,9 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             f.write("=" * 50 + "\n\n")
             f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
-            if self.apgi_system:
+            if self.apgi_simulation:
                 # Basic summary
-                summary = self.apgi_system.get_state_summary()
+                summary = self.apgi_simulation.get_state_summary()
                 f.write(f"Simulation Time: {summary['time_ms'] / 1000.0:.2f} seconds\n")
                 f.write(f"Ignition Events: {summary['ignition_stats']['recent_ignitions']}\n")
                 f.write(f"Metabolic Reserves: {summary['metabolic_reserves']:.1f}\n")
@@ -4896,10 +4904,10 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
                 # Enhanced statistical analysis
                 try:
-                    from apgi_system.analysis import SystemAnalyzer
+                    from apgi_simulation.analysis import SystemAnalyzer
 
-                    analyzer = SystemAnalyzer(self.apgi_system.config)
-                    analysis_results = analyzer.analyze_system(self.apgi_system)
+                    analyzer = SystemAnalyzer(self.apgi_simulation.config)
+                    analysis_results = analyzer.analyze_system(self.apgi_simulation)
                     statistical_summary = analyzer.generate_statistical_summary(analysis_results)
 
                     f.write("STATISTICAL ANALYSIS\n")
@@ -4991,9 +4999,9 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             )
             story.append(Spacer(1, 12))
 
-            if self.apgi_system:
+            if self.apgi_simulation:
                 # Basic summary
-                summary = self.apgi_system.get_state_summary()
+                summary = self.apgi_simulation.get_state_summary()
                 story.append(Paragraph("<b>Simulation Summary</b>", styles["Heading2"]))
                 story.append(Spacer(1, 6))
 
@@ -5008,10 +5016,10 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
                 # Enhanced statistical analysis
                 try:
-                    from apgi_system.analysis import SystemAnalyzer
+                    from apgi_simulation.analysis import SystemAnalyzer
 
-                    analyzer = SystemAnalyzer(self.apgi_system.config)
-                    analysis_results = analyzer.analyze_system(self.apgi_system)
+                    analyzer = SystemAnalyzer(self.apgi_simulation.config)
+                    analysis_results = analyzer.analyze_system(self.apgi_simulation)
                     statistical_summary = analyzer.generate_statistical_summary(analysis_results)
 
                     story.append(Paragraph("<b>Statistical Analysis</b>", styles["Heading2"]))
@@ -5091,7 +5099,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
     def _show_statistical_analysis(self):
         """Show detailed statistical analysis dialog."""
-        if not self.apgi_system:
+        if not self.apgi_simulation:
             messagebox.showwarning("No System", "Please start the simulation first")
             return
 
@@ -5114,14 +5122,14 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             text_widget.insert(tk.END, "Running statistical analysis...\n\n")
 
             try:
-                from apgi_system.analysis import SystemAnalyzer
+                from apgi_simulation.analysis import SystemAnalyzer
 
-                analyzer = SystemAnalyzer(self.apgi_system.config)
+                analyzer = SystemAnalyzer(self.apgi_simulation.config)
 
                 # Correlation analysis
                 text_widget.insert(tk.END, "CORRELATION ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                correlations = analyzer.compute_correlation_analysis(self.apgi_system.history)
+                correlations = analyzer.compute_correlation_analysis(self.apgi_simulation.history)
 
                 for var1, corr_dict in correlations.items():
                     text_widget.insert(tk.END, f"{var1} correlations:\n")
@@ -5141,7 +5149,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 # Frequency analysis
                 text_widget.insert(tk.END, "\nFREQUENCY DOMAIN ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                freq_analysis = analyzer.compute_frequency_analysis(self.apgi_system.history)
+                freq_analysis = analyzer.compute_frequency_analysis(self.apgi_simulation.history)
 
                 for signal_name, freq_data in freq_analysis.items():
                     text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
@@ -5157,7 +5165,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 # Stationarity analysis
                 text_widget.insert(tk.END, "STATIONARITY ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                stationarity = analyzer.compute_stationarity_analysis(self.apgi_system.history)
+                stationarity = analyzer.compute_stationarity_analysis(self.apgi_simulation.history)
 
                 for signal_name, stats in stationarity.items():
                     text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
@@ -5275,7 +5283,7 @@ A computational model of consciousness based on:
 
 Developed using Python, NumPy, Matplotlib, and Tkinter
 
-For more information, visit: https://github.com/lesoto/apgi-system
+For more information, visit: https://github.com/lesoto/apgi-simulation
 """
 
         messagebox.showinfo("About APGI System", about_text)
@@ -5412,7 +5420,7 @@ TROUBLESHOOTING
 - If simulation won't start: Check configuration file
 - If plots are empty: Ensure simulation is running
 - If system unresponsive: Check log panel for errors
-- For detailed help: See APGI-System-README.md
+- For detailed help: See APGI-Simulation-README.md
 
 For more information, visit the documentation or contact support.
 """
@@ -5524,7 +5532,7 @@ def main():
             print("3. Check Python version (requires 3.8+)")
             print("\nFor detailed installation instructions, see:")
             print("- QUICKSTART_GUI.txt in the project root")
-            print("- APGI-System-README.md")
+            print("- APGI-Simulation-README.md")
             print("=" * 60)
 
             # Try to show GUI dialog if possible

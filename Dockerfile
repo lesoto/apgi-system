@@ -43,7 +43,7 @@ COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY api/ ./api/
-COPY apgi_system/ ./apgi_system/
+COPY apgi_simulation/ ./apgi_simulation/
 COPY config/ ./config/
 COPY utils/ ./utils/
 

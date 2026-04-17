@@ -16,7 +16,7 @@ import tkinter as tk
 import numpy as np
 import pytest
 
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 
 
 class TestGUIInitialization:
@@ -45,8 +45,8 @@ class TestGUIInitialization:
             assert app.root is root
 
             # Verify system was initialized
-            assert app.apgi_system is not None
-            assert isinstance(app.apgi_system, APGISystem)
+            assert app.apgi_simulation is not None
+            assert isinstance(app.apgi_simulation, APGISystem)
 
             # Verify initial state
             assert app.is_running is False
@@ -246,7 +246,7 @@ class TestPlotUpdateMechanisms:
             # Run a few simulation steps
             for i in range(5):
                 obs = np.random.randn(256) * 0.5
-                app.apgi_system.step(obs)
+                app.apgi_simulation.step(obs)
 
             # Update status labels
             app._update_status_labels()
@@ -274,7 +274,7 @@ class TestPlotUpdateMechanisms:
 
             # Generate a state
             obs = np.random.randn(256) * 0.5
-            state = app.apgi_system.step(obs)
+            state = app.apgi_simulation.step(obs)
 
             # Record the state
             initial_log_size = len(app.log_data)
@@ -342,9 +342,9 @@ class TestParameterAdjustments:
             app._apply_parameters()
 
             # Verify parameters were applied
-            assert app.apgi_system.precision.extero_baseline == 2.5
-            assert app.apgi_system.precision.intero_baseline == 1.5
-            assert app.apgi_system.ignition_threshold.baseline_threshold == 3.0
+            assert app.apgi_simulation.precision.extero_baseline == 2.5
+            assert app.apgi_simulation.precision.intero_baseline == 1.5
+            assert app.apgi_simulation.ignition_threshold.baseline_threshold == 3.0
 
         finally:
             root.quit()
@@ -369,9 +369,9 @@ class TestParameterAdjustments:
             root.update()  # Process trace callbacks
             app._apply_parameters()
 
-            assert app.apgi_system.precision.extero_baseline == 0.1
-            assert app.apgi_system.precision.intero_baseline == 0.1
-            assert app.apgi_system.ignition_threshold.baseline_threshold == 1.0
+            assert app.apgi_simulation.precision.extero_baseline == 0.1
+            assert app.apgi_simulation.precision.intero_baseline == 0.1
+            assert app.apgi_simulation.ignition_threshold.baseline_threshold == 1.0
 
             # Test maximum values (use 8.0 to avoid validation warning for very high precision)
             app.param_vars["extero_precision"].set(8.0)
@@ -380,9 +380,9 @@ class TestParameterAdjustments:
             root.update()  # Process trace callbacks
             app._apply_parameters()
 
-            assert app.apgi_system.precision.extero_baseline == 8.0
-            assert app.apgi_system.precision.intero_baseline == 8.0
-            assert app.apgi_system.ignition_threshold.baseline_threshold == 5.0
+            assert app.apgi_simulation.precision.extero_baseline == 8.0
+            assert app.apgi_simulation.precision.intero_baseline == 8.0
+            assert app.apgi_simulation.ignition_threshold.baseline_threshold == 5.0
 
         finally:
             root.quit()
@@ -401,14 +401,14 @@ class TestParameterAdjustments:
             app = APGIGui(root)
 
             # Set system to None to simulate error condition
-            original_system = app.apgi_system
-            app.apgi_system = None
+            original_system = app.apgi_simulation
+            app.apgi_simulation = None
 
             # Apply parameters (should not raise errors)
             app._apply_parameters()
 
             # Restore system
-            app.apgi_system = original_system
+            app.apgi_simulation = original_system
 
             # Verify no exceptions were raised
             assert True
@@ -492,14 +492,14 @@ class TestManualInterventions:
 
             # Get initial allostatic load
             obs = np.random.randn(256) * 0.5
-            app.apgi_system.step(obs)
+            app.apgi_simulation.step(obs)
 
             # Induce stressor
             app._induce_stressor()
 
             # Step the system to see the effect
             obs = np.random.randn(256) * 0.5
-            app.apgi_system.step(obs)
+            app.apgi_simulation.step(obs)
 
             # Verify stressor was applied (method should execute without errors)
             # Note: The exact effect on allostatic load depends on system dynamics
@@ -546,7 +546,7 @@ class TestManualInterventions:
             # Run some simulation steps
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                state = app.apgi_simulation.step(obs)
                 app._record_state(state)
 
             # Verify data was accumulated
@@ -562,7 +562,7 @@ class TestManualInterventions:
                 assert len(buffer) == 0
 
             # Verify system was reset
-            assert app.apgi_system.time == 0
+            assert app.apgi_simulation.time == 0
 
         finally:
             root.quit()
@@ -587,7 +587,7 @@ class TestDataExport:
             # Generate some data
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                state = app.apgi_simulation.step(obs)
                 app._record_state(state)
 
             # Export to temporary CSV file
@@ -653,7 +653,7 @@ class TestDataExport:
             # Generate some data
             for i in range(10):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                state = app.apgi_simulation.step(obs)
                 app._record_state(state)
 
             # Export to temporary JSON file

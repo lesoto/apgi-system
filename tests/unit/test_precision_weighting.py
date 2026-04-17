@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from apgi_system.core.precision import NeuromodulatorType, PrecisionWeighting
+from apgi_simulation.core.precision import NeuromodulatorType, PrecisionWeighting
 
 
 @pytest.fixture

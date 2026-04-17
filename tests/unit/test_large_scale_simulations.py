@@ -19,14 +19,14 @@ import numpy as np
 import psutil
 import pytest
 
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 
 
 class TestLargeScaleSimulations:
     """Tests for large-scale simulation scenarios."""
 
     @pytest.fixture
-    def apgi_system(self) -> APGISystem:
+    def apgi_simulation(self) -> APGISystem:
         """Create APGI system instance for testing."""
         return APGISystem()
 
@@ -48,7 +48,7 @@ class TestLargeScaleSimulations:
             },
         }
 
-    def test_1000_timestep_simulation(self, apgi_system: APGISystem) -> None:
+    def test_1000_timestep_simulation(self, apgi_simulation: APGISystem) -> None:
         """Test running a simulation for 1000+ timesteps."""
         # Run 1000 simulation steps
         num_steps = 1000
@@ -64,7 +64,7 @@ class TestLargeScaleSimulations:
             if i > 500:
                 obs += np.sin(i * 0.01) * 0.2  # Add periodic component
 
-            state = apgi_system.step(obs)
+            state = apgi_simulation.step(obs)
             observations.append(state)
 
         end_time = time.time()
@@ -72,7 +72,7 @@ class TestLargeScaleSimulations:
 
         # Verify simulation completed
         assert len(observations) == num_steps
-        assert apgi_system.time > 0
+        assert apgi_simulation.time > 0
 
         # Verify final state is valid
         final_state = observations[-1]
@@ -86,14 +86,14 @@ class TestLargeScaleSimulations:
 
         print(".3f")
 
-    def test_2000_timestep_simulation_stability(self, apgi_system: APGISystem) -> None:
+    def test_2000_timestep_simulation_stability(self, apgi_simulation: APGISystem) -> None:
         """Test system stability over 2000 timesteps."""
         num_steps = 2000
         stability_metrics = []
 
         for i in range(num_steps):
             obs = np.random.randn(256) * 0.5
-            state = apgi_system.step(obs)
+            state = apgi_simulation.step(obs)
 
             # Track key metrics for stability analysis
             metrics = {
@@ -125,7 +125,7 @@ class TestLargeScaleSimulations:
         # System time should advance correctly
         assert stability_metrics[-1]["time"] > stability_metrics[0]["time"]
 
-    def test_memory_usage_during_long_simulation(self, apgi_system: APGISystem) -> None:
+    def test_memory_usage_during_long_simulation(self, apgi_simulation: APGISystem) -> None:
         """Test memory usage during long simulation runs."""
         process = psutil.Process()
         gc.collect()  # Clean up before measurement
@@ -139,7 +139,7 @@ class TestLargeScaleSimulations:
 
         for i in range(num_steps):
             obs = np.random.randn(256) * 0.5
-            apgi_system.step(obs)
+            apgi_simulation.step(obs)
 
             # Sample memory every 100 steps
             if i % 100 == 0:
@@ -448,7 +448,7 @@ class TestLargeScaleGUIIntegration:
 
             for i in range(num_steps):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                state = app.apgi_simulation.step(obs)
                 app._record_state(state)
 
                 # Update plots periodically
@@ -491,7 +491,7 @@ class TestLargeScaleGUIIntegration:
 
             for i in range(num_steps):
                 obs = np.random.randn(256) * 0.5
-                state = app.apgi_system.step(obs)
+                state = app.apgi_simulation.step(obs)
                 app._record_state(state)
 
                 # Update GUI periodically

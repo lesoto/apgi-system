@@ -22,9 +22,9 @@ from numpy.typing import NDArray
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_system.core.active_inference import HierarchicalGaussianFilter  # noqa
-from apgi_system.system import APGISystem  # noqa
-from apgi_system.validation import InputValidator  # noqa
+from apgi_simulation.core.active_inference import HierarchicalGaussianFilter  # noqa
+from apgi_simulation.system import APGISystem  # noqa
+from apgi_simulation.validation import InputValidator  # noqa
 from tests.strategies import config_strategy, observation_strategy  # noqa
 
 # Configure Hypothesis for property-based testing
@@ -216,7 +216,7 @@ class TestErrorHandlingProperties:
             or "range" in error_msg.lower()
         ), f"Error message should mention dt, positive, or range: {error_msg}"
 
-    @given(observation=observation_strategy())
+    @given(observation=observation_strategy(dim=256))
     def test_property_input_validation_accepts_valid_input(
         self, observation: NDArray[np.float64]
     ) -> None:

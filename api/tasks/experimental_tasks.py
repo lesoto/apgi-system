@@ -11,15 +11,15 @@ from typing import Any, Dict
 import yaml
 from celery import Task  # type: ignore
 
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
-from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
-from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_system.experiments.tasks.nback_task import NBackTask
-from apgi_system.experiments.tasks.stroop_task import StroopTask
-from apgi_system.platform_utils import get_resource_path
-from apgi_system.system import APGISystem
+from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_simulation.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+from apgi_simulation.experiments.tasks.change_blindness import ChangeBlindnessTask
+from apgi_simulation.experiments.tasks.iowa_gambling import IowaGamblingTask
+from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask
+from apgi_simulation.experiments.tasks.nback_task import NBackTask
+from apgi_simulation.experiments.tasks.stroop_task import StroopTask
+from apgi_simulation.platform_utils import get_resource_path
+from apgi_simulation.system import APGISystem
 from api.celery_app import celery_app
 from api.database.connection import get_db
 from api.database.models import Task as TaskModel
@@ -100,17 +100,17 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]) ->
 class APGITask(Task):  # type: ignore[misc]
     """Base task class with APGI system initialization."""
 
-    _apgi_system = None
+    _apgi_simulation = None
 
     @property
-    def apgi_system(self) -> APGISystem:
+    def apgi_simulation(self) -> APGISystem:
         """Lazy initialization of APGI system."""
-        if self._apgi_system is None:
+        if self._apgi_simulation is None:
             # Use platform-aware resource path resolution
-            self._apgi_system = APGISystem(
+            self._apgi_simulation = APGISystem(
                 config_path=str(get_resource_path("config/default.yaml"))
             )
-        return self._apgi_system
+        return self._apgi_simulation
 
 
 @celery_app.task(
@@ -158,7 +158,7 @@ def execute_iowa_gambling_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Iowa Gambling Task completed for session {session_id}")
 
@@ -234,7 +234,7 @@ def execute_masking_paradigm_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Masking Paradigm Task completed for session {session_id}")
 
@@ -307,7 +307,7 @@ def execute_attentional_blink_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Attentional Blink Task completed for session {session_id}")
 
@@ -371,7 +371,7 @@ def execute_change_blindness_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Change Blindness Task completed for session {session_id}")
 
@@ -436,7 +436,7 @@ def execute_nback_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"N-Back Task completed for session {session_id}")
 
@@ -499,7 +499,7 @@ def execute_stroop_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Stroop Task completed for session {session_id}")
 
@@ -565,7 +565,7 @@ def execute_binocular_rivalry_task(
         )
 
         # Run all trials
-        results = task.run_all_trials(self.apgi_system)
+        results = task.run_all_trials(self.apgi_simulation)
 
         logger.info(f"Binocular Rivalry Task completed for session {session_id}")
 

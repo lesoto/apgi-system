@@ -167,8 +167,8 @@ All experimental tasks inherit from `ExperimentalTask` base class:
 
 ```python
 class ExperimentalTask:
-    def __init__(self, apgi_system, config):
-        self.system = apgi_system
+    def __init__(self, apgi_simulation, config):
+        self.system = apgi_simulation
         self.config = config
         
     def setup(self):
@@ -242,13 +242,13 @@ data_collection:
 
 ```bash
 # Run single task
-python -m apgi_system.experiments.tasks.attentional_blink --config config.yaml
+python -m apgi_simulation.experiments.tasks.attentional_blink --config config.yaml
 
 # Run with custom parameters
-python -m apgi_system.experiments.tasks.iowa_gambling --trials 200 --decks 4
+python -m apgi_simulation.experiments.tasks.iowa_gambling --trials 200 --decks 4
 
 # Batch experiments
-python -m apgi_system.experiments.run_batch --tasks all --output results/
+python -m apgi_simulation.experiments.run_batch --tasks all --output results/
 ```
 
 ### GUI Integration

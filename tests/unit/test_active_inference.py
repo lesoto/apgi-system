@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from apgi_system.core.active_inference import (
+from apgi_simulation.core.active_inference import (
     ActiveInferenceEngine,
     BeliefState,
     HierarchicalGaussianFilter,
@@ -34,10 +34,12 @@ def simple_config() -> Dict[str, Any]:
                 {"nodes": 16, "name": "conceptual"},
             ],
         },
-        "active_inference": {"learning_rate": 0.01, "precision_range": [0.1, 10.0]},
+        "active_inference": {
+            "learning_rate": 0.01,
+            "precision_range": [0.1, 10.0],
+            "planning": {"num_policies": 5, "horizon": 2},
+        },
         "system": {"timestep_ms": 1.0},
-        "num_policies": 5,
-        "planning_horizon": 2,
     }
 
 
@@ -204,9 +206,9 @@ class TestHierarchicalGaussianFilter:
 
         assert filter.num_levels == 3
         assert len(filter.beliefs) == 3
-        assert filter.beliefs[0].mean.shape == (64,)
-        assert filter.beliefs[1].mean.shape == (32,)
-        assert filter.beliefs[2].mean.shape == (16,)
+        assert filter.beliefs[0].mean.shape == (1, 64)
+        assert filter.beliefs[1].mean.shape == (1, 32)
+        assert filter.beliefs[2].mean.shape == (1, 16)
 
     def test_update_basic(self) -> None:
         """Test basic update functionality."""
@@ -275,13 +277,24 @@ class TestHierarchicalGaussianFilter:
         beliefs, fe = filter.update(observation)
 
         # Free energy should be sum of precision-weighted errors
+        # Match the actual implementation in _compute_total_free_energy:
+        # - Level 0: uses observation - prediction (not prediction_error)
+        # - Higher levels: use prediction_error
+        # - Precision is per-agent (batch), then averaged
         manual_fe = 0.0
-        for belief in beliefs:
-            error_sq = np.sum(belief.prediction_error**2)
-            manual_fe += 0.5 * np.mean(belief.precision) * error_sq
+
+        # Level 0: sensory error
+        error = observation.reshape(1, -1) - beliefs[0].prediction
+        fe_batch = 0.5 * beliefs[0].precision * np.sum(error**2, axis=1)
+        manual_fe += np.mean(fe_batch)
+
+        # Higher levels
+        for level in range(1, len(beliefs)):
+            error = beliefs[level].prediction_error
+            fe_batch = 0.5 * beliefs[level].precision * np.sum(error**2, axis=1)
+            manual_fe += np.mean(fe_batch)
 
         # Should be approximately equal (allowing for numerical differences)
-        # Use larger tolerance for numerical stability and projection learning dynamics
         assert abs(fe - manual_fe) < 1e-3
 
     def test_edge_case_zero_observation(self) -> None:
@@ -342,10 +355,11 @@ class TestHierarchicalGaussianFilter:
         beliefs, fe = filter.update(observation)
 
         # Verify all levels updated correctly
+        # Note: With batch_size=1, shapes are (1, D) not (D,)
         assert len(beliefs) == 3
-        assert beliefs[0].mean.shape == (256,)
-        assert beliefs[1].mean.shape == (128,)
-        assert beliefs[2].mean.shape == (64,)
+        assert beliefs[0].mean.shape == (1, 256)
+        assert beliefs[1].mean.shape == (1, 128)
+        assert beliefs[2].mean.shape == (1, 64)
         assert np.isfinite(fe)
         assert fe >= 0
 
@@ -441,8 +455,8 @@ class TestHierarchicalGaussianFilter:
             filter._projection_cache[(1, 16, 8)] = np.full((16, 8), np.nan)
 
         # Should return zeros instead of propagating NaN
-        result = filter._map_down(1, np.ones(8))
-        assert result.shape == (16,)
+        result = filter._map_down(1, np.ones((1, 8)))
+        assert result.shape == (1, 16)
         assert np.all(np.isfinite(result))
         assert np.allclose(result, 0.0)
 
@@ -459,12 +473,12 @@ class TestHierarchicalGaussianFilter:
         filter.update(observation)
 
         # Inject Inf into state (not matrix, since matrix gets nan_to_num)
-        state_with_inf = np.full(8, np.inf)
+        state_with_inf = np.full((1, 8), np.inf)
 
         # The function applies nan_to_num which converts inf to 1.0
         # So we test that it handles it gracefully
         result = filter._map_down(1, state_with_inf)
-        assert result.shape == (16,)
+        assert result.shape == (1, 16)
         assert np.all(np.isfinite(result))
 
     def test_top_level_projection_edge_case(self) -> None:
@@ -513,10 +527,10 @@ class TestHierarchicalGaussianFilter:
             filter._projection_cache[(1, 16, 8)] = near_zero_matrix
 
         # Should handle gracefully - the code replaces near-zero with 1e-10
-        state = np.ones(8)
+        state = np.ones((1, 8))
         result = filter._project_up(0, state)  # Project from level 0 to level 1
 
-        assert result.shape == (16,)
+        assert result.shape == (1, 16)
         assert np.all(np.isfinite(result))
 
     def test_nan_handling_in_project_up(self) -> None:
@@ -540,8 +554,8 @@ class TestHierarchicalGaussianFilter:
             filter._projection_cache[(1, 16, 8)] = np.full((16, 8), np.nan)
 
         # Should return zeros instead of propagating NaN
-        result = filter._project_up(0, np.ones(8))  # Project from level 0 to level 1
-        assert result.shape == (16,)
+        result = filter._project_up(0, np.ones((1, 8)))  # Project from level 0 to level 1
+        assert result.shape == (1, 16)
         assert np.all(np.isfinite(result))
         assert np.allclose(result, 0.0)
 
@@ -566,11 +580,11 @@ class TestHierarchicalGaussianFilter:
         extreme_matrix = np.full((16, 8), 1e100)
         with filter._cache_lock:
             filter._projection_cache[(1, 16, 8)] = extreme_matrix
-        extreme_state = np.full(8, 1e100)
+        extreme_state = np.full((1, 8), 1e100)
 
         # Should handle gracefully with fallback
         result = filter._project_up(0, extreme_state)  # Project from level 0 to level 1
-        assert result.shape == (16,)
+        assert result.shape == (1, 16)
         assert np.all(np.isfinite(result))
 
 
@@ -687,7 +701,7 @@ class TestActiveInferenceEngineEdgeCases:
         # Test with initial beliefs (near zero)
         observation = np.random.randn(64) * 0.01
         action1, info1 = engine.step(observation, actions)
-        assert action1 in [a for a in actions if np.allclose(action1, a)]
+        assert any(np.allclose(action1, a) for a in actions)
 
         # Test with updated beliefs (after several steps)
         for _ in range(5):
@@ -697,7 +711,7 @@ class TestActiveInferenceEngineEdgeCases:
         # Test with well-formed beliefs
         observation = np.random.randn(64) * 0.1
         action2, info2 = engine.step(observation, actions)
-        assert action2 in [a for a in actions if np.allclose(action2, a)]
+        assert any(np.allclose(action2, a) for a in actions)
 
     def test_action_execution_edge_cases(self, simple_config) -> None:
         """Test action execution with edge cases.

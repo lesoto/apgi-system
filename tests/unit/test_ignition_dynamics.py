@@ -9,8 +9,8 @@ from typing import Any, Dict, Union
 import numpy as np
 import pytest
 
-from apgi_system.ignition.global_workspace import GlobalWorkspace, WorkspaceState
-from apgi_system.ignition.threshold import IgnitionThreshold
+from apgi_simulation.ignition.global_workspace import GlobalWorkspace, WorkspaceState
+from apgi_simulation.ignition.threshold import IgnitionThreshold
 
 
 class TestIgnitionThreshold:

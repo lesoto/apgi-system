@@ -16,7 +16,7 @@ from typing import Any, Dict
 import numpy as np
 import pytest
 
-from apgi_system.core.active_inference import (
+from apgi_simulation.core.active_inference import (
     ActiveInferenceAgent,
     ActiveInferenceEngine,
     VectorizedAgentPool,

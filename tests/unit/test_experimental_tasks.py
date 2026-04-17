@@ -16,11 +16,15 @@ from typing import Any
 
 import numpy as np
 
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
-from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
-from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
-from apgi_system.experiments.tasks.iowa_gambling import DECK_SCHEDULES, DeckType, IowaGamblingTask
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
+from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
+from apgi_simulation.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+from apgi_simulation.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
+from apgi_simulation.experiments.tasks.iowa_gambling import (
+    DECK_SCHEDULES,
+    DeckType,
+    IowaGamblingTask,
+)
+from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
 
 
 class TestIowaGamblingTask:
@@ -106,12 +110,12 @@ class TestIowaGamblingTask:
             # Check that stimulus magnitude is reasonable
             assert np.max(np.abs(trial.deck_stimulus)) < 10.0
 
-    def test_single_trial_execution(self, apgi_system):
+    def test_single_trial_execution(self, apgi_simulation):
         """Test running a single trial on the APGI system."""
         task = IowaGamblingTask(num_trials=1)
         trial = task.trials[0]
 
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -130,13 +134,13 @@ class TestIowaGamblingTask:
         expected_total = task.initial_balance + result.net_outcome
         assert result.running_total == expected_total
 
-    def test_multiple_trials_balance_tracking(self, apgi_system):
+    def test_multiple_trials_balance_tracking(self, apgi_simulation):
         """Test that balance is tracked correctly across multiple trials."""
         task = IowaGamblingTask(num_trials=5)
         initial_balance = task.initial_balance
 
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         # Final balance should equal initial + sum of all net outcomes
         total_net = sum(r.net_outcome for r in task.results)
@@ -153,13 +157,13 @@ class TestIowaGamblingTask:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_analysis_structure(self, apgi_system):
+    def test_analysis_structure(self, apgi_simulation):
         """Test that analysis returns expected structure."""
         task = IowaGamblingTask(num_trials=20)
 
         # Run a few trials
         for i in range(10):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         analysis = task.analyze_results()
 
@@ -183,13 +187,13 @@ class TestIowaGamblingTask:
             assert "avg_net_outcome" in deck_data
             assert "avg_somatic_marker" in deck_data
 
-    def test_task_reset(self, apgi_system):
+    def test_task_reset(self, apgi_simulation):
         """Test that task reset works correctly."""
         task = IowaGamblingTask(num_trials=10)
 
         # Run some trials
         for i in range(5):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         initial_results_count = len(task.results)
         assert initial_results_count > 0
@@ -285,12 +289,12 @@ class TestMaskingParadigm:
         assert trial.soa_ms == 300
         # Long SOA means significant gap between target and mask
 
-    def test_single_trial_execution(self, apgi_system):
+    def test_single_trial_execution(self, apgi_simulation):
         """Test running a single masking trial."""
         task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -306,7 +310,7 @@ class TestMaskingParadigm:
             assert result.detection_time is not None
             assert result.detection_time >= 0
 
-    def test_masking_effect_short_soa(self, apgi_system):
+    def test_masking_effect_short_soa(self, apgi_simulation):
         """Test that short SOA typically shows masking effect."""
         task = MaskingParadigmTask(
             soas=[0, 17],  # Very short SOAs
@@ -316,20 +320,20 @@ class TestMaskingParadigm:
         )
 
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         # At least some trials should show suppression at short SOAs
         suppressed_count = sum(1 for r in task.results if r.mask_suppression_occurred)
         # We expect some suppression, but not necessarily all trials
         assert suppressed_count >= 0  # At least check it's tracked
 
-    def test_analysis_structure(self, apgi_system):
+    def test_analysis_structure(self, apgi_simulation):
         """Test that analysis returns expected structure."""
         task = MaskingParadigmTask(soas=[0, 100], num_trials_per_condition=2)
 
         # Run all trials
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         analysis = task.analyze_results()
 
@@ -360,13 +364,13 @@ class TestMaskingParadigm:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system):
+    def test_task_reset(self, apgi_simulation):
         """Test that task reset works correctly."""
         task = MaskingParadigmTask(soas=[0, 100], num_trials_per_condition=2)
 
         # Run some trials
         for i in range(2):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         assert len(task.results) > 0
 
@@ -483,12 +487,12 @@ class TestAttentionalBlink:
         # Distractors should have lower magnitude than targets
         assert np.std(distractor) < task.target_salience
 
-    def test_single_trial_execution(self, apgi_system):
+    def test_single_trial_execution(self, apgi_simulation):
         """Test running a single attentional blink trial."""
         task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -513,7 +517,7 @@ class TestAttentionalBlink:
         expected_blink = result.t1_detected and not result.t2_detected
         assert result.blink_occurred == expected_blink
 
-    def test_lag_1_sparing(self, apgi_system):
+    def test_lag_1_sparing(self, apgi_simulation):
         """Test lag-1 sparing effect (T2 often detected at lag 1)."""
         task = AttentionalBlinkTask(
             stream_length=10,
@@ -523,20 +527,20 @@ class TestAttentionalBlink:
         )
 
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         # At lag 1, we might see some T2 detections (lag-1 sparing)
         # Just verify the mechanism works, not strict performance
         t2_detections = sum(1 for r in task.results if r.t2_detected)
         assert t2_detections >= 0  # At least check it's tracked
 
-    def test_analysis_structure(self, apgi_system):
+    def test_analysis_structure(self, apgi_simulation):
         """Test that analysis returns expected structure."""
         task = AttentionalBlinkTask(stream_length=10, lags=[1, 3], num_trials_per_lag=2)
 
         # Run all trials
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         analysis = task.analyze_results()
 
@@ -569,13 +573,13 @@ class TestAttentionalBlink:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system: Any) -> None:
+    def test_task_reset(self, apgi_simulation: Any) -> None:
         """Test that task reset works correctly."""
         task = AttentionalBlinkTask(lags=[1, 2], num_trials_per_lag=2)
 
         # Run some trials
         for i in range(2):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         assert len(task.results) > 0
 
@@ -587,12 +591,12 @@ class TestAttentionalBlink:
         assert task.current_trial_idx == 0
         assert len(task.trials) == len(task.lags) * task.num_trials_per_lag
 
-    def test_blink_detection_logic(self, apgi_system: Any) -> None:
+    def test_blink_detection_logic(self, apgi_simulation: Any) -> None:
         """Test that blink detection logic works correctly."""
         task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify blink logic
         if result.t1_detected and not result.t2_detected:
@@ -604,11 +608,11 @@ class TestAttentionalBlink:
 class TestTaskResultCompleteness:
     """Test that all tasks produce complete result structures."""
 
-    def test_iowa_gambling_result_fields(self, apgi_system: Any) -> None:
+    def test_iowa_gambling_result_fields(self, apgi_simulation: Any) -> None:
         """Test that Iowa Gambling results have all required fields."""
         task = IowaGamblingTask(num_trials=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -628,11 +632,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_masking_result_fields(self, apgi_system: Any) -> None:
+    def test_masking_result_fields(self, apgi_simulation: Any) -> None:
         """Test that Masking Paradigm results have all required fields."""
         task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -649,11 +653,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_attentional_blink_result_fields(self, apgi_system):
+    def test_attentional_blink_result_fields(self, apgi_simulation):
         """Test that Attentional Blink results have all required fields."""
         task = AttentionalBlinkTask(lags=[2], num_trials_per_lag=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -671,13 +675,13 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_change_blindness_result_fields(self, apgi_system: Any) -> None:
+    def test_change_blindness_result_fields(self, apgi_simulation: Any) -> None:
         """Test that Change Blindness results have all required fields."""
         task = ChangeBlindnessTask(
             max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5]
         )
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -693,11 +697,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_binocular_rivalry_result_fields(self, apgi_system: Any) -> None:
+    def test_binocular_rivalry_result_fields(self, apgi_simulation: Any) -> None:
         """Test that Binocular Rivalry results have all required fields."""
         task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -786,14 +790,14 @@ class TestChangeBlindnessTask:
 
         assert diff_high > diff_low, "Higher magnitude should create larger changes"
 
-    def test_single_trial_execution(self, apgi_system):
+    def test_single_trial_execution(self, apgi_simulation):
         """Test running a single change blindness trial."""
         task = ChangeBlindnessTask(
             max_alternations=3, num_trials_per_condition=1, change_magnitudes=[0.5]
         )
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -809,7 +813,7 @@ class TestChangeBlindnessTask:
             assert result.time_to_detection is not None
             assert result.time_to_detection > 0
 
-    def test_analysis_structure(self, apgi_system):
+    def test_analysis_structure(self, apgi_simulation):
         """Test that analysis returns expected structure."""
         task = ChangeBlindnessTask(
             max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5, 0.8]
@@ -817,7 +821,7 @@ class TestChangeBlindnessTask:
 
         # Run a few trials
         for i in range(min(4, len(task.trials))):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         analysis = task.analyze_results()
 
@@ -840,7 +844,7 @@ class TestChangeBlindnessTask:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system):
+    def test_task_reset(self, apgi_simulation):
         """Test that task reset works correctly."""
         task = ChangeBlindnessTask(
             max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5]
@@ -848,7 +852,7 @@ class TestChangeBlindnessTask:
 
         # Run some trials
         for i in range(min(2, len(task.trials))):
-            task.run_trial(apgi_system, task.trials[i])
+            task.run_trial(apgi_simulation, task.trials[i])
 
         assert len(task.results) > 0
 
@@ -934,7 +938,7 @@ class TestBinocularRivalryTask:
         # Stimuli should vary over time (temporal dynamics)
         assert not np.allclose(stimulus_t0, stimulus_t1)
 
-    def test_single_trial_execution(self, apgi_system) -> None:
+    def test_single_trial_execution(self, apgi_simulation) -> None:
         """Test running a single rivalry trial."""
         task = BinocularRivalryTask(
             trial_duration_ms=5000.0,  # Short trial for testing
@@ -944,7 +948,7 @@ class TestBinocularRivalryTask:
         )
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -959,7 +963,7 @@ class TestBinocularRivalryTask:
         # Dominance ratio should be between 0 and 1
         assert 0.0 <= result.pattern_a_dominance_ratio <= 1.0
 
-    def test_dominance_period_tracking(self, apgi_system) -> None:
+    def test_dominance_period_tracking(self, apgi_simulation) -> None:
         """Test that dominance periods are tracked correctly."""
         task = BinocularRivalryTask(
             trial_duration_ms=3000.0,
@@ -968,7 +972,7 @@ class TestBinocularRivalryTask:
         )
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_system, trial)
+        result = task.run_trial(apgi_simulation, trial)
 
         # Check dominance periods structure
         for period in result.dominance_periods:
@@ -979,7 +983,7 @@ class TestBinocularRivalryTask:
             assert period.end_time >= period.start_time
             assert period.duration == period.end_time - period.start_time
 
-    def test_analysis_structure(self, apgi_system) -> None:
+    def test_analysis_structure(self, apgi_simulation) -> None:
         """Test that analysis returns expected structure."""
         task = BinocularRivalryTask(
             trial_duration_ms=2000.0,
@@ -989,7 +993,7 @@ class TestBinocularRivalryTask:
 
         # Run all trials
         for trial in task.trials:
-            task.run_trial(apgi_system, trial)
+            task.run_trial(apgi_simulation, trial)
 
         analysis = task.analyze_results()
 
@@ -1012,12 +1016,12 @@ class TestBinocularRivalryTask:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_system) -> None:
+    def test_task_reset(self, apgi_simulation) -> None:
         """Test that task reset works correctly."""
         task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
 
         # Run some trials
-        task.run_trial(apgi_system, task.trials[0])
+        task.run_trial(apgi_simulation, task.trials[0])
 
         assert len(task.results) > 0
 

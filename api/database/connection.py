@@ -127,7 +127,7 @@ def create_default_user() -> None:
         default_user = User(
             user_id=secure_username,
             username=secure_username,
-            email=f"{secure_username}@apgi-system.local",
+            email=f"{secure_username}@apgi-simulation.local",
             password_hash=AuthManager.hash_password(secure_password),
             roles=["admin"],
         )

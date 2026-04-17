@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 
 
 class DataExporter:
@@ -42,21 +42,29 @@ class DataExporter:
         """
         current_time = state["time"] / 1000.0  # Convert to seconds
 
+        # Helper to convert numpy arrays/scalars to Python scalars
+        def to_scalar(val):
+            if isinstance(val, np.ndarray):
+                return float(val.item()) if val.size == 1 else float(val[0])
+            if isinstance(val, (np.integer, np.floating)):
+                return float(val)
+            return val
+
         # Extract and record metrics (matches GUI logic)
         data_entry = {
             "time": current_time,
             "ignition": 1 if state["ignition"]["ignition_occurred"] else 0,
-            "free_energy": state["ignition"]["total_signal"],
-            "extero_precision": state["precision"]["exteroceptive"],
-            "intero_precision": state["precision"]["interoceptive"],
-            "metabolic_reserves": state["metabolism"]["reserves"],
-            "allostatic_load": state["allostasis"]["allostatic_load"],
-            "heart_rate": state["body"]["current"]["heart_rate"],
-            "cortisol": state["body"]["current"]["cortisol"],
-            "workspace_active": 1 if state["workspace"]["is_broadcasting"] else 0,
+            "free_energy": to_scalar(state["ignition"]["total_signal"]),
+            "extero_precision": to_scalar(state["precision"]["exteroceptive"]),
+            "intero_precision": to_scalar(state["precision"]["interoceptive"]),
+            "metabolic_reserves": to_scalar(state["metabolism"]["reserves"]),
+            "allostatic_load": to_scalar(state["allostasis"]["allostatic_load"]),
+            "heart_rate": to_scalar(state["body"]["current"]["heart_rate"]),
+            "cortisol": to_scalar(state["body"]["current"]["cortisol"]),
+            "workspace_active": 1 if state["workspace"]["is_reportable"] else 0,
             "gamma_power": state["oscillations"]["band_powers"].get("gamma", 0),
             "beta_power": state["oscillations"]["band_powers"].get("beta", 0),
-            "minimal_self_coherence": state["self_model"]["minimal"]["coherence"],
+            "minimal_self_coherence": to_scalar(state["self_model"]["minimal"]["coherence"]),
         }
 
         self.log_data.append(data_entry)
@@ -101,8 +109,22 @@ class DataExporter:
         if not self.log_data:
             return False
 
+        # Convert numpy arrays to lists for JSON serialization
+        def convert_numpy(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {k: convert_numpy(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.floating)):
+                return float(obj)
+            return obj
+
+        converted_data = convert_numpy(self.log_data)
+
         with open(filename, "w") as f:
-            json.dump(self.log_data, f, indent=2)
+            json.dump(converted_data, f, indent=2)
         return True
 
     def generate_analysis_report(self) -> dict[str, Any]:

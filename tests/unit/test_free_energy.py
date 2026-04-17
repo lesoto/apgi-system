@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from apgi_system.core.free_energy import (
+from apgi_simulation.core.free_energy import (
     FreeEnergyCalculator,
     compute_accuracy,
     compute_complexity,

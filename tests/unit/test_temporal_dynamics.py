@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from apgi_system.core.temporal_dynamics import TemporalDynamics
+from apgi_simulation.core.temporal_dynamics import TemporalDynamics
 
 # ---------------------------------------------------------------------------
 # Fixtures

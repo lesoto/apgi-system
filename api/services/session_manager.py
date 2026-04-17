@@ -19,7 +19,7 @@ import redis.asyncio as redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session as SessionLocal
 
-from apgi_system.system import APGISystem
+from apgi_simulation.system import APGISystem
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
 from api.exceptions import ServiceUnavailableError, SessionNotFoundError
@@ -99,7 +99,7 @@ class SimulationSession:
 
         # Initialize APGI system
         config_path = config.get("config_path")
-        self.apgi_system = APGISystem(config_path=config_path)
+        self.apgi_simulation = APGISystem(config_path=config_path)
 
         # Apply custom config overrides if provided
         if "custom_config" in config and config["custom_config"]:
@@ -125,10 +125,10 @@ class SimulationSession:
                 else:
                     base[key] = value
 
-        deep_merge(self.apgi_system.config, custom_config)
+        deep_merge(self.apgi_simulation.config, custom_config)
 
         # Reinitialize subsystems with new config
-        self.apgi_system._initialize_subsystems()
+        self.apgi_simulation._initialize_subsystems()
 
     async def start(self) -> Dict[str, Any]:
         """
@@ -217,7 +217,7 @@ class SimulationSession:
         """
         async with self.lock:
             # Reset APGI system
-            self.apgi_system.reset()
+            self.apgi_simulation.reset()
 
             # Clear paused state
             self._paused_state = None
@@ -253,7 +253,7 @@ class SimulationSession:
             # Execute step in APGI system off the event loop
             import asyncio
 
-            state = await asyncio.to_thread(self.apgi_system.step, extero_input)
+            state = await asyncio.to_thread(self.apgi_simulation.step, extero_input)
             self.updated_at = datetime.utcnow()
 
             return state
@@ -266,7 +266,7 @@ class SimulationSession:
             Complete system state
         """
         async with self.lock:
-            state = self.apgi_system.get_state()
+            state = self.apgi_simulation.get_state()
 
             # Add session metadata
             state["session_metadata"] = {
@@ -282,27 +282,27 @@ class SimulationSession:
 
     def _capture_state(self) -> Dict[str, Any]:
         """Capture complete system state for pause/resume."""
-        return self.apgi_system.get_state()
+        return self.apgi_simulation.get_state()
 
     def _restore_state(self, state: Dict[str, Any]) -> None:
         """Restore system state from snapshot."""
         # Restore basic system state
-        self.apgi_system.time = state.get("time", 0.0)
-        self.apgi_system.history = state.get("history", {})
+        self.apgi_simulation.time = state.get("time", 0.0)
+        self.apgi_simulation.history = state.get("history", {})
 
         # Restore core subsystems
         if "core" in state:
             core_state = state["core"]
             if "precision" in core_state:
-                self.apgi_system.precision.__dict__.update(core_state["precision"])
+                self.apgi_simulation.precision.__dict__.update(core_state["precision"])
             if "active_inference" in core_state:
                 ai_state = core_state["active_inference"]
-                self.apgi_system.active_inference.time = ai_state.get("time", 0.0)
+                self.apgi_simulation.active_inference.time = ai_state.get("time", 0.0)
                 # Restore beliefs if present
                 if "beliefs" in ai_state:
                     for i, belief_data in enumerate(ai_state["beliefs"]):
-                        if i < len(self.apgi_system.active_inference.filter.beliefs):
-                            belief = self.apgi_system.active_inference.filter.beliefs[i]
+                        if i < len(self.apgi_simulation.active_inference.filter.beliefs):
+                            belief = self.apgi_simulation.active_inference.filter.beliefs[i]
                             belief.mean = belief_data.get("mean", belief.mean)
                             belief.covariance = belief_data.get("covariance", belief.covariance)
                             belief.precision = belief_data.get("precision", belief.precision)
@@ -315,7 +315,7 @@ class SimulationSession:
         if "ignition" in state:
             ignition_state = state["ignition"]
             if "threshold_stats" in ignition_state:
-                self.apgi_system.ignition_threshold.__dict__.update(
+                self.apgi_simulation.ignition_threshold.__dict__.update(
                     ignition_state["threshold_stats"]
                 )
 
@@ -323,41 +323,43 @@ class SimulationSession:
         if "interoception" in state:
             intero_state = state["interoception"]
             if "body_state" in intero_state:
-                self.apgi_system.body_model.__dict__.update(intero_state["body_state"])
+                self.apgi_simulation.body_model.__dict__.update(intero_state["body_state"])
             if "allostatic_load" in intero_state:
-                self.apgi_system.allostasis.__dict__.update(
+                self.apgi_simulation.allostasis.__dict__.update(
                     {"allostatic_load": intero_state["allostatic_load"]}
                 )
             if "somatic_markers" in intero_state:
-                self.apgi_system.somatic_markers.__dict__.update(intero_state["somatic_markers"])
+                self.apgi_simulation.somatic_markers.__dict__.update(
+                    intero_state["somatic_markers"]
+                )
 
         # Restore self-model subsystems
         if "self_model" in state:
             self_state = state["self_model"]
             if "minimal_self" in self_state:
-                self.apgi_system.minimal_self.__dict__.update(self_state["minimal_self"])
+                self.apgi_simulation.minimal_self.__dict__.update(self_state["minimal_self"])
             if "narrative_self" in self_state:
-                self.apgi_system.narrative_self.__dict__.update(self_state["narrative_self"])
+                self.apgi_simulation.narrative_self.__dict__.update(self_state["narrative_self"])
             if "coherence" in self_state:
-                self.apgi_system.coherence.__dict__.update(self_state["coherence"])
+                self.apgi_simulation.coherence.__dict__.update(self_state["coherence"])
 
         # Restore thermodynamic subsystems
         if "thermodynamic" in state:
             thermo_state = state["thermodynamic"]
             if "metabolic_reserves" in thermo_state:
-                self.apgi_system.metabolism.__dict__.update(
+                self.apgi_simulation.metabolism.__dict__.update(
                     {"current_reserves": thermo_state["metabolic_reserves"]}
                 )
             if "entropy_stats" in thermo_state:
-                self.apgi_system.entropy.__dict__.update(thermo_state["entropy_stats"])
+                self.apgi_simulation.entropy.__dict__.update(thermo_state["entropy_stats"])
 
         # Restore neural subsystems
         if "neural" in state:
             neural_state = state["neural"]
             if "oscillations" in neural_state:
-                self.apgi_system.oscillations.__dict__.update(neural_state["oscillations"])
+                self.apgi_simulation.oscillations.__dict__.update(neural_state["oscillations"])
             if "networks" in neural_state:
-                self.apgi_system.networks.__dict__.update(neural_state["networks"])
+                self.apgi_simulation.networks.__dict__.update(neural_state["networks"])
 
         logger.info(f"Session {self.session_id} state restored")
 

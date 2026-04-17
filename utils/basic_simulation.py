@@ -15,8 +15,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from apgi_system.platform_utils import get_resource_path
-from apgi_system.system import APGISystem
+from apgi_simulation.platform_utils import get_resource_path
+from apgi_simulation.system import APGISystem
 from utils.datetime_utils import format_duration_ms, get_elapsed_ms, utc_now
 
 

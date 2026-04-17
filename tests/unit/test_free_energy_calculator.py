@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from apgi_system.core.free_energy import FreeEnergyCalculator
+from apgi_simulation.core.free_energy import FreeEnergyCalculator
 
 
 class TestFreeEnergyCalculator:

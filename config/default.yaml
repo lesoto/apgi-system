@@ -163,3 +163,12 @@ validation:
   compute_pci: true  # Perturbational complexity
   track_erp_analogs: true
   measure_ignition_frequency: true
+  vp15:
+    min_synchrony: 0.05  # Lowered from 0.20 for amplitude-based synchrony metric
+    critical_energy: 0.05
+    energy_restore_rate: 0.02
+    max_allostatic_load: 0.90
+    load_damping_gain: 0.15
+    kl_epsilon: -1e-10
+    precision_floor: 0.10
+    precision_ceil: 10.0

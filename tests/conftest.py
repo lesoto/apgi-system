@@ -15,8 +15,8 @@ import yaml
 from hypothesis import HealthCheck, settings
 from numpy.typing import NDArray
 
-from apgi_system.interoception.body_model import BodyModel
-from apgi_system.system import APGISystem
+from apgi_simulation.interoception.body_model import BodyModel
+from apgi_simulation.system import APGISystem
 
 # Set environment variables for testing
 os.environ["ENVIRONMENT"] = "testing"
@@ -70,7 +70,7 @@ def config() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def apgi_system() -> Generator[APGISystem, None, None]:
+def apgi_simulation() -> Generator[APGISystem, None, None]:
     """
     Provide a fresh APGI system instance.
 
@@ -83,7 +83,7 @@ def apgi_system() -> Generator[APGISystem, None, None]:
     -----
     The system is reset after the test completes to ensure clean state.
     """
-    from apgi_system.system import APGISystem
+    from apgi_simulation.system import APGISystem
 
     system = APGISystem()
     yield system
@@ -105,7 +105,7 @@ def body_model(config: Dict[str, Any]) -> BodyModel:
     BodyModel
         A newly initialized body model instance.
     """
-    from apgi_system.interoception.body_model import BodyModel
+    from apgi_simulation.interoception.body_model import BodyModel
 
     return BodyModel(config)
 
@@ -118,14 +118,15 @@ def random_observation() -> NDArray[np.float64]:
     Returns
     -------
     np.ndarray
-        Random observation vector of shape (448,) with values ~ N(0, 0.5^2).
+        Random observation vector of shape (256,) with values ~ N(0, 0.5^2).
 
     Notes
     -----
     The observation is scaled to have moderate variance (0.5) to represent
-    typical sensory input magnitudes.
+    typical sensory input magnitudes. Dimension matches the sensory level
+    in the hierarchy configuration (256 nodes).
     """
-    return np.random.randn(448) * 0.5
+    return np.random.randn(256) * 0.5
 
 
 @pytest.fixture

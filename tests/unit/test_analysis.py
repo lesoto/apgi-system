@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from apgi_system.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
-from apgi_system.system import APGISystem
+from apgi_simulation.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
+from apgi_simulation.system import APGISystem
 
 
 def test_analysis_results_dataclass():
@@ -150,10 +150,15 @@ def test_extract_temporal_dynamics(config: dict) -> None:
     system.history["precision"] = [1.0, 1.1, 1.2, 1.3]
     system.history["metabolic_reserves"] = [1.0, 0.99, 0.98, 0.97]
 
-    # Add signal history
-    system.ignition_threshold.signal_history.extend(
-        [np.array([2.0]), np.array([2.5]), np.array([3.0]), np.array([2.8])]
-    )
+    # Add signal history (numpy arrays as expected by signal_history type)
+    system.ignition_threshold.signal_history = [
+        np.array([2.0]),
+        np.array([2.5]),
+        np.array([3.0]),
+        np.array([2.8]),
+    ]
+    # Also add threshold history
+    system.ignition_threshold.threshold_history = [2.0, 2.0, 2.0, 2.0]
 
     dynamics = analyzer.extract_temporal_dynamics(system.history, system.ignition_threshold)
 
@@ -161,6 +166,7 @@ def test_extract_temporal_dynamics(config: dict) -> None:
     assert len(dynamics["free_energy"]) == 4
     assert len(dynamics["precision"]) == 4
     assert len(dynamics["metabolic_reserves"]) == 4
+    # signal_history contains arrays, so ignition_signal will be a list of arrays
     assert len(dynamics["ignition_signal"]) == 4
     assert len(dynamics["threshold"]) == 4
 
