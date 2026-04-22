@@ -206,7 +206,7 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "h5py.*"]
+module = ["scipy.*", "h5py.*", "plotly.*", "fooof.*", "specparam.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

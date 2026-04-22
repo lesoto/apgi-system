@@ -354,7 +354,7 @@ class TestExecutableFunctionality:
         except ImportError as e:
             pytest.fail(f"Required tkinter submodule not available: {e}")
 
-    def test_core_system_imports_available(self):
+    def test_core_system_imports_available(self, project_root):
         """
         Test that core APGI system imports are available.
 
@@ -370,7 +370,10 @@ class TestExecutableFunctionality:
 
         # Test that system can be instantiated
         try:
-            system = APGISystem()
+            config_path = project_root / "apgi_simulation" / "resources" / "config" / "default.yaml"
+            if not config_path.exists():
+                pytest.skip(f"Config file not found at {config_path}")
+            system = APGISystem(str(config_path))
             assert system is not None
             system.reset()
         except Exception as e:

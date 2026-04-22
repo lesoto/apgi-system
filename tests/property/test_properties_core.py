@@ -45,9 +45,21 @@ settings.register_profile(
 settings.load_profile("property_tests")
 
 
+def load_config_path() -> str:
+    """Get configuration file path for tests."""
+    config_path = (
+        Path(__file__).parent.parent.parent
+        / "apgi_simulation"
+        / "resources"
+        / "config"
+        / "default.yaml"
+    )
+    return str(config_path)
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
-    config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
+    config_path = load_config_path()
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -252,7 +264,8 @@ class TestCoreSystemProperties:
 
         **Validates: Requirements 2.4**
         """
-        apgi_simulation = APGISystem()
+        config_path = load_config_path()
+        apgi_simulation = APGISystem(config_path)
         state = apgi_simulation.step(observation)
 
         # Check that state is a dictionary
@@ -366,7 +379,8 @@ class TestCoreSystemProperties:
 
         **Validates: Requirements 5.1**
         """
-        apgi_simulation = APGISystem()
+        config_path = load_config_path()
+        apgi_simulation = APGISystem(config_path)
         # Extract free energy from various sources
         free_energy_sources = []
 
@@ -509,7 +523,8 @@ class TestCoreSystemProperties:
 
         **Validates: Requirements 5.5**
         """
-        apgi_simulation = APGISystem()
+        config_path = load_config_path()
+        apgi_simulation = APGISystem(config_path)
 
         # Get initial state
         initial_state = apgi_simulation.get_state_summary()

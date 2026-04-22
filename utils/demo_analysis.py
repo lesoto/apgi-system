@@ -4,8 +4,15 @@ This script demonstrates how to use the analysis module to examine
 APGI system behavior after a simulation run.
 """
 
-from apgi_simulation.analysis import analyze_simulation_run
-from apgi_simulation.system import APGISystem
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from apgi_simulation.analysis import analyze_simulation_run  # noqa: E402
+from apgi_simulation.system import APGISystem  # noqa: E402
 
 
 def main() -> None:

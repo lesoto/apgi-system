@@ -57,14 +57,16 @@ settings.load_profile(profile)
 @pytest.fixture
 def config() -> Dict[str, Any]:
     """
-    Load default configuration from config/default.yaml.
+    Load default configuration from apgi_simulation/resources/config/default.yaml.
 
     Returns
     -------
     dict
         Configuration dictionary with all system parameters.
     """
-    config_path = Path(__file__).parent.parent / "config" / "default.yaml"
+    config_path = (
+        Path(__file__).parent.parent / "apgi_simulation" / "resources" / "config" / "default.yaml"
+    )
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -85,7 +87,10 @@ def apgi_simulation() -> Generator[APGISystem, None, None]:
     """
     from apgi_simulation.system import APGISystem
 
-    system = APGISystem()
+    config_path = (
+        Path(__file__).parent.parent / "apgi_simulation" / "resources" / "config" / "default.yaml"
+    )
+    system = APGISystem(str(config_path))
     yield system
     system.reset()
 

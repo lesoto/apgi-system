@@ -34,12 +34,14 @@ from apgi_simulation.system import APGISystem
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)
-# Reduce logging verbosity for cleaner GUI startup
+
+# Ensure logging is configured only once and doesn't leak ResourceWarnings
+log_file = get_data_dir() / "apgi_gui.log"
 logging.basicConfig(
     level=logging.WARNING,  # Only show warnings and errors, not info/debug
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(str(get_data_dir() / "apgi_gui.log")),
+        logging.FileHandler(str(log_file)),
         # Only log to file, not console for cleaner startup
     ],
 )

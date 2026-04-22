@@ -5,6 +5,11 @@ Tests core functionality without GUI
 
 import sys
 import traceback
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 
 def test_imports() -> bool:
@@ -32,7 +37,9 @@ def test_apgi_simulation() -> bool:
         from apgi_simulation.platform_utils import get_resource_path
         from apgi_simulation.system import APGISystem
 
-        APGISystem(config_path=str(get_resource_path("config/default.yaml")))
+        APGISystem(
+            config_path=str(get_resource_path("apgi_simulation/resources/config/default.yaml"))
+        )
         print("[OK] APGI System initialized successfully")
         return True
     except Exception as e:
@@ -50,7 +57,9 @@ def test_system_step() -> bool:
         from apgi_simulation.platform_utils import get_resource_path
         from apgi_simulation.system import APGISystem
 
-        system = APGISystem(config_path=str(get_resource_path("config/default.yaml")))
+        system = APGISystem(
+            config_path=str(get_resource_path("apgi_simulation/resources/config/default.yaml"))
+        )
         extero_input = np.random.randn(256)
         state = system.step(extero_input)
 
@@ -109,7 +118,7 @@ def test_config_file() -> bool:
 
         from apgi_simulation.platform_utils import get_resource_path
 
-        config_path = get_resource_path("config/default.yaml")
+        config_path = get_resource_path("apgi_simulation/resources/config/default.yaml")
         if not config_path.exists():
             print(f"[FAIL] Config file not found: {config_path}")
             return False

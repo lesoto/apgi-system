@@ -9,15 +9,20 @@ visualizations of ignition events, free energy, precision, and metabolic reserve
 import argparse
 import os
 import sys
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from apgi_simulation.platform_utils import get_resource_path
-from apgi_simulation.system import APGISystem
-from utils.datetime_utils import format_duration_ms, get_elapsed_ms, utc_now
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from apgi_simulation.platform_utils import get_resource_path  # noqa: E402
+from apgi_simulation.system import APGISystem  # noqa: E402
+from utils.datetime_utils import format_duration_ms, get_elapsed_ms, utc_now  # noqa: E402
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -128,7 +133,7 @@ def run_simulation(
     print("Initializing APGI System...")
 
     if config_path is None:
-        config_path = str(get_resource_path("config/default.yaml"))
+        config_path = str(get_resource_path("apgi_simulation/resources/config/default.yaml"))
 
     system = APGISystem(config_path=config_path)
 

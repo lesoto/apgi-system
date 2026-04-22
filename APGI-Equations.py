@@ -45,7 +45,7 @@ __all__ = [
 
 # Check for optional visualization packages
 try:
-    import plotly.io as pio  # type: ignore
+    import plotly.io as pio
 
     PLOTLY_AVAILABLE = True
     pio.templates.default = "plotly_white+plotly_dark"
