@@ -90,7 +90,7 @@ def announce_to_screen_reader(message: str, priority: str = "polite"):
 | Shortcut | Function | Context | Available In |
 | ---------- | ---------- | --------- | ------------- |
 | `Ctrl/Cmd + Q` | Quit application | Global | All GUIs |
-| `Ctrl/Cmd + N` | New session | Global | apgi_gui.py, Assistant-GUI.py |
+| `Ctrl/Cmd + N` | New session | Global | apgi_gui.py, Assistant_GUI.py |
 | `Ctrl/Cmd + O` | Open configuration | Global | All GUIs |
 | `Ctrl/Cmd + S` | Save configuration | Global | All GUIs |
 | `Ctrl/Cmd + E` | Export data | Global | All GUIs |
@@ -104,9 +104,9 @@ def announce_to_screen_reader(message: str, priority: str = "polite"):
 | `Ctrl/Cmd + +` | Zoom in | Global | All GUIs |
 | `Ctrl/Cmd + -` | Zoom out | Global | All GUIs |
 | `Ctrl/Cmd + 0` | Reset zoom | Global | All GUIs |
-| `Ctrl/Cmd + F` | Find/Search | Global | Assistant-GUI.py, Utils-GUI.py |
-| `Ctrl/Cmd + G` | Find next | Global | Assistant-GUI.py, Utils-GUI.py |
-| `Ctrl/Cmd + Shift + G` | Find previous | Global | Assistant-GUI.py, Utils-GUI.py |
+| `Ctrl/Cmd + F` | Find/Search | Global | Assistant_GUI.py, Utils-GUI.py |
+| `Ctrl/Cmd + G` | Find next | Global | Assistant_GUI.py, Utils-GUI.py |
+| `Ctrl/Cmd + Shift + G` | Find previous | Global | Assistant_GUI.py, Utils-GUI.py |
 | `Ctrl/Cmd + A` | Select all | Global | Text areas and inputs |
 | `Ctrl/Cmd + C` | Copy | Global | Text areas and inputs |
 | `Ctrl/Cmd + V` | Paste | Global | Text areas and inputs |
@@ -338,7 +338,7 @@ class AccessibleFocusFrame(ttk.Frame):
             announce_to_screen_reader(f"Focused on {self.accessible_name}")
 ```
 
-### Assistant GUI (Assistant-GUI.py)
+### Assistant GUI (Assistant_GUI.py)
 
 #### Query Input Accessibility
 

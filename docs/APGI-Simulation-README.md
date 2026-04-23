@@ -155,7 +155,7 @@ pip install -e .
 #### Main APGI System GUI
 
 ```bash
-python APGI-GUI.py
+python APGI_GUI.py
 ```
 
 **Features**: Complete real-time visualization, parameter control, and data export
@@ -173,7 +173,7 @@ python Tests-GUI.py
 python Utils-GUI.py
 
 # Interactive AI assistant for APGI system
-python Assistant-GUI.py
+python Assistant_GUI.py
 ```
 
 ### Programmatic Usage
@@ -291,7 +291,7 @@ The system is organized into several key modules:
 **Launch**:
 
 ```bash
-python APGI-GUI.py
+python APGI_GUI.py
 ```
 
 **Features**:
@@ -360,7 +360,7 @@ python Utils-GUI.py
 
 ### **5. Assistant GUI**
 
-**File**: [Assistant-GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-simulation/Assistant-GUI.py:0:0-0:0) (8,647 bytes)
+**File**: [Assistant_GUI.py](cci:7://file:///Users/lesoto/Sites/PYTHON/apgi-simulation/Assistant_GUI.py:0:0-0:0) (8,647 bytes)
 **Launch**:
 
 ```bash
@@ -572,12 +572,12 @@ The APGI framework provides a comprehensive platform for studying consciousness 
 
 To explore the system further:
 
-1. **Start the Main GUI**: Run `python APGI-GUI.py` to launch the comprehensive interactive interface
+1. **Start the Main GUI**: Run `python APGI_GUI.py` to launch the comprehensive interactive interface
 2. **Explore Specialized GUIs**:
    - `python Psychological-States-GUI.py` - Parameter library for 51 psychological states
    - `python Tests-GUI.py` - Run and monitor test scripts
    - `python Utils-GUI.py` - Execute utility scripts with GUI interface
-   - `python Assistant-GUI.py` - Interactive AI assistant for guidance
+   - `python Assistant_GUI.py` - Interactive AI assistant for guidance
 3. **Use Utility Scripts**:
    - `python utils/basic_simulation.py` - Run configurable simulations
    - `python utils/dependency_checker.py` - Check system requirements

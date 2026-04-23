@@ -181,7 +181,7 @@ class StatusManager:
     ) -> None:
         self.status_label = status_label
         self.assistant_status = assistant_status
-        self.status_history: deque = deque(maxlen=100)
+        self.status_history: deque[Dict[str, Any]] = deque(maxlen=100)
         self.last_update_time = 0.0
         self.min_update_interval = 0.5
 
@@ -238,13 +238,13 @@ class APGISystemGUI:
         self.current_theme = "normal"
 
         # Data storage
-        self.state_history: deque = deque(maxlen=GUIConfig.MAX_STATE_HISTORY)
-        self.energy_history: deque = deque(maxlen=GUIConfig.MAX_ENERGY_HISTORY)
-        self.query_history: deque = deque(maxlen=GUIConfig.MAX_QUERY_HISTORY)
+        self.state_history: deque[Any] = deque(maxlen=GUIConfig.MAX_STATE_HISTORY)
+        self.energy_history: deque[Any] = deque(maxlen=GUIConfig.MAX_ENERGY_HISTORY)
+        self.query_history: deque[Any] = deque(maxlen=GUIConfig.MAX_QUERY_HISTORY)
 
         # Threading
         self.system_lock = threading.Lock()
-        self.data_queue: queue.Queue = queue.Queue()
+        self.data_queue: queue.Queue[Any] = queue.Queue()
         self.update_thread: Optional[threading.Thread] = None
         self.stop_event = threading.Event()
 
@@ -439,8 +439,8 @@ class APGISystemGUI:
 
         self.spectrum_fig = Figure(figsize=(8, 4), dpi=100)
         self.spectrum_ax = self.spectrum_fig.add_subplot(111)
-        self.spectrum_canvas = FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame)
-        self.spectrum_canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.spectrum_canvas = FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame)  # type: ignore[no-untyped-call]
+        self.spectrum_canvas.get_tk_widget().pack(fill="both", expand=True)  # type: ignore[no-untyped-call]
 
         # Frequency distribution
         freq_frame = ttk.LabelFrame(
@@ -450,8 +450,8 @@ class APGISystemGUI:
 
         self.freq_fig = Figure(figsize=(8, 4), dpi=100)
         self.freq_ax = self.freq_fig.add_subplot(111)
-        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame)
-        self.freq_canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame)  # type: ignore[no-untyped-call]
+        self.freq_canvas.get_tk_widget().pack(fill="both", expand=True)  # type: ignore[no-untyped-call]
 
         # Configure grid
         self.oscillatory_frame.grid_columnconfigure(0, weight=1)
@@ -518,8 +518,8 @@ class APGISystemGUI:
 
         self.energy_fig = Figure(figsize=(8, 4), dpi=100)
         self.energy_ax = self.energy_fig.add_subplot(111)
-        self.energy_canvas = FigureCanvasTkAgg(self.energy_fig, energy_frame)
-        self.energy_canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.energy_canvas = FigureCanvasTkAgg(self.energy_fig, energy_frame)  # type: ignore[no-untyped-call]
+        self.energy_canvas.get_tk_widget().pack(fill="both", expand=True)  # type: ignore[no-untyped-call]
 
         # Battery status
         battery_frame = ttk.LabelFrame(self.energy_frame, text="Battery Status", padding=10)
@@ -910,13 +910,13 @@ Features:
             self.root.destroy()
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     root = tk.Tk()
 
     # Set DPI awareness for better scaling on high-DPI displays
     try:
-        from ctypes import windll
+        from ctypes import windll  # type: ignore[attr-defined]
 
         windll.shcore.SetProcessDpiAwareness(1)
     except Exception:

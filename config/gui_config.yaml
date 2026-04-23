@@ -1,0 +1,8 @@
+simulation:
+  tau_S_default: 0.5
+  tau_theta_default: 30.0
+  theta_0_default: 0.5
+  alpha_default: 5.0
+
+visualization:
+  cache_max_size: 50

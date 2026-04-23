@@ -254,7 +254,7 @@ class MaskingParadigmTask:
                     target_detected = True
                     detection_time = state["time"] - target_start_time
 
-                ignition_strength = state["ignition"]["total_signal"]
+                ignition_strength = float(state["ignition"]["total_signal"])
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 
@@ -276,7 +276,7 @@ class MaskingParadigmTask:
                         target_detected = True
                         detection_time = state["time"] - target_start_time
 
-                    ignition_strength = state["ignition"]["total_signal"]
+                    ignition_strength = float(state["ignition"]["total_signal"])
                     if ignition_strength > max_ignition_strength:
                         max_ignition_strength = ignition_strength
 
@@ -306,7 +306,7 @@ class MaskingParadigmTask:
                     continue
 
                 ignition_count += 1
-                ignition_strength = state["ignition"]["total_signal"]
+                ignition_strength = float(state["ignition"]["total_signal"])
                 if ignition_strength > max_ignition_strength:
                     max_ignition_strength = ignition_strength
 

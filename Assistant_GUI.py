@@ -1180,8 +1180,8 @@ def load_apgi_module() -> Any:
     # Try from current directory with various possible names
     current_dir = Path(__file__).parent
     possible_files = [
-        "AI-Assistant.py",
-        "APGI-Assistant.py",
+        "AI_Assistant.py",
+        "APGI_Assistant.py",
         "APGI-Assistant-Full.py",
         "APGI-Assistant-Short.py",
     ]
@@ -2232,7 +2232,7 @@ class APGIGUI:
                 "Degraded Mode",
                 "APGI Assistant core module is not available.\n\n"
                 "Running in degraded mode with limited features.\n"
-                "Please ensure AI-Assistant.py is in the same directory\n"
+                "Please ensure AI_Assistant.py is in the same directory\n"
                 "and all required dependencies are installed.",
             )
 
@@ -3274,9 +3274,9 @@ class APGIGUI:
         )
         self.assistant_status.pack(side="right")
 
-        self.status_mgr = StatusManager(self.status_label, self.assistant_status)  # type: ignore
+        self.status_mgr = StatusManager(self.status_label, self.assistant_status)
         if self.status_mgr:
-            self.status_mgr.set_status("ready", "Not Initialized")  # type: ignore
+            self.status_mgr.set_status("ready", "Not Initialized")
 
     def _force_hide_progress(self) -> None:
         """Force hide progress dialog (safety fallback)"""
@@ -3298,7 +3298,7 @@ class APGIGUI:
         ):
             self.logger.warning("Force hiding progress while still initializing")
             self.init_state = InitializationState.FAILED
-            if self.status_mgr:  # type: ignore[unreachable]
+            if self.status_mgr:
                 self.status_mgr.set_status("Initialization forced hide", "error", "Error ✗")
 
     def _emergency_progress_cleanup(self) -> None:
@@ -3852,7 +3852,7 @@ class APGIGUI:
 
                 # Update UI
                 if (
-                    self.status_mgr  # type: ignore[unreachable]
+                    self.status_mgr
                     and hasattr(self, "root")
                     and self.root
                     and self.root.winfo_exists()
@@ -3871,7 +3871,7 @@ class APGIGUI:
                 self.is_initialized = False
 
                 # Update UI
-                if self.status_mgr:  # type: ignore[unreachable]
+                if self.status_mgr:
                     self.status_mgr.set_status("Initialization cancelled", "error", "Cancelled ✗")
 
             else:
@@ -3886,7 +3886,7 @@ class APGIGUI:
                 self.logger.error(f"✗ Initialization failed: {error_msg}")
 
                 # Update UI
-                if self.status_mgr:  # type: ignore[unreachable]
+                if self.status_mgr:
                     self.status_mgr.set_status("Initialization failed", "error", "Failed ✗")
 
                 # Show error to user
@@ -3986,7 +3986,7 @@ class APGIGUI:
             self.assistant = None
 
         # Update UI
-        if self.status_mgr:  # type: ignore[unreachable]
+        if self.status_mgr:
             self.status_mgr.set_status(
                 f"Initialization timed out ({self.init_timeout_seconds}s)", "timeout", "Timeout ⌛"
             )
@@ -4022,7 +4022,7 @@ class APGIGUI:
             self.assistant = None
 
         # Update UI
-        if self.status_mgr:  # type: ignore[unreachable]
+        if self.status_mgr:
             self.status_mgr.set_status("Initialization failed", "error", "Error ✗")
 
         # Show error to user
@@ -4065,7 +4065,7 @@ class APGIGUI:
         )
 
         # Update UI
-        if self.status_mgr:  # type: ignore[unreachable]
+        if self.status_mgr:
             self.status_mgr.set_status(
                 "Initializing assistant components", "initializing", "Initializing"
             )
@@ -4109,7 +4109,7 @@ class APGIGUI:
             self.progress.hide()
 
         # Update status
-        if self.status_mgr:  # type: ignore[unreachable]
+        if self.status_mgr:
             self.status_mgr.set_status("Initialization cancelled", "error", "Cancelled ✗")
 
         # Clean up
@@ -5544,9 +5544,9 @@ Energy Usage:
             message: The status message to display
             status_type: Type of status (determines icon and styling)
         """
-        if self.status_mgr and hasattr(self.status_mgr, "set_status"):  # type: ignore[unreachable]
+        if self.status_mgr and hasattr(self.status_mgr, "set_status"):
             try:
-                self.status_mgr.set_status(message, status_type)  # type: ignore[unreachable]
+                self.status_mgr.set_status(message, status_type)
             except Exception as e:
                 self.logger.debug(f"Failed to set status: {e}")
 
@@ -5557,9 +5557,9 @@ Energy Usage:
             message: The status message to display (without 'Assistant: ' prefix)
             status_type: Type of status (determines icon and styling)
         """
-        if self.status_mgr and hasattr(self.status_mgr, "set_status"):  # type: ignore[unreachable]
+        if self.status_mgr and hasattr(self.status_mgr, "set_status"):
             try:
-                self.status_mgr.set_status("", status_type, message)  # type: ignore[unreachable]
+                self.status_mgr.set_status("", status_type, message)
             except Exception as e:
                 self.logger.debug(f"Failed to update assistant status: {e}")
 
@@ -7178,7 +7178,7 @@ Energy Usage:
                                 # Save figure to temporary file and add to PDF
                                 import io
 
-                                from reportlab.lib.utils import (  # type: ignore[import-untyped]
+                                from reportlab.lib.utils import (
                                     ImageReader,
                                 )
                                 from reportlab.platypus import Image as RLImage
@@ -7330,7 +7330,9 @@ Energy Usage:
                             }
                         )
 
-                    fig = APGIVisualizer.plot_state_timeline(mock_history) if APGIVisualizer else None  # type: ignore[union-attr]
+                    fig = (
+                        APGIVisualizer.plot_state_timeline(mock_history) if APGIVisualizer else None
+                    )
                 else:
                     fig = (
                         APGIVisualizer.plot_state_timeline(self.assistant.state_history)  # type: ignore[union-attr]
@@ -7392,7 +7394,11 @@ Energy Usage:
                             }
                         )
 
-                    fig = APGIVisualizer.plot_energy_usage(mock_energy_history) if APGIVisualizer else None  # type: ignore[union-attr]
+                    fig = (
+                        APGIVisualizer.plot_energy_usage(mock_energy_history)
+                        if APGIVisualizer
+                        else None
+                    )
                 else:
                     fig = (
                         APGIVisualizer.plot_energy_usage(self.assistant.energy_history)  # type: ignore[union-attr]
@@ -7652,7 +7658,9 @@ Energy Usage:
                             }
                         )
 
-                    fig = APGIVisualizer.plot_state_timeline(mock_history) if APGIVisualizer else None  # type: ignore[union-attr]
+                    fig = (
+                        APGIVisualizer.plot_state_timeline(mock_history) if APGIVisualizer else None
+                    )
                 else:
                     fig = (
                         APGIVisualizer.plot_state_timeline(self.assistant.state_history)  # type: ignore[union-attr]
@@ -7696,7 +7704,11 @@ Energy Usage:
                             }
                         )
 
-                    fig = APGIVisualizer.plot_energy_usage(mock_energy_history) if APGIVisualizer else None  # type: ignore[union-attr]
+                    fig = (
+                        APGIVisualizer.plot_energy_usage(mock_energy_history)
+                        if APGIVisualizer
+                        else None
+                    )
                 else:
                     fig = (
                         APGIVisualizer.plot_energy_usage(self.assistant.energy_history)  # type: ignore[union-attr]

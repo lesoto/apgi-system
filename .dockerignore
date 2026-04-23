@@ -53,9 +53,9 @@ k8s/
 *.cache
 .mypy_cache/
 .dmypy.json
-APGI-GUI.py
-APGI-Simulation-GUI.py
-Assistant-GUI.py
+APGI_GUI.py
+APGI_Simulation_GUI.py
+Assistant_GUI.py
 Psychological-States-GUI.py
 Tests-GUI.py
 Utils-GUI.py

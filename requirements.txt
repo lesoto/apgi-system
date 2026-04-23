@@ -47,3 +47,7 @@ reportlab==4.2.0
 setuptools==69.0.0
 wheel==0.42.0
 types-toml==0.10.0
+datasets==3.0.1
+specparam==2.0.0rc6
+tkinterweb==4.1.0
+plotly==5.24.1

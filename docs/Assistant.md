@@ -572,7 +572,7 @@ All GUI updates are coordinated through thread-safe mechanisms:
 
 ### Getting Started
 
-1. **Launch Application**: Run `python APGI-GUI.py`
+1. **Launch Application**: Run `python APGI_GUI.py`
 2. **Wait for Initialization**: Assistant initializes automatically with timeout protection
 3. **Enter Query**: Type your question in the main interface (max 10,000 characters)
 4. **Set Physiology**: Adjust sliders or use presets (Relaxed, Normal, Stressed, Anxious)
@@ -651,7 +651,7 @@ For advanced users and researchers:
 
 #### Main Files
 
-- **APGI-GUI.py**: Primary GUI application (v2.0) - Main entry point
+- **APGI_GUI.py**: Primary GUI application (v2.0) - Main entry point
 - **APGI-Assistant.py**: Core assistant logic with LTC networks
 - **requirements.txt**: Dependency specifications
 - **pyproject.toml**: Code formatting and linting configuration

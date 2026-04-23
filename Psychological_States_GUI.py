@@ -29,6 +29,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from apgi_simulation.self_model.state_classifier import StateClassifier
 
+# Import empirical dataset catalog
+try:
+    from utils.empirical_dataset_catalog import get_dataset_by_id
+
+    DATASET_CATALOG_AVAILABLE = True
+except ImportError:
+    DATASET_CATALOG_AVAILABLE = False
+    logger_placeholder = logging.getLogger(__name__)
+    logger_placeholder.warning(
+        "Dataset catalog not available. Install with: pip install apgi-simulation"
+    )
+
 # Import specparam (formerly fooof) for aperiodic EEG parameterization
 try:
     try:
@@ -42,28 +54,14 @@ except ImportError:
     logger_placeholder = logging.getLogger(__name__)
     logger_placeholder.warning("specparam/fooof not available. Install with: pip install specparam")
 
-# Import psychedelic neuroimaging data support (Carhart-Harris DS-07)
-try:
-    pass
-
-    PSYCHEDELIC_DATA_AVAILABLE = True
-except ImportError:
+# Check dataset availability from catalog
+if DATASET_CATALOG_AVAILABLE:
+    PSYCHEDELIC_DATA_AVAILABLE = get_dataset_by_id("DS-07") is not None
+    IEEG_DATA_AVAILABLE = get_dataset_by_id("DS-09") is not None
+    THINGS_DATA_AVAILABLE = get_dataset_by_id("DS-15") is not None
+else:
     PSYCHEDELIC_DATA_AVAILABLE = False
-
-# Import iEEG consciousness data support (Cogitate Consortium DS-09)
-try:
-    pass
-
-    IEEG_DATA_AVAILABLE = True
-except ImportError:
     IEEG_DATA_AVAILABLE = False
-
-# Import THINGS-Data multimodal support (Gifford et al. DS-15)
-try:
-    pass
-
-    THINGS_DATA_AVAILABLE = True
-except ImportError:
     THINGS_DATA_AVAILABLE = False
 
 # Import theme manager
@@ -171,15 +169,15 @@ except ImportError:
 
 # Try to import tkinterweb for HTML rendering, fallback to built-in approach
 try:
-    try:
-        from tkinterweb import HTMLFrame  # type: ignore
+    from tkinterweb import HTMLFrame  # type: ignore
 
-        TKINTERWEB_AVAILABLE = True
-    except ImportError:
-        TKINTERWEB_AVAILABLE = False
-except Exception as e:
+    TKINTERWEB_AVAILABLE = True
+except (ImportError, Exception) as e:
     TKINTERWEB_AVAILABLE = False
-    logger.warning(f"Could not import tkinterweb: {e}")
+    if not isinstance(e, ImportError):
+        logger.warning(f"Could not initialize tkinterweb even though it might be installed: {e}")
+    else:
+        logger.info("tkinterweb not found, using matplotlib fallback for visualizations")
 
 # No external browser dependencies or save options needed - all visualizations are embedded
 
@@ -323,6 +321,19 @@ class EmbeddedVisualizationRenderer:
         self.current_file: Optional[str] = None
         self._cleanup_on_exit = True
         self._temp_dir_initialized = False
+
+    def __enter__(self) -> "EmbeddedVisualizationRenderer":
+        """Context manager entry"""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[object],
+    ) -> None:
+        """Context manager exit - cleanup resources"""
+        self.force_cleanup()
 
     def _ensure_temp_dir(self) -> str:
         """Ensure temp directory exists (lazy initialization)"""
@@ -613,6 +624,7 @@ class APGIVisualizer:
         self.cache = VisualizationCache()
 
         self.df: Optional[pd.DataFrame] = None
+        self._df_cache_key: Optional[str] = None
 
         if PANDAS_AVAILABLE:
             self.df = self._create_dataframe()
@@ -677,7 +689,19 @@ class APGIVisualizer:
         )
 
     def _create_dataframe(self) -> "pd.DataFrame":
-        """Create a pandas DataFrame for visualization"""
+        """Create a pandas DataFrame for visualization with caching"""
+        # Generate cache key based on states
+        try:
+            cache_key = hashlib.md5(str(sorted(self.states.keys())).encode()).hexdigest()
+
+            # Return cached dataframe if states haven't changed
+            if self._df_cache_key == cache_key and self.df is not None:
+                return self.df
+
+            self._df_cache_key = cache_key
+        except Exception:
+            pass  # Continue without caching if hash fails
+
         data: List[Dict[str, Any]] = []
         for name, params in self.states.items():
             row: Dict[str, Any] = params.to_dict()
@@ -1549,8 +1573,8 @@ class GeneticDataVisualizer:
 
     def __init__(self) -> None:
         """Initialize genetic data visualizer"""
-        self.connector = None
-        self.df = None
+        self.connector: Optional["PGCDataConnector"] = None
+        self.df: Optional[pd.DataFrame] = None
         self.renderer = EmbeddedVisualizationRenderer()
 
     def load_dataset(self, dataset_key: str = "MDD") -> Optional[pd.DataFrame]:
@@ -1567,17 +1591,30 @@ class GeneticDataVisualizer:
             return None
 
         try:
-            self.connector = PGCDataConnector(dataset_key)  # type: ignore[assignment]
-            if self.connector is None:
-                logger.error("Failed to create PGCDataConnector")
+            # Create connector with proper error handling
+            try:
+                self.connector = PGCDataConnector(dataset_key)
+            except Exception as e:
+                logger.error(f"Failed to create PGCDataConnector: {e}")
                 return None
-            self.df = self.connector.fetch_data(streaming=True)  # type: ignore[unreachable]
+
+            # Try streaming first, then fallback to non-streaming
+            try:
+                self.df = self.connector.fetch_data(streaming=True)
+            except Exception as e:
+                logger.warning(f"Streaming load failed: {e}. Retrying non-streaming mode")
+                self.df = None
+
             if self.df is None:
                 logger.warning(
                     f"Streaming load returned no data for {dataset_key}; retrying non-streaming mode"
                 )
                 if self.connector is not None:
-                    self.df = self.connector.fetch_data(streaming=False)
+                    try:
+                        self.df = self.connector.fetch_data(streaming=False)
+                    except Exception as e:
+                        logger.error(f"Non-streaming load failed: {e}")
+                        return None
 
             if self.df is None:
                 logger.error(f"No data returned for dataset {dataset_key}")
@@ -1593,7 +1630,11 @@ class GeneticDataVisualizer:
         """Get available column names from loaded data"""
         if self.df is None:
             return []
-        return list(self.df.columns)  # type: ignore[unreachable]
+        try:
+            return list(self.df.columns)
+        except Exception as e:
+            logger.error(f"Error getting column names: {e}")
+            return []
 
     def plot_manhattan(
         self,
@@ -1621,17 +1662,20 @@ class GeneticDataVisualizer:
             logger.warning("Plotly not available or no data loaded")
             return None
 
-        try:  # type: ignore[unreachable]
-            # Validate columns exist
-            required_cols = [p_col, chr_col, bp_col]
-            missing_cols = [c for c in required_cols if c not in self.df.columns]
-            if missing_cols:
-                logger.warning(f"Missing columns: {missing_cols}")
-                return None
+        # Validate columns exist
+        required_cols = [p_col, chr_col, bp_col]
+        missing_cols = [c for c in required_cols if c not in self.df.columns]
+        if missing_cols:
+            logger.error(f"Missing required columns: {missing_cols}")
+            return None
 
-            # Calculate -log10(p)
+        try:
+            # Calculate -log10(p) with proper handling of zero/invalid values
             df_plot = self.df.copy()
-            df_plot.loc[:, "neg_log_p"] = -np.log10(df_plot.loc[:, p_col].replace(0, np.nan))
+            # Replace 0 and negative values with NaN before log transformation
+            p_values = df_plot[p_col].replace(0, np.nan)
+            p_values = p_values[p_values > 0]  # Keep only positive values
+            df_plot.loc[:, "neg_log_p"] = -np.log10(p_values)
 
             # Create figure
             fig = go.Figure()
@@ -1678,9 +1722,8 @@ class GeneticDataVisualizer:
                             marker=dict(size=10, color="red", symbol="star"),
                             name="Significant Hits",
                             text=sig_hits.get(snp_col, sig_hits.index),
-                            hovertemplate="<b>%{text}</b><br>p-value: "
-                            + sig_hits[p_col].astype(str)
-                            + "<br>-log10(p): %{y:.2f}<extra></extra>",
+                            hovertemplate="<b>%{text}</b><br>p-value: %{customdata[0]}<br>-log10(p): %{y:.2f}<extra></extra>",
+                            customdata=sig_hits[[p_col]].values,
                         )
                     )
 
@@ -1710,7 +1753,7 @@ class GeneticDataVisualizer:
         if not PLOTLY_AVAILABLE or self.df is None:
             return None
 
-        try:  # type: ignore[unreachable]
+        try:
             if p_col not in self.df.columns:
                 logger.warning(f"P-value column {p_col} not found")
                 return None
@@ -1772,7 +1815,7 @@ class GeneticDataVisualizer:
         if self.df is None:
             return {}
 
-        stats = {  # type: ignore[unreachable]
+        stats = {
             "total_variants": len(self.df),
             "columns": list(self.df.columns),
             "memory_usage": f"{self.df.memory_usage(deep=True).sum() / 1024**2:.2f} MB",
@@ -1878,6 +1921,15 @@ class SpectralAnalyzer:
             return None
 
         try:
+            # Validate input arrays
+            if len(freqs) == 0 or len(powers) == 0:
+                logger.warning("Empty frequency or power array provided")
+                return None
+
+            if len(freqs) != len(powers):
+                logger.warning("Frequency and power arrays have different lengths")
+                return None
+
             # Store for later reference
             self.last_freqs = freqs
             self.last_spectrum = powers
@@ -1888,28 +1940,92 @@ class SpectralAnalyzer:
             if verbose:
                 self.fooof_model.print_results()
 
-            # Extract parameters
-            aperiodic_params = self.fooof_model.aperiodic_params_
+            # Extract parameters - handle both old (fooof) and new (specparam) APIs
+            aperiodic_params = None
             periodic_peaks = []
+            error_val = 0.0
+            r_squared_val = 0.0
 
-            for peak in self.fooof_model.peak_params_:
-                periodic_peaks.append(
-                    {
-                        "frequency": float(peak[0]),
-                        "power": float(peak[1]),
-                        "bandwidth": float(peak[2]),
-                    }
-                )
+            # Try new specparam API first
+            if hasattr(self.fooof_model, "results"):
+                try:
+                    # New specparam API
+                    aperiodic_params = self.fooof_model.results.params.aperiodic.params
+
+                    # Extract periodic peaks if available
+                    if hasattr(self.fooof_model.results.params, "peaks") and hasattr(
+                        self.fooof_model.results.params.peaks, "params"
+                    ):
+                        for peak in self.fooof_model.results.params.peaks.params:
+                            periodic_peaks.append(
+                                {
+                                    "frequency": float(peak[0]),
+                                    "power": float(peak[1]),
+                                    "bandwidth": float(peak[2]),
+                                }
+                            )
+
+                    # Extract metrics
+                    if hasattr(self.fooof_model.results, "metrics"):
+                        measures = self.fooof_model.results.metrics.measures
+                        error_val = float(measures.get("mae", 0.0))
+                        r_squared_val = float(measures.get("rsquared", 0.0))
+                except (AttributeError, KeyError, TypeError) as e:
+                    logger.debug(f"Could not extract specparam results: {e}")
+                    aperiodic_params = None
+
+            # Fallback to old fooof API if new API didn't work
+            if aperiodic_params is None:
+                if hasattr(self.fooof_model, "aperiodic_params"):
+                    aperiodic_params = self.fooof_model.aperiodic_params
+                elif hasattr(self.fooof_model, "aperiodic_params_"):
+                    aperiodic_params = self.fooof_model.aperiodic_params_
+                else:
+                    logger.error("Could not find aperiodic_params attribute in FOOOF model")
+                    return None
+
+                # Extract periodic peaks from old API
+                peak_params_attr = None
+                if hasattr(self.fooof_model, "peak_params"):
+                    peak_params_attr = self.fooof_model.peak_params
+                elif hasattr(self.fooof_model, "peak_params_"):
+                    peak_params_attr = self.fooof_model.peak_params_
+
+                if peak_params_attr is not None:
+                    for peak in peak_params_attr:
+                        periodic_peaks.append(
+                            {
+                                "frequency": float(peak[0]),
+                                "power": float(peak[1]),
+                                "bandwidth": float(peak[2]),
+                            }
+                        )
+
+                # Extract error and r_squared from old API
+                if hasattr(self.fooof_model, "error"):
+                    error_val = float(self.fooof_model.error)
+                elif hasattr(self.fooof_model, "error_"):
+                    error_val = float(self.fooof_model.error_)
+
+                if hasattr(self.fooof_model, "r_squared"):
+                    r_squared_val = float(self.fooof_model.r_squared)
+                elif hasattr(self.fooof_model, "r_squared_"):
+                    r_squared_val = float(self.fooof_model.r_squared_)
 
             return SpectralParameters(
                 aperiodic_exponent=float(aperiodic_params[1]),
                 aperiodic_offset=float(aperiodic_params[0]),
                 periodic_peaks=periodic_peaks,
-                error=float(self.fooof_model.error_),
-                r_squared=float(self.fooof_model.r_squared_),
+                error=error_val,
+                r_squared=r_squared_val,
                 frequency_range=self.freq_range,
             )
 
+        except AttributeError as e:
+            logger.error(
+                f"FOOOF model attribute error: {e}. This may be due to specparam/fooof version mismatch."
+            )
+            return None
         except Exception as e:
             logger.error(f"Error fitting spectrum: {e}")
             return None
@@ -2021,11 +2137,27 @@ class SpectralVisualizer:
             if spectral_params is None:
                 return None
 
-            # Get model predictions
-            if self.analyzer.fooof_model is not None:
+            # Get model predictions with proper attribute checking
+            if self.analyzer.fooof_model is None:
+                logger.warning("FOOOF model not available")
+                return None
+
+            # Handle both old (fooof) and new (specparam) attribute names
+            model_spectrum = None
+            aperiodic_spectrum = None
+
+            if hasattr(self.analyzer.fooof_model, "fooofed_spectrum"):
+                model_spectrum = self.analyzer.fooof_model.fooofed_spectrum
+            elif hasattr(self.analyzer.fooof_model, "fooofed_spectrum_"):
                 model_spectrum = self.analyzer.fooof_model.fooofed_spectrum_
+
+            if hasattr(self.analyzer.fooof_model, "aperiodic_spectrum"):
+                aperiodic_spectrum = self.analyzer.fooof_model.aperiodic_spectrum
+            elif hasattr(self.analyzer.fooof_model, "aperiodic_spectrum_"):
                 aperiodic_spectrum = self.analyzer.fooof_model.aperiodic_spectrum_
-            else:
+
+            if model_spectrum is None or aperiodic_spectrum is None:
+                logger.warning("Could not extract FOOOF model spectra")
                 return None
 
             # Original spectrum
@@ -2296,7 +2428,12 @@ class PsychedelicAnalyzer:
 
     def __init__(self) -> None:
         """Initialize psychedelic analyzer"""
-        self.openneuro_dataset = "ds003059"  # Carhart-Harris et al. 2020
+        if DATASET_CATALOG_AVAILABLE:
+            self.dataset = get_dataset_by_id("DS-07")
+            self.openneuro_dataset = "ds003059"  # Carhart-Harris et al. 2020
+        else:
+            self.dataset = None
+            self.openneuro_dataset = "ds003059"
         self.substances = ["psilocybin", "lsd", "ketamine"]
         self.time_points = ["baseline", "peak", "recovery"]
 
@@ -2462,36 +2599,58 @@ class PsychedelicAnalyzer:
             "interoceptive_change": psychedelic.interoceptive_precision,
         }
 
-    def get_openneuro_info(self) -> Dict[str, Any]:
-        """Get information about OpenNeuro ds003059 dataset.
+    def get_psychedelic_info(self) -> Dict[str, Any]:
+        """Get information about Carhart-Harris DS-07 dataset.
 
         Returns:
             Dataset metadata and access information
         """
-        return {
-            "dataset_id": self.openneuro_dataset,
-            "title": "Carhart-Harris et al. (2020) - Psychedelic Neuroimaging",
-            "url": f"https://openneuro.org/datasets/{self.openneuro_dataset}",
-            "modalities": ["fMRI", "MEG", "EEG"],
-            "substances": ["psilocybin", "LSD", "ketamine"],
-            "sample_sizes": {
-                "psilocybin_fmri": 15,
-                "lsd_meg_eeg": 20,
-                "treatment_resistant_depression": 35,
-            },
-            "key_measures": [
-                "Global alpha power reduction",
-                "Broadband spectral changes",
-                "Default mode network connectivity",
-                "Entropy measures",
-                "Precision landscape flattening",
-            ],
-            "references": [
-                "Carhart-Harris et al. (2012) PNAS 109(6): 2138-2143",
-                "Carhart-Harris et al. (2016) PNAS 113(17): 4853-4858",
-                "Carhart-Harris et al. (2019) Nature Neuroscience 22: 1582-1589",
-            ],
-        }
+        if self.dataset:
+            return {
+                "dataset_id": self.dataset.id,
+                "name": self.dataset.name,
+                "tier": self.dataset.tier.value,
+                "modality": self.dataset.modality,
+                "access_status": self.dataset.access_status.value,
+                "primary_url": self.dataset.primary_url,
+                "sample_size": self.dataset.sample_size,
+                "key_measures": self.dataset.key_measures,
+                "apgi_innovations": self.dataset.apgi_innovations,
+                "validation_protocols": self.dataset.validation_protocols,
+                "bids_compliant": self.dataset.bids_compliant,
+                "notes": self.dataset.notes,
+                "substances": ["psilocybin", "LSD", "ketamine"],
+                "references": [
+                    "Carhart-Harris et al. (2012) PNAS 109(6): 2138-2143",
+                    "Carhart-Harris et al. (2016) PNAS 113(17): 4853-4858",
+                    "Carhart-Harris et al. (2019) Nature Neuroscience 22: 1582-1589",
+                ],
+            }
+        else:
+            return {
+                "dataset_id": self.openneuro_dataset,
+                "title": "Carhart-Harris et al. (2020) - Psychedelic Neuroimaging",
+                "url": f"https://openneuro.org/datasets/{self.openneuro_dataset}",
+                "modalities": ["fMRI", "MEG", "EEG"],
+                "substances": ["psilocybin", "LSD", "ketamine"],
+                "sample_sizes": {
+                    "psilocybin_fmri": 15,
+                    "lsd_meg_eeg": 20,
+                    "ketamine_fmri": 19,
+                },
+                "key_measures": [
+                    "Global alpha power reduction",
+                    "Broadband spectral changes",
+                    "Default mode network connectivity",
+                    "Entropy measures",
+                    "Precision landscape flattening",
+                ],
+                "references": [
+                    "Carhart-Harris et al. (2012) PNAS 109(6): 2138-2143",
+                    "Carhart-Harris et al. (2016) PNAS 113(17): 4853-4858",
+                    "Carhart-Harris et al. (2019) Nature Neuroscience 22: 1582-1589",
+                ],
+            }
 
 
 class PsychedelicVisualizer:
@@ -4073,7 +4232,12 @@ class iEEGConsciousnessAnalyzer:
 
     def __init__(self) -> None:
         """Initialize iEEG consciousness analyzer"""
-        self.dataset_id = "ds009"
+        if DATASET_CATALOG_AVAILABLE:
+            self.dataset = get_dataset_by_id("DS-09")
+            self.dataset_id = "ds009"
+        else:
+            self.dataset = None
+            self.dataset_id = "ds009"
         self.n_patients = 38
         self.n_centers = 3
         self.stimulus_categories = ["face", "object", "letter", "scrambled"]
@@ -4102,7 +4266,7 @@ class iEEGConsciousnessAnalyzer:
                     "sustained": 0.8,
                     "ignition": 0.85,
                     "recurrence": 0.3,
-                    "gnw": 0.82,
+                    "gnw": 0.92,
                     "iit": 0.35,
                     "rt": 0.45,
                 },
@@ -4163,7 +4327,7 @@ class iEEGConsciousnessAnalyzer:
                     "ignition": 0.15,
                     "recurrence": 0.8,
                     "gnw": 0.18,
-                    "iit": 0.8,
+                    "iit": 0.65,
                     "rt": 0.0,
                 },
                 "unconscious": {
@@ -4172,7 +4336,7 @@ class iEEGConsciousnessAnalyzer:
                     "ignition": 0.1,
                     "recurrence": 0.85,
                     "gnw": 0.12,
-                    "iit": 0.85,
+                    "iit": 0.45,
                     "rt": 0.0,
                 },
             },
@@ -4188,7 +4352,13 @@ class iEEGConsciousnessAnalyzer:
         ignition = params["ignition"] * duration_factor
         recurrence = params["recurrence"] * (2.0 - duration_factor)
 
-        orientation_factor = 1.0 if stimulus_orientation == 0 else 0.85
+        # Orientation factor: consciousness increases with orientation (0° < 90° < 180°)
+        if stimulus_orientation == 0:
+            orientation_factor = 0.85
+        elif stimulus_orientation == 90:
+            orientation_factor = 1.0
+        else:  # 180°
+            orientation_factor = 1.15
 
         return iEEGConsciousnessState(
             patient_id=f"sub-{np.random.randint(1, 39):02d}",
@@ -4206,10 +4376,19 @@ class iEEGConsciousnessAnalyzer:
             electrode_region=np.random.choice(self.electrode_regions),
         )
 
-    def compare_gnw_vs_iit(self, stimulus_category: str = "face") -> Dict[str, float]:
+    def compare_gnw_vs_iit(
+        self,
+        stimulus_category: str = "face",
+        stimulus_duration: float = 1.0,
+        stimulus_orientation: int = 0,
+    ) -> Dict[str, float]:
         """Compare GNW vs. IIT predictions for a stimulus category."""
-        conscious_state = self.create_ieeg_state(stimulus_category, conscious=True)
-        unconscious_state = self.create_ieeg_state(stimulus_category, conscious=False)
+        conscious_state = self.create_ieeg_state(
+            stimulus_category, stimulus_duration, stimulus_orientation, conscious=True
+        )
+        unconscious_state = self.create_ieeg_state(
+            stimulus_category, stimulus_duration, stimulus_orientation, conscious=False
+        )
 
         return {
             "gnw_conscious_prediction": conscious_state.gnw_prediction,
@@ -4224,37 +4403,60 @@ class iEEGConsciousnessAnalyzer:
 
     def get_cogitate_info(self) -> Dict[str, Any]:
         """Get information about Cogitate Consortium DS-09 dataset."""
-        return {
-            "dataset_id": "ds009",
-            "consortium": "Cogitate Consortium",
-            "title": "Open multi-center intracranial electroencephalography dataset with task probing conscious visual perception",
-            "url": "https://www.nature.com/articles/s41597-025-04833-z",
-            "arc_url": "https://arc-cogitate.com",
-            "publication_year": 2025,
-            "n_patients": 38,
-            "n_centers": 3,
-            "modalities": ["iEEG", "eye tracking", "behavioral"],
-            "stimulus_categories": self.stimulus_categories,
-            "stimulus_durations": self.stimulus_durations,
-            "stimulus_orientations": self.stimulus_orientations,
-            "key_measures": [
-                "Broadband high-gamma (70-150 Hz)",
-                "Sustained vs. transient activity",
-                "Ignition vs. local recurrent dynamics",
-                "GNW vs. IIT predictions",
-                "Behavioral reports",
-                "Reaction times",
-            ],
-            "apgi_innovations": [
-                "I-20: Joint HEP × PCI",
-                "I-33: Cross-Species Gradient",
-                "Global ignition vs. local recurrence distinction",
-                "Sustained frontal ignition testing",
-            ],
-            "references": [
-                "Cogitate Consortium / Melloni L. et al. (2025). Open multi-center intracranial electroencephalography dataset with task probing conscious visual perception. Scientific Data.",
-            ],
-        }
+        if self.dataset:
+            return {
+                "dataset_id": "ds009",  # Normalize to lowercase for consistency
+                "title": self.dataset.name,
+                "name": self.dataset.name,
+                "tier": self.dataset.tier.value,
+                "modality": self.dataset.modality,
+                "modalities": [self.dataset.modality],
+                "access_status": self.dataset.access_status.value,
+                "primary_url": self.dataset.primary_url,
+                "url": self.dataset.primary_url,
+                "sample_size": self.dataset.sample_size,
+                "key_measures": self.dataset.key_measures,
+                "apgi_innovations": self.dataset.apgi_innovations,
+                "validation_protocols": self.dataset.validation_protocols,
+                "bids_compliant": self.dataset.bids_compliant,
+                "notes": self.dataset.notes,
+                "consortium": "Cogitate Consortium",
+                "arc_url": "https://arc-cogitate.com",
+                "n_patients": 38,
+                "n_centers": 3,
+                "stimulus_categories": self.stimulus_categories,
+                "stimulus_durations": self.stimulus_durations,
+                "stimulus_orientations": self.stimulus_orientations,
+                "electrode_regions": self.electrode_regions,
+                "references": [
+                    "Cogitate Consortium / Melloni L. et al. (2025). Open multi-center intracranial electroencephalography dataset with task probing conscious visual perception. Scientific Data.",
+                ],
+            }
+        else:
+            return {
+                "dataset_id": "ds009",
+                "consortium": "Cogitate Consortium",
+                "title": "Open multi-center intracranial electroencephalography dataset with task probing conscious visual perception",
+                "url": "https://www.nature.com/articles/s41597-025-04833-z",
+                "arc_url": "https://arc-cogitate.com",
+                "publication_year": 2025,
+                "n_patients": 38,
+                "n_centers": 3,
+                "modalities": ["iEEG", "eye tracking", "behavioral"],
+                "stimulus_categories": self.stimulus_categories,
+                "stimulus_durations": self.stimulus_durations,
+                "stimulus_orientations": self.stimulus_orientations,
+                "electrode_regions": self.electrode_regions,
+                "apgi_innovations": [
+                    "I-20: Joint HEP x PCI",
+                    "I-33: Cross-Species Gradient",
+                    "Global ignition vs. local recurrence distinction",
+                    "Sustained frontal ignition testing",
+                ],
+                "references": [
+                    "Cogitate Consortium / Melloni L. et al. (2025). Open multi-center intracranial electroencephalography dataset with task probing conscious visual perception. Scientific Data.",
+                ],
+            }
 
 
 class iEEGConsciousnessVisualizer:
@@ -4265,7 +4467,12 @@ class iEEGConsciousnessVisualizer:
         self.analyzer = analyzer
         self.renderer = EmbeddedVisualizationRenderer()
 
-    def plot_gnw_vs_iit_predictions(self, stimulus_category: str = "face") -> Optional[go.Figure]:
+    def plot_gnw_vs_iit_predictions(
+        self,
+        stimulus_category: str = "face",
+        stimulus_duration: float = 1.0,
+        stimulus_orientation: int = 0,
+    ) -> Optional[go.Figure]:
         """Visualize GNW vs. IIT predictions for conscious vs. unconscious perception."""
         if not PLOTLY_AVAILABLE:
             logger.warning("Plotly not available")
@@ -4327,7 +4534,12 @@ class iEEGConsciousnessVisualizer:
             logger.error(f"Error creating GNW vs. IIT plot: {e}")
             return None
 
-    def plot_ignition_vs_recurrence(self, stimulus_category: str = "face") -> Optional[go.Figure]:
+    def plot_ignition_vs_recurrence(
+        self,
+        stimulus_category: str = "face",
+        stimulus_duration: float = 1.0,
+        stimulus_orientation: int = 0,
+    ) -> Optional[go.Figure]:
         """Visualize ignition vs. local recurrence dynamics."""
         if not PLOTLY_AVAILABLE:
             logger.warning("Plotly not available")
@@ -4385,7 +4597,7 @@ class iEEGConsciousnessVisualizer:
             return None
 
     def plot_stimulus_duration_effects(
-        self, stimulus_category: str = "face"
+        self, stimulus_category: str = "face", stimulus_orientation: int = 0
     ) -> Optional[go.Figure]:
         """Visualize effects of stimulus duration on consciousness measures."""
         if not PLOTLY_AVAILABLE:
@@ -4490,7 +4702,12 @@ class iEEGConsciousnessVisualizer:
             logger.error(f"Error creating duration effects plot: {e}")
             return None
 
-    def plot_consciousness_discrimination(self) -> Optional[go.Figure]:
+    def plot_consciousness_discrimination(
+        self,
+        stimulus_category: str = "face",
+        stimulus_duration: float = 1.0,
+        stimulus_orientation: int = 0,
+    ) -> Optional[go.Figure]:
         """Plot consciousness discrimination across stimulus categories."""
         if not PLOTLY_AVAILABLE:
             logger.warning("Plotly not available")
@@ -4725,7 +4942,12 @@ class THINGSDataAnalyzer:
 
     def __init__(self) -> None:
         """Initialize THINGS-Data analyzer"""
-        self.dataset_id = "things-eeg2"  # Primary EEG dataset
+        if DATASET_CATALOG_AVAILABLE:
+            self.dataset = get_dataset_by_id("DS-15")
+            self.dataset_id = "things-eeg2"  # Primary EEG dataset
+        else:
+            self.dataset = None
+            self.dataset_id = "things-eeg2"
         self.n_subjects = 10
         self.n_concepts = 1854
         self.n_behavioral_judgments = 4_700_000
@@ -4924,49 +5146,71 @@ class THINGSDataAnalyzer:
         Returns:
             Dataset metadata and access information
         """
-        return {
-            "dataset_id": "ds015",
-            "title": "THINGS-Data: Multimodal EEG, MEG & fMRI Object Representations",
-            "citation": "Gifford et al. (2022). THINGS-data, a multimodal collection of large-scale datasets. eLife, 11, e82580.",
-            "primary_url": "https://doi.org/10.7554/eLife.82580",
-            "eeg_repository": "service.tib.eu/ldmservice/dataset/things-eeg2",
-            "modalities": self.modalities,
-            "n_subjects": self.n_subjects,
-            "n_concepts": self.n_concepts,
-            "n_behavioral_judgments": self.n_behavioral_judgments,
-            "eeg_temporal_resolution_ms": self.eeg_resolution_ms,
-            "rsvp_stimulus_duration_ms": self.rsvp_duration_ms,
-            "paradigm": self.paradigm,
-            "access_status": "FULLY PUBLIC",
-            "repositories": ["OSF", "Zenodo", "TIB"],
-            "format": "BIDS-formatted",
-            "key_measures": [
-                "EEG temporal dynamics (1 ms resolution)",
-                "fMRI spatial patterns (ventral stream)",
-                "MEG spatiotemporal dynamics",
-                "Representational similarity analysis (RSA)",
-                "Behavioral similarity judgments",
-                "Object recognition latency",
-            ],
-            "apgi_innovations": [
-                "I-15 (Classic Perceptual Paradigms)",
-                "I-04 (Reservoir attractor dynamics benchmarking)",
-                "Temporal dynamics of object recognition as ignition proxy",
-            ],
-            "strengths": [
-                "Extraordinarily large stimulus set (1,854 concepts)",
-                "Enables reservoir computing model benchmarking",
-                "Multimodal design allows spatial (fMRI) + temporal (EEG) validation",
-                "Fully public across multiple repositories",
-                "RSVP paradigm directly comparable to attentional blink (DS-01)",
-            ],
-            "limitations": [
-                "Suprathreshold stimuli only",
-                "Ignition threshold/bifurcation dynamics not accessible",
-                "No pharmacological or altered state conditions",
-                "No cardiac ECG for interoceptive precision weighting",
-            ],
-        }
+        if self.dataset:
+            return {
+                "dataset_id": self.dataset.id,
+                "name": self.dataset.name,
+                "tier": self.dataset.tier.value,
+                "modality": self.dataset.modality,
+                "access_status": self.dataset.access_status.value,
+                "primary_url": self.dataset.primary_url,
+                "sample_size": self.dataset.sample_size,
+                "key_measures": self.dataset.key_measures,
+                "apgi_innovations": self.dataset.apgi_innovations,
+                "validation_protocols": self.dataset.validation_protocols,
+                "bids_compliant": self.dataset.bids_compliant,
+                "notes": self.dataset.notes,
+                "eeg_repository": "service.tib.eu/ldmservice/dataset/things-eeg2",
+                "n_concepts": self.n_concepts,
+                "n_behavioral_judgments": self.n_behavioral_judgments,
+                "eeg_temporal_resolution_ms": self.eeg_resolution_ms,
+                "rsvp_duration_ms": self.rsvp_duration_ms,
+                "paradigm": self.paradigm,
+                "citation": "Gifford et al. (2022). THINGS-data, a multimodal collection of large-scale datasets. eLife, 11, e82580.",
+                "strengths": [
+                    "Extraordinarily large stimulus set (1,854 concepts)",
+                    "Multimodal design allows spatial + temporal validation",
+                    "Fully public across multiple repositories",
+                    "RSVP paradigm directly comparable to attentional blink (DS-01)",
+                ],
+                "limitations": [
+                    "Suprathreshold stimuli only - ignition threshold not accessible",
+                    "No pharmacological or altered state conditions",
+                    "No cardiac ECG for interoceptive precision weighting",
+                ],
+            }
+        else:
+            return {
+                "dataset_id": "ds015",
+                "title": "THINGS-Data: Multimodal EEG, MEG & fMRI Object Representations",
+                "citation": "Gifford et al. (2022). THINGS-data, a multimodal collection of large-scale datasets. eLife, 11, e82580.",
+                "primary_url": "https://doi.org/10.7554/eLife.82580",
+                "eeg_repository": "service.tib.eu/ldmservice/dataset/things-eeg2",
+                "modalities": self.modalities,
+                "n_subjects": self.n_subjects,
+                "n_concepts": self.n_concepts,
+                "n_behavioral_judgments": self.n_behavioral_judgments,
+                "eeg_temporal_resolution_ms": self.eeg_resolution_ms,
+                "rsvp_duration_ms": self.rsvp_duration_ms,
+                "paradigm": self.paradigm,
+                "apgi_innovations": [
+                    "I-15: Classic Perceptual Paradigms",
+                    "I-04: Reservoir Attractor Dynamics Benchmarking",
+                    "Temporal dynamics of object recognition as ignition proxy",
+                ],
+                "strengths": [
+                    "Extraordinarily large stimulus set (1,854 concepts)",
+                    "Multimodal design allows spatial + temporal validation",
+                    "Fully public across multiple repositories",
+                    "RSVP paradigm directly comparable to attentional blink (DS-01)",
+                ],
+                "limitations": [
+                    "Suprathreshold stimuli only",
+                    "Ignition threshold/bifurcation dynamics not accessible",
+                    "No pharmacological or altered state conditions",
+                    "No cardiac ECG for interoceptive precision weighting",
+                ],
+            }
 
 
 class THINGSVisualizer:
@@ -5464,6 +5708,24 @@ class APGIVisualizerGUI:
         self.notebook.add(self.ai_models_frame, text="Recommended AI Models")
         self._setup_ai_models_tab()
 
+    def _display_viz(self, fig: Any, display_panel: "EmbeddedDisplayPanel") -> None:
+        """Helper to display a visualization in a panel with proper fallback handling.
+
+        Args:
+            fig: Plotly Figure to display
+            display_panel: The EmbeddedDisplayPanel instance to use
+        """
+        if not fig:
+            return
+
+        if display_panel.display_method == "tkinterweb":
+            # Render to temporary HTML and load
+            filepath = self.visualizer.renderer.render_figure_to_html(fig)
+            display_panel.load_html_file(filepath)
+        else:
+            # Matplotlib fallback
+            display_panel.display_plotly_figure(fig)
+
     def _setup_psychological_states_tab(self) -> None:
         """Setup the Psychological States tab"""
         # Configure grid
@@ -5625,10 +5887,15 @@ class APGIVisualizerGUI:
         if TOOLTIP_AVAILABLE:
             ToolTip(viz_button, "Generate visualization of selected psychological state")
 
+        save_btn = ttk.Button(
+            self.control_frame, text="Save Parameters", command=self.save_parameters
+        )
+        save_btn.grid(row=20, column=0, sticky="we", pady=5)
+
         clear_button = ttk.Button(
             self.control_frame, text="Clear Display", command=self.clear_display
         )
-        clear_button.grid(row=20, column=0, sticky="we", pady=5)
+        clear_button.grid(row=21, column=0, sticky="we", pady=5)
         if TOOLTIP_AVAILABLE:
             ToolTip(clear_button, "Clear the visualization display")
 
@@ -5870,8 +6137,7 @@ class APGIVisualizerGUI:
                 fig = self.spectral_visualizer.plot_ei_balance_heatmap(PSYCHOLOGICAL_STATES)
 
             if fig:
-                filepath = self.spectral_visualizer.renderer.render_figure_to_html(fig)
-                self.spectral_display.load_html_file(filepath)
+                self._display_viz(fig, self.spectral_display)
                 self.status_var.set(f"✓ {viz_type} generated")
             else:
                 self.status_var.set("Error generating visualization")
@@ -6099,27 +6365,65 @@ class APGIVisualizerGUI:
 
     def _show_psychedelic_dataset_info(self) -> None:
         """Show OpenNeuro ds003059 dataset information"""
-        info = self.psychedelic_analyzer.get_openneuro_info()
+        info = self.psychedelic_analyzer.get_psychedelic_info()
 
-        info_text = (
-            f"Dataset: {info['title']}\n"
-            f"OpenNeuro ID: {info['dataset_id']}\n"
-            f"URL: {info['url']}\n\n"
-            f"Modalities: {', '.join(info['modalities'])}\n"
-            f"Substances: {', '.join(info['substances'])}\n\n"
-            f"Sample Sizes:\n"
-        )
+        # Handle both catalog-based and fallback formats
+        if "name" in info:
+            # Catalog-based format
+            info_text = (
+                f"Dataset: {info['name']}\n"
+                f"ID: {info['dataset_id']}\n"
+                f"Tier: {info['tier']}\n"
+                f"Modality: {info['modality']}\n"
+                f"Access: {info['access_status']}\n"
+                f"URL: {info['primary_url']}\n"
+                f"Sample Size: {info['sample_size']}\n"
+                f"BIDS Compliant: {info['bids_compliant']}\n\n"
+            )
 
-        for study, n in info["sample_sizes"].items():
-            info_text += f"  • {study}: N={n}\n"
+            info_text += "APGI Innovations:\n"
+            for innovation in info["apgi_innovations"]:
+                info_text += f"  • {innovation}\n"
 
-        info_text += "\nKey Measures:\n"
-        for measure in info["key_measures"]:
-            info_text += f"  • {measure}\n"
+            info_text += "\nKey Measures:\n"
+            for measure in info["key_measures"]:
+                info_text += f"  • {measure}\n"
 
-        info_text += "\nReferences:\n"
-        for ref in info["references"]:
-            info_text += f"  • {ref}\n"
+            info_text += "\nValidation Protocols:\n"
+            for protocol in info["validation_protocols"]:
+                info_text += f"  • {protocol}\n"
+
+            if "notes" in info:
+                info_text += f"\nNotes: {info['notes']}\n"
+
+            if "substances" in info:
+                info_text += f"\nSubstances: {', '.join(info['substances'])}\n"
+
+            if "references" in info:
+                info_text += "\nReferences:\n"
+                for ref in info["references"]:
+                    info_text += f"  • {ref}\n"
+        else:
+            # Fallback format
+            info_text = (
+                f"Dataset: {info['title']}\n"
+                f"OpenNeuro ID: {info['dataset_id']}\n"
+                f"URL: {info['url']}\n\n"
+                f"Modalities: {', '.join(info['modalities'])}\n"
+                f"Substances: {', '.join(info['substances'])}\n\n"
+                f"Sample Sizes:\n"
+            )
+
+            for study, n in info["sample_sizes"].items():
+                info_text += f"  • {study}: N={n}\n"
+
+            info_text += "\nKey Measures:\n"
+            for measure in info["key_measures"]:
+                info_text += f"  • {measure}\n"
+
+            info_text += "\nReferences:\n"
+            for ref in info["references"]:
+                info_text += f"  • {ref}\n"
 
         self._update_psychedelic_info(info_text)
 
@@ -6460,8 +6764,7 @@ class APGIVisualizerGUI:
                 fig = self.hcp_ep_visualizer.plot_treatment_response_prediction(n_samples=100)
 
             if fig:
-                filepath = self.hcp_ep_visualizer.renderer.render_figure_to_html(fig)
-                self.hcp_ep_display.load_html_file(filepath)
+                self._display_viz(fig, self.hcp_ep_display)
                 self.status_var.set(f"✓ {viz_type} generated")
 
                 # Update info with sample profile
@@ -6726,8 +7029,7 @@ class APGIVisualizerGUI:
                 fig = self.eeg_depression_visualizer.plot_apgi_depression_index(n_samples=100)
 
             if fig:
-                filepath = self.eeg_depression_visualizer.renderer.render_figure_to_html(fig)
-                self.eeg_depression_display.load_html_file(filepath)
+                self._display_viz(fig, self.eeg_depression_display)
                 self.status_var.set(f"✓ {viz_type} generated")
 
                 # Update info with sample profile
@@ -7006,8 +7308,7 @@ class APGIVisualizerGUI:
                 fig = self.ieeg_visualizer.plot_consciousness_discrimination()
 
             if fig:
-                filepath = self.ieeg_visualizer.renderer.render_figure_to_html(fig)
-                self.ieeg_display.load_html_file(filepath)
+                self._display_viz(fig, self.ieeg_display)
                 self.status_var.set(f"✓ {viz_type} generated")
             else:
                 self.status_var.set("Error generating visualization")
@@ -7072,27 +7373,36 @@ class APGIVisualizerGUI:
         )
         title_label.grid(row=0, column=0, columnspan=2, sticky="ew", pady=10)
 
-        # Control panel
-        control_frame = ttk.LabelFrame(self.things_frame, text="Analysis Controls", padding="10")
-        control_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        # Control panel (Left)
+        control_frame = ttk.LabelFrame(self.things_frame, text="Analysis Controls", padding="12")
+        control_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # Concept selection
-        ttk.Label(control_frame, text="Object Concept:").grid(row=0, column=0, sticky="w", padx=5)
+        ttk.Label(control_frame, text="Object Concept:", font=("Arial", 10, "bold")).grid(
+            row=0, column=0, sticky="w", pady=(5, 2)
+        )
         self.things_concept_var = tk.StringVar(value="apple")
-        concept_entry = ttk.Entry(control_frame, textvariable=self.things_concept_var, width=20)
-        concept_entry.grid(row=0, column=1, sticky="ew", padx=5)
+        concept_entry = ttk.Entry(control_frame, textvariable=self.things_concept_var, width=25)
+        concept_entry.grid(row=1, column=0, sticky="ew", pady=(0, 10))
 
         # Analysis type selection
-        ttk.Label(control_frame, text="Analysis Type:").grid(row=0, column=2, sticky="w", padx=5)
+        ttk.Label(control_frame, text="Analysis Type:", font=("Arial", 10, "bold")).grid(
+            row=2, column=0, sticky="w", pady=(5, 2)
+        )
         self.things_analysis_var = tk.StringVar(value="multimodal")
         analysis_combo = ttk.Combobox(
             control_frame,
             textvariable=self.things_analysis_var,
             values=["multimodal", "recognition_dynamics", "rsvp_comparison"],
             state="readonly",
-            width=20,
+            font=("Arial", 9),
         )
-        analysis_combo.grid(row=0, column=3, sticky="ew", padx=5)
+        analysis_combo.grid(row=3, column=0, sticky="ew", pady=(0, 10))
+
+        # Separator
+        ttk.Separator(control_frame, orient="horizontal").grid(
+            row=4, column=0, sticky="we", pady=10
+        )
 
         # Generate button
         generate_btn = ttk.Button(
@@ -7100,18 +7410,37 @@ class APGIVisualizerGUI:
             text="Generate Analysis",
             command=self._generate_things_analysis,
         )
-        generate_btn.grid(row=0, column=4, sticky="ew", padx=5)
+        generate_btn.grid(row=5, column=0, sticky="ew", pady=5)
 
-        control_frame.columnconfigure(1, weight=1)
-        control_frame.columnconfigure(3, weight=1)
+        # Clear button
+        clear_btn = ttk.Button(
+            control_frame, text="Clear Display", command=self._clear_things_display
+        )
+        clear_btn.grid(row=6, column=0, sticky="ew", pady=5)
 
-        # Info panel
+        control_frame.columnconfigure(0, weight=1)
+
+        # Visualization Panel (Right)
+        self.things_viz_frame = ttk.LabelFrame(
+            self.things_frame, text="THINGS Visualization", padding="5"
+        )
+        self.things_viz_frame.grid(row=0, column=1, sticky="nsew")
+        self.things_viz_frame.columnconfigure(0, weight=1)
+        self.things_viz_frame.rowconfigure(0, weight=1)
+
+        # Create embedded display for THINGS data
+        self.things_display = EmbeddedDisplayPanel(self.things_viz_frame)
+        self.things_display.pack(fill=tk.BOTH, expand=True)
+
+        # Info Panel (Bottom)
         info_frame = ttk.LabelFrame(self.things_frame, text="Dataset Information", padding="10")
-        info_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+        info_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
         info_frame.rowconfigure(0, weight=1)
         info_frame.columnconfigure(0, weight=1)
 
-        self.things_info_text = tk.Text(info_frame, height=15, width=80, wrap=tk.WORD)
+        self.things_info_text = tk.Text(
+            info_frame, height=4, width=80, wrap=tk.WORD, font=("Courier", 9)
+        )
         self.things_info_text.grid(row=0, column=0, sticky="nsew")
 
         scrollbar = ttk.Scrollbar(
@@ -7181,8 +7510,7 @@ class APGIVisualizerGUI:
                 fig = self.things_visualizer.plot_rsvp_paradigm_comparison()
 
             if fig:
-                html_file = self.things_visualizer.renderer.render_figure_to_html(fig)
-                self.embedded_display.load_html_file(html_file)
+                self._display_viz(fig, self.things_display)
                 self._update_things_info(
                     f"Analysis: {analysis_type.replace('_', ' ').title()}\n"
                     f"Concept: {concept.title()}\n\n"
@@ -7194,6 +7522,11 @@ class APGIVisualizerGUI:
         except Exception as e:
             logger.error(f"Error generating THINGS analysis: {e}")
             messagebox.showerror("Error", f"Failed to generate analysis: {str(e)}")
+
+    def _clear_things_display(self) -> None:
+        """Clear the THINGS-Data visualization display"""
+        self.things_display.clear()
+        self._update_things_info("Display cleared")
 
     def _update_things_info(self, text: str) -> None:
         """Update the THINGS-Data info text area"""
@@ -7320,7 +7653,7 @@ class APGIVisualizerGUI:
 
         self.status_var.set(f"✓ Found {len(models)} model recommendations for state")
 
-    def _on_model_select(self, event: tk.Event) -> None:
+    def _on_model_select(self, event: tk.Event[Any]) -> None:
         """Show details for the selected model"""
         selected = self.model_tree.selection()
         if not selected:
@@ -7381,7 +7714,7 @@ class APGIVisualizerGUI:
             self._update_genetic_info("Please load genetic data first!")
             return
 
-        viz_type = self.genetic_viz_type.get()  # type: ignore[unreachable]
+        viz_type = self.genetic_viz_type.get()
         self.genetic_status_var.set(f"Generating {viz_type}...")
         self.genetic_frame.update()
 
@@ -7399,7 +7732,7 @@ class APGIVisualizerGUI:
                         p_col=p_col,
                         chr_col=chr_col,
                         bp_col=bp_col,
-                        snp_col=snp_col,
+                        snp_col=snp_col or "snp",
                         threshold=float(self.p_threshold_var.get()),
                     )
                 else:
@@ -7420,8 +7753,7 @@ class APGIVisualizerGUI:
                 return
 
             if fig:
-                filepath = self.genetic_visualizer.renderer.render_figure_to_html(fig)
-                self.genetic_display.load_html_file(filepath)
+                self._display_viz(fig, self.genetic_display)
                 self.genetic_status_var.set(f"✓ {viz_type} generated")
         except Exception as e:
             self.genetic_status_var.set("✗ Error")
@@ -7657,20 +7989,8 @@ class APGIVisualizerGUI:
             if fig:
                 self.current_visualization = fig
 
-                # Render to HTML for tkinterweb
-                if self.embedded_display.display_method == "tkinterweb":
-                    self.status_var.set("Rendering HTML...")
-                    self.root.update()
-                    html_file = self.visualizer.renderer.render_figure_to_html(
-                        fig, "current_viz.html"
-                    )
-                    self.current_html_file = html_file
-                    self.embedded_display.load_html_file(html_file)
-                else:
-                    # Pass the actual figure to matplotlib fallback
-                    self.status_var.set("Converting to matplotlib...")
-                    self.root.update()
-                    self.embedded_display.display_plotly_figure(fig)
+                # Display visualization using helper
+                self._display_viz(fig, self.embedded_display)
 
                 cache_status = " (cached)" if from_cache else " (new)"
                 self.status_var.set(f"✓ Generated {viz_type}{cache_status}")
@@ -7872,7 +8192,7 @@ class APGIVisualizerGUI:
             self.root.update()
 
             # Import simulation components with enhanced error handling
-            sim_module_path = "APGI-Equations.py"
+            sim_module_path = "APGI_Equations.py"
             if not os.path.exists(sim_module_path):
                 raise ImportError(f"Simulation module not found: {sim_module_path}")
 
@@ -7953,7 +8273,7 @@ class APGIVisualizerGUI:
             messagebox.showerror(
                 "Import Error",
                 f"Required simulation module not found: {str(e)}\n"
-                "Please ensure APGI-Equations.py is available.",
+                "Please ensure APGI_Equations.py is available.",
             )
             self.status_var.set("Error: Missing simulation module")
         except Exception as e:
@@ -8050,6 +8370,41 @@ class APGIVisualizerGUI:
 
         except Exception as e:
             self.update_info(f"Visualization error: {str(e)}")
+
+    def save_parameters(self) -> None:
+        """Save current parameters to a JSON file."""
+        import json
+        from tkinter import filedialog
+        from datetime import datetime
+
+        params = {
+            "Pi_e": self.pi_e_var.get(),  # type: ignore[attr-defined]
+            "Pi_i_eff": self.pi_i_var.get(),  # type: ignore[attr-defined]
+            "M_ca": self.m_ca_var.get(),  # type: ignore[attr-defined]
+            "theta_t": self.theta_t_var.get(),  # type: ignore[attr-defined]
+            "tau_S": self.tau_S_var.get(),
+            "tau_theta": self.tau_theta_var.get(),
+            "theta_0": self.theta_0_var.get(),
+            "alpha": self.alpha_var.get(),
+            "state_name": self.state_var.get(),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            title="Save APGI Parameters",
+        )
+
+        if file_path:
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(params, f, indent=4)
+                self.status_var.set(f"✓ Parameters saved to {os.path.basename(file_path)}")
+                messagebox.showinfo("Success", f"Parameters saved successfully to {file_path}")
+            except Exception as e:
+                logger.error(f"Error saving parameters: {e}")
+                messagebox.showerror("Error", f"Failed to save parameters: {e}")
 
     def load_configuration(self) -> bool:
         """Load configuration from file with fallback to defaults.
@@ -8439,15 +8794,29 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
         self._configure_polar_axes(ax, fig)
 
-    def _prepare_polar_data(self, trace: Any) -> Tuple[List[Any], List[Any]]:
-        """Prepare and clean polar plot data from trace"""
-        theta_values = list(trace.theta)
-        r_values = list(trace.r)
+    def _prepare_polar_data(self, trace: Any) -> Tuple[List[float], List[float]]:
+        """Prepare and clean polar plot data from trace, converting strings to angles if needed"""
+        theta_raw = list(trace.theta)
+        r_values = [float(v) for v in trace.r]
 
-        # Remove duplicate closing point if present
-        if len(theta_values) > 1 and theta_values[0] == theta_values[-1]:
-            theta_values = theta_values[:-1]
-            r_values = r_values[:-1]
+        # Convert strings to angles (equally spaced)
+        if all(isinstance(v, str) for v in theta_raw):
+            # If the last point is a duplicate of the first (closed loop in Plotly)
+            # we need to handle it before calculating spacing
+            is_closed = len(theta_raw) > 1 and theta_raw[0] == theta_raw[-1]
+
+            unique_thetas = theta_raw[:-1] if is_closed else theta_raw
+            n = len(unique_thetas)
+            angles = [i * (2 * np.pi / n) for i in range(n)]
+
+            if is_closed:
+                angles.append(angles[0])
+            theta_values = angles
+        else:
+            # Assume numeric and convert to radians
+            theta_values = [
+                float(v) * (np.pi / 180) if float(v) > 2 * np.pi else float(v) for v in theta_raw
+            ]
 
         return theta_values, r_values
 
@@ -8465,14 +8834,28 @@ class EmbeddedDisplayPanel(ttk.Frame):
 
     def _configure_polar_axes(self, ax: Any, fig: Any) -> None:
         """Configure polar axes with grid, title, and legend"""
-        ax.set_thetagrids(range(0, 360, 45))
+        # Try to get labels from first trace
+        labels = []
+        if fig.data and hasattr(fig.data[0], "theta"):
+            labels = list(fig.data[0].theta)
+            # Remove closing duplicate for labels
+            if len(labels) > 1 and labels[0] == labels[-1]:
+                labels = labels[:-1]
+
+        if labels and all(isinstance(v, str) for v in labels):
+            n = len(labels)
+            angles_deg = [i * (360 / n) for i in range(n)]
+            ax.set_thetagrids(angles_deg, labels)
+        else:
+            ax.set_thetagrids(range(0, 360, 45))
+
         ax.set_title(
-            f"{fig.layout.title.text if hasattr(fig.layout, 'title') else 'APGI Radar Chart'}"
+            f"{fig.layout.title.text if hasattr(fig.layout, 'title') and fig.layout.title.text else 'APGI Radar Chart'}"
         )
 
         # Add legend if multiple traces
         if len(fig.data) > 1:
-            ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0))
+            ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
 
     def _render_standard_plot(self, fig: Any, mpl_fig: Any) -> None:
         """Render standard 2D/3D plots from Plotly to matplotlib"""

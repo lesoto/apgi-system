@@ -2880,6 +2880,7 @@ class CompleteAPGIVisualizer:
     def _plot_measurements(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot measurement proxies"""
         time = history["time"]
+        ax_twin = None
 
         if "HEP_amplitude" in history:
             ax.plot(time, history["HEP_amplitude"], "g-", label="HEP Amplitude", alpha=0.7)
@@ -2899,8 +2900,9 @@ class CompleteAPGIVisualizer:
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("HEP Amplitude (μV)")
         ax.set_title("Measurement Proxies (HEP & P3b)", fontweight="bold")
-        ax.legend(loc="upper left")
-        if "ax_twin" in locals():
+        if "HEP_amplitude" in history:
+            ax.legend(loc="upper left")
+        if ax_twin is not None:
             ax_twin.legend(loc="upper right")
         ax.grid(True, alpha=0.3)
 
@@ -2912,8 +2914,10 @@ class CompleteAPGIVisualizer:
         colors = ["blue", "red", "green", "purple"]
         labels = ["ACh", "NE", "DA", "5-HT"]
 
+        has_data = False
         for i, (neuromod, color, label) in enumerate(zip(neuromods, colors, labels)):
             if neuromod in history:
+                has_data = True
                 ax.plot(
                     time,
                     history[neuromod],
@@ -2926,11 +2930,13 @@ class CompleteAPGIVisualizer:
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Neuromodulator Level")
         ax.set_title("Neuromodulator Dynamics", fontweight="bold")
-        ax.legend()
+        if has_data:
+            ax.legend()
         ax.grid(True, alpha=0.3)
 
     def _plot_domain_analysis(self, ax: plt.Axes, history: Dict[str, np.ndarray]) -> None:
         """Plot domain-specific analysis"""
+        has_data = False
         if "content_domain" in history:
             # Convert domain to numerical for plotting
             domains = history["content_domain"]
@@ -2955,21 +2961,24 @@ class CompleteAPGIVisualizer:
                 alpha=0.2,
                 label="Neutral Content",
             )
+            has_data = True
 
             # Plot surprise
-            ax.plot(
-                time,
-                history["S"] / max(history["S"]),
-                "k-",
-                linewidth=1,
-                alpha=0.7,
-                label="Normalized Surprise",
-            )
+            if "S" in history:
+                ax.plot(
+                    time,
+                    history["S"] / max(history["S"]),
+                    "k-",
+                    linewidth=1,
+                    alpha=0.7,
+                    label="Normalized Surprise",
+                )
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Domain / Normalized S")
         ax.set_title("Domain-Specific Analysis", fontweight="bold")
-        ax.legend()
+        if has_data:
+            ax.legend()
         ax.grid(True, alpha=0.3)
         ax.set_ylim(0, 1.1)
 

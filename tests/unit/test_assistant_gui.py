@@ -37,7 +37,7 @@ APGIGUI: Any = None  # type: ignore[misc]
 
 try:
     # Load from hyphenated filename using importlib
-    assistant_gui_path = Path(__file__).parent.parent.parent / "Assistant-GUI.py"
+    assistant_gui_path = Path(__file__).parent.parent.parent / "Assistant_GUI.py"
     if assistant_gui_path.exists():
         Assistant_GUI = load_module_from_file("Assistant_GUI", assistant_gui_path)
         APGIGUI = Assistant_GUI.APGIGUI
@@ -55,7 +55,7 @@ HAS_ASSISTANT = False
 APGIAssistant: Any = None  # type: ignore[misc]
 
 try:
-    ai_assistant_path = Path(__file__).parent.parent.parent / "AI-Assistant.py"
+    ai_assistant_path = Path(__file__).parent.parent.parent / "AI_Assistant.py"
     if ai_assistant_path.exists():
         AI_Assistant = load_module_from_file("AI_Assistant", ai_assistant_path)
         APGIAssistant = AI_Assistant.APGIAssistant

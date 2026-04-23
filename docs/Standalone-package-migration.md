@@ -15,7 +15,7 @@ pip install apgi-simulation
 - **Core Package**: `apgi_system/` - Allostatic Precision-Gated Ignition Framework
 - **GUI Package**: `apgi_gui/` - GUI components (imports from root-level APGI-GUI.py)
 - **API Package**: `api/` - API components
-- **Standalone Scripts**: Root-level .py files (APGI-GUI.py, APGI-Simulation-GUI.py, etc.)
+- **Standalone Scripts**: Root-level .py files (APGI_GUI.py, APGI_Simulation_GUI.py, etc.)
 - **Tests**: `tests/` directory with unit, integration, property tests
 - **Documentation**: `docs/` directory
 
@@ -36,8 +36,8 @@ pip install apgi-simulation
 
 ### Phase 1: Package Structure Refactoring ✅
 
-- **Consolidate GUI Module**: Done. Moved `APGI-GUI.py` to `apgi_gui/main.py`.
-- **Refactor apgi_gui/__init__.py**: Done. Updated to use standard imports.
+- **Consolidate GUI Module**: Done. Moved `APGI_GUI.py` to `apgi_gui/main.py`.
+- **Refactor apgi\_gui/\_\_init\_\_.py**: Done. Updated to use standard imports.
 - **Internal Imports**: Finalized relative imports and resource management.
 - **Resource Consolidation**: Moved icons and configs to `apgi_gui/resources` and `apgi_simulation/resources`.
 
@@ -69,13 +69,13 @@ pip install apgi-simulation
 
 **Actions**:
 
-- Move GUI implementation from `APGI-GUI.py` into `apgi_gui/main.py`
+- Move GUI implementation from `APGI_GUI.py` into `apgi_gui/main.py`
 - Refactor `apgi_gui/__init__.py` to use standard imports
 - Update all internal imports to use relative imports
 
 **Files to Create/Modify**:
 
-- `apgi_gui/main.py` (new - extract from APGI-GUI.py)
+- `apgi_gui/main.py` (new - extract from APGI_GUI.py)
 - `apgi_gui/__init__.py` (refactor)
 - `apgi_gui/components/` (ensure all components included)
 
@@ -625,7 +625,7 @@ apgi-gui
 
 ### Phase 1: Structure
 
-- [ ] Extract GUI from APGI-GUI.py to apgi_gui/main.py
+- [ ] Extract GUI from APGI_GUI.py to apgi_gui/main.py
 - [ ] Refactor `apgi_gui/__init__.py` with standard imports + dual-mode compatibility
 - [ ] Update pyproject.toml packages list (apgi_system, apgi_gui, api)
 - [ ] Add complete PyPI metadata (classifiers, keywords, URLs)
@@ -761,7 +761,7 @@ The package refactoring must not break existing workflows:
 
 ### 1. Keep Root-Level Scripts Functional
 
-- `APGI-GUI.py` remains importable for existing users
+- `APGI_GUI.py` remains importable for existing users
 - Add deprecation warnings but maintain functionality
 - Gradual migration path over 2-3 minor versions
 
@@ -787,7 +787,7 @@ except ImportError:
 ```bash
 git clone https://github.com/lesoto/apgi-simulation.git
 cd apgi-simulation
-python APGI-GUI.py
+python APGI_GUI.py
 ```
 
 **After (pip installation)**:

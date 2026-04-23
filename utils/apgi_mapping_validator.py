@@ -5,19 +5,19 @@ from typing import Dict, List
 
 class APGIMappingValidator:
     """
-    Validates the mapping between mathematical equations in APGI-Equations.py
+    Validates the mapping between mathematical equations in APGI_Equations.py
     and their corresponding unit tests.
     """
 
     def __init__(self, root_dir: str):
         self.root_dir = Path(root_dir)
-        self.equations_file = self.root_dir / "APGI-Equations.py"
+        self.equations_file = self.root_dir / "APGI_Equations.py"
         self.tests_dir = self.root_dir / "tests" / "unit"
         self.equation_pattern = re.compile(r"From Section ([\d\.]+)")
         self.test_ref_pattern = re.compile(r"APGI Eq\. ([\d\.]+)")
 
     def extract_equations(self) -> Dict[str, str]:
-        """Extracts documented equation sections from APGI-Equations.py."""
+        """Extracts documented equation sections from APGI_Equations.py."""
         equations: Dict[str, str] = {}
         if not self.equations_file.exists():
             return equations
@@ -57,7 +57,7 @@ class APGIMappingValidator:
 
         print("APGI Code-to-Math Mapping Report")
         print("===============================")
-        print(f"Found {len(equations)} documented equation sections in APGI-Equations.py")
+        print(f"Found {len(equations)} documented equation sections in APGI_Equations.py")
         print(f"Found {len(test_mappings)} equation references in unit tests\n")
 
         covered = []

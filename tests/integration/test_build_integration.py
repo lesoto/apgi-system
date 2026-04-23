@@ -64,7 +64,7 @@ class TestWindowsBuildIntegration:
         Validates: Requirements 9.1
         """
         # Check that required files exist (cross-platform entry points)
-        entry_points = ["apgi_gui.py", "APGI-GUI.py", "Assistant-GUI.py"]
+        entry_points = ["apgi_gui.py", "APGI_GUI.py", "Assistant_GUI.py"]
         found_entry = any((project_root / ep).exists() for ep in entry_points)
         assert found_entry, f"No entry point found (tried: {entry_points})"
 
@@ -243,8 +243,8 @@ class TestMacOSBuildIntegration:
         """
         # Check that required files exist
         assert (
-            project_root / "Assistant-GUI.py"
-        ).exists(), "Entry point Assistant-GUI.py not found"
+            project_root / "Assistant_GUI.py"
+        ).exists(), "Entry point Assistant_GUI.py not found"
         assert (project_root / "requirements.txt").exists(), "requirements.txt not found"
 
         # Check Python version

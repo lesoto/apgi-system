@@ -235,7 +235,7 @@ class AttentionalBlinkTask:
                             if 0 <= time_since_t1 <= 400:  # 400ms window
                                 t1_detected = True
                                 t1_ignition_time = ignition_time
-                                t1_signal_strength = state["ignition"]["total_signal"]
+                                t1_signal_strength = float(state["ignition"]["total_signal"])
 
                     if seen_t2 and not t2_detected:
                         if t2_presentation_time is not None:
@@ -243,7 +243,7 @@ class AttentionalBlinkTask:
                             if 0 <= time_since_t2 <= 400:  # 400ms window
                                 t2_detected = True
                                 t2_ignition_time = ignition_time
-                                t2_signal_strength = state["ignition"]["total_signal"]
+                                t2_signal_strength = float(state["ignition"]["total_signal"])
 
         # Determine if blink occurred: T1 detected but T2 missed
         blink_occurred = t1_detected and not t2_detected
@@ -283,6 +283,11 @@ class AttentionalBlinkTask:
         for trial_idx, trial in enumerate(self.trials):
             if trial_idx % 10 == 0:
                 print(f"Progress: {trial_idx}/{len(self.trials)} trials...")
+
+            self.run_trial(apgi_simulation, trial)
+
+        print(f"Progress: {len(self.trials)}/{len(self.trials)} trials (100.0%)")
+        print("\nAll trials completed. Analyzing results...\n")
 
         # Analyze results
         return self.analyze_results()
@@ -567,7 +572,9 @@ class AttentionalBlinkTask:
                     if 0 <= time_since_t1 <= 400:  # 400ms window
                         state["t1_detected"] = True
                         state["t1_ignition_time"] = ignition_time
-                        state["t1_signal_strength"] = system_state["ignition"]["total_signal"]
+                        state["t1_signal_strength"] = float(
+                            system_state["ignition"]["total_signal"]
+                        )
 
             if state["seen_t2"] and not state["t2_detected"]:
                 if state["t2_presentation_time"] is not None:
@@ -575,7 +582,9 @@ class AttentionalBlinkTask:
                     if 0 <= time_since_t2 <= 400:  # 400ms window
                         state["t2_detected"] = True
                         state["t2_ignition_time"] = ignition_time
-                        state["t2_signal_strength"] = system_state["ignition"]["total_signal"]
+                        state["t2_signal_strength"] = float(
+                            system_state["ignition"]["total_signal"]
+                        )
 
         # Advance step counter
         state["step_in_position"] += 1

@@ -140,7 +140,7 @@ class TestDependencyCompleteness:
         We expect to find at least: numpy, scipy, matplotlib, tkinter, yaml
         """
         project_root = get_project_root()
-        entry_point = project_root / "APGI-GUI.py"
+        entry_point = project_root / "APGI_GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")
@@ -163,7 +163,7 @@ class TestDependencyCompleteness:
         Dependency analysis should return a dict with set values.
         """
         project_root = get_project_root()
-        entry_point = project_root / "APGI-GUI.py"
+        entry_point = project_root / "APGI_GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")
@@ -185,7 +185,7 @@ class TestDependencyCompleteness:
         Standard library modules don't need to be bundled.
         """
         project_root = get_project_root()
-        entry_point = project_root / "APGI-GUI.py"
+        entry_point = project_root / "APGI_GUI.py"
 
         if not entry_point.exists():
             pytest.skip("Entry point not found")

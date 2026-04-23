@@ -1830,7 +1830,9 @@ class APGIGui:
             self.status_labels["Metabolic Reserves"].config(text=f"{reserves:.1f}%")
 
             load = summary["allostatic_load"] * 100
-            self.status_labels["Allostatic Load"].config(text=f"{load:.1f}%")
+            # Convert array to scalar for display
+            load_scalar = float(np.mean(load)) if hasattr(load, "__len__") else float(load)
+            self.status_labels["Allostatic Load"].config(text=f"{load_scalar:.1f}%")
 
         except Exception as e:
             self._log_event("Error updating status labels")
@@ -2049,6 +2051,17 @@ class APGIGui:
         fe = data_copies["free_energy"]
         prec = data_copies["extero_precision"]
         load = data_copies["allostatic_load"]
+
+        # Flatten arrays to ensure 1D homogeneous shapes for 3D scatter
+        fe = np.asarray(fe).flatten()
+        prec = np.asarray(prec).flatten()
+        load = np.asarray(load).flatten()
+
+        # Ensure all arrays have the same length
+        min_len = min(len(fe), len(prec), len(load))
+        fe = fe[:min_len]
+        prec = prec[:min_len]
+        load = load[:min_len]
 
         # Color by time
 

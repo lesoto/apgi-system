@@ -143,7 +143,7 @@ class APGIGui:
 
         # Initialize custom input attributes
         self.custom_input_steps_remaining = 0
-        self.custom_input_params = None
+        self.custom_input_params: Dict[str, object] | None = None
 
         # Initialize view variables as tk.BooleanVar with master
         # Moved to _convert_to_tkinter_variables for proper timing
@@ -688,7 +688,7 @@ class APGIGui:
             label="Interoception",
             command=self._toggle_interoception,
         )
-        view_menu.add_checkbutton(  # type: ignore[func-returns-value]
+        view_menu.add_checkbutton(
             label="System Metrics",
             command=self._toggle_system_metrics,
         )
@@ -821,7 +821,7 @@ class APGIGui:
         """Clean up and close all toplevel windows."""
         try:
             for child in self.root.winfo_children():
-                if isinstance(child, tk.Toplevel):  # type: ignore
+                if isinstance(child, tk.Toplevel):
                     try:
                         child.destroy()
                     except Exception as e:
@@ -1519,7 +1519,7 @@ class APGIGui:
         if self.custom_input_steps_remaining > 0:
             params = self.custom_input_params
             if params:
-                pattern = params["pattern"]  # type: ignore[unreachable]
+                pattern = params["pattern"]
                 intensity = params["intensity"]
                 noise_level = params["noise"]
 
@@ -1528,13 +1528,13 @@ class APGIGui:
                 elif pattern == "pulse":
                     # Create a pulse in the middle of the step
                     base = np.zeros(256)
-                    base[intensity > 0.5] = intensity  # Simplified pulse
+                    base[intensity > 0.5] = intensity  # type: ignore[operator, call-overload]
                 elif pattern == "sine":
                     base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(256)
                 else:  # random
-                    base = np.random.randn(256) * intensity
+                    base = np.random.randn(256) * intensity  # type: ignore[operator]
 
-                noise = np.random.randn(256) * noise_level
+                noise = np.random.randn(256) * noise_level  # type: ignore[operator]
                 input_signal = base + noise
 
                 self.custom_input_steps_remaining -= 1
@@ -1913,7 +1913,7 @@ class APGIGui:
 
         self.neural_axes["ignition"].set_xlim(time_data[0], time_data[-1])
 
-        self.neural_canvas.draw_idle()
+        self.neural_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     def _update_intero_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update interoception plots."""
@@ -1932,7 +1932,7 @@ class APGIGui:
             ax.relim()
             ax.autoscale_view(scalex=False, scaley=True)
 
-        self.intero_canvas.draw_idle()
+        self.intero_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     def _update_metrics_plots(self, time_data: Any, data_copies: Dict[str, Any]) -> None:
         """Update system metrics plots."""
@@ -2069,7 +2069,7 @@ class APGIGui:
         self.state_ax.set_ylim(prec_min, prec_max)
         self.state_ax.set_zlim(0, 1)
 
-        self.state_canvas.draw_idle()
+        self.state_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     # Menu Command Methods
 
@@ -2232,7 +2232,7 @@ class APGIGui:
             value="pdf",
         ).pack(anchor=tk.W, pady=5)
 
-        def proceed_with_export():
+        def proceed_with_export() -> None:
             dialog.destroy()
             self._do_export_plot(export_var.get())
 
@@ -2386,11 +2386,11 @@ class APGIGui:
         tab_index = 0
         if visible:
             # Show tab
-            if self.tab_frames[tab_index] not in self.notebook.tabs():
+            if self.tab_frames[tab_index] not in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
         else:
             # Hide tab
-            if self.tab_frames[tab_index] in self.notebook.tabs():
+            if self.tab_frames[tab_index] in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"Neural activity panel {'shown' if visible else 'hidden'}")
 
@@ -2400,11 +2400,11 @@ class APGIGui:
         tab_index = 1
         if visible:
             # Show tab
-            if self.tab_frames[tab_index] not in self.notebook.tabs():
+            if self.tab_frames[tab_index] not in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
         else:
             # Hide tab
-            if self.tab_frames[tab_index] in self.notebook.tabs():
+            if self.tab_frames[tab_index] in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"Interoception panel {'shown' if visible else 'hidden'}")
 
@@ -2414,11 +2414,11 @@ class APGIGui:
         tab_index = 2
         if visible:
             # Show tab
-            if self.tab_frames[tab_index] not in self.notebook.tabs():
+            if self.tab_frames[tab_index] not in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.add(self.tab_frames[tab_index], text=self.tab_texts[tab_index])
         else:
             # Hide tab
-            if self.tab_frames[tab_index] in self.notebook.tabs():
+            if self.tab_frames[tab_index] in self.notebook.tabs():  # type: ignore[no-untyped-call]
                 self.notebook.hide(self.tab_frames[tab_index])
         self._log_event(f"System metrics panel {'shown' if visible else 'hidden'}")
 
@@ -2491,7 +2491,7 @@ class APGIGui:
         """Clean up all toplevel windows to prevent Tkinter warnings."""
         try:
             for widget in self.root.winfo_children():
-                if isinstance(widget, tk.Toplevel):  # type: ignore
+                if isinstance(widget, tk.Toplevel):
                     try:
                         widget.destroy()
                     except Exception as e:
@@ -2578,7 +2578,7 @@ class APGIGui:
             else:
                 messagebox.showwarning("Warning", "No active parameter system found.")
 
-        def reset_to_defaults():
+        def reset_to_defaults() -> None:
             """Reset all parameters to their default values."""
             for i, (label, key, min_val, max_val, default) in enumerate(parameters):
                 param_vars[key].set(default)
@@ -2651,7 +2651,7 @@ class APGIGui:
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=20)
 
-        def apply_precision():
+        def apply_precision() -> None:
             try:
                 self.param_vars["extero_precision"].set(extero_var.get())
                 self.param_vars["intero_precision"].set(intero_var.get())
@@ -2714,7 +2714,7 @@ class APGIGui:
         button_frame = ttk.Frame(frame)
         button_frame.pack(pady=20)
 
-        def apply_threshold():
+        def apply_threshold() -> None:
             try:
                 self.param_vars["baseline_threshold"].set(threshold_var.get())
                 self._apply_parameters()
@@ -2779,9 +2779,9 @@ class APGIGui:
         run_button = ttk.Button(dialog, text="Run Task", state=tk.DISABLED)
         run_button.pack(pady=5)
 
-        def on_selection_change(event):
+        def on_selection_change(event: Any) -> None:
             """Enable Run Task button when a task is selected."""
-            if listbox.curselection():
+            if listbox.curselection():  # type: ignore[no-untyped-call]
                 run_button.config(state=tk.NORMAL)
             else:
                 run_button.config(state=tk.DISABLED)
@@ -2789,8 +2789,8 @@ class APGIGui:
         # Bind selection change event
         listbox.bind("<<ListboxSelect>>", on_selection_change)
 
-        def run_selected():
-            selection = listbox.curselection()
+        def run_selected() -> None:
+            selection = listbox.curselection()  # type: ignore[no-untyped-call]
             if selection:
                 task_name = tasks[selection[0]]
 
@@ -2884,14 +2884,14 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(
                         0,
-                        lambda p=progress, i=trial_idx, t=total_trials: (
-                            progress_var.set(p),  # type: ignore[func-returns-value, misc]
+                        lambda p=progress, i=trial_idx, t=total_trials: (  # type: ignore[misc]
+                            progress_var.set(p),  # type: ignore[func-returns-value]
                             (
                                 status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
-                        ),  # type: ignore[misc]
+                        ),
                     )
 
                     # Run trial with system lock
@@ -2903,7 +2903,7 @@ class APGIGui:
                         msg = f"Trial {trial_idx}: Lag {result.lag}, T1: {result.t1_detected}, T2: {result.t2_detected}\n"
                         self.root.after(
                             0,
-                            lambda m=msg, rt=results_text: (
+                            lambda m=msg, rt=results_text: (  # type: ignore[misc]
                                 rt.insert(tk.END, m) if rt.winfo_exists() else None
                             ),
                         )
@@ -2912,14 +2912,12 @@ class APGIGui:
                         )
 
                 # Task complete
-                self.root.after(
-                    0, lambda pv=progress_var: pv.set(100)  # type: ignore[func-returns-value, misc]
-                )
+                self.root.after(0, lambda pv=progress_var: pv.set(100))  # type: ignore[misc]
                 self.root.after(
                     0,
-                    lambda sl=status_label: (
+                    lambda sl=status_label: (  # type: ignore[misc]
                         sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
 
                 # Analyze results
@@ -2940,9 +2938,9 @@ class APGIGui:
 
                 self.root.after(
                     0,
-                    lambda s=summary, rt=results_text: (
+                    lambda s=summary, rt=results_text: (  # type: ignore[misc]
                         rt.insert(tk.END, s) if rt.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
                 self.root.after(
                     0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None  # type: ignore[misc]
@@ -2960,7 +2958,7 @@ class APGIGui:
                 )
 
                 # Add close button
-                def close_and_show_results():
+                def close_and_show_results() -> None:
                     progress_dialog.destroy()
                     task.print_results(analysis)
                     messagebox.showinfo(
@@ -3051,7 +3049,7 @@ class APGIGui:
                     self.root.after(
                         0,
                         lambda p=progress, i=trial_idx, t=total_trials: (  # type: ignore[misc]
-                            progress_var.set(p),
+                            progress_var.set(p),  # type: ignore[func-returns-value]
                             (
                                 status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
@@ -3070,7 +3068,7 @@ class APGIGui:
                         msg = f"Trial {trial_idx}: {result.change_type.value}, Detected: {detected_str}\n"
                         self.root.after(
                             0,
-                            lambda m=msg, rt=results_text: (
+                            lambda m=msg, rt=results_text: (  # type: ignore[misc]
                                 rt.insert(tk.END, m) if rt.winfo_exists() else None
                             ),
                         )
@@ -3084,9 +3082,9 @@ class APGIGui:
                 )
                 self.root.after(
                     0,
-                    lambda sl=status_label: (
+                    lambda sl=status_label: (  # type: ignore[misc]
                         sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
 
                 # Analyze results
@@ -3111,9 +3109,9 @@ class APGIGui:
 
                 self.root.after(
                     0,
-                    lambda s=summary, rt=results_text: (
+                    lambda s=summary, rt=results_text: (  # type: ignore[misc]
                         rt.insert(tk.END, s) if rt.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
                 self.root.after(
                     0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None  # type: ignore[misc]
@@ -3131,7 +3129,7 @@ class APGIGui:
                 )
 
                 # Add close button
-                def close_and_show_results():
+                def close_and_show_results() -> None:
                     progress_dialog.destroy()
                     task.print_results(analysis)
                     messagebox.showinfo(
@@ -3163,7 +3161,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _run_binocular_rivalry_task(self, num_trials: int = 10):
+    def _run_binocular_rivalry_task(self, num_trials: int = 10) -> None:
         """Run the Binocular Rivalry experimental task."""
         if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
@@ -3220,14 +3218,14 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100
                     self.root.after(
                         0,
-                        lambda p=progress, i=trial_idx, t=total_trials: (
-                            progress_var.set(p),  # type: ignore[func-returns-value, misc]
+                        lambda p=progress, i=trial_idx, t=total_trials: (  # type: ignore[misc]
+                            progress_var.set(p),  # type: ignore[func-returns-value]
                             (
                                 status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
-                        ),  # type: ignore[misc]
+                        ),
                     )
 
                     # Run trial with system lock
@@ -3242,7 +3240,7 @@ class APGIGui:
                         )
                         self.root.after(
                             0,
-                            lambda m=msg, rt=results_text: (
+                            lambda m=msg, rt=results_text: (  # type: ignore[misc]
                                 rt.insert(tk.END, m) if rt.winfo_exists() else None
                             ),
                         )
@@ -3251,14 +3249,12 @@ class APGIGui:
                         )
 
                 # Task complete
-                self.root.after(
-                    0, lambda pv=progress_var: pv.set(100)  # type: ignore[func-returns-value, misc]
-                )
+                self.root.after(0, lambda pv=progress_var: pv.set(100))  # type: ignore[misc]
                 self.root.after(
                     0,
-                    lambda sl=status_label: (
+                    lambda sl=status_label: (  # type: ignore[misc]
                         sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
 
                 # Analyze results
@@ -3286,9 +3282,9 @@ class APGIGui:
 
                 self.root.after(
                     0,
-                    lambda s=summary, rt=results_text: (
+                    lambda s=summary, rt=results_text: (  # type: ignore[misc]
                         rt.insert(tk.END, s) if rt.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
                 self.root.after(
                     0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None  # type: ignore[misc]
@@ -3306,7 +3302,7 @@ class APGIGui:
                 )
 
                 # Add close button
-                def close_and_show_results():
+                def close_and_show_results() -> None:
                     progress_dialog.destroy()
                     task.print_results(analysis)
                     messagebox.showinfo(
@@ -3338,7 +3334,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _run_masking_paradigm_task(self, trials_per_condition: int = 20):
+    def _run_masking_paradigm_task(self, trials_per_condition: int = 20) -> None:
         """Run the Masking Paradigm experimental task."""
         if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
@@ -3383,14 +3379,14 @@ class APGIGui:
                     progress = (trial_idx / total_trials) * 100 if total_trials else 0
                     self.root.after(
                         0,
-                        lambda p=progress, i=trial_idx, t=total_trials: (
-                            progress_var.set(p),  # type: ignore[func-returns-value, misc]
+                        lambda p=progress, i=trial_idx, t=total_trials: (  # type: ignore[misc]
+                            progress_var.set(p),  # type: ignore[func-returns-value]
                             (
                                 status_label.config(text=f"Trial {i + 1} of {t}")
                                 if status_label.winfo_exists()
                                 else None
                             ),
-                        ),  # type: ignore[misc]
+                        ),
                     )
 
                     # Run trial with system lock
@@ -3405,22 +3401,19 @@ class APGIGui:
                         )
                         self.root.after(
                             0,
-                            lambda m=msg, rt=results_text: (
+                            lambda m=msg, rt=results_text: (  # type: ignore[misc]
                                 rt.insert(tk.END, m) if rt.winfo_exists() else None
                             ),
                         )
                         self.root.after(
                             0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None  # type: ignore[misc]
                         )
-
-                self.root.after(
-                    0, lambda pv=progress_var: pv.set(100)  # type: ignore[func-returns-value, misc]
-                )
+                self.root.after(0, lambda pv=progress_var: pv.set(100))  # type: ignore[misc]
                 self.root.after(
                     0,
-                    lambda sl=status_label: (
+                    lambda sl=status_label: (  # type: ignore[misc]
                         sl.config(text="Analysis complete!") if sl.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
 
                 analysis = task.analyze_results()
@@ -3441,9 +3434,9 @@ class APGIGui:
 
                 self.root.after(
                     0,
-                    lambda s=summary, rt=results_text: (
+                    lambda s=summary, rt=results_text: (  # type: ignore[misc]
                         rt.insert(tk.END, s) if rt.winfo_exists() else None
-                    ),  # type: ignore[misc]
+                    ),
                 )
                 self.root.after(
                     0, lambda rt=results_text: rt.see(tk.END) if rt.winfo_exists() else None  # type: ignore[misc]
@@ -3459,7 +3452,7 @@ class APGIGui:
                     0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
                 )
 
-                def close_and_show_results():
+                def close_and_show_results() -> None:
                     progress_dialog.destroy()
                     task.print_results(analysis)
                     messagebox.showinfo(
@@ -3486,7 +3479,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _run_iowa_gambling_task(self, num_trials: int = 100):
+    def _run_iowa_gambling_task(self, num_trials: int = 100) -> None:
         """Run the Iowa Gambling Task experimental task."""
         if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
@@ -3551,9 +3544,9 @@ class APGIGui:
 
                     self.root.after(
                         0,
-                        lambda p=progress, i=trial_idx, t=total_trials: update_igt_progress(
+                        lambda p=progress, i=trial_idx, t=total_trials: update_igt_progress(  # type: ignore[misc]
                             p, i, t
-                        ),  # type: ignore[misc]
+                        ),
                     )
 
                     # Run trial with system lock
@@ -3618,13 +3611,13 @@ class APGIGui:
                     if rt.winfo_exists():
                         rt.insert(tk.END, s)
 
-                self.root.after(0, lambda s=summary, rt=results_text: insert_igt_summary(s, rt))
+                self.root.after(0, lambda s=summary, rt=results_text: insert_igt_summary(s, rt))  # type: ignore[misc]
 
                 def scroll_igt_summary(rt: "scrolledtext.ScrolledText") -> None:
                     if rt.winfo_exists():
                         rt.see(tk.END)
 
-                self.root.after(0, lambda rt=results_text: scroll_igt_summary(rt))
+                self.root.after(0, lambda rt=results_text: scroll_igt_summary(rt))  # type: ignore[misc]
 
                 # Save results
                 import datetime
@@ -3736,7 +3729,7 @@ class APGIGui:
 
                         self.root.after(
                             0,
-                            lambda i=i, total=len(results), sl=status_label: update_stroop_status(
+                            lambda i=i, total=len(results), sl=status_label: update_stroop_status(  # type: ignore[misc]
                                 i, total, sl
                             ),
                         )
@@ -3863,7 +3856,7 @@ class APGIGui:
 
             traceback.print_exc()
 
-    def _run_nback_task(self, num_trials: int = 30):
+    def _run_nback_task(self, num_trials: int = 30) -> None:
         """Run the N-Back Task experimental task."""
         if not self.apgi_simulation:
             messagebox.showerror("Error", "System not initialized")
@@ -3919,14 +3912,12 @@ class APGIGui:
                         progress = (i + 1) / len(results) * 100
                         self.root.after(
                             0,
-                            lambda p=progress, pv=progress_var: (
-                                pv.set(p)  # type: ignore[func-returns-value]
-                            ),
+                            lambda p=progress, pv=progress_var: (pv.set(p)),  # type: ignore[misc]
                         )
                         self.root.after(
                             0,
-                            lambda i=i, total=len(results), sl=status_label: (
-                                sl.config(text=f"Trial {i + 1} of {total}")  # type: ignore[misc]
+                            lambda i=i, total=len(results), sl=status_label: (  # type: ignore[misc]
+                                sl.config(text=f"Trial {i + 1} of {total}")
                                 if sl.winfo_exists()
                                 else None
                             ),
@@ -3935,8 +3926,8 @@ class APGIGui:
                         # Log trial results
                         self.root.after(
                             0,
-                            lambda r=result, rt=results_text: (
-                                rt.insert(  # type: ignore[misc]
+                            lambda r=result, rt=results_text: (  # type: ignore[misc]
+                                rt.insert(
                                     tk.END,
                                     f"Trial {r['trial_number']}: Stimulus '{r['stimulus']}' - Target: {r['is_target']} - Response: {r['response']} - Correct: {r['is_correct']}\n",
                                 )
@@ -3968,8 +3959,8 @@ class APGIGui:
 
                     self.root.after(
                         0,
-                        lambda s=summary, rt=results_text: (
-                            rt.insert(tk.END, s) if rt.winfo_exists() else None  # type: ignore[misc]
+                        lambda s=summary, rt=results_text: (  # type: ignore[misc]
+                            rt.insert(tk.END, s) if rt.winfo_exists() else None
                         ),
                     )
                     self.root.after(
@@ -3988,7 +3979,7 @@ class APGIGui:
                     )
 
                     # Add close button
-                    def close_and_show_results():
+                    def close_and_show_results() -> None:
                         progress_dialog.destroy()
                         task.print_results(analysis)
                         messagebox.showinfo(
@@ -4045,7 +4036,7 @@ class APGIGui:
                     y_range = (ylim[1] - ylim[0]) * 0.8
                     ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
                     ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
-                self.neural_canvas.draw_idle()
+                self.neural_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
             # Zoom in on other plot canvases if they exist
             for canvas_attr in [
@@ -4086,7 +4077,7 @@ class APGIGui:
                     y_range = (ylim[1] - ylim[0]) * 1.25
                     ax.set_xlim(x_center - x_range / 2, x_center + x_range / 2)
                     ax.set_ylim(y_center - y_range / 2, y_center + y_range / 2)
-                self.neural_canvas.draw_idle()
+                self.neural_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
             # Zoom out on other plot canvases if they exist
             for canvas_attr in [
@@ -4130,7 +4121,7 @@ class APGIGui:
                 for ax in self.neural_axes.values():
                     ax.relim()
                     ax.autoscale_view()
-                self.neural_canvas.draw_idle()
+                self.neural_canvas.draw_idle()  # type: ignore[no-untyped-call]
 
             # Reset other plot canvases if they exist
             for canvas_attr in [
@@ -4151,7 +4142,7 @@ class APGIGui:
         except Exception as e:
             self._log_event(f"Error fitting to window: {str(e)}")
 
-    def _trigger_ignition(self):
+    def _trigger_ignition(self) -> None:
         """Manually trigger ignition event."""
         if not self.apgi_simulation:
             messagebox.showinfo("No System", "Please initialize the system first.")
@@ -4166,7 +4157,7 @@ class APGIGui:
         self.param_vars["stress"].set(0.8)
         self._log_event("Manual ignition trigger activated")
 
-    def _induce_stressor(self):
+    def _induce_stressor(self) -> None:
         """Induce stressor event with configurable intensity."""
         if not self.apgi_simulation:
             messagebox.showinfo("No System", "Please initialize the system first.")
@@ -4208,9 +4199,10 @@ class APGIGui:
             "write", lambda *args: intensity_label.config(text=f"{intensity_var.get():.2f}")
         )
 
-        def apply_stressor():
+        def apply_stressor() -> None:
             intensity = intensity_var.get()
-            self.apgi_simulation.allostasis.trigger_stressor(intensity=intensity)
+            if self.apgi_simulation:
+                self.apgi_simulation.allostasis.trigger_stressor(intensity=intensity)  # type: ignore[attr-defined]
             self._log_event(f"Stressor induced (intensity: {intensity:.2f})")
             messagebox.showinfo("Success", f"Stressor induced with intensity {intensity:.2f}")
             dialog.destroy()
@@ -4222,7 +4214,7 @@ class APGIGui:
         ttk.Button(button_frame, text="Apply", command=apply_stressor).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=10)
 
-    def _modulate_precision(self):
+    def _modulate_precision(self) -> None:
         """Open precision modulation dialog."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Modulate Precision")
@@ -4237,7 +4229,7 @@ class APGIGui:
         factor_var = tk.DoubleVar(value=1.0)
         ttk.Scale(frame, from_=0.1, to=3.0, variable=factor_var, orient=tk.HORIZONTAL).pack()
 
-        def apply():
+        def apply() -> None:
             factor = factor_var.get()
             extero_current = self.param_vars["extero_precision"].get()
             intero_current = self.param_vars["intero_precision"].get()
@@ -4259,7 +4251,7 @@ class APGIGui:
 
         ttk.Button(dialog, text="Apply", command=apply).pack(pady=10)
 
-    def _inject_input(self):
+    def _inject_input(self) -> None:
         """Inject custom sensory input."""
         if not self.apgi_simulation:
             messagebox.showwarning(
@@ -4359,7 +4351,7 @@ class APGIGui:
         status_text = tk.Text(status_frame, height=6, width=50)
         status_text.pack(fill=tk.BOTH, expand=True)
 
-        def inject_input():
+        def inject_input() -> None:
             """Inject the custom input into the APGI system."""
             try:
                 input_type_val = input_type.get()
@@ -4428,7 +4420,7 @@ class APGIGui:
         ).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
-    def _set_body_state(self):
+    def _set_body_state(self) -> None:
         """Set body state manually."""
         if not self.apgi_simulation:
             messagebox.showwarning(
@@ -4456,8 +4448,8 @@ class APGIGui:
         current_frame.pack(fill=tk.X, pady=5)
 
         current_values = {
-            "Heart Rate": f"{self.apgi_simulation.body_model.heart_rate:.1f} bpm",
-            "Cortisol": f"{self.apgi_simulation.body_model.cortisol:.3f} μg/dL",
+            "Heart Rate": f"{self.apgi_simulation.body_model.get_current_state_dict()['heart_rate']:.1f} bpm",
+            "Cortisol": f"{self.apgi_simulation.body_model.get_current_state_dict()['cortisol']:.3f} μg/dL",
             "Arousal": f"{self.apgi_simulation.body_model.arousal_level:.3f}",
             "Stress": f"{self.apgi_simulation.body_model.stress_level:.3f}",
             "Activity": f"{self.apgi_simulation.body_model.activity_level:.3f}",
@@ -4484,8 +4476,20 @@ class APGIGui:
                 1.0,
                 self.apgi_simulation.body_model.activity_level,
             ),
-            ("Heart Rate", "heart_rate", 60.0, 180.0, self.apgi_simulation.body_model.heart_rate),
-            ("Cortisol", "cortisol", 0.0, 2.0, self.apgi_simulation.body_model.cortisol),
+            (
+                "Heart Rate",
+                "heart_rate",
+                60.0,
+                180.0,
+                self.apgi_simulation.body_model.get_current_state_dict()["heart_rate"],
+            ),
+            (
+                "Cortisol",
+                "cortisol",
+                0.0,
+                2.0,
+                self.apgi_simulation.body_model.get_current_state_dict()["cortisol"],
+            ),
             (
                 "Temperature",
                 "temperature",
@@ -4533,10 +4537,12 @@ class APGIGui:
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
 
-        def apply_body_state():
+        def apply_body_state() -> None:
             """Apply the body state changes."""
             try:
                 # Set the parameters
+                if self.apgi_simulation is None:
+                    return
                 if "arousal" in param_vars:
                     self.apgi_simulation.body_model.set_arousal(param_vars["arousal"].get())
                 if "stress" in param_vars:
@@ -4547,11 +4553,17 @@ class APGIGui:
                 # For other parameters, try to set them if the body_model supports it
                 for key in ["heart_rate", "cortisol", "temperature", "respiration", "glucose"]:
                     if hasattr(self.apgi_simulation.body_model, f"set_{key}"):
-                        getattr(self.apgi_simulation.body_model, f"set_{key}")(
-                            param_vars[key].get()
-                        )
+                        val = param_vars[key].get()
+                        # Extract scalar if numpy array
+                        if hasattr(val, "__iter__") and not isinstance(val, str):  # type: ignore[unreachable]
+                            val = float(val[0]) if len(val) > 0 else 0.0  # type: ignore[index, arg-type]
+                        getattr(self.apgi_simulation.body_model, f"set_{key}")(val)
                     elif hasattr(self.apgi_simulation.body_model, key):
-                        setattr(self.apgi_simulation.body_model, key, param_vars[key].get())
+                        val = param_vars[key].get()
+                        # Extract scalar if numpy array
+                        if hasattr(val, "__iter__") and not isinstance(val, str):  # type: ignore[unreachable]
+                            val = float(val[0]) if len(val) > 0 else 0.0  # type: ignore[index, arg-type]
+                        setattr(self.apgi_simulation.body_model, key, val)
 
                 self._log_event("Body state manually adjusted")
                 messagebox.showinfo("Success", "Body state updated successfully!")
@@ -4560,17 +4572,33 @@ class APGIGui:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to update body state: {str(e)}")
 
-        def reset_to_current():
+        def reset_to_current() -> None:
             """Reset sliders to current values."""
+            if self.apgi_simulation is None:
+                return
+            state_dict = self.apgi_simulation.body_model.get_current_state_dict()
             for key, var in param_vars.items():
-                if hasattr(self.apgi_simulation.body_model, key):
-                    var.set(getattr(self.apgi_simulation.body_model, key))
+                if key in state_dict:
+                    val = state_dict[key]
+                    # Extract scalar if numpy array
+                    if hasattr(val, "__iter__") and not isinstance(val, str):
+                        val = float(val[0]) if len(val) > 0 else 0.0
+                    var.set(val)
                 elif key == "arousal":
-                    var.set(self.apgi_simulation.body_model.arousal_level)
+                    arousal_val = self.apgi_simulation.body_model.arousal_level
+                    if hasattr(arousal_val, "__iter__") and not isinstance(arousal_val, str):  # type: ignore[unreachable]
+                        arousal_val = float(arousal_val[0]) if len(arousal_val) > 0 else 0.0  # type: ignore[assignment]
+                    var.set(arousal_val)  # type: ignore[arg-type]
                 elif key == "stress":
-                    var.set(self.apgi_simulation.body_model.stress_level)
+                    stress_val = self.apgi_simulation.body_model.stress_level
+                    if hasattr(stress_val, "__iter__") and not isinstance(stress_val, str):  # type: ignore[unreachable]
+                        stress_val = float(stress_val[0]) if len(stress_val) > 0 else 0.0  # type: ignore[assignment]
+                    var.set(stress_val)  # type: ignore[arg-type]
                 elif key == "activity":
-                    var.set(self.apgi_simulation.body_model.activity_level)
+                    activity_val = self.apgi_simulation.body_model.activity_level
+                    if hasattr(activity_val, "__iter__") and not isinstance(activity_val, str):  # type: ignore[unreachable]
+                        activity_val = float(activity_val[0]) if len(activity_val) > 0 else 0.0  # type: ignore[assignment]
+                    var.set(activity_val)  # type: ignore[arg-type]
 
         ttk.Button(button_frame, text="Apply", command=apply_body_state).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset to Current", command=reset_to_current).pack(
@@ -4578,7 +4606,7 @@ class APGIGui:
         )
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
-    def _show_diagnostics(self):
+    def _show_diagnostics(self) -> None:
         """Show system diagnostics."""
         if not self.apgi_simulation:
             messagebox.showwarning("No System", "System not initialized")
@@ -4616,7 +4644,7 @@ Somatic Markers:
 
         messagebox.showinfo("System Diagnostics", diag_text)
 
-    def _show_ignition_stats(self):
+    def _show_ignition_stats(self) -> None:
         """Show detailed ignition statistics."""
         if not self.apgi_simulation:
             return
@@ -4637,7 +4665,7 @@ Current Probability: {stats['current_probability']:.3f}
 
         messagebox.showinfo("Ignition Statistics", text)
 
-    def _show_energy_report(self):
+    def _show_energy_report(self) -> None:
         """Show energy budget report."""
         if not self.apgi_simulation:
             return
@@ -4655,7 +4683,7 @@ Reserve Fraction: {self.apgi_simulation.metabolism.current_reserves / self.apgi_
 
         messagebox.showinfo("Energy Budget", text)
 
-    def _analyze_markers(self):
+    def _analyze_markers(self) -> None:
         """Analyze somatic markers."""
         if not self.apgi_simulation:
             return
@@ -4677,7 +4705,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
         messagebox.showinfo("Somatic Marker Analysis", text)
 
-    def _analyze_coherence(self):
+    def _analyze_coherence(self) -> None:
         """Analyze self-model coherence."""
         if not self.apgi_simulation:
             messagebox.showwarning("No System", "Please start the simulation first")
@@ -4702,7 +4730,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
         results_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, height=20)
         results_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        def run_coherence_analysis():
+        def run_coherence_analysis() -> None:
             """Run coherence analysis and display results."""
             results_text.delete(1.0, tk.END)
             results_text.insert(tk.END, "ANALYZING SELF-MODEL COHERENCE\n")
@@ -4807,7 +4835,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 results_text.insert(tk.END, traceback.format_exc())
 
         # Buttons
-        button_frame = ttk.Frame(main_frame)
+        button_frame = ttk.Frame(dialog)
         button_frame.pack(fill=tk.X, pady=10)
 
         ttk.Button(button_frame, text="Run Analysis", command=run_coherence_analysis).pack(
@@ -4848,7 +4876,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             format_frame, text="PDF Report (.pdf)", variable=format_var, value="pdf"
         ).pack(anchor=tk.W)
 
-        def proceed_with_format():
+        def proceed_with_format() -> None:
             dialog.destroy()
             self._do_generate_report(format_var.get())
 
@@ -5097,7 +5125,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
         except Exception as e:
             raise Exception(f"PDF generation failed: {str(e)}")
 
-    def _show_statistical_analysis(self):
+    def _show_statistical_analysis(self) -> None:
         """Show detailed statistical analysis dialog."""
         if not self.apgi_simulation:
             messagebox.showwarning("No System", "Please start the simulation first")
@@ -5117,19 +5145,19 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
         text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Analysis button
-        def run_analysis():
+        def run_analysis() -> None:
             text_widget.delete(1.0, tk.END)
             text_widget.insert(tk.END, "Running statistical analysis...\n\n")
 
             try:
                 from apgi_simulation.analysis import SystemAnalyzer
 
-                analyzer = SystemAnalyzer(self.apgi_simulation.config)
+                analyzer = SystemAnalyzer(self.apgi_simulation.config)  # type: ignore[union-attr]
 
                 # Correlation analysis
                 text_widget.insert(tk.END, "CORRELATION ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                correlations = analyzer.compute_correlation_analysis(self.apgi_simulation.history)
+                correlations = analyzer.compute_correlation_analysis(self.apgi_simulation.history)  # type: ignore[union-attr]
 
                 for var1, corr_dict in correlations.items():
                     text_widget.insert(tk.END, f"{var1} correlations:\n")
@@ -5149,7 +5177,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 # Frequency analysis
                 text_widget.insert(tk.END, "\nFREQUENCY DOMAIN ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                freq_analysis = analyzer.compute_frequency_analysis(self.apgi_simulation.history)
+                freq_analysis = analyzer.compute_frequency_analysis(self.apgi_simulation.history)  # type: ignore[union-attr]
 
                 for signal_name, freq_data in freq_analysis.items():
                     text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
@@ -5165,7 +5193,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
                 # Stationarity analysis
                 text_widget.insert(tk.END, "STATIONARITY ANALYSIS\n")
                 text_widget.insert(tk.END, "=" * 40 + "\n\n")
-                stationarity = analyzer.compute_stationarity_analysis(self.apgi_simulation.history)
+                stationarity = analyzer.compute_stationarity_analysis(self.apgi_simulation.history)  # type: ignore[union-attr]
 
                 for signal_name, stats in stationarity.items():
                     text_widget.insert(tk.END, f"{signal_name.upper()}:\n")
@@ -5194,7 +5222,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
         ).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
 
-    def _save_analysis_results(self, text_widget):
+    def _save_analysis_results(self, text_widget: Any) -> None:
         """Save statistical analysis results to file."""
         filename = filedialog.asksaveasfilename(
             title="Save Statistical Analysis",
@@ -5211,7 +5239,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save analysis:\n{str(e)}")
 
-    def _show_docs(self):
+    def _show_docs(self) -> None:
         """Show documentation."""
         try:
             docs_path = Path(__file__).parent / "docs" / "GUI.md"
@@ -5231,7 +5259,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
         ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
 
-    def _show_shortcuts(self):
+    def _show_shortcuts(self) -> None:
         """Show keyboard shortcuts."""
         shortcuts = """Keyboard Shortcuts
 
@@ -5268,7 +5296,7 @@ F1      - Show Help
 
         messagebox.showinfo("Keyboard Shortcuts", shortcuts)
 
-    def _show_about(self):
+    def _show_about(self) -> None:
         """Show about dialog."""
         about_text = """APGI System v0.1.0
 
@@ -5503,17 +5531,17 @@ For more information, visit the documentation or contact support.
             if hasattr(self, "right_panel"):
                 for child in self.right_panel.winfo_children():
                     if isinstance(child, ttk.Notebook):
-                        current = child.index("current")
-                        total = child.index("end") - 1
+                        current = child.index("current")  # type: ignore[no-untyped-call]
+                        total = child.index("end") - 1  # type: ignore[no-untyped-call]
                         new_index = (current + direction) % total
-                        child.select(new_index)
-                        self._log_event(f"Switched to tab: {child.tab(new_index, 'text')}")
+                        child.select(new_index)  # type: ignore[no-untyped-call]
+                        self._log_event(f"Switched to tab: {child.tab(new_index, 'text')}")  # type: ignore[no-untyped-call]
                         break
         except Exception as e:
             self._log_event(f"Error cycling tabs: {e}")
 
 
-def main():
+def main() -> None:
     """Main entry point for GUI application."""
     # Check dependencies before starting with user-friendly error handling
     try:

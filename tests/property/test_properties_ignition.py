@@ -383,12 +383,19 @@ class TestIgnitionDynamicsProperties:
         assert intero_signal_low >= 0 and np.isfinite(intero_signal_low)
         assert intero_signal_high >= 0 and np.isfinite(intero_signal_high)
 
-        # Verify the mathematical relationship: signal = precision × gain × ||error||
+        # Verify the mathematical relationship: signal = 0.5 × precision × gain × mean(||error||²)
+        # The implementation uses mean of squared errors, not Euclidean norm
         expected_low = (
-            error_data["intero_precision"] * gain_low * np.linalg.norm(error_data["intero_error"])
+            0.5
+            * error_data["intero_precision"]
+            * gain_low
+            * np.mean(error_data["intero_error"] ** 2)
         )
         expected_high = (
-            error_data["intero_precision"] * gain_high * np.linalg.norm(error_data["intero_error"])
+            0.5
+            * error_data["intero_precision"]
+            * gain_high
+            * np.mean(error_data["intero_error"] ** 2)
         )
 
         assert (
