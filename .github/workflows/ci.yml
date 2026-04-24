@@ -38,7 +38,11 @@ jobs:
     - name: Check types with mypy
       run: |
         mypy apgi_framework api
-        
+
+    - name: Check for undocumented stubs (QG-01)
+      run: |
+        python scripts/check_stubs.py
+
     - name: Run unit tests
       run: |
         pytest tests/unit --cov=apgi_framework --cov=api --cov-report=xml

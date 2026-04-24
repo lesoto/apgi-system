@@ -108,8 +108,8 @@ z_i: float    # Interoceptive z-score
 def precision(variance: float) -> float:
     if variance <= 0:
         return float("inf")
+
     return 1.0 / variance
-```
 
 **Implementation:**
 
@@ -356,6 +356,7 @@ def signal_dynamics(
     # Euler integration
     dS_dt = decay + exteroceptive_input + interoceptive_input + noise
     S_new = S + dS_dt * dt
+
     
     return float(max(0.0, S_new))  # Surprise must be non-negative
 ```
@@ -443,10 +444,10 @@ def _update_threshold(self, current_time: float) -> None:
     threshold = self.baseline_threshold * (
         1.0 + 0.5 * metabolic_penalty + 0.3 * allostatic_penalty
     )
+
     self.current_threshold = np.clip(
         threshold, self.threshold_range[0], self.threshold_range[1]
     )
-```
 
 **Implementation:**
 
@@ -513,11 +514,11 @@ def euler_maruyama_step(X: float, drift: float, diffusion: float, dt: float, rng
 
 # Applied in:
 # - signal_dynamics()
+
 # - threshold_dynamics()
 # - somatic_marker_dynamics()
 # - precision_dynamics()
 # - arousal_dynamics()
-```
 
 **Implementation:**
 

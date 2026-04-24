@@ -23,9 +23,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-docker-compose --version >nul 2>&1
+docker compose version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Docker Compose is not installed or not in PATH
+    echo [ERROR] Docker Compose v2 is not installed or not in PATH
     pause
     exit /b 1
 )
@@ -150,6 +150,13 @@ goto :eof
 REM Function to build Docker image
 :build_image
 echo [INFO] Building Docker image: %DOCKER_IMAGE_NAME%:%DOCKER_TAG%
+
+if not exist "Dockerfile" (
+    echo [ERROR] Dockerfile not found in current directory
+    pause
+    exit /b 1
+)
+
 docker build -t "%DOCKER_IMAGE_NAME%:%DOCKER_TAG%" .
 if errorlevel 1 (
     echo [ERROR] Failed to build Docker image
@@ -171,7 +178,7 @@ call :build_image
 
 REM Start services
 echo [INFO] Starting services with Docker Compose...
-docker-compose up -d
+docker compose up -d
 if errorlevel 1 (
     echo [ERROR] Failed to deploy application
     pause
@@ -180,15 +187,13 @@ if errorlevel 1 (
 
 echo [INFO] Application deployed successfully
 echo [INFO] Container name: %DOCKER_CONTAINER_NAME%
-echo [INFO] Access logs with: docker-compose logs -f
+echo [INFO] Access logs with: docker compose logs -f
 goto :eof
 
 REM Function to stop container
 :stop_container
 echo [INFO] Stopping existing containers...
-docker-compose down >nul 2>&1
-docker stop %DOCKER_CONTAINER_NAME% >nul 2>&1
-docker rm %DOCKER_CONTAINER_NAME% >nul 2>&1
+docker compose down >nul 2>&1
 goto :eof
 
 REM Function to show status
@@ -196,10 +201,10 @@ REM Function to show status
 echo [INFO] Deployment Status
 echo.
 echo Running containers:
-docker-compose ps
+docker compose ps
 echo.
 echo Container logs ^(last 20 lines^):
-docker-compose logs --tail=20
+docker compose logs --tail=20
 goto :eof
 
 REM Function to backup data
@@ -273,7 +278,7 @@ if "%1"=="deploy" (
     call :show_status
 ) else if "%1"=="logs" (
     call :check_docker
-    docker-compose logs -f
+    docker compose logs -f
 ) else if "%1"=="backup" (
     call :backup_data
 ) else if "%1"=="init" (

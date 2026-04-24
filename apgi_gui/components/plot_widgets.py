@@ -37,6 +37,11 @@ class PlotWidget:
 
         self.lines: Dict[str, Any] = {}
 
+    @property
+    def fig(self):
+        """Alias for figure (for compatibility)."""
+        return self.figure
+
     def add_line(self, name: str, color: str = "blue", label: Optional[str] = None) -> None:
         """Add a data line to the plot."""
         (line,) = self.ax.plot([], [], color=color, label=label or name)
@@ -75,6 +80,20 @@ class MultiPlotWidget:
         self.plots: Dict[str, PlotWidget] = {}
         self.rows = rows
         self.cols = cols
+
+    @property
+    def fig(self):
+        """Get the figure from the first plot (for compatibility)."""
+        if self.plots:
+            return next(iter(self.plots.values())).figure
+        return None
+
+    @property
+    def canvas(self):
+        """Get the canvas from the first plot (for compatibility)."""
+        if self.plots:
+            return next(iter(self.plots.values())).canvas
+        return None
 
     def add_plot(self, key: str, row: int, col: int, title: str, **kwargs) -> PlotWidget:
         """Add a plot to the grid."""

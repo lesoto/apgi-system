@@ -126,7 +126,12 @@ class LogStreamer:
         """Stop the streaming thread."""
         self.running = False
         if self.thread:
-            self.thread.join()
+            if sys.is_finalizing():
+                return  # Cannot join during interpreter shutdown
+            try:
+                self.thread.join(timeout=2.0)
+            except RuntimeError:
+                pass  # Thread may already be dead or shutting down
 
     def _stream_worker(self) -> None:
         """Background worker for streaming."""

@@ -24,9 +24,9 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements and install Python dependencies
-COPY requirements-minimal.txt .
+COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install -r requirements-minimal.txt
+    pip install -r requirements.txt
 
 # Production stage for GUI
 FROM python:3.9-slim AS gui
@@ -77,7 +77,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import apgi_framework; print('OK')" || exit 1
 
 # Default command for GUI
-CMD ["python", "GUI.py"]
+CMD ["python", "GUI-Launcher.py"]
 
 # =============================================================================
 # APGI REST API Dockerfile - Multi-stage build for API (Python 3.11)
@@ -125,7 +125,7 @@ COPY --from=api-builder /root/.local /root/.local
 
 # Copy application code
 COPY api/ ./api/
-COPY apgi_simulation/ ./apgi_simulation/
+COPY apgi_framework/ ./apgi_framework/
 COPY config/ ./config/
 COPY utils/ ./utils/
 

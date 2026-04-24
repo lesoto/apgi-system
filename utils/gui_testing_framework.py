@@ -370,7 +370,7 @@ class GUITestSuite(unittest.TestCase):
                 self.tester.close_app()
 
 
-def test_tkinter_utils_gui():
+def test_tkinter_utils_gui(skip_gui_launch: bool = False):
     """Test the tkinter Utils GUI."""
     if not TKINTER_AVAILABLE:
         print("Skipping tkinter tests - tkinter not available")
@@ -385,7 +385,7 @@ def test_tkinter_utils_gui():
             # Get the project root directory
             current_dir = Path(__file__).parent
             project_root = current_dir.parent
-            gui_file = project_root / "Utils-GUI.py"
+            gui_file = project_root / "Utils_GUI.py"
 
             # Load the module dynamically since filename has hyphen
             spec = importlib.util.spec_from_file_location("utils_gui", gui_file)
@@ -396,6 +396,18 @@ def test_tkinter_utils_gui():
             utils_gui_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(utils_gui_module)
             UtilsRunnerGUI = utils_gui_module.UtilsRunnerGUI
+
+            # Skip actual GUI launch if requested (for headless environments)
+            if skip_gui_launch:
+                result.add_warning("GUI launch skipped (headless mode)")
+                result.metadata.update(
+                    {
+                        "window_title": "APGI Utils Scripts Runner (simulated)",
+                        "widgets_found": ["Listbox", "Button (simulated)"],
+                        "headless_mode": True,
+                    }
+                )
+                return
 
             # Launch app
             tester.launch_app(UtilsRunnerGUI)
@@ -493,7 +505,7 @@ def test_dash_interactive_dashboard():
     return result.success
 
 
-def run_gui_tests():
+def run_gui_tests(skip_gui_launch: bool = False):
     """Run all available GUI tests."""
     print("APGI GUI Testing Framework")
     print("=" * 40)
@@ -504,7 +516,7 @@ def run_gui_tests():
     if TKINTER_AVAILABLE:
         print("Running tkinter GUI tests...")
         try:
-            results["tkinter"] = test_tkinter_utils_gui()
+            results["tkinter"] = test_tkinter_utils_gui(skip_gui_launch=skip_gui_launch)
             print(f"  Tkinter tests: {'PASSED' if results['tkinter'] else 'FAILED'}")
         except Exception as e:
             print(f"  Tkinter tests failed: {e}")
@@ -540,8 +552,19 @@ def run_gui_tests():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run GUI tests for APGI framework")
+    parser.add_argument(
+        "--skip-gui-launch",
+        action="store_true",
+        help="Skip actual GUI launch (for headless environments)",
+    )
+
+    args = parser.parse_args()
+
     # Run GUI tests
-    results = run_gui_tests()
+    results = run_gui_tests(skip_gui_launch=args.skip_gui_launch)
 
     # Exit with appropriate code
     if any(r is False for r in results.values() if r is not None):

@@ -15,10 +15,86 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from ..logging.standardized_logging import get_logger
 from .error_dialog_manager import ErrorDialogType, show_error_dialog
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states."""
+
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+
+class CircuitBreaker:
+    """Implementation of the Circuit Breaker pattern."""
+
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 60.0,
+        half_open_max_requests: int = 3,
+    ):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.half_open_max_requests = half_open_max_requests
+
+        self.state = CircuitBreakerState.CLOSED
+        self.failures = 0
+        self.successes = 0
+        self.last_failure_time: Optional[datetime.datetime] = None
+        self.logger = get_logger(f"circuit_breaker.{name}")
+
+    def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Call the function through the circuit breaker."""
+        self._check_state()
+
+        if self.state == CircuitBreakerState.OPEN:
+            raise RuntimeError(f"Circuit breaker '{self.name}' is OPEN. Request rejected.")
+
+        try:
+            result = func(*args, **kwargs)
+            self._record_success()
+            return result
+        except Exception as e:
+            self._record_failure()
+            raise e
+
+    def _check_state(self) -> None:
+        """Transition from OPEN to HALF_OPEN if timeout expired."""
+        if self.state == CircuitBreakerState.OPEN and self.last_failure_time:
+            elapsed = (datetime.datetime.now() - self.last_failure_time).total_seconds()
+            if elapsed >= self.recovery_timeout:
+                self.logger.info(f"Circuit breaker '{self.name}' transitioning to HALF_OPEN")
+                self.state = CircuitBreakerState.HALF_OPEN
+                self.successes = 0
+
+    def _record_success(self) -> None:
+        """Handle successful call."""
+        if self.state == CircuitBreakerState.HALF_OPEN:
+            self.successes += 1
+            if self.successes >= self.half_open_max_requests:
+                self.logger.info(f"Circuit breaker '{self.name}' transitioning to CLOSED")
+                self.state = CircuitBreakerState.CLOSED
+                self.failures = 0
+
+    def _record_failure(self) -> None:
+        """Handle failed call."""
+        self.failures += 1
+        self.last_failure_time = datetime.datetime.now()
+
+        if self.state == CircuitBreakerState.CLOSED:
+            if self.failures >= self.failure_threshold:
+                self.logger.warning(f"Circuit breaker '{self.name}' transitioning to OPEN")
+                self.state = CircuitBreakerState.OPEN
+        elif self.state == CircuitBreakerState.HALF_OPEN:
+            self.logger.warning(f"Circuit breaker '{self.name}' transitioning back to OPEN")
+            self.state = CircuitBreakerState.OPEN
 
 
 class ErrorSeverity(Enum):
@@ -235,6 +311,26 @@ class ConfigurationRecovery(ErrorRecoveryStrategy):
             return False
         except Exception:
             return False
+
+
+class CircuitBreakerRecovery(ErrorRecoveryStrategy):
+    """Recovery strategy for circuit breaker events."""
+
+    def __init__(self, breaker: CircuitBreaker) -> None:
+        super().__init__(
+            f"circuit_breaker_recovery_{breaker.name}",
+            f"Manages recovery for circuit breaker '{breaker.name}'",
+        )
+        self.breaker = breaker
+
+    def can_handle(self, error: APGIError) -> bool:
+        # This strategy is triggered when an error occurs in a circuit-protected call
+        return True
+
+    def recover(self, error: APGIError, **kwargs: Any) -> bool:
+        """Attempt to handle error by recording failure in breaker."""
+        self.breaker._record_failure()
+        return False  # Still let the error bubble up or be handled by others
 
 
 class EnhancedErrorHandler:

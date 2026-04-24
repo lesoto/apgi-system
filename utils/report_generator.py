@@ -53,7 +53,7 @@ class ReportGenerator:
     """Automated report generation for APGI framework."""
 
     def __init__(self, output_dir: Optional[Path] = None):
-        self.output_dir = output_dir or Path("apgi_output/reports")
+        self.output_dir = output_dir or Path("apgi_outputs/reports")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Template directory

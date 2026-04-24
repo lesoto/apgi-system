@@ -1,17 +1,9 @@
-"""
-Stub module for subsystem interfaces.
-
-This module provides type stubs for subsystem protocol interfaces
-that are being migrated from the old apgi_simulation structure.
-"""
-
+from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-import numpy as np
 
-
-class SubsystemProtocol:
-    """Protocol for subsystem communication."""
+class SubsystemProtocol(ABC):
+    """Abstract base class for subsystem communication."""
 
     def __init__(self, name: str):
         """Initialize subsystem protocol.
@@ -24,21 +16,25 @@ class SubsystemProtocol:
         self.name = name
         self.enabled = True
 
-    def process(self, input_data: np.ndarray) -> np.ndarray:
-        """Process input data.
+    @abstractmethod
+    def step(self, dt: float, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a single timestep of the subsystem.
 
         Parameters
         ----------
-        input_data : np.ndarray
-            Input data to process
+        dt : float
+            Timestep duration in ms
+        inputs : Dict[str, Any]
+            Input data for the subsystem
 
         Returns
         -------
-        np.ndarray
-            Processed output
+        Dict[str, Any]
+            Subsystem output and state updates
         """
-        return input_data
+        pass
 
+    @abstractmethod
     def get_state(self) -> Dict[str, Any]:
         """Get current subsystem state.
 
@@ -47,8 +43,9 @@ class SubsystemProtocol:
         Dict[str, Any]
             State dictionary
         """
-        return {"name": self.name, "enabled": self.enabled}
+        pass
 
+    @abstractmethod
     def reset(self) -> None:
         """Reset subsystem state."""
-        self.enabled = True
+        pass

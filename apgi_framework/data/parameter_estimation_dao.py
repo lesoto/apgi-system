@@ -314,6 +314,174 @@ class ParameterEstimationDAO:
         except Exception as e:
             raise ParameterEstimationDAOError(f"Failed to create trial: {str(e)}")
 
+    def create_trials_batch(self, trials: List[TrialData]) -> List[str]:
+        """
+        Create multiple trial records in a single transaction.
+
+        Args:
+            trials: List of trial data objects
+
+        Returns:
+            List[str]: List of created trial IDs
+        """
+        if not trials:
+            return []
+
+        try:
+            trial_ids = []
+            with sqlite3.connect(self.db_path) as conn:
+                # Prepare batch data for base trials
+                base_trials_data = []
+                detection_data = []
+                heartbeat_data = []
+                oddball_data = []
+                quality_data = []
+
+                for trial in trials:
+                    if not trial.validate():
+                        raise ParameterEstimationDAOError(
+                            f"Invalid trial data for ID {trial.trial_id}"
+                        )
+
+                    base_trials_data.append(
+                        (
+                            trial.trial_id,
+                            trial.session_id,
+                            trial.participant_id,
+                            trial.task_type.value,
+                            trial.trial_number,
+                            trial.timestamp.isoformat(),
+                            trial.stimulus_modality.value,
+                            trial.stimulus_intensity,
+                            json.dumps(trial.stimulus_parameters),
+                            (
+                                trial.behavioral_response.response_time
+                                if trial.behavioral_response
+                                else None
+                            ),
+                            (
+                                trial.behavioral_response.detected
+                                if trial.behavioral_response
+                                else None
+                            ),
+                            (
+                                trial.behavioral_response.confidence
+                                if trial.behavioral_response
+                                else None
+                            ),
+                            (
+                                trial.behavioral_response.response_key
+                                if trial.behavioral_response
+                                else None
+                            ),
+                            (
+                                trial.behavioral_response.reaction_time_valid
+                                if trial.behavioral_response
+                                else None
+                            ),
+                            trial.quality_metrics.eeg_artifact_ratio,
+                            trial.quality_metrics.pupil_data_loss,
+                            trial.quality_metrics.cardiac_signal_quality,
+                            trial.quality_metrics.overall_quality_score,
+                            json.dumps(trial.metadata),
+                        )
+                    )
+
+                    if isinstance(trial, DetectionTrialResult):
+                        detection_data.append(
+                            (
+                                trial.trial_id,
+                                trial.gabor_orientation,
+                                trial.tone_frequency,
+                                trial.contrast_level,
+                                trial.p3b_amplitude,
+                                trial.p3b_latency,
+                                trial.staircase_intensity,
+                                trial.staircase_reversals,
+                            )
+                        )
+                    elif isinstance(trial, HeartbeatTrialResult):
+                        heartbeat_data.append(
+                            (
+                                trial.trial_id,
+                                trial.is_synchronous,
+                                trial.tone_delay_ms,
+                                (
+                                    trial.r_peak_timestamp.isoformat()
+                                    if trial.r_peak_timestamp
+                                    else None
+                                ),
+                                trial.heart_rate,
+                                trial.rr_interval,
+                                trial.hep_amplitude,
+                                trial.interoceptive_p3b,
+                                trial.pupil_baseline,
+                                trial.pupil_dilation_peak,
+                                trial.pupil_time_to_peak,
+                            )
+                        )
+                    elif isinstance(trial, OddballTrialResult):
+                        oddball_data.append(
+                            (
+                                trial.trial_id,
+                                trial.is_deviant,
+                                trial.deviant_type,
+                                trial.co2_puff_duration,
+                                trial.co2_concentration,
+                                trial.heartbeat_flash_delay,
+                                trial.gabor_orientation_deviation,
+                                trial.auditory_deviant_frequency,
+                                trial.interoceptive_p3b,
+                                trial.exteroceptive_p3b,
+                                trial.p3b_ratio,
+                                trial.interoceptive_precision,
+                                trial.exteroceptive_precision,
+                            )
+                        )
+
+                    quality_data.append(
+                        (
+                            trial.trial_id,
+                            json.dumps(trial.quality_metrics.electrode_impedances),
+                            json.dumps(trial.quality_metrics.bad_channels),
+                            trial.quality_metrics.blink_rate,
+                            trial.quality_metrics.tracking_loss_episodes,
+                            trial.quality_metrics.r_peak_detection_confidence,
+                            trial.quality_metrics.heart_rate_variability,
+                        )
+                    )
+
+                    trial_ids.append(trial.trial_id)
+
+                # Batch inserts
+                conn.executemany(
+                    "INSERT INTO parameter_estimation_trials VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    base_trials_data,
+                )
+                if detection_data:
+                    conn.executemany(
+                        "INSERT INTO detection_trials VALUES (?,?,?,?,?,?,?,?)", detection_data
+                    )
+                if heartbeat_data:
+                    conn.executemany(
+                        "INSERT INTO heartbeat_trials VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                        heartbeat_data,
+                    )
+                if oddball_data:
+                    conn.executemany(
+                        "INSERT INTO oddball_trials VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        oddball_data,
+                    )
+
+                conn.executemany(
+                    "INSERT INTO trial_quality_metrics VALUES (?,?,?,?,?,?,?)", quality_data
+                )
+
+                conn.commit()
+            return trial_ids
+        except Exception as e:
+            raise ParameterEstimationDAOError(f"Failed to create trials batch: {str(e)}")
+
     def _create_detection_trial(
         self, conn: sqlite3.Connection, trial_data: DetectionTrialResult
     ) -> None:

@@ -117,9 +117,9 @@ class TestCoreSystemProperties:
                 iteration_energies = []
 
                 for obs in observations:
-                    # Reshape observation to match system expectations (1, dim)
-                    obs_reshaped = obs.reshape(1, -1)
-                    state = apgi_framework.step(obs_reshaped)
+                    # Flatten observation to 1D (framework expects shape (dim,) not (1, dim))
+                    obs_flat = obs.reshape(-1)
+                    state = apgi_framework.step(obs_flat)
                     # Extract free energy from state
                     if "free_energy" in state:
                         fe = state["free_energy"]
@@ -228,9 +228,9 @@ class TestCoreSystemProperties:
                 iteration_errors = []
 
                 for obs in observations:
-                    # Reshape observation to match system expectations (1, dim)
-                    obs_reshaped = obs.reshape(1, -1)
-                    state = apgi_framework.step(obs_reshaped)
+                    # Flatten observation to 1D (framework expects shape (dim,) not (1, dim))
+                    obs_flat = obs.reshape(-1)
+                    state = apgi_framework.step(obs_flat)
 
                     # Extract prediction error magnitude
                     if "prediction" in state:
@@ -269,7 +269,9 @@ class TestCoreSystemProperties:
         """
         config_path = load_config_path()
         apgi_framework = APGISystem(config_path)
-        state = apgi_framework.step(observation)
+        # Flatten observation to 1D (framework expects shape (dim,) not (1, dim))
+        obs_flat = observation.reshape(-1)
+        state = apgi_framework.step(obs_flat)
 
         # Check that state is a dictionary
         assert isinstance(state, dict), "System state should be a dictionary"
@@ -384,6 +386,8 @@ class TestCoreSystemProperties:
         """
         config_path = load_config_path()
         apgi_framework = APGISystem(config_path)
+        # Flatten observation to 1D (framework expects shape (dim,) not (1, dim))
+        obs_flat = observation.reshape(-1)
         # Extract free energy from various sources
         free_energy_sources = []
 
@@ -392,7 +396,7 @@ class TestCoreSystemProperties:
             # Try to get free energy from the active inference engine
             try:
                 # Step the active inference engine directly
-                action, ai_info = apgi_framework.active_inference.step(observation, [])
+                action, ai_info = apgi_framework.active_inference.step(obs_flat, [])
                 if "free_energy" in ai_info:
                     free_energy_sources.append(ai_info["free_energy"])
             except Exception:
@@ -401,7 +405,7 @@ class TestCoreSystemProperties:
         # If no direct free energy available, compute from prediction errors
         if not free_energy_sources:
             # Use prediction error as proxy for free energy
-            pred_error_magnitude = np.sum(observation**2)
+            pred_error_magnitude = np.sum(obs_flat**2)
             free_energy_sources.append(pred_error_magnitude)
 
         # All free energy values should be non-negative

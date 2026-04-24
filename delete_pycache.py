@@ -6,7 +6,7 @@ This script removes temporary files and output directories generated during vali
 
 Features:
 - Removes Python cache files (__pycache__, *.pyc, etc.)
-- Cleans APGI-specific output directories (apgi_output, apgi_complete_output, etc.)
+- Cleans APGI-specific output directories (apgi_outputs, apgi_complete_output, etc.)
 - Removes visualization files (*.png, *.html, *.svg)
 - Cleans debugging and temporary files (debug_*, test_*, temp_*, etc.)
 - Preserves core functionality and important project files
@@ -899,7 +899,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         include_dir_patterns.extend(
             [
                 "apgi_*",
-                "apgi_output*",
+                "apgi_outputs*",
                 "apgi_complete_output",
                 "data_output",
                 "analysis_output",

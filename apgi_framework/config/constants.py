@@ -71,6 +71,18 @@ class GUIConstants:
     DEFAULT_N_PARTICIPANTS = 10
     DEFAULT_SESSION_DURATION = 60.0
 
+    # Parameter descriptions for tooltips
+    PARAMETER_DESCRIPTIONS = {
+        "exteroceptive_precision": "Precision of external sensory input. Higher values mean more weight is given to external data.",
+        "interoceptive_precision": "Precision of internal bodily signals. Higher values mean more weight is given to internal data.",
+        "somatic_gain": "Gain factor for somatic markers. Controls how strongly bodily states influence decision making.",
+        "threshold": "The minimum signal strength required for global ignition/consciousness.",
+        "steepness": "The steepness of the sigmoid activation function for neural units.",
+        "num_trials": "Number of experimental trials to simulate per participant.",
+        "n_participants": "Total number of simulated participants in the study.",
+        "session_duration": "Duration of each experimental session in seconds.",
+    }
+
 
 # Timing Constants
 class TimingConstants:

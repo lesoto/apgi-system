@@ -1,7 +1,7 @@
 """
 Database Connection Management
 
-SQLAlchemy engine and session configuration.
+SQLAlchemy engine and session configuration with async support.
 """
 
 import logging
@@ -13,6 +13,7 @@ from typing import Any, Dict, Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from api.config import settings
 from api.database.models import Base, User
@@ -23,7 +24,7 @@ from utils.circuit_breaker_utils import CircuitBreakerException, circuit_breaker
 logger = logging.getLogger(__name__)
 
 
-# Create SQLAlchemy engine
+# Create synchronous SQLAlchemy engine
 engine = create_engine(
     settings.database_url,
     echo=settings.db_echo_sql,
@@ -33,8 +34,30 @@ engine = create_engine(
 )
 
 
-# Create session factory
+# Create async SQLAlchemy engine with asyncpg for PostgreSQL
+# Convert postgresql:// to postgresql+asyncpg:// for async driver
+async_db_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+async_engine = create_async_engine(
+    async_db_url,
+    echo=settings.db_echo_sql,
+    pool_pre_ping=True,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+)
+
+
+# Create synchronous session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# Create async session factory
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
 
 
 def generate_secure_password(length: int = 32) -> str:
@@ -166,6 +189,23 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+async def get_async_db() -> AsyncSession:
+    """
+    Dependency function to get async database session.
+
+    Yields:
+        AsyncSession: SQLAlchemy async database session
+
+    Usage:
+        @app.get("/endpoint")
+        async def endpoint(db: AsyncSession = Depends(get_async_db)):
+            # Use async db session
+            pass
+    """
+    async with AsyncSessionLocal() as session:
+        yield session
 
 
 @contextmanager

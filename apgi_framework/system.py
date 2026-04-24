@@ -140,8 +140,9 @@ class APGISystem:
     def _build_subsystem_protocol_adapters(self) -> Dict[str, SubsystemProtocol]:
         """Wrap heterogeneous subsystem APIs behind the SubsystemProtocol contract."""
 
-        class _SubsystemAdapter(SubsystemProtocol):  # type: ignore[misc]
-            def __init__(self, subsystem: Any):
+        class _SubsystemAdapter(SubsystemProtocol):
+            def __init__(self, name: str, subsystem: Any):
+                super().__init__(name)
                 self._subsystem = subsystem
 
             def step(self, dt: float, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -169,22 +170,24 @@ class APGISystem:
                 return {"type": type(self._subsystem).__name__}
 
         return {
-            "active_inference": _SubsystemAdapter(self.active_inference),
-            "predictor": _SubsystemAdapter(self.predictor),
-            "precision": _SubsystemAdapter(self.precision),
-            "body_model": _SubsystemAdapter(self.body_model),
-            "allostasis": _SubsystemAdapter(self.allostasis),
-            "somatic_markers": _SubsystemAdapter(self.somatic_markers),
-            "ignition_threshold": _SubsystemAdapter(self.ignition_threshold),
-            "global_workspace": _SubsystemAdapter(self.global_workspace),
-            "networks": _SubsystemAdapter(self.networks),
-            "minimal_self": _SubsystemAdapter(self.minimal_self),
-            "narrative_self": _SubsystemAdapter(self.narrative_self),
-            "coherence": _SubsystemAdapter(self.coherence),
-            "metabolism": _SubsystemAdapter(self.metabolism),
-            "entropy": _SubsystemAdapter(self.entropy),
-            "oscillations": _SubsystemAdapter(self.oscillations),
-            "performance_monitor": _SubsystemAdapter(self.performance_monitor),
+            "active_inference": _SubsystemAdapter("active_inference", self.active_inference),
+            "predictor": _SubsystemAdapter("predictor", self.predictor),
+            "precision": _SubsystemAdapter("precision", self.precision),
+            "body_model": _SubsystemAdapter("body_model", self.body_model),
+            "allostasis": _SubsystemAdapter("allostasis", self.allostasis),
+            "somatic_markers": _SubsystemAdapter("somatic_markers", self.somatic_markers),
+            "ignition_threshold": _SubsystemAdapter("ignition_threshold", self.ignition_threshold),
+            "global_workspace": _SubsystemAdapter("global_workspace", self.global_workspace),
+            "networks": _SubsystemAdapter("networks", self.networks),
+            "minimal_self": _SubsystemAdapter("minimal_self", self.minimal_self),
+            "narrative_self": _SubsystemAdapter("narrative_self", self.narrative_self),
+            "coherence": _SubsystemAdapter("coherence", self.coherence),
+            "metabolism": _SubsystemAdapter("metabolism", self.metabolism),
+            "entropy": _SubsystemAdapter("entropy", self.entropy),
+            "oscillations": _SubsystemAdapter("oscillations", self.oscillations),
+            "performance_monitor": _SubsystemAdapter(
+                "performance_monitor", self.performance_monitor
+            ),
         }
 
     def step(

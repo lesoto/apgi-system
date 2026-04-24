@@ -98,7 +98,7 @@ dmypy.json
 *.tiff
 *.tif
 logs/
-apgi_output/
+apgi_outputs/
 apgi_complete_output/
 validation_results/
 data_output/

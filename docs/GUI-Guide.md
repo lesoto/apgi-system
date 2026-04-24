@@ -2,7 +2,7 @@
 
 ## Overview
 
-The APGI GUI provides a comprehensive, real-time interface for interacting with the Allostatic Precision-Gated Ignition consciousness modeling framework. Built with Tkinter, it offers 100% access to all system features through an intuitive graphical interface.
+The APGI GUI provides a real-time interface for interacting with the Allostatic Precision-Gated Ignition consciousness modeling framework. Built with Tkinter, it offers core system features through an intuitive graphical interface.
 
 ## Features
 
@@ -14,6 +14,8 @@ The APGI GUI provides a comprehensive, real-time interface for interacting with 
 - **Preset experimental tasks**
 
 ### 📊 **Multi-Panel Visualization**
+
+The GUI currently provides three primary visualization tabs:
 
 #### **Tab 1: Neural Activity**
 
@@ -35,23 +37,7 @@ The APGI GUI provides a comprehensive, real-time interface for interacting with 
 - Gamma band power (30-80 Hz)
 - Beta band power (12-30 Hz)
 
-#### **Tab 4: Self-Model**
-
-- Minimal self coherence
-- Depersonalization threshold indicators
-- Narrative self integrity
-
-#### **Tab 5: Oscillations**
-
-- Real-time oscillation signal
-- Multi-band power spectrum
-- Delta, theta, alpha, beta, gamma
-
-#### **Tab 6: 3D State Space**
-
-- 3D trajectory visualization
-- Free Energy × Precision × Allostatic Load
-- Color-coded temporal evolution
+*Note: Additional tabs (Self-Model, Oscillations, 3D State Space) are planned for future releases.*
 
 ### 🎚️ **Quick Parameter Controls**
 
@@ -158,14 +144,14 @@ pip install numpy scipy matplotlib pyyaml
 ### Launch GUI
 
 ```bash
-# Method 1: Direct launcher
-python run_gui.py
-
-# Method 2: Direct execution
-python apgi_gui.py
-
-# Method 3: From Python
+# Method 1: Module execution (recommended)
 python -m apgi_gui
+
+# Method 2: CLI launcher with optional config
+python -m apgi_gui.cli --config path/to/config.yaml
+
+# Method 3: Python one-liner
+python -c "from apgi_gui.main import main; main()"
 ```
 
 ## Quick Start Guide
@@ -175,7 +161,7 @@ python -m apgi_gui
 1. **Launch Application**
 
    ```bash
-   python run_gui.py
+   python -m apgi_gui
    ```
 
 2. **Start Simulation**
@@ -216,7 +202,8 @@ python -m apgi_gui
 Tools → Trigger Ignition Event
 ```
 
-Forces high arousal/stress to induce ignition
+Temporarily elevates arousal and stress levels to induce ignition, then
+auto-restores after 2 seconds.
 
 **Induce Stressor:**
 
@@ -282,15 +269,17 @@ time, ignition, free_energy, extero_precision, intero_precision,...
 
 | Shortcut | Action |
 | - | - |
-| **Ctrl+N** | New Session |
-| **Ctrl+O** | Load Configuration |
-| **Ctrl+S** | Save Configuration |
-| **Ctrl+E** | Export Data |
-| **Ctrl+Q** | Exit Application |
+| **Ctrl+N** / **⌘N** | New Session |
+| **Ctrl+O** / **⌘O** | Load Configuration |
+| **Ctrl+S** / **⌘S** | Save Configuration |
+| **Ctrl+E** / **⌘E** | Export Data |
+| **Ctrl+Q** / **⌘Q** | Exit Application |
 | **F5** | Start Simulation |
 | **F6** | Pause/Resume |
 | **F7** | Stop Simulation |
 | **F8** | Reset System |
+
+*On macOS, use ⌘ (Command) in place of Ctrl.*
 
 ## Visualization Guide
 
@@ -340,35 +329,16 @@ time, ignition, free_energy, extero_precision, intero_precision,...
 - Recovers slowly over time
 - Depletion → performance degradation
 
-### 3D State Space Interpretation
-
-- **X-axis (Free Energy)**: Prediction error magnitude
-- **Y-axis (Precision)**: Confidence in predictions
-- **Z-axis (Allostatic Load)**: Cumulative stress
-- **Color**: Time evolution (blue→red = early→late)
-
-**Healthy trajectory:**
-
-- Low free energy (good predictions)
-- Moderate precision (balanced)
-- Low allostatic load (stable)
-
-**Stressed trajectory:**
-
-- High free energy (poor predictions)
-- Variable precision (uncertainty)
-- High allostatic load (overload)
-
 ## Troubleshooting
 
 ### GUI Won't Start
 
 ```bash
 # Check dependencies
-pip install matplotlib tkinter
+pip install matplotlib
 
 # Verify system installation
-python -c "from apgi_simulation.system import APGISystem; print('OK')"
+python -c "from apgi_framework.system import APGISystem; print('OK')"
 ```
 
 ### Slow Performance
@@ -402,8 +372,8 @@ python -c "from apgi_simulation.system import APGISystem; print('OK')"
 
 1. **Trigger events** - Use Tools → Trigger Ignition for dramatic effect
 2. **Stress response** - Induce stressor to show allostatic regulation
-3. **3D visualization** - Show state space tab for spatial intuition
-4. **Parameter sweep** - Smoothly vary arousal to show threshold dynamics
+3. **Parameter sweep** - Smoothly vary arousal to show threshold dynamics
+4. **Export data** - Export to CSV/JSON for post-analysis
 
 ### For Learning
 
@@ -439,14 +409,25 @@ User Input → Parameters → APGI System → State → Buffers → Plots
 
 Planned features:
 
+- [ ] Additional visualization tabs (Self-Model, Oscillations, 3D State Space)
+- [x] Full Edit menu dialogs (System Parameters, Precision Settings, Ignition Threshold)
+- [x] Tools menu interventions (Trigger Ignition, Induce Stressor, Modulate Precision, Inject Input, Set Body State)
+- [x] Analysis menu reports (Statistics, Energy Report, Coherence Analysis, Generate Report)
+- [x] Help menu dialogs (Documentation, Shortcuts, About)
+- [x] Config file I/O (Load/Save/Export CSV/JSON)
+- [x] Preset task runner (Attentional Blink, Change Blindness, etc.)
+- [x] Auto-save data toggle
+- [x] Plot export (PNG/PDF)
+- [x] Keyboard shortcuts with platform-aware bindings (Command on macOS)
+- [x] System Diagnostics window (live thread/buffer/memory info)
+- [x] View menu panel/tab toggles (hide/show control panel and viz tabs)
+- [x] Sensory input injection with configurable amplitude and duration
 - [ ] Custom task designer
 - [ ] Real-time neural network visualization
 - [ ] Multi-session comparison
 - [ ] Automated parameter optimization
 - [ ] Video export (simulation playback)
 - [ ] Plugin system for extensions
-- [ ] Cloud synchronization
-- [ ] Collaborative sessions
 
 ## Support & Resources
 

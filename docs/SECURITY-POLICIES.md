@@ -1,5 +1,204 @@
 # Security Policies
 
+## Overview
+
+This document outlines the security policies and procedures for the APGI System.
+
+## Reporting Security Vulnerabilities
+
+We take security seriously and appreciate your help in identifying vulnerabilities.
+
+### How to Report
+
+**Email:** security@apgi.example.com  
+**PGP Key:** [PGP Key ID]  
+**Expected Response Time:** Within 48 hours
+
+### What to Include
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Proof of concept (if applicable)
+- Your preferred method of acknowledgment
+
+### Safe Harbor
+
+We commit to:
+- Not pursue legal action against security researchers who follow this policy
+- Work with researchers to understand and fix vulnerabilities
+- Credit researchers in our security advisories (if desired)
+- Maintain confidentiality during the disclosure process
+
+## Security Principles
+
+### Defense in Depth
+
+Multiple layers of security controls:
+- Network security (firewalls, VPC isolation)
+- Application security (authentication, authorization)
+- Data security (encryption, access controls)
+- Physical security (data center controls)
+
+### Least Privilege
+
+- Users have minimum necessary access
+- Role-based access control (RBAC)
+- Regular access reviews
+- Principle of least privilege enforced
+
+### Secure by Default
+
+- Secure configurations by default
+- Encryption enabled by default
+- Logging enabled by default
+- Security headers enabled by default
+
+### Transparency
+
+- Open security documentation
+- Public vulnerability disclosure
+- Security incident communication
+- Regular security reports
+
+## Security Controls
+
+### Authentication
+
+- Multi-factor authentication (MFA) required for all users
+- Password complexity requirements (12+ chars, 3 character classes)
+- Session timeout after 15 minutes of inactivity
+- Account lockout after 5 failed attempts
+- Password rotation every 90 days
+
+### Authorization
+
+- Role-based access control (RBAC)
+- Permission-based access
+- Resource-level permissions
+- Regular access reviews (quarterly)
+
+### Data Protection
+
+- Encryption at rest (AES-256)
+- Encryption in transit (TLS 1.3)
+- PII masking in logs
+- Data classification and handling
+- Secure key management
+
+### Network Security
+
+- VPC isolation
+- Security groups with least privilege
+- DDoS protection
+- Web Application Firewall (WAF)
+- Intrusion detection/prevention
+
+### Application Security
+
+- Input validation and sanitization
+- Output encoding
+- SQL injection prevention
+- XSS prevention
+- CSRF protection
+- Security headers (CSP, HSTS, X-Frame-Options)
+
+### Monitoring and Logging
+
+- Comprehensive audit logging
+- Real-time security monitoring
+- Anomaly detection
+- Alerting for suspicious activities
+- Log retention: 90 days (security), 1 year (audit)
+
+### Incident Response
+
+- 24/7 incident response team
+- Incident classification and severity
+- Response procedures documented
+- Communication procedures
+- Post-incident reviews
+
+## Compliance
+
+### GDPR
+
+- Data subject rights implemented
+- Data protection impact assessments
+- Data breach notification (72 hours)
+- Data minimization principles
+- Privacy by design
+
+### HIPAA
+
+- PHI protection measures
+- Business associate agreements
+- Security risk assessments
+- Breach notification (60 days)
+- Minimum necessary standard
+
+### SOC 2 Type II
+
+- Security controls documented
+- Annual independent audits
+- Control testing
+- Evidence collection
+- Continuous monitoring
+
+## Security Best Practices
+
+### For Developers
+
+- Follow secure coding guidelines
+- Use parameterized queries
+- Validate all inputs
+- Handle errors securely
+- Keep dependencies updated
+- Use security linters (Bandit, Safety)
+
+### For Operations
+
+- Regular security updates
+- Vulnerability scanning
+- Penetration testing
+- Security training
+- Incident response drills
+- Backup and recovery testing
+
+### For Users
+
+- Use strong, unique passwords
+- Enable MFA
+- Report suspicious activity
+- Keep software updated
+- Be cautious of phishing
+- Follow security policies
+
+## Security Contacts
+
+### Security Team
+
+- **Security Officer:** security@apgi.example.com
+- **Incident Response:** incidents@apgi.example.com
+- **Bug Bounty:** security@apgi.example.com
+
+### Emergency Contacts
+
+- **24/7 Hotline:** [Phone Number]
+- **Emergency Email:** emergency@apgi.example.com
+
+## Security Resources
+
+- [Security Documentation](docs/security/)
+- [Compliance Documentation](docs/compliance/)
+- [Security Advisories](docs/security/advisories/)
+- [Security Training](docs/security/training/)
+
+## Acknowledgments
+
+We thank the security community for their contributions to making the APGI System more secure.
+
+
 ## Secrets Rotation Policy
 
 ### Overview
@@ -141,73 +340,6 @@ This policy aligns with:
 
 ---
 
-## API Key Rotation Mechanism
-
-### API Key Overview
-
-API keys are used for external service integrations and must be rotated regularly to maintain security.
-
-### Rotation Procedure
-
-#### 1. Key Generation
-
-```bash
-# Generate new API key (32+ characters)
-openssl rand -base64 32
-```
-
-#### 2. Update Process
-
-1. Generate new API key
-2. Update external service configuration with new key
-3. Update environment variable in all environments
-4. Deploy changes
-5. Test integration
-6. Revoke old key after 24 hours
-
-#### 3. Testing
-
-```bash
-# Test API key validity
-curl -H "Authorization: Bearer <NEW_API_KEY>" https://api.example.com/health
-```
-
-### Key Storage
-
-- Store API keys in environment variables
-- Never commit API keys to version control
-- Use secret management tools for production
-- Rotate keys every 90 days
-
-### Key Types
-
-#### Internal API Keys
-
-- Used for service-to-service communication
-- Rotate every 90 days
-- Store in Kubernetes secrets
-
-#### External API Keys
-
-- Used for third-party integrations
-- Rotate according to provider requirements
-- Store in environment variables
-
-#### Webhook Secrets
-
-- Used for webhook signature verification
-- Rotate every 180 days
-- Store in environment variables
-
-### Monitoring
-
-- Monitor API key usage patterns
-- Alert on unusual activity
-- Track key expiration dates
-- Log all key rotations
-
----
-
 ## Response Caching Strategy
 
 ### Response Caching Overview
@@ -287,10 +419,6 @@ Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT
 ---
 
 ## Database Query Optimization
-
-### Database Optimization Overview
-
-Optimizing database queries ensures efficient data retrieval and maintains application performance.
 
 ### Indexing Strategy
 

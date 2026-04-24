@@ -99,7 +99,7 @@ class HardwareFailureHandler:
             "cardiac": {"available": True, "last_check": None, "error": None},
         }
 
-        self.failure_callbacks: Dict[str, List[Callable]] = {
+        self.failure_callbacks: Dict[str, List[Callable[..., Any]]] = {
             "eeg": [],
             "eye_tracker": [],
             "cardiac": [],
@@ -107,7 +107,7 @@ class HardwareFailureHandler:
 
         logger.info("HardwareFailureHandler initialized")
 
-    def register_failure_callback(self, hardware_type: str, callback: Callable) -> None:
+    def register_failure_callback(self, hardware_type: str, callback: Callable[..., Any]) -> None:
         """
         Register callback for hardware failure.
 

@@ -13,7 +13,7 @@ import json
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -278,11 +278,11 @@ class BatchTestRunner:
     def _run_tests_parallel(
         self, test_files: List[str], max_workers: int, timeout: int, failfast: bool
     ) -> List[TestResult]:
-        """Run tests in parallel using ThreadPoolExecutor."""
+        """Run tests in parallel using ProcessPoolExecutor."""
         test_results = []
         completed_count = 0
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             # Submit all test tasks
             future_to_test = {
                 executor.submit(self._run_single_test, test_file, timeout): test_file

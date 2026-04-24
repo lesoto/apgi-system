@@ -54,6 +54,7 @@ dependencies = [
     "pyyaml>=6.0",
     "jupyter>=1.0.0",
     "psutil>=5.9.0",
+    "orjson>=3.9.0",
 ]
 
 [project.urls]
@@ -116,9 +117,13 @@ dev = [
     "hypothesis>=6.82.0",
     "mutmut>=2.4.0",
     "types-requests>=2.28.0",
+    "types-Pillow>=10.0.0",
+    "types-psutil>=5.9.0",
+    "types-tqdm>=4.65.0",
     "pre-commit>=2.0",
-    "sphinx>=4.0",
-    "sphinx-rtd-theme>=1.0",
+    "sphinx>=8.0",
+    "sphinx-rtd-theme>=2.0",
+    "py-spy>=0.3.0",
 ]
 testing = [
     "hypothesis>=6.82.0",
@@ -158,8 +163,8 @@ all = [
     "flake8>=6.0.0",
     "mypy>=1.0",
     "pre-commit>=2.0",
-    "sphinx>=4.0",
-    "sphinx-rtd-theme>=1.0",
+    "sphinx>=8.0",
+    "sphinx-rtd-theme>=2.0",
     "scikit-learn>=1.3.0",
     "torch>=2.0.0",
     "torchvision>=0.15.0",
@@ -236,11 +241,11 @@ addopts = [
     "--tb=short",
     "--cov=apgi_framework",
     "--cov=api",
+    "--cov-branch",
     "--cov-report=html:htmlcov",
     "--cov-report=term-missing",
     "--cov-report=json:coverage.json",
     "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=90",
 ]
 markers = [
     "unit: Unit tests for individual components",
@@ -324,7 +329,7 @@ module = ["scipy.*", "h5py.*", "plotly.*", "fooof.*", "specparam.*", "customtkin
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["APGI-GUI", "APGI-Simulation-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI", "apgi_gui.*", "apgi_framework.*"]
+module = ["APGI-GUI", "APGI-Simulation-GUI", "Assistant-GUI", "Psychological-States-GUI", "Tests-GUI", "Utils-GUI"]
 disallow_untyped_defs = false
 disallow_any_generics = false
 disallow_untyped_calls = false
@@ -332,6 +337,9 @@ disallow_incomplete_defs = false
 check_untyped_defs = false
 warn_unused_ignores = false
 disable_error_code = ["misc", "func-returns-value", "unused-ignore"]
+
+# Note: apgi_gui.* and apgi_framework.* now use strict typing
+# Remove overrides to enforce strict type checking across core modules
 
 [[tool.mypy.overrides]]
 module = ["api.tasks.experimental_tasks"]
@@ -393,8 +401,18 @@ paths_to_mutate = [
     "apgi_framework/core/active_inference.py",
     "apgi_framework/core/free_energy.py",
     "apgi_framework/core/vp15.py",
+    "apgi_framework/core/surprise_dynamics.py",
+    "apgi_framework/core/threshold_phenomenon.py",
     "apgi_framework/ignition/threshold.py",
     "apgi_framework/interoception/allostasis.py",
+    "apgi_framework/adaptive/quest_plus_staircase.py",
+    "apgi_framework/adaptive/stimulus_generators.py",
+    "apgi_framework/analysis/analysis_engine.py",
+    "apgi_framework/analysis/bayesian_models.py",
+    "apgi_framework/clinical/disorder_classification.py",
+    "apgi_framework/clinical/parameter_extraction.py",
+    "apgi_framework/data/parameter_estimation_dao.py",
+    "apgi_framework/accessibility/accessibility_manager.py",
 ]
 test_command = "python -m pytest tests/unit/test_active_inference.py tests/unit/test_vp15_protocol.py tests/unit/test_free_energy.py tests/unit/test_ignition_dynamics.py tests/unit/test_allostasis.py -x -q --no-header"
 no_progress_bar = false

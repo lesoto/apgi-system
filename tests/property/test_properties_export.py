@@ -78,20 +78,32 @@ class DataExporter:
 
         # Extract and record metrics (matches GUI logic)
         # Convert arrays to scalars for export
+        # Use .get() for safe access to nested keys that may not exist
+        oscillations = state.get("oscillations", {})
+        band_powers = oscillations.get("band_powers", {}) if isinstance(oscillations, dict) else {}
+
         data_entry = {
             "time": current_time,
-            "ignition": 1 if state["ignition"]["ignition_occurred"] else 0,
-            "free_energy": self._to_scalar(state["ignition"]["total_signal"]),
-            "extero_precision": self._to_scalar(state["precision"]["exteroceptive"]),
-            "intero_precision": self._to_scalar(state["precision"]["interoceptive"]),
-            "metabolic_reserves": self._to_scalar(state["metabolism"]["reserves"]),
-            "allostatic_load": self._to_scalar(state["allostasis"]["allostatic_load"]),
-            "heart_rate": self._to_scalar(state["body"]["current"]["heart_rate"]),
-            "cortisol": self._to_scalar(state["body"]["current"]["cortisol"]),
-            "workspace_active": 1 if state["workspace"]["is_reportable"] else 0,
-            "gamma_power": self._to_scalar(state["oscillations"]["band_powers"].get("gamma", 0)),
-            "beta_power": self._to_scalar(state["oscillations"]["band_powers"].get("beta", 0)),
-            "minimal_self_coherence": self._to_scalar(state["self_model"]["minimal"]["coherence"]),
+            "ignition": 1 if state.get("ignition", {}).get("ignition_occurred") else 0,
+            "free_energy": self._to_scalar(state.get("ignition", {}).get("total_signal", 0)),
+            "extero_precision": self._to_scalar(state.get("precision", {}).get("exteroceptive", 0)),
+            "intero_precision": self._to_scalar(state.get("precision", {}).get("interoceptive", 0)),
+            "metabolic_reserves": self._to_scalar(state.get("metabolism", {}).get("reserves", 0)),
+            "allostatic_load": self._to_scalar(
+                state.get("allostasis", {}).get("allostatic_load", 0)
+            ),
+            "heart_rate": self._to_scalar(
+                state.get("body", {}).get("current", {}).get("heart_rate", 0)
+            ),
+            "cortisol": self._to_scalar(
+                state.get("body", {}).get("current", {}).get("cortisol", 0)
+            ),
+            "workspace_active": 1 if state.get("workspace", {}).get("is_reportable") else 0,
+            "gamma_power": self._to_scalar(band_powers.get("gamma", 0)),
+            "beta_power": self._to_scalar(band_powers.get("beta", 0)),
+            "minimal_self_coherence": self._to_scalar(
+                state.get("self_model", {}).get("minimal", {}).get("coherence", 0)
+            ),
         }
 
         self.log_data.append(data_entry)
@@ -218,10 +230,13 @@ def test_property_export_data_completeness(
     system = APGISystem()
     exporter = DataExporter()
 
+    # Flatten observation to 1D (framework expects shape (dim,) not (1, dim))
+    obs_flat = observation.reshape(-1)
+
     # Run simulation for specified steps
     for step in range(num_steps):
         # Generate varied input for each step
-        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        input_obs = obs_flat + np.random.randn(len(obs_flat)) * 0.1
         state = system.step(input_obs)
         exporter.record_state(state)
 
@@ -288,9 +303,12 @@ def test_property_analysis_report_statistics(
     system = APGISystem()
     exporter = DataExporter()
 
+    # Flatten observation to 1D
+    obs_flat = observation.reshape(-1)
+
     # Run simulation for specified steps
     for step in range(num_steps):
-        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        input_obs = obs_flat + np.random.randn(len(obs_flat)) * 0.1
         state = system.step(input_obs)
         exporter.record_state(state)
 
@@ -354,9 +372,12 @@ def test_property_csv_format_consistency(num_steps: int, observation: NDArray[np
     system = APGISystem()
     exporter = DataExporter()
 
+    # Flatten observation to 1D
+    obs_flat = observation.reshape(-1)
+
     # Run simulation for specified steps
     for step in range(num_steps):
-        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        input_obs = obs_flat + np.random.randn(len(obs_flat)) * 0.1
         state = system.step(input_obs)
         exporter.record_state(state)
 
@@ -437,9 +458,12 @@ def test_property_json_round_trip_preservation(
     system = APGISystem()
     exporter = DataExporter()
 
+    # Flatten observation to 1D
+    obs_flat = observation.reshape(-1)
+
     # Run simulation for specified steps
     for step in range(num_steps):
-        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        input_obs = obs_flat + np.random.randn(len(obs_flat)) * 0.1
         state = system.step(input_obs)
         exporter.record_state(state)
 
@@ -523,9 +547,12 @@ def test_property_pagination_consistency(
     system = APGISystem()
     exporter = DataExporter()
 
+    # Flatten observation to 1D
+    obs_flat = observation.reshape(-1)
+
     # Run simulation for specified steps to generate data
     for step in range(num_steps):
-        input_obs = observation + np.random.randn(len(observation)) * 0.1
+        input_obs = obs_flat + np.random.randn(len(obs_flat)) * 0.1
         state = system.step(input_obs)
         exporter.record_state(state)
 

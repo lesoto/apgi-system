@@ -37,7 +37,7 @@ class StaticDashboardGenerator:
 
     def __init__(self, output_dir: Optional[str] = None):
         """Initialize the dashboard generator."""
-        self.output_dir = Path(output_dir or "apgi_output/dashboards")
+        self.output_dir = Path(output_dir or "apgi_outputs/dashboards")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_system_dashboard(self) -> str:

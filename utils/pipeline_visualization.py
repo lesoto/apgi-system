@@ -92,7 +92,7 @@ class PipelineVisualizer:
     """Advanced pipeline visualization system."""
 
     def __init__(self, output_dir: Optional[Path] = None):
-        self.output_dir = output_dir or Path("apgi_output/pipeline_visualizations")
+        self.output_dir = output_dir or Path("apgi_outputs/pipeline_visualizations")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Color schemes for different node types

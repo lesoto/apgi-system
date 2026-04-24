@@ -223,7 +223,7 @@ class ComprehensiveGUILauncher:
                 },
                 {
                     "name": "APGI Application GUI",
-                    "file": "APGI_Application -GUI.py",
+                    "file": "APGI_Application_GUI.py",
                     "description": "Application-level GUI for APGI Framework",
                     "icon": "[App]",
                     "command": self.launch_apgi_application_gui,
@@ -324,13 +324,6 @@ class ComprehensiveGUILauncher:
             ],
             "Configuration & Management": [
                 {
-                    "name": "Utils GUI",
-                    "file": "Utils-GUI.py",
-                    "description": "Utility script runner with GUI interface",
-                    "icon": "[Tools]",
-                    "command": self.launch_utils_gui,
-                },
-                {
                     "name": "Task Configuration",
                     "file": "apgi_framework/gui/task_configuration.py",
                     "description": "Configure experimental tasks",
@@ -374,13 +367,6 @@ class ComprehensiveGUILauncher:
                 },
             ],
             "Development & Testing": [
-                {
-                    "name": "Tests GUI",
-                    "file": "Tests-GUI.py",
-                    "description": "Comprehensive test runner with GUI interface",
-                    "icon": "[Tests]",
-                    "command": self.launch_tests_gui,
-                },
                 {
                     "name": "GUI Template",
                     "file": "apps/gui_template.py",
@@ -528,13 +514,6 @@ class ComprehensiveGUILauncher:
                     "description": "Clean Python cache files",
                     "icon": "[Clean]",
                     "command": self.launch_delete_cache,
-                },
-                {
-                    "name": "Install Dependencies",
-                    "file": "utils/install_dependencies.py",
-                    "description": "Installation and dependency setup",
-                    "icon": "[Setup]",
-                    "command": self.launch_setup_script,
                 },
                 {
                     "name": "Backup Manager",
@@ -1005,17 +984,9 @@ class ComprehensiveGUILauncher:
             "apgi_framework/gui/progress_monitoring.py", "Progress Monitoring"
         )
 
-    def launch_utils_gui(self):
-        """Launch Utils GUI."""
-        self.launch_python_script("Utils-GUI.py", "Utils GUI")
-
     def launch_error_handling(self):
         """Launch Error Handling Demo."""
         self.launch_python_script("apgi_framework/gui/error_handling.py", "Error Handling Demo")
-
-    def launch_tests_gui(self):
-        """Launch Tests GUI."""
-        self.launch_python_script("Tests-GUI.py", "Tests GUI")
 
     # Additional GUI launch methods
     def launch_coverage_visualization(self):
@@ -1056,7 +1027,6 @@ class ComprehensiveGUILauncher:
         """Launch Deployment CLI."""
         self.launch_python_script("apgi_framework/deployment/cli.py", "Deployment CLI")
 
-    # Setup & Deployment launch methods
     def launch_setup_script(self):
         """Launch Setup Script."""
         self.launch_python_script("utils/install_dependencies.py", "Setup Script")
@@ -1113,7 +1083,7 @@ class ComprehensiveGUILauncher:
 
     def launch_apgi_application_gui(self):
         """Launch APGI Application GUI."""
-        self.launch_python_script("APGI_Application -GUI.py", "APGI Application GUI")
+        self.launch_python_script("APGI_Application_GUI.py", "APGI Application GUI")
 
     def launch_assistant_gui(self):
         """Launch Assistant GUI."""

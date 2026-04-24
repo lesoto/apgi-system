@@ -125,31 +125,28 @@ def install_core_dependencies() -> bool:
 
     # Upgrade pip first (try multiple approaches)
     pip_upgraded = False
-    try:
-        # First try without --break-system-packages
-        run_command(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "pip"],
-            "Upgrading pip",
-        )
+
+    # First try without --break-system-packages
+    if run_command(
+        [sys.executable, "-m", "pip", "install", "--upgrade", "pip"],
+        "Upgrading pip",
+    ):
         pip_upgraded = True
-    except Exception:
-        try:
-            # If that fails, try with --break-system-packages
-            run_command(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    "pip",
-                    "--break-system-packages",
-                ],
-                "Upgrading pip (with system packages override)",
-            )
-            pip_upgraded = True
-        except Exception:
-            print("⚠️  Could not upgrade pip, continuing with current version...")
+    elif run_command(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--upgrade",
+            "pip",
+            "--break-system-packages",
+        ],
+        "Upgrading pip (with system packages override)",
+    ):
+        pip_upgraded = True
+    else:
+        print("⚠️  Could not upgrade pip, continuing with current version...")
 
     if pip_upgraded:
         print("✅ Pip upgraded successfully")
@@ -157,32 +154,30 @@ def install_core_dependencies() -> bool:
         print("ℹ️  Using existing pip version")
 
     # Install core requirements
-    success = False
-    try:
-        success = run_command(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "-r",
-                str(requirements_path),
-                "--break-system-packages",
-            ],
-            "Installing core dependencies",
-        )
-    except Exception:
-        try:
-            # Fallback: try without --break-system-packages
-            success = run_command(
-                [sys.executable, "-m", "pip", "install", "-r", str(requirements_path)],
-                "Installing core dependencies (fallback)",
-            )
-        except Exception:
-            print("❌ Failed to install core dependencies")
-            return False
+    # First try with --break-system-packages
+    if run_command(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            str(requirements_path),
+            "--break-system-packages",
+        ],
+        "Installing core dependencies",
+    ):
+        return True
 
-    return success
+    # Fallback: try without --break-system-packages
+    if run_command(
+        [sys.executable, "-m", "pip", "install", "-r", str(requirements_path)],
+        "Installing core dependencies (fallback)",
+    ):
+        return True
+
+    print("❌ Failed to install core dependencies")
+    return False
 
 
 def install_optional_dependencies() -> None:
@@ -274,9 +269,9 @@ def main() -> None:
     if verify_installation():
         print("\n🎉 Installation completed successfully!")
         print("\nNext steps:")
-        print("1. Run 'python main.py --help' to see available commands")
-        print("2. Try 'python main.py validate --all-protocols' to test the framework")
-        print("3. Use 'python main.py gui --gui-type analysis' for the web interface")
+        print("1. Run 'python apgi_gui/main.py' to launch the GUI")
+        print("2. Try 'python -m apgi_framework --help' to see available commands")
+        print("3. Run 'python GUI-Launcher.py' for the unified launcher interface")
     else:
         error = ConfigurationError(
             message="Installation verification failed",

@@ -555,8 +555,10 @@ class InteractiveVisualizer:
     Provides interactive visualization capabilities for real-time analysis.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str = "figures") -> None:
         """Initialize interactive visualizer"""
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)
         self.logger = logging.getLogger(__name__)
 
     def create_interactive_dashboard_data(
@@ -613,3 +615,106 @@ class InteractiveVisualizer:
 
         except Exception as e:
             raise VisualizationError(f"Failed to create interactive dashboard data: {str(e)}")
+
+    def plot_self_model(
+        self,
+        trials: List[ExperimentalTrial],
+        save_path: Optional[Union[str, Path]] = None,
+    ) -> str:
+        """Visualize the self-model dynamics."""
+        try:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+            intero_precisions = [t.apgi_parameters.intero_precision for t in trials]
+            somatic_gains = [t.apgi_parameters.somatic_gain for t in trials]
+            consciousness = [t.consciousness_assessment.subjective_report for t in trials]
+
+            # Plot interoceptive precision vs somatic gain
+            colors = ["green" if c else "red" for c in consciousness]
+            ax1.scatter(intero_precisions, somatic_gains, c=colors, alpha=0.6)
+            ax1.set_title("Self-Model: Interoceptive Precision vs Somatic Gain")
+            ax1.set_xlabel("Interoceptive Precision (Πᵢ)")
+            ax1.set_ylabel("Somatic Gain (M_{c,a})")
+
+            # Plot distribution of somatic influence
+            somatic_influence = [i * g for i, g in zip(intero_precisions, somatic_gains)]
+            sns.kdeplot(somatic_influence, ax=ax2, fill=True)
+            ax2.set_title("Distribution of Somatic Influence (Πᵢ * M_{c,a})")
+            ax2.set_xlabel("Influence Strength")
+
+            plt.tight_layout()
+            if not save_path:
+                save_path = (
+                    self.output_dir / f"self_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                )
+            plt.savefig(save_path)
+            plt.close()
+            return str(save_path)
+        except Exception as e:
+            raise VisualizationError(f"Failed to create self-model plot: {str(e)}")
+
+    def plot_oscillations(
+        self,
+        trials: List[ExperimentalTrial],
+        save_path: Optional[Union[str, Path]] = None,
+    ) -> str:
+        """Visualize oscillatory dynamics across trials."""
+        try:
+            fig, ax = plt.subplots(figsize=(12, 6))
+
+            gamma_plvs = [t.neural_signatures.gamma_plv for t in trials]
+            trial_indices = range(len(trials))
+
+            ax.plot(trial_indices, gamma_plvs, label="Gamma PLV", color="purple")
+            ax.set_title("Oscillatory Dynamics Across Trials")
+            ax.set_xlabel("Trial Index")
+            ax.set_ylabel("Gamma Phase-Locking Value")
+            ax.legend()
+
+            plt.tight_layout()
+            if not save_path:
+                save_path = (
+                    self.output_dir / f"oscillations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                )
+            plt.savefig(save_path)
+            plt.close()
+            return str(save_path)
+        except Exception as e:
+            raise VisualizationError(f"Failed to create oscillations plot: {str(e)}")
+
+    def plot_3d_state_space(
+        self,
+        trials: List[ExperimentalTrial],
+        save_path: Optional[Union[str, Path]] = None,
+    ) -> str:
+        """Visualize APGI state space in 3D."""
+        try:
+            from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection="3d")
+
+            extero = [t.apgi_parameters.extero_precision for t in trials]
+            intero = [t.apgi_parameters.intero_precision for t in trials]
+            threshold = [t.apgi_parameters.threshold for t in trials]
+            consciousness = [t.consciousness_assessment.subjective_report for t in trials]
+
+            colors = ["green" if c else "red" for c in consciousness]
+            ax.scatter(extero, intero, threshold, c=colors, alpha=0.6)
+
+            ax.set_title("3D APGI State Space")
+            ax.set_xlabel("Extero Precision")
+            ax.set_ylabel("Intero Precision")
+            ax.set_zlabel("Threshold")
+
+            plt.tight_layout()
+            if not save_path:
+                save_path = (
+                    self.output_dir
+                    / f"state_space_3d_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                )
+            plt.savefig(save_path)
+            plt.close()
+            return str(save_path)
+        except Exception as e:
+            raise VisualizationError(f"Failed to create 3D state space plot: {str(e)}")

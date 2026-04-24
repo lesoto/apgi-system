@@ -53,6 +53,12 @@ class SimulationController:
         self.is_running = False
         self.is_paused = False
 
+        # Wait for simulation thread to complete with timeout
+        if self.simulation_thread is not None and self.simulation_thread.is_alive():
+            self.simulation_thread.join(timeout=2.0)
+            if self.simulation_thread.is_alive():
+                logger.warning("Simulation thread did not terminate within timeout")
+
     def reset(self) -> None:
         """Reset the simulation."""
         was_running = self.is_running
@@ -105,4 +111,4 @@ class SimulationController:
             logger.error(f"Simulation error: {e}")
             self.is_running = False
             if "on_error" in self.callbacks:
-                self.callbacks["on_error"](str(e))
+                self.callbacks["on_error"]({"message": str(e)})

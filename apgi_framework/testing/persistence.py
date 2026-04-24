@@ -82,6 +82,11 @@ class TestResultPersistence:
         # Initialize database
         self._initialize_database()
 
+    def _log_operation(self, operation: str, details: str) -> None:
+        """Log a database operation for auditing."""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.logger.info(f"AUDIT | {timestamp} | {operation} | {details}")
+
     @contextmanager
     def get_connection(self) -> Iterator[sqlite3.Connection]:
         """Get database connection with proper error handling."""
@@ -99,6 +104,7 @@ class TestResultPersistence:
 
     def _initialize_database(self) -> None:
         """Initialize database tables."""
+        self._log_operation("INITIALIZE", "Database tables initialization")
         with self.get_connection() as conn:
             # Create batch_executions table
             conn.execute("""
@@ -181,6 +187,7 @@ class TestResultPersistence:
         if batch_id is None:
             batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+        self._log_operation("WRITE", f"Storing batch results for {batch_id}")
         try:
             with self.get_connection() as conn:
                 # Store batch execution record
@@ -367,6 +374,9 @@ class TestResultPersistence:
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """Get test execution history."""
+        self._log_operation(
+            "READ", f"Fetching test history (name={test_name}, file={test_file}, days={days})"
+        )
         try:
             with self.get_connection() as conn:
                 query = """
@@ -609,6 +619,7 @@ Analysis Period: Last {days} days
 
     def cleanup_old_records(self, days_to_keep: int = 90) -> Tuple[int, int]:
         """Clean up old test execution records."""
+        self._log_operation("DELETE", f"Cleaning up records older than {days_to_keep} days")
         try:
             with self.get_connection() as conn:
                 # Delete old batch executions

@@ -188,7 +188,7 @@ class PerformanceProfiler:
     """Advanced performance profiling for APGI framework."""
 
     def __init__(self, save_dir: Optional[Union[str, Path]] = None):
-        self.save_dir = Path(save_dir or "apgi_output/performance_profiles")
+        self.save_dir = Path(save_dir or "apgi_outputs/performance_profiles")
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         self.function_profiles: Dict[str, FunctionProfile] = {}
