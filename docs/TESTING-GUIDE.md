@@ -12,6 +12,52 @@ This guide provides comprehensive information about the testing infrastructure f
 6. [Fixtures and Utilities](#fixtures-and-utilities)
 7. [Best Practices](#best-practices)
 
+## Coverage Commands
+
+```bash
+# Generate coverage report
+python -m pytest --cov=apgi_framework --cov-report=term-missing
+
+# Generate HTML report
+python -m pytest --cov=apgi_framework --cov-report=html
+
+# Generate XML report for CI
+python -m pytest --cov=apgi_framework --cov-report=xml
+
+# Run specific module coverage
+python -m pytest tests/test_analysis.py --cov=apgi_framework.analysis
+
+# Run with coverage minimum threshold
+python -m pytest --cov=apgi_framework --cov-fail-under=80
+```
+
+## Test Directory Structure
+
+The 177 test files are organized into logical categories:
+
+```text
+tests/
+├── unit/                    # 43 files - Core unit tests
+│   ├── api/                # API endpoint tests
+│   ├── test_*.py           # Component-specific unit tests
+│   └── ...
+├── integration/             # 10 files - Integration workflows
+│   ├── test_api_workflows.py
+│   ├── test_end_to_end_workflow.py
+│   └── ...
+├── property/                # 14 files - Property-based tests
+│   ├── test_properties_*.py
+│   └── ...
+├── framework/               # 4 files - Framework-specific tests
+│   ├── gui/
+│   ├── neural/
+│   └── ...
+├── test_*.py               # 100+ top-level test files
+└── conftest.py           # Shared pytest fixtures
+```
+
+---
+
 ## Test Organization
 
 Tests are organized into three main categories:

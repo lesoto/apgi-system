@@ -368,6 +368,20 @@ class ComprehensiveGUILauncher:
             ],
             "Development & Testing": [
                 {
+                    "name": "Tests GUI",
+                    "file": "Tests_GUI.py",
+                    "description": "GUI to run all tests folder scripts with summary panel",
+                    "icon": "[Tests]",
+                    "command": self.launch_tests_gui,
+                },
+                {
+                    "name": "Utils GUI",
+                    "file": "Utils_GUI.py",
+                    "description": "GUI to run all utility scripts from utils folder",
+                    "icon": "[Utils]",
+                    "command": self.launch_utils_gui,
+                },
+                {
                     "name": "GUI Template",
                     "file": "apps/gui_template.py",
                     "description": "GUI template for development",
@@ -724,15 +738,28 @@ class ComprehensiveGUILauncher:
         header_frame = tk.Frame(main_container, bg="#ecf0f1")
         header_frame.pack(fill=tk.X, pady=(0, UIConfig.HEADER_SPACING))
 
-        # Title and subtitle
+        # Title and exit button container
+        title_container = tk.Frame(header_frame, bg="#ecf0f1")
+        title_container.pack(fill=tk.X)
+
+        # Title
         title_label = tk.Label(
-            header_frame,
+            title_container,
             text="APGI Framework Launcher",
             font=("Helvetica", UIConfig.FONT_TITLE_SIZE, "bold"),
             bg="#ecf0f1",
             fg="#2c3e50",
         )
-        title_label.pack()
+        title_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Exit button (top right)
+        exit_button = ttk.Button(
+            title_container,
+            text="Exit",
+            command=self.root.quit,
+            style="Danger.TButton",
+        )
+        exit_button.pack(side=tk.RIGHT, padx=(20, 0))
 
         # Scrollable area for applications
         canvas = tk.Canvas(main_container, bg="#ecf0f1", highlightthickness=0)
@@ -777,27 +804,6 @@ class ComprehensiveGUILauncher:
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
         canvas.bind_all("<Button-4>", _on_mousewheel_linux)
         canvas.bind_all("<Button-5>", _on_mousewheel_linux)
-
-        # Bottom buttons
-        self.create_bottom_buttons(main_container)
-
-    def create_bottom_buttons(self, parent):
-        """Create bottom action buttons."""
-        bottom_frame = tk.Frame(parent, bg="#ecf0f1")
-        bottom_frame.pack(fill=tk.BOTH, expand=True, pady=(UIConfig.BOTTOM_BUTTON_SPACING, 0))
-
-        # Left side buttons
-        left_frame = tk.Frame(bottom_frame, bg="#ecf0f1")
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Exit button
-        exit_button = ttk.Button(
-            left_frame,
-            text="Exit",
-            command=self.root.quit,
-            style="Danger.TButton",
-        )
-        exit_button.pack(side=tk.LEFT)
 
     def create_application_sections(self, parent):
         """Create application sections for each category."""
@@ -1120,6 +1126,14 @@ class ComprehensiveGUILauncher:
         self.launch_python_script("apgi_gui/main.py", "apgi GUI Main")
 
     # Development & Testing launch methods
+    def launch_tests_gui(self):
+        """Launch Tests GUI."""
+        self.launch_python_script("Tests_GUI.py", "Tests GUI")
+
+    def launch_utils_gui(self):
+        """Launch Utils GUI."""
+        self.launch_python_script("Utils_GUI.py", "Utils GUI")
+
     def launch_apgi_design(self):
         """Launch APGI Design."""
         self.launch_python_script("apps/apgi-design.py", "APGI Design")

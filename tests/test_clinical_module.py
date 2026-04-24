@@ -1,5 +1,12 @@
 """
 Tests for clinical module components.
+
+Consolidated from:
+- test_clinical_module.py (base tests)
+- test_clinical_modules.py (cross-validation and treatment prediction tests)
+- test_clinical_simple.py (enum tests for ModalityType, TaskType)
+- test_clinical_biomarkers.py (biomarker analysis tests)
+- test_clinical_parameter_extraction_coverage.py (reliability metrics)
 """
 
 # Mock imports for testing
@@ -14,8 +21,18 @@ from apgi_framework.clinical.disorder_classification import (
     NeuralSignatureProfile,
 )
 from apgi_framework.clinical.parameter_extraction import (
+    AssessmentBattery,
+    AssessmentTask,
     ClinicalParameterExtractor,
     ClinicalParameters,
+    ModalityType,
+    TaskType,
+)
+from apgi_framework.clinical.treatment_prediction import (
+    BaselineParameters,
+    TreatmentPrediction,
+    TreatmentPredictor,
+    TreatmentType,
 )
 
 
@@ -340,6 +357,252 @@ class TestTreatmentPredictor:
             assert hasattr(TreatmentType, "SNRI")
         except ImportError:
             pytest.skip("TreatmentType enum not implemented yet")
+
+
+class TestNeuralSignatureProfileExtended:
+    """Extended tests for NeuralSignatureProfile."""
+
+    def test_feature_vector_conversion(self):
+        """Test conversion to feature vector."""
+        import numpy as np
+
+        profile = NeuralSignatureProfile(
+            p3b_amplitude_extero=5.0,
+            p3b_amplitude_intero=3.0,
+            gamma_power_frontal=0.2,
+            gamma_coherence=0.35,
+            pupil_dilation_intero=0.8,
+        )
+
+        feature_vector = profile.to_feature_vector()
+
+        assert isinstance(feature_vector, np.ndarray)
+        assert len(feature_vector) == len(NeuralSignatureProfile.feature_names())
+        assert feature_vector[0] == 5.0  # p3b_amplitude_extero
+        assert feature_vector[1] == 3.0  # p3b_amplitude_intero
+
+    def test_feature_names(self):
+        """Test feature names method."""
+        feature_names = NeuralSignatureProfile.feature_names()
+
+        assert isinstance(feature_names, list)
+        assert len(feature_names) > 0
+        assert "p3b_amplitude_extero" in feature_names
+        assert "p3b_amplitude_intero" in feature_names
+        assert "gamma_power_frontal" in feature_names
+
+
+class TestAdditionalEnums:
+    """Test additional clinical enums."""
+
+    def test_modality_types(self):
+        """Test all modality type values."""
+        assert ModalityType.VISUAL.value == "visual"
+        assert ModalityType.AUDITORY.value == "auditory"
+        assert ModalityType.INTEROCEPTIVE.value == "interoceptive"
+
+    def test_task_types(self):
+        """Test all task type values."""
+        assert TaskType.THRESHOLD_DETECTION.value == "threshold_detection"
+        assert TaskType.ODDBALL.value == "oddball"
+        assert TaskType.EMOTIONAL_STROOP.value == "emotional_stroop"
+        assert TaskType.HEARTBEAT_DETECTION.value == "heartbeat_detection"
+        assert TaskType.BREATH_HOLD.value == "breath_hold"
+
+    def test_treatment_type_enum(self):
+        """Test TreatmentType enum values."""
+        assert TreatmentType.SSRI.value == "ssri"
+        assert TreatmentType.SNRI.value == "snri"
+        assert TreatmentType.BETA_BLOCKER.value == "beta_blocker"
+        assert TreatmentType.CBT.value == "cbt"
+        assert TreatmentType.EXPOSURE_THERAPY.value == "exposure_therapy"
+
+
+class TestTreatmentPrediction:
+    """Test treatment prediction functionality."""
+
+    def test_baseline_parameters_initialization(self):
+        """Test BaselineParameters initialization."""
+        params = BaselineParameters()
+        assert params.theta_t == 3.5
+        assert params.pi_e == 2.0
+        assert params.pi_i == 1.5
+        assert params.beta == 1.2
+
+    def test_treatment_predictor_initialization(self):
+        """Test treatment predictor initialization."""
+        predictor = TreatmentPredictor()
+        assert predictor is not None
+
+    def test_treatment_response_prediction(self):
+        """Test treatment response prediction."""
+        predictor = TreatmentPredictor()
+
+        # Test prediction
+        params = BaselineParameters()
+        prediction = predictor.predict(params)
+
+        assert isinstance(prediction, TreatmentPrediction)
+        assert isinstance(prediction.recommended_treatment, TreatmentType)
+        assert 0 <= prediction.predicted_response <= 1.0
+        assert 0 <= prediction.confidence <= 1.0
+
+
+class TestAssessmentBattery:
+    """Test assessment battery functionality."""
+
+    def test_assessment_task_to_dict(self):
+        """Test AssessmentTask serialization."""
+        task = AssessmentTask(
+            task_type=TaskType.THRESHOLD_DETECTION,
+            modality=ModalityType.VISUAL,
+            duration=5.0,
+            n_trials=40,
+        )
+        data = task.to_dict()
+        assert data["task_type"] == "threshold_detection"
+        assert data["modality"] == "visual"
+        assert data["duration"] == 5.0
+
+    def test_assessment_battery_logic(self):
+        """Test AssessmentBattery management."""
+        battery = AssessmentBattery(battery_id="B001", participant_id="P001")
+        task1 = AssessmentTask(TaskType.THRESHOLD_DETECTION, ModalityType.VISUAL, 5.0, 40)
+        task2 = AssessmentTask(TaskType.THRESHOLD_DETECTION, ModalityType.AUDITORY, 5.0, 40)
+
+        battery.add_task(task1)
+        battery.add_task(task2)
+
+        assert len(battery.tasks) == 2
+        assert battery.get_total_planned_duration() == 10.0
+        assert battery.get_completion_rate() == 0.0
+
+        task1.completed = True
+        task1.data_quality = 0.8
+        assert battery.get_completion_rate() == 0.5
+        assert battery.get_overall_quality() == 0.8
+
+
+class TestClinicalParameterExtraction:
+    """Test clinical parameter extraction coverage."""
+
+    def test_clinical_parameters_to_dict_with_date(self):
+        """Test ClinicalParameters serialization with date."""
+        from datetime import datetime
+
+        params = ClinicalParameters(
+            participant_id="P001",
+            assessment_date=datetime(2024, 1, 1),
+            theta_t=3.7,
+            pi_e=2.2,
+            pi_i=1.6,
+            beta=1.3,
+        )
+        data = params.to_dict()
+        assert data["participant_id"] == "P001"
+        assert data["theta_t"] == 3.7
+        assert data["assessment_date"] == "2024-01-01T00:00:00"
+
+    def test_clinical_parameters_from_dict(self):
+        """Test ClinicalParameters deserialization."""
+        from datetime import datetime
+
+        data = {
+            "participant_id": "P002",
+            "theta_t": 3.8,
+            "assessment_date": "2024-02-01T12:00:00",
+        }
+        params = ClinicalParameters.from_dict(data)
+        assert params.participant_id == "P002"
+        assert params.theta_t == 3.8
+        assert params.assessment_date == datetime(2024, 2, 1, 12, 0)
+
+    def test_extractor_create_battery(self):
+        """Test creating standard battery."""
+        extractor = ClinicalParameterExtractor("P001")
+        battery = extractor.create_standard_battery()
+
+        assert battery.participant_id == "P001"
+        assert len(battery.tasks) == 6
+        assert any(
+            t.task_type == TaskType.THRESHOLD_DETECTION and t.modality == ModalityType.VISUAL
+            for t in battery.tasks
+        )
+
+    def test_extract_parameters_from_battery(self):
+        """Test parameter extraction from battery."""
+        extractor = ClinicalParameterExtractor("P001")
+        battery = extractor.create_standard_battery()
+
+        # Mock data
+        behavioral_data = {
+            "visual_threshold": 0.4,
+            "auditory_threshold": 0.4,
+            "interoceptive_threshold": 0.6,
+            "visual_accuracy": 0.8,
+            "auditory_accuracy": 0.8,
+            "rt_variability": 80.0,
+            "heartbeat_accuracy": 0.7,
+            "breath_awareness": 0.6,
+            "emotional_stroop_interference": 70.0,
+            "psychometric_slope": 1.2,
+            "recovery_trials": 3,
+        }
+
+        params = extractor.extract_parameters_from_battery(battery, behavioral_data)
+
+        assert params.participant_id == "P001"
+        assert 1.0 <= params.theta_t <= 6.0
+        assert 0.5 <= params.pi_e <= 4.0
+        assert 0.3 <= params.pi_i <= 3.5
+        assert 0.5 <= params.beta <= 3.0
+
+    def test_reliability_metrics(self):
+        """Test reliability metric calculations."""
+        extractor = ClinicalParameterExtractor("P001")
+        p1 = ClinicalParameters(theta_t=3.5, pi_e=2.0)
+        p2 = ClinicalParameters(theta_t=3.6, pi_e=2.1)
+
+        metrics = extractor.calculate_reliability_metrics(p1, p2)
+        assert "theta_t" in metrics.test_retest_icc
+        assert "pi_e" in metrics.test_retest_icc
+
+    def test_internal_consistency(self):
+        """Test internal consistency calculation."""
+        extractor = ClinicalParameterExtractor("P001")
+        battery = extractor.create_standard_battery()
+        trial_data = {
+            "task1": [1.0, 1.0, 0.0, 1.0, 1.0] * 10,
+            "task2": [1.0, 0.0, 1.0, 1.0, 1.0] * 10,
+        }
+        alpha = extractor.calculate_internal_consistency(battery, trial_data)
+        assert isinstance(alpha, float)
+
+    def test_split_half_reliability(self):
+        """Test split-half reliability calculation."""
+        extractor = ClinicalParameterExtractor("P001")
+        battery = extractor.create_standard_battery()
+        trial_data = {"task1": [1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0] * 10}
+        res = extractor.calculate_split_half_reliability(battery, trial_data)
+        assert isinstance(res, float)
+
+
+class TestClinicalIntegration:
+    """Test integration between clinical modules."""
+
+    def test_classification_to_treatment_pipeline(self):
+        """Test pipeline from disorder classification to treatment prediction."""
+        # Test that basic classes can be initialized
+        profile = NeuralSignatureProfile()
+        assert profile.p3b_amplitude_extero == 0.0
+
+    def test_parameter_extraction_to_classification(self):
+        """Test pipeline from parameter extraction to disorder classification."""
+        extractor = ClinicalParameterExtractor()
+
+        # Test that extractor can be initialized
+        assert extractor.participant_id == ""
+        assert len(extractor.assessment_history) == 0
 
 
 if __name__ == "__main__":

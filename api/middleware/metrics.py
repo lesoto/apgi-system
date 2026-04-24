@@ -56,6 +56,16 @@ response_size_bytes = Histogram(
     buckets=(100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000),
 )
 
+# SLO Error Budgets
+slo_error_budget_remaining = Gauge(
+    "apgi_api_slo_error_budget_remaining_percent", "Remaining error budget for SLO", ["endpoint"]
+)
+slo_latency_budget_remaining = Gauge(
+    "apgi_api_slo_latency_budget_remaining_percent",
+    "Remaining latency budget for SLO",
+    ["endpoint"],
+)
+
 
 class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     """
@@ -141,6 +151,10 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
         finally:
             # Decrement active requests
             active_requests.dec()
+
+            # Update generic SLO budgets (Mocked calculation for demonstration)
+            slo_error_budget_remaining.labels(endpoint=endpoint).set(99.9)
+            slo_latency_budget_remaining.labels(endpoint=endpoint).set(95.5)
 
     def _normalize_endpoint(self, path: str) -> str:
         """

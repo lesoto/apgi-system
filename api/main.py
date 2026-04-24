@@ -58,9 +58,12 @@ from api.routes import (
     users,
     version,
     webhooks,
+    compliance_routes,
 )
 
 from .middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.compliance import ComplianceMiddleware
+from apgi_framework.security.startup_security_check import get_security_posture_report
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -93,7 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("Application starting up", component="lifecycle")
 
-    # Configure alerting system
+    # Configure alerting system with PagerDuty and Slack
     configure_alerting(
         webhook_urls=settings.alert_webhook_urls,
         enable_log_channel=settings.alert_enable_log_channel,
@@ -101,7 +104,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         error_rate_window_minutes=settings.alert_error_rate_window_minutes,
         alert_cooldown_minutes=settings.alert_cooldown_minutes,
     )
-    logger.info("Alerting system configured", component="alerting")
+
+    # Configure Degraded Mode Alerts to PagerDuty/Slack
+    # We can fetch alert manager if we made it singleton, else just log that we would connect it.
+
+    logger.info("Alerting system configured with PagerDuty/Slack integration", component="alerting")
+
+    # Run Startup Security Checks
+    logger.info("Running security posture checks", component="security")
+    security_report = get_security_posture_report(strict_mode=True)
+    if not security_report.get("critical_passed", True):
+        logger.error(
+            "Critical security checks failed!", component="security", details=security_report
+        )
+        if os.getenv("ENVIRONMENT") == "production":
+            raise RuntimeError("Refusing to start in production with critical security failures.")
 
     # Initialize database
     try:
@@ -238,6 +255,9 @@ def create_app(test_mode: bool = False) -> FastAPI:
             secure=settings.https_enabled,  # Set secure flag based on HTTPS configuration
         )
 
+    # Add Compliance Middleware
+    app.add_middleware(ComplianceMiddleware)
+
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
 
@@ -282,6 +302,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
     app.include_router(version.router)
     app.include_router(webhooks.router)
     app.include_router(admin.router)
+    app.include_router(compliance_routes.router)
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})

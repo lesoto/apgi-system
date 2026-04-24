@@ -10,8 +10,8 @@ We take security seriously and appreciate your help in identifying vulnerabiliti
 
 ### How to Report
 
-**Email:** security@apgi.example.com  
-**PGP Key:** [PGP Key ID]  
+**Email:** <security@apgi.example.com>
+**PGP Key:** [PGP Key ID]
 **Expected Response Time:** Within 48 hours
 
 ### What to Include
@@ -25,6 +25,7 @@ We take security seriously and appreciate your help in identifying vulnerabiliti
 ### Safe Harbor
 
 We commit to:
+
 - Not pursue legal action against security researchers who follow this policy
 - Work with researchers to understand and fix vulnerabilities
 - Credit researchers in our security advisories (if desired)
@@ -35,6 +36,7 @@ We commit to:
 ### Defense in Depth
 
 Multiple layers of security controls:
+
 - Network security (firewalls, VPC isolation)
 - Application security (authentication, authorization)
 - Data security (encryption, access controls)
@@ -178,14 +180,14 @@ Multiple layers of security controls:
 
 ### Security Team
 
-- **Security Officer:** security@apgi.example.com
-- **Incident Response:** incidents@apgi.example.com
-- **Bug Bounty:** security@apgi.example.com
+- **Security Officer:** <security@apgi.example.com>
+- **Incident Response:** <incidents@apgi.example.com>
+- **Bug Bounty:** <security@apgi.example.com>
 
 ### Emergency Contacts
 
 - **24/7 Hotline:** [Phone Number]
-- **Emergency Email:** emergency@apgi.example.com
+- **Emergency Email:** <emergency@apgi.example.com>
 
 ## Security Resources
 
@@ -198,10 +200,9 @@ Multiple layers of security controls:
 
 We thank the security community for their contributions to making the APGI System more secure.
 
-
 ## Secrets Rotation Policy
 
-### Overview
+### Policy Overview
 
 This document outlines the secrets rotation policy for the APGI System to maintain security best practices and minimize the impact of potential credential leaks.
 
@@ -324,7 +325,7 @@ If a secret is suspected to be compromised:
 - Monitor for failed rotation attempts
 - Log all rotation activities
 
-### Compliance
+### Compliance Standards
 
 This policy aligns with:
 

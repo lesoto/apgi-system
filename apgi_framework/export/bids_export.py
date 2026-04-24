@@ -20,12 +20,12 @@ logger = get_logger(__name__)
 class BIDSExporter:
     """Export APGI data to BIDS-compliant format."""
 
-    def __init__(self, bids_root: Union[str, Path] = "bids_dataset"):
+    def __init__(self, bids_root: Union[str, Path] = "data/bids_dataset"):
         """
         Initialize BIDS exporter.
 
         Args:
-            bids_root: Root directory for BIDS dataset (default: "bids_dataset")
+            bids_root: Root directory for BIDS dataset (default: "data/bids_dataset")
         """
         self.bids_root = Path(bids_root)
         self.bids_root.mkdir(parents=True, exist_ok=True)
@@ -709,7 +709,7 @@ def export_apgi_to_bids(
 
 if __name__ == "__main__":
     # Example usage
-    exporter = BIDSExporter("test_bids_dataset")
+    exporter = BIDSExporter("data/test_bids_dataset")
 
     # Create sample data
     eeg_data = np.random.rand(8, 60000)  # 8 channels, 60 seconds at 1kHz

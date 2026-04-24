@@ -5705,7 +5705,7 @@ class APGIVisualizerGUI:
 
         # Tab 9: AI Model Recommendations
         self.ai_models_frame = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(self.ai_models_frame, text="Recommended AI Models")
+        self.notebook.add(self.ai_models_frame, text="Public Datasets")
         self._setup_ai_models_tab()
 
     def _display_viz(self, fig: Any, display_panel: "EmbeddedDisplayPanel") -> None:
