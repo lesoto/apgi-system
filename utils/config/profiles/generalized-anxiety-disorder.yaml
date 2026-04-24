@@ -1,0 +1,23 @@
+author: APGI Framework
+category: disorder
+compatibility:
+  max_version: '2.0'
+  min_version: '1.0'
+created_at: '2026-01-28T10:38:08.760251'
+dependencies: []
+description: Defined by elevated exteroceptive precision for threat-related stimuli.
+metadata: {}
+name: generalized-anxiety-disorder
+parameters:
+  model:
+    alpha: 12.0
+    gamma_A: 0.15
+    gamma_M: -0.4
+    tau_S: 0.3
+    tau_theta: 20.0
+    theta_0: 0.4
+tags:
+- GAD
+- clinical
+- threat-precision
+version: '1.0'

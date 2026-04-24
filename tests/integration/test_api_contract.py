@@ -36,7 +36,7 @@ def mock_redis() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_apgi_simulation() -> Mock:
+def mock_apgi_framework() -> Mock:
     """Create a mock APGI system with realistic state."""
     mock_system = Mock()
     mock_system.time = 0.0
@@ -83,7 +83,7 @@ def mock_apgi_simulation() -> Mock:
 
 
 @pytest.fixture
-def mock_session_manager(mock_apgi_simulation: Mock) -> Mock:
+def mock_session_manager(mock_apgi_framework: Mock) -> Mock:
     """Create a mock SessionManager."""
     manager = Mock(spec=SessionManager)
 
@@ -99,14 +99,14 @@ def mock_session_manager(mock_apgi_simulation: Mock) -> Mock:
             mock_sim.created_at = "2025-12-03T10:30:00"
             mock_sim.updated_at = "2025-12-03T10:30:00"
             mock_sim.config = {"config_path": "config/default.yaml"}
-            mock_sim.apgi_simulation = mock_apgi_simulation
+            mock_sim.apgi_framework = mock_apgi_framework
             mock_sim.user_id = "test-user-123"
 
             async def mock_start() -> Dict[str, Any]:
                 return {"session_id": session_id, "status": "running"}
 
             async def mock_get_state() -> Dict[str, Any]:
-                return mock_apgi_simulation.get_state()
+                return mock_apgi_framework.get_state()  # type: ignore[no-any-return]
 
             mock_sim.start = AsyncMock(side_effect=mock_start)
             mock_sim.get_state = AsyncMock(side_effect=mock_get_state)
@@ -259,7 +259,7 @@ def openapi_schema(client: Any) -> Dict[str, Any]:
     """Get the OpenAPI schema from the API."""
     response = client.get("/openapi.json")
     assert response.status_code == 200
-    return response.json()
+    return response.json()  # type: ignore[no-any-return]
 
 
 def validate_response_against_schema(

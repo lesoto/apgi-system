@@ -1,10 +1,22 @@
 """Unit tests for extended analysis capabilities."""
 
+import importlib.util
 import numpy as np
 import pytest
 
-from apgi_simulation.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
-from apgi_simulation.system import APGISystem
+# Import from analysis.py file directly to avoid conflict with analysis/ package
+spec = importlib.util.spec_from_file_location(
+    "analysis_module", "/Users/lesoto/Sites/PYTHON/apgi-system/apgi_framework/analysis.py"
+)
+if spec is None or spec.loader is None:
+    raise ImportError("Failed to load analysis module")
+analysis_module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+spec.loader.exec_module(analysis_module)  # type: ignore[union-attr]
+
+AnalysisResults = analysis_module.AnalysisResults
+SystemAnalyzer = analysis_module.SystemAnalyzer
+analyze_simulation_run = analysis_module.analyze_simulation_run
+from apgi_framework.system import APGISystem
 
 
 def test_analysis_results_dataclass():

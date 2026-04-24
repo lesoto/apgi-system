@@ -1,0 +1,1 @@
+# Framework GUI tests package

@@ -43,8 +43,8 @@ from matplotlib.figure import Figure  # noqa: E402
 # Try to import APGI system
 try:
     sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-    from apgi_simulation.core.free_energy import FreeEnergyCalculator  # noqa: F401, E402
-    from apgi_simulation.system import APGISystem  # noqa: E402
+    from apgi_framework.core.free_energy import FreeEnergyCalculator  # noqa: F401, E402
+    from apgi_framework.system import APGISystem  # noqa: E402
 
     HAS_APGI = True
 except ImportError as e:

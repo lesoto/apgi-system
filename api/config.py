@@ -30,7 +30,7 @@ class Settings:
 
             client = boto3.client("ssm", region_name=os.getenv("AWS_REGION", "us-east-1"))
             response = client.get_parameter(Name=name, WithDecryption=True)
-            return response["Parameter"]["Value"]
+            return response["Parameter"]["Value"]  # type: ignore[no-any-return]
         except Exception as e:
             warnings.warn(f"Failed to fetch {name} from AWS SSM: {str(e)}")
             return None

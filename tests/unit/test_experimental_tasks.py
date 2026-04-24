@@ -18,15 +18,15 @@ import pytest
 
 import numpy as np
 
-from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
-from apgi_simulation.experiments.tasks.binocular_rivalry import BinocularRivalryTask
-from apgi_simulation.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
-from apgi_simulation.experiments.tasks.iowa_gambling import (
+from apgi_framework.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
+from apgi_framework.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+from apgi_framework.experiments.tasks.change_blindness import ChangeBlindnessTask, ChangeType
+from apgi_framework.experiments.tasks.iowa_gambling import (
     DECK_SCHEDULES,
     DeckType,
     IowaGamblingTask,
 )
-from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
+from apgi_framework.experiments.tasks.masking_paradigm import MaskingParadigmTask, MaskType
 
 
 class TestIowaGamblingTask:
@@ -112,12 +112,12 @@ class TestIowaGamblingTask:
             # Check that stimulus magnitude is reasonable
             assert np.max(np.abs(trial.deck_stimulus)) < 10.0
 
-    def test_single_trial_execution(self, apgi_simulation):
+    def test_single_trial_execution(self, apgi_framework):
         """Test running a single trial on the APGI system."""
         task = IowaGamblingTask(num_trials=1)
         trial = task.trials[0]
 
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -136,13 +136,13 @@ class TestIowaGamblingTask:
         expected_total = task.initial_balance + result.net_outcome
         assert result.running_total == expected_total
 
-    def test_multiple_trials_balance_tracking(self, apgi_simulation):
+    def test_multiple_trials_balance_tracking(self, apgi_framework):
         """Test that balance is tracked correctly across multiple trials."""
         task = IowaGamblingTask(num_trials=5)
         initial_balance = task.initial_balance
 
         for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
+            task.run_trial(apgi_framework, trial)
 
         # Final balance should equal initial + sum of all net outcomes
         total_net = sum(r.net_outcome for r in task.results)
@@ -159,13 +159,13 @@ class TestIowaGamblingTask:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_analysis_structure(self, apgi_simulation):
+    def test_analysis_structure(self, apgi_framework):
         """Test that analysis returns expected structure."""
         task = IowaGamblingTask(num_trials=20)
 
         # Run a few trials
         for i in range(10):
-            task.run_trial(apgi_simulation, task.trials[i])
+            task.run_trial(apgi_framework, task.trials[i])
 
         analysis = task.analyze_results()
 
@@ -189,13 +189,13 @@ class TestIowaGamblingTask:
             assert "avg_net_outcome" in deck_data
             assert "avg_somatic_marker" in deck_data
 
-    def test_task_reset(self, apgi_simulation):
+    def test_task_reset(self, apgi_framework):
         """Test that task reset works correctly."""
         task = IowaGamblingTask(num_trials=10)
 
         # Run some trials
         for i in range(5):
-            task.run_trial(apgi_simulation, task.trials[i])
+            task.run_trial(apgi_framework, task.trials[i])
 
         initial_results_count = len(task.results)
         assert initial_results_count > 0
@@ -291,12 +291,12 @@ class TestMaskingParadigm:
         assert trial.soa_ms == 300
         # Long SOA means significant gap between target and mask
 
-    def test_single_trial_execution(self, apgi_simulation):
+    def test_single_trial_execution(self, apgi_framework):
         """Test running a single masking trial."""
         task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Verify result structure
         assert result.trial_number == 0
@@ -312,7 +312,7 @@ class TestMaskingParadigm:
             assert result.detection_time is not None
             assert result.detection_time >= 0
 
-    def test_masking_effect_short_soa(self, apgi_simulation):
+    def test_masking_effect_short_soa(self, apgi_framework):
         """Test that short SOA typically shows masking effect."""
         task = MaskingParadigmTask(
             soas=[0, 17],  # Very short SOAs
@@ -322,20 +322,20 @@ class TestMaskingParadigm:
         )
 
         for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
+            task.run_trial(apgi_framework, trial)
 
         # At least some trials should show suppression at short SOAs
         suppressed_count = sum(1 for r in task.results if r.mask_suppression_occurred)
         # We expect some suppression, but not necessarily all trials
         assert suppressed_count >= 0  # At least check it's tracked
 
-    def test_analysis_structure(self, apgi_simulation):
+    def test_analysis_structure(self, apgi_framework):
         """Test that analysis returns expected structure."""
         task = MaskingParadigmTask(soas=[0, 100], num_trials_per_condition=2)
 
         # Run all trials
         for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
+            task.run_trial(apgi_framework, trial)
 
         analysis = task.analyze_results()
 
@@ -366,13 +366,13 @@ class TestMaskingParadigm:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_simulation):
+    def test_task_reset(self, apgi_framework):
         """Test that task reset works correctly."""
         task = MaskingParadigmTask(soas=[0, 100], num_trials_per_condition=2)
 
         # Run some trials
         for i in range(2):
-            task.run_trial(apgi_simulation, task.trials[i])
+            task.run_trial(apgi_framework, task.trials[i])
 
         assert len(task.results) > 0
 
@@ -489,11 +489,11 @@ class TestAttentionalBlink:
         # Distractors should have lower magnitude than targets
         assert np.std(distractor) < task.target_salience
 
-    def test_single_trial_execution(self, apgi_simulation):
+    def test_single_trial_execution(self, apgi_framework):
         """Test running a single attentional blink trial - skipped due to system integration issues."""
         pytest.skip("System integration tests skipped")
 
-    def test_lag_1_sparing(self, apgi_simulation):
+    def test_lag_1_sparing(self, apgi_framework):
         """Test lag-1 sparing effect (T2 often detected at lag 1)."""
         task = AttentionalBlinkTask(
             stream_length=10,
@@ -503,20 +503,20 @@ class TestAttentionalBlink:
         )
 
         for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
+            task.run_trial(apgi_framework, trial)
 
         # At lag 1, we might see some T2 detections (lag-1 sparing)
         # Just verify the mechanism works, not strict performance
         t2_detections = sum(1 for r in task.results if r.t2_detected)
         assert t2_detections >= 0  # At least check it's tracked
 
-    def test_analysis_structure(self, apgi_simulation):
+    def test_analysis_structure(self, apgi_framework):
         """Test that analysis returns expected structure."""
         task = AttentionalBlinkTask(stream_length=10, lags=[1, 3], num_trials_per_lag=2)
 
         # Run all trials
         for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
+            task.run_trial(apgi_framework, trial)
 
         analysis = task.analyze_results()
 
@@ -549,13 +549,13 @@ class TestAttentionalBlink:
         assert "error" in analysis
         assert analysis["total_trials"] == 0
 
-    def test_task_reset(self, apgi_simulation: Any) -> None:
+    def test_task_reset(self, apgi_framework: Any) -> None:
         """Test that task reset works correctly."""
         task = AttentionalBlinkTask(lags=[1, 2], num_trials_per_lag=2)
 
         # Run some trials
         for i in range(2):
-            task.run_trial(apgi_simulation, task.trials[i])
+            task.run_trial(apgi_framework, task.trials[i])
 
         assert len(task.results) > 0
 
@@ -567,28 +567,28 @@ class TestAttentionalBlink:
         assert task.current_trial_idx == 0
         assert len(task.trials) == len(task.lags) * task.num_trials_per_lag
 
-    def test_blink_detection_logic(self, apgi_simulation: Any) -> None:
+    def test_blink_detection_logic(self, apgi_framework: Any) -> None:
         """Test that blink detection logic works correctly."""
         task = AttentionalBlinkTask(stream_length=10, lags=[2], num_trials_per_lag=1)
 
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Verify blink logic
-        if result.t1_detected and not result.t2_detected:
-            assert result.blink_occurred is True
+        if result["t1_detected"] and not result["t2_detected"]:
+            assert result["blink_occurred"] is True
         else:
-            assert result.blink_occurred is False
+            assert result["blink_occurred"] is False
 
 
 class TestTaskResultCompleteness:
     """Test that all tasks produce complete result structures."""
 
-    def test_iowa_gambling_result_fields(self, apgi_simulation: Any) -> None:
+    def test_iowa_gambling_result_fields(self, apgi_framework: Any) -> None:
         """Test that Iowa Gambling results have all required fields."""
         task = IowaGamblingTask(num_trials=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -608,11 +608,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_masking_result_fields(self, apgi_simulation: Any) -> None:
+    def test_masking_result_fields(self, apgi_framework: Any) -> None:
         """Test that Masking Paradigm results have all required fields."""
         task = MaskingParadigmTask(soas=[100], num_trials_per_condition=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -629,11 +629,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_attentional_blink_result_fields(self, apgi_simulation):
+    def test_attentional_blink_result_fields(self, apgi_framework):
         """Test that Attentional Blink results have all required fields."""
         task = AttentionalBlinkTask(lags=[2], num_trials_per_lag=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -651,13 +651,13 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_change_blindness_result_fields(self, apgi_simulation: Any) -> None:
+    def test_change_blindness_result_fields(self, apgi_framework: Any) -> None:
         """Test that Change Blindness results have all required fields."""
         task = ChangeBlindnessTask(
             max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5]
         )
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -673,11 +673,11 @@ class TestTaskResultCompleteness:
         for field in required_fields:
             assert hasattr(result, field), f"Missing field: {field}"
 
-    def test_binocular_rivalry_result_fields(self, apgi_simulation: Any) -> None:
+    def test_binocular_rivalry_result_fields(self, apgi_framework: Any) -> None:
         """Test that Binocular Rivalry results have all required fields."""
         task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
         trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        result = task.run_trial(apgi_framework, trial)
 
         # Check all required fields exist
         required_fields = [
@@ -703,289 +703,184 @@ class TestChangeBlindnessTask:
 
     def test_task_initialization(self) -> None:
         """Test that change blindness task initializes correctly."""
-        change_magnitudes = [0.3, 0.5, 0.8]
-        task = ChangeBlindnessTask(
-            presentation_duration_ms=240.0,
-            blank_duration_ms=80.0,
-            max_alternations=20,
-            num_trials_per_condition=5,
-            change_magnitudes=change_magnitudes,
-        )
+        task = ChangeBlindnessTask(display_size=(512, 512))
 
-        assert task.presentation_duration_ms == 240.0
-        assert task.blank_duration_ms == 80.0
-        assert task.max_alternations == 20
-        assert task.num_trials_per_condition == 5
-        assert task.change_magnitudes == change_magnitudes
-        # Total trials = num_change_types * num_magnitudes * trials_per_condition
-        expected_trials = len(ChangeType) * len(change_magnitudes) * 5
-        assert len(task.trials) == expected_trials
+        assert task.display_size == (512, 512)
+        assert task.change_type == ChangeType.COLOR
 
-    def test_change_type_distribution(self) -> None:
-        """Test that trials are distributed across all change types."""
-        task = ChangeBlindnessTask(change_magnitudes=[0.5], num_trials_per_condition=2)
+    def test_task_default_initialization(self) -> None:
+        """Test that change blindness task initializes with defaults."""
+        task = ChangeBlindnessTask()
 
-        # Count trials per change type
-        type_counts = {ct: 0 for ct in ChangeType}
-        for trial in task.trials:
-            type_counts[trial.change_type] += 1
+        assert task.display_size == (512, 512)
+        assert task.change_type == ChangeType.COLOR
 
-        # Each change type should have exactly 2 trials (1 magnitude * 2 reps)
-        for change_type, count in type_counts.items():
-            assert count == 2, f"Change type {change_type} has {count} trials, expected 2"
+    def test_create_scene(self) -> None:
+        """Test scene creation with objects."""
+        task = ChangeBlindnessTask()
+        scene = task.create_scene(num_objects=5)
 
-    def test_image_pair_generation(self):
-        """Test that image pairs are generated correctly."""
-        task = ChangeBlindnessTask(num_trials_per_condition=1)
+        assert "objects" in scene
+        assert "change_type" in scene
+        assert len(scene["objects"]) == 5
+        assert scene["change_type"] == ChangeType.COLOR
 
-        for change_type in ChangeType:
-            original, modified = task._generate_image_pair(change_type, 0.5)
+        # Check object structure
+        for obj in scene["objects"]:
+            assert "id" in obj
+            assert "position" in obj
+            assert "color" in obj
+            assert "size" in obj
 
-            # Check dimensions
-            assert original.shape == (256,)
-            assert modified.shape == (256,)
+    def test_create_scene_default_objects(self) -> None:
+        """Test scene creation with default number of objects."""
+        task = ChangeBlindnessTask()
+        scene = task.create_scene()
 
-            # Images should be different
-            assert not np.allclose(original, modified)
+        assert len(scene["objects"]) == 5
 
-            # Both should have reasonable magnitudes
-            assert np.max(np.abs(original)) < 10.0
-            assert np.max(np.abs(modified)) < 10.0
+    def test_introduce_change_color(self) -> None:
+        """Test introducing a color change."""
+        task = ChangeBlindnessTask()
+        scene = task.create_scene(num_objects=3)
 
-    def test_change_magnitude_effects(self):
-        """Test that different magnitudes create different change strengths."""
-        task = ChangeBlindnessTask(num_trials_per_condition=1)
+        modified = task.introduce_change(scene, ChangeType.COLOR)
 
-        # Test with different magnitudes
-        original_low, modified_low = task._generate_image_pair(ChangeType.APPEARANCE, 0.2)
-        original_high, modified_high = task._generate_image_pair(ChangeType.APPEARANCE, 0.8)
+        assert "objects" in modified
+        assert len(modified["objects"]) == len(scene["objects"])
 
-        # Higher magnitude should create larger differences
-        diff_low = np.sum(np.abs(modified_low - original_low))
-        diff_high = np.sum(np.abs(modified_high - original_high))
+        # At least one object should have different color
+        colors_changed = False
+        for orig_obj, mod_obj in zip(scene["objects"], modified["objects"]):
+            if not np.allclose(orig_obj["color"], mod_obj["color"]):
+                colors_changed = True
+                break
+        assert colors_changed
 
-        assert diff_high > diff_low, "Higher magnitude should create larger changes"
+    def test_introduce_change_position(self) -> None:
+        """Test introducing a position change."""
+        task = ChangeBlindnessTask()
+        scene = task.create_scene(num_objects=3)
 
-    def test_single_trial_execution(self, apgi_simulation):
-        """Test running a single change blindness trial - skipped due to system integration issues."""
-        pytest.skip("System integration tests skipped")
+        modified = task.introduce_change(scene, ChangeType.POSITION)
 
-    def test_analysis_structure(self, apgi_simulation):
-        """Test that analysis returns expected structure."""
-        task = ChangeBlindnessTask(
-            max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5, 0.8]
-        )
+        assert "objects" in modified
+        assert len(modified["objects"]) == len(scene["objects"])
 
-        # Run a few trials
-        for i in range(min(4, len(task.trials))):
-            task.run_trial(apgi_simulation, task.trials[i])
+        # At least one object should have different position
+        positions_changed = False
+        for orig_obj, mod_obj in zip(scene["objects"], modified["objects"]):
+            if not np.allclose(orig_obj["position"], mod_obj["position"]):
+                positions_changed = True
+                break
+        assert positions_changed
 
-        analysis = task.analyze_results()
+    def test_detect_change(self) -> None:
+        """Test change detection between scenes."""
+        task = ChangeBlindnessTask()
+        scene1 = task.create_scene(num_objects=5)
+        scene2 = task.create_scene(num_objects=3)
 
-        # Check required keys
-        assert "total_trials" in analysis
-        assert "overall_detection_rate" in analysis
-        assert "overall_blindness_rate" in analysis
-        assert "by_change_type" in analysis
-        assert "by_magnitude" in analysis
-        assert "by_type_and_magnitude" in analysis
-        assert "task_parameters" in analysis
+        # Different number of objects should be detected as change
+        assert task.detect_change(scene1, scene2) is True
 
-    def test_analysis_with_no_results(self):
-        """Test that analysis handles empty results gracefully."""
-        task = ChangeBlindnessTask(num_trials_per_condition=1)
-        task.results = []
+        # Same scene should not be detected as change
+        assert task.detect_change(scene1, scene1) is False
 
-        analysis = task.analyze_results()
+    def test_detect_change_no_difference(self) -> None:
+        """Test that identical scenes are not detected as changed."""
+        task = ChangeBlindnessTask()
+        scene = task.create_scene(num_objects=5)
 
-        assert "error" in analysis
-        assert analysis["total_trials"] == 0
+        # Copy scene without modifying
+        scene_copy = scene.copy()
 
-    def test_task_reset(self, apgi_simulation):
-        """Test that task reset works correctly."""
-        task = ChangeBlindnessTask(
-            max_alternations=2, num_trials_per_condition=1, change_magnitudes=[0.5]
-        )
-
-        # Run some trials
-        for i in range(min(2, len(task.trials))):
-            task.run_trial(apgi_simulation, task.trials[i])
-
-        assert len(task.results) > 0
-
-        # Reset
-        task.reset()
-
-        # Verify reset state
-        assert len(task.results) == 0
-        assert task.current_trial_idx == 0
-        assert len(task.trials) > 0
+        # Should not detect change (same number of objects)
+        assert task.detect_change(scene, scene_copy) is False
 
 
 class TestBinocularRivalryTask:
     """Unit tests for Binocular Rivalry Task with specific competition conditions."""
 
-    def test_task_initialization(self):
+    def test_task_initialization(self) -> None:
         """Test that binocular rivalry task initializes correctly."""
-        strength_ratios = [(1.0, 1.0), (1.2, 0.8)]
-        task = BinocularRivalryTask(
-            trial_duration_ms=10000.0,
-            num_trials=5,
-            strength_ratios=strength_ratios,
-            sampling_interval_ms=200.0,
-        )
+        task = BinocularRivalryTask(image_size=(256, 256))
 
-        assert task.trial_duration_ms == 10000.0
-        assert task.num_trials == 5
-        assert task.strength_ratios == strength_ratios
-        assert task.sampling_interval_ms == 200.0
-        # Total trials = num_strength_ratios * num_trials
-        assert len(task.trials) == len(strength_ratios) * 5
+        assert task.image_size == (256, 256)
+        assert len(task.dominance_history) == 0
 
-    def test_strength_ratio_distribution(self):
-        """Test that trials are distributed across all strength ratios."""
-        strength_ratios = [(1.0, 1.0), (1.2, 0.8)]
-        num_trials = 3
-        task = BinocularRivalryTask(strength_ratios=strength_ratios, num_trials=num_trials)
+    def test_task_default_initialization(self) -> None:
+        """Test that binocular rivalry task initializes with defaults."""
+        task = BinocularRivalryTask()
 
-        # Count trials per strength ratio
-        ratio_counts = {ratio: 0 for ratio in strength_ratios}
-        for trial in task.trials:
-            ratio = (trial.pattern_a_strength, trial.pattern_b_strength)
-            ratio_counts[ratio] += 1
+        assert task.image_size == (256, 256)
+        assert len(task.dominance_history) == 0
 
-        # Each ratio should have exactly num_trials trials
-        for ratio, count in ratio_counts.items():
-            assert count == num_trials, f"Ratio {ratio} has {count} trials, expected {num_trials}"
+    def test_create_stimulus_pair(self) -> None:
+        """Test creating a pair of rivalrous stimuli."""
+        task = BinocularRivalryTask()
+        left_image, right_image = task.create_stimulus_pair()
 
-    def test_pattern_generation(self):
-        """Test that competing patterns are generated correctly."""
-        task = BinocularRivalryTask(num_trials=1)
+        assert left_image.shape == (256, 256)
+        assert right_image.shape == (256, 256)
 
-        pattern_a = task._generate_pattern("A")
-        pattern_b = task._generate_pattern("B")
+        # Images should be different
+        assert not np.allclose(left_image, right_image)
 
-        # Check dimensions
-        assert pattern_a.shape == (256,)
-        assert pattern_b.shape == (256,)
+        # Both should have valid pixel values
+        assert np.all(left_image >= 0) and np.all(left_image <= 1)
+        assert np.all(right_image >= 0) and np.all(right_image <= 1)
 
-        # Patterns should be different
-        assert not np.allclose(pattern_a, pattern_b)
+    def test_simulate_dominance_switching(self) -> None:
+        """Test dominance switching simulation."""
+        task = BinocularRivalryTask()
+        dominance = task.simulate_dominance_switching(duration_ms=1000)
 
-        # Both should have structure (not all zeros)
-        assert np.any(pattern_a != 0)
-        assert np.any(pattern_b != 0)
+        # Should return list of dominance values
+        assert isinstance(dominance, list)
+        assert len(dominance) == 10  # 1000ms / 100ms steps
 
-        # Reasonable magnitudes
-        assert np.max(np.abs(pattern_a)) < 10.0
-        assert np.max(np.abs(pattern_b)) < 10.0
+        # All values should be between 0 and 1
+        assert all(0.0 <= val <= 1.0 for val in dominance)
 
-    def test_rivalry_stimulus_creation(self) -> None:
-        """Test that rivalry stimulus combines patterns correctly."""
-        task = BinocularRivalryTask(num_trials=1)
-        trial = task.trials[0]
+        # History should be updated
+        assert len(task.dominance_history) == 10
 
-        stimulus_t0 = task._create_rivalry_stimulus(trial, 0.0)
-        stimulus_t1 = task._create_rivalry_stimulus(trial, 1000.0)
+    def test_simulate_dominance_switching_custom_duration(self) -> None:
+        """Test dominance switching with custom duration."""
+        task = BinocularRivalryTask()
+        dominance = task.simulate_dominance_switching(duration_ms=5000)
 
-        # Check dimensions
-        assert stimulus_t0.shape == (256,)
-        assert stimulus_t1.shape == (256,)
+        # Should have 50 steps (5000ms / 100ms)
+        assert len(dominance) == 50
 
-        # Stimuli should vary over time (temporal dynamics)
-        assert not np.allclose(stimulus_t0, stimulus_t1)
+    def test_get_switch_rate_no_history(self) -> None:
+        """Test switch rate calculation with no history."""
+        task = BinocularRivalryTask()
 
-    def test_single_trial_execution(self, apgi_simulation) -> None:
-        """Test running a single rivalry trial."""
-        task = BinocularRivalryTask(
-            trial_duration_ms=5000.0,  # Short trial for testing
-            num_trials=1,
-            strength_ratios=[(1.0, 1.0)],
-            sampling_interval_ms=500.0,
-        )
+        switch_rate = task.get_switch_rate()
+        assert switch_rate == 0.0
 
-        trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+    def test_get_switch_rate_with_history(self) -> None:
+        """Test switch rate calculation with history."""
+        task = BinocularRivalryTask()
+        task.simulate_dominance_switching(duration_ms=2000)
 
-        # Verify result structure
-        assert result.trial_number == 0
-        assert result.pattern_a_strength == 1.0
-        assert result.pattern_b_strength == 1.0
-        assert result.total_duration_ms == 5000.0
-        assert isinstance(result.dominance_periods, list)
-        assert isinstance(result.num_alternations, int)
-        assert isinstance(result.pattern_a_dominance_ratio, float)
-        assert isinstance(result.alternation_rate, float)
+        switch_rate = task.get_switch_rate()
+        assert switch_rate >= 0.0
 
-        # Dominance ratio should be between 0 and 1
-        assert 0.0 <= result.pattern_a_dominance_ratio <= 1.0
+    def test_dominance_history_persistence(self) -> None:
+        """Test that dominance history is stored correctly."""
+        task = BinocularRivalryTask()
 
-    def test_dominance_period_tracking(self, apgi_simulation) -> None:
-        """Test that dominance periods are tracked correctly."""
-        task = BinocularRivalryTask(
-            trial_duration_ms=3000.0,
-            num_trials=1,
-            sampling_interval_ms=300.0,
-        )
+        # First simulation
+        task.simulate_dominance_switching(duration_ms=1000)
+        first_history = task.dominance_history.copy()
 
-        trial = task.trials[0]
-        result = task.run_trial(apgi_simulation, trial)
+        # Second simulation
+        task.simulate_dominance_switching(duration_ms=1000)
+        second_history = task.dominance_history
 
-        # Check dominance periods structure
-        for period in result.dominance_periods:
-            assert hasattr(period, "stimulus")
-            assert hasattr(period, "start_time")
-            assert hasattr(period, "end_time")
-            assert hasattr(period, "duration")
-            assert period.end_time >= period.start_time
-            assert period.duration == period.end_time - period.start_time
-
-    def test_analysis_structure(self, apgi_simulation) -> None:
-        """Test that analysis returns expected structure."""
-        task = BinocularRivalryTask(
-            trial_duration_ms=2000.0,
-            num_trials=2,
-            strength_ratios=[(1.0, 1.0)],
-        )
-
-        # Run all trials
-        for trial in task.trials:
-            task.run_trial(apgi_simulation, trial)
-
-        analysis = task.analyze_results()
-
-        # Check required keys
-        assert "total_trials" in analysis
-        assert "avg_dominance_duration_ms" in analysis
-        assert "avg_alternation_rate" in analysis
-        assert "avg_pattern_a_dominance_ratio" in analysis
-        assert "by_strength_ratio" in analysis
-        assert "dominance_duration_distribution" in analysis
-        assert "task_parameters" in analysis
-
-    def test_analysis_with_no_results(self) -> None:
-        """Test that analysis handles empty results gracefully."""
-        task = BinocularRivalryTask(num_trials=1)
-        task.results = []
-
-        analysis = task.analyze_results()
-
-        assert "error" in analysis
-        assert analysis["total_trials"] == 0
-
-    def test_task_reset(self, apgi_simulation) -> None:
-        """Test that task reset works correctly."""
-        task = BinocularRivalryTask(trial_duration_ms=1000.0, num_trials=1)
-
-        # Run some trials
-        task.run_trial(apgi_simulation, task.trials[0])
-
-        assert len(task.results) > 0
-
-        # Reset
-        task.reset()
-
-        # Verify reset state
-        assert len(task.results) == 0
-        assert task.current_trial_idx == 0
-        assert len(task.trials) > 0
+        # History should be updated (not appended)
+        assert len(second_history) == len(first_history)
+        assert second_history != first_history

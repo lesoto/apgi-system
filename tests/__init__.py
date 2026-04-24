@@ -1,1 +1,1 @@
-"""APGI system test suite."""
+# Tests package

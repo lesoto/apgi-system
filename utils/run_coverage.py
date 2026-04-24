@@ -30,7 +30,7 @@ def run_tests_with_coverage() -> int:
         "pytest",
         "tests/",
         "-v",
-        "--cov=apgi_simulation",
+        "--cov=apgi_framework",
         "--cov=api",
         "--cov-report=html:htmlcov",
         "--cov-report=term-missing",

@@ -288,13 +288,13 @@ Coverage settings in `pyproject.toml`:
 ```toml
 [tool.pytest.ini_options]
 addopts = [
-    "--cov=apgi_simulation",
+    "--cov=apgi_framework",
     "--cov=api",
     "--cov-fail-under=85",
 ]
 
 [tool.coverage.run]
-source = ["apgi_simulation", "api"]
+source = ["apgi_framework", "api"]
 omit = [
     "**/apgi_gui.py",
     "**/*_GUI.py",

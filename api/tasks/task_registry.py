@@ -13,8 +13,8 @@ from api.tasks.experimental_tasks import (
     execute_change_blindness_task,
     execute_iowa_gambling_task,
     execute_masking_paradigm_task,
-    execute_nback_task,
-    execute_stroop_task,
+    # execute_nback_task,  # Not yet implemented
+    # execute_stroop_task,  # Not yet implemented
 )
 
 
@@ -26,8 +26,8 @@ class TaskType(str, Enum):
     ATTENTIONAL_BLINK = "attentional_blink"
     CHANGE_BLINDNESS = "change_blindness"
     BINOCULAR_RIVALRY = "binocular_rivalry"
-    N_BACK = "nback_task"
-    STROOP = "stroop_task"
+    # N_BACK = "nback_task"  # Not yet implemented
+    # STROOP = "stroop_task"  # Not yet implemented
 
 
 # Map task types to Celery task names
@@ -37,8 +37,8 @@ TASK_REGISTRY: Dict[TaskType, str] = {
     TaskType.ATTENTIONAL_BLINK: "api.tasks.experimental_tasks.execute_attentional_blink_task",
     TaskType.CHANGE_BLINDNESS: "api.tasks.experimental_tasks.execute_change_blindness_task",
     TaskType.BINOCULAR_RIVALRY: "api.tasks.experimental_tasks.execute_binocular_rivalry_task",
-    TaskType.N_BACK: "api.tasks.experimental_tasks.execute_nback_task",
-    TaskType.STROOP: "api.tasks.experimental_tasks.execute_stroop_task",
+    # TaskType.N_BACK: "api.tasks.experimental_tasks.execute_nback_task",  # Not yet implemented
+    # TaskType.STROOP: "api.tasks.experimental_tasks.execute_stroop_task",  # Not yet implemented
 }
 
 
@@ -49,8 +49,6 @@ TASK_FUNCTIONS: Dict[TaskType, Callable[..., Any]] = {
     TaskType.ATTENTIONAL_BLINK: execute_attentional_blink_task,
     TaskType.CHANGE_BLINDNESS: execute_change_blindness_task,
     TaskType.BINOCULAR_RIVALRY: execute_binocular_rivalry_task,
-    TaskType.N_BACK: execute_nback_task,
-    TaskType.STROOP: execute_stroop_task,
 }
 
 

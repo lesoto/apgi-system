@@ -1,0 +1,667 @@
+openapi: 3.0.3
+info:
+  title: APGI Framework API
+  version: 1.0.0
+  description: |
+    API for APGI Framework experiments and analysis.
+    Provides endpoints for experiment management, data processing,
+    parameter estimation, and analysis operations.
+  contact:
+    name: APGI Research Team
+    email: research@apgi.org
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.apgi-framework.com/api/v1
+    description: Production server
+
+paths:
+  /experiments:
+    get:
+      summary: List experiments
+      operationId: listExperiments
+      tags:
+        - experiments
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperimentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      summary: Create experiment
+      operationId: createExperiment
+      tags:
+        - experiments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperimentCreate'
+      responses:
+        '201':
+          description: Experiment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Experiment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /experiments/{experimentId}:
+    get:
+      summary: Get experiment by ID
+      operationId: getExperiment
+      tags:
+        - experiments
+      parameters:
+        - name: experimentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $components/schemas/Experiment:
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      summary: Update experiment
+      operationId: updateExperiment
+      tags:
+        - experiments
+      parameters:
+        - name: experimentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperimentUpdate'
+      responses:
+        '200':
+          description: Experiment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Experiment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      summary: Delete experiment
+      operationId: deleteExperiment
+      tags:
+        - experiments
+      parameters:
+        - name: experimentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Experiment deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /experiments/{experimentId}/results:
+    get:
+      summary: Get experiment results
+      operationId: getExperimentResults
+      tags:
+        - experiments
+      parameters:
+        - name: experimentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperimentResults'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /parameters:
+    get:
+      summary: List parameters
+      operationId: listParameters
+      tags:
+        - parameters
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParameterList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      summary: Create parameter
+      operationId: createParameter
+      tags:
+        - parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParameterCreate'
+      responses:
+        '201':
+          description: Parameter created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parameter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /parameters/{parameterId}:
+    get:
+      summary: Get parameter by ID
+      operationId: getParameter
+      tags:
+        - parameters
+      parameters:
+        - name: parameterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parameter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analysis:
+    post:
+      summary: Run analysis
+      operationId: runAnalysis
+      tags:
+        - analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /data/{datasetId}:
+    get:
+      summary: Get dataset
+      operationId: getDataset
+      tags:
+        - data
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $components/schemas/Dataset
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      summary: Delete dataset
+      operationId: deleteDataset
+      tags:
+        - data
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Dataset deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500:
+          $ref: '#/components/responses/ServerError'
+
+  /compliance/audit:
+    get:
+      summary: Get audit log
+      operationId: getAuditLog
+      tags:
+        - compliance
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    ExperimentList:
+      type: object
+      properties:
+        experiments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperimentSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+
+    ExperimentSummary:
+      type: object
+      properties:
+        experiment_id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Experiment:
+      type: object
+      properties:
+        version:
+          type: string
+          const: "1.0.0"
+        experiment_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        parameters:
+          type: object
+          additionalProperties: true
+        results:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+        format: date-time
+      required:
+        - version
+        - experiment_id
+        - name
+        - status
+
+    ExperimentCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+      required:
+        - name
+
+    ExperimentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        parameters:
+          type: object
+          additionalProperties: true
+        results:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+
+    ExperimentResults:
+      type: object
+      properties:
+        experiment_id:
+          type: string
+        results:
+          type: object
+        summary:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    ParameterList:
+      type: object
+      properties:
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParameterSummary'
+        total:
+          type: integer
+
+    ParameterSummary:
+      type: object
+      properties:
+        parameter_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        default_value:
+          type: string
+        description:
+          type: string
+
+    Parameter:
+      type: object
+      properties:
+        version:
+          type: string
+          const: "1.0.0"
+        parameter_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: string
+        bounds:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        description:
+          type: string
+        metadata:
+          type: object
+      required:
+        - version
+        - parameter_id
+        - name
+        - type
+
+    ParameterCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: string
+        bounds:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        description:
+          type: string
+      required:
+        - name
+        - type
+
+    AnalysisRequest:
+      type: object
+      properties:
+        analysis_type:
+          type: string
+        experiment_id:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        options:
+          type: object
+          additionalProperties: true
+      required:
+        - analysis_type
+
+    AnalysisResult:
+      type: object
+      properties:
+        analysis_id:
+          type: string
+        analysis_type:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        results:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Dataset:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+        name:
+          type: string
+        format:
+          type: string
+        size:
+          type: integer
+        classification:
+          type: string
+          enum: [public, internal, confidential, restricted, pii, phi, sensitive_research]
+        created_at:
+          type: string
+          format: date-time
+        retention_date:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    AuditLog:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+        total:
+          type: integer
+        page:
+          type: integer
+
+    AuditEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        classification:
+          type: string
+        outcome:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              details:
+                type: object
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string

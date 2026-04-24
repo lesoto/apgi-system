@@ -348,7 +348,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.iowa_gambling import IowaGamblingTask
+            from apgi_framework.experiments.tasks.iowa_gambling import IowaGamblingTask
 
             assert IowaGamblingTask is not None
         except ImportError as e:
@@ -361,7 +361,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.iowa_gambling import IowaGamblingTask
+            from apgi_framework.experiments.tasks.iowa_gambling import IowaGamblingTask
 
             # Create task instance
             task = IowaGamblingTask()
@@ -394,7 +394,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask
+            from apgi_framework.experiments.tasks.masking_paradigm import MaskingParadigmTask
 
             assert MaskingParadigmTask is not None
         except ImportError as e:
@@ -407,7 +407,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask
+            from apgi_framework.experiments.tasks.masking_paradigm import MaskingParadigmTask
 
             # Create task instance
             task = MaskingParadigmTask()
@@ -433,7 +433,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask
+            from apgi_framework.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
             assert AttentionalBlinkTask is not None
         except ImportError as e:
@@ -446,7 +446,7 @@ class TestExperimentalTasksExecution:
         Validates: Requirements 9.2, 9.4
         """
         try:
-            from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask
+            from apgi_framework.experiments.tasks.attentional_blink import AttentionalBlinkTask
 
             # Create task instance
             task = AttentionalBlinkTask()
@@ -483,7 +483,7 @@ class TestExperimentalTasksExecution:
 
         for task_name in expected_tasks:
             try:
-                module_name = f"apgi_simulation.experiments.tasks.{task_name}"
+                module_name = f"apgi_framework.experiments.tasks.{task_name}"
                 __import__(module_name)
                 available_tasks.append(task_name)
             except ImportError:
@@ -517,7 +517,7 @@ class TestPlatformSpecificFeatures:
         Validates: Requirements 9.4
         """
         try:
-            from apgi_simulation.platform_utils import get_platform, get_resource_path, is_bundled
+            from apgi_framework.platform_utils import get_platform, get_resource_path, is_bundled
 
             # Test platform detection
             platform = get_platform()
@@ -563,7 +563,7 @@ class TestPlatformSpecificFeatures:
         Validates: Requirements 9.3, 9.4
         """
         try:
-            from apgi_simulation.platform_utils import get_config_dir, get_data_dir
+            from apgi_framework.platform_utils import get_config_dir, get_data_dir
 
             # Get directories
             data_dir = get_data_dir()
@@ -650,7 +650,7 @@ class TestResourceBundling:
         Validates: Requirements 9.3
         """
         try:
-            from apgi_simulation.platform_utils import get_resource_path, is_bundled
+            from apgi_framework.platform_utils import get_resource_path, is_bundled
 
             # Test resource path resolution
             config_path = get_resource_path("config/default.yaml")
@@ -673,7 +673,7 @@ class TestErrorHandlingInBundledEnv:
         Validates: Requirements 9.3
         """
         try:
-            from apgi_simulation.platform_utils import get_resource_path
+            from apgi_framework.platform_utils import get_resource_path
 
             # Try to get non-existent resource
             nonexistent_path = get_resource_path("nonexistent/file.txt")

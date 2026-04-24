@@ -19,7 +19,7 @@ import redis.asyncio as redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session as SessionLocal
 
-from apgi_simulation.system import APGISystem
+from apgi_framework.system import APGISystem
 from api.database.models import Session as SessionModel
 from api.database.models import SessionState
 from api.exceptions import ServiceUnavailableError, SessionNotFoundError
@@ -256,7 +256,7 @@ class SimulationSession:
             state = await asyncio.to_thread(self.apgi_simulation.step, extero_input)
             self.updated_at = datetime.utcnow()
 
-            return state
+            return state  # type: ignore
 
     async def get_state(self) -> Dict[str, Any]:
         """
@@ -278,11 +278,11 @@ class SimulationSession:
                 "updated_at": self.updated_at.isoformat() + "Z",
             }
 
-            return state
+            return state  # type: ignore
 
     def _capture_state(self) -> Dict[str, Any]:
         """Capture complete system state for pause/resume."""
-        return self.apgi_simulation.get_state()
+        return self.apgi_simulation.get_state()  # type: ignore
 
     def _restore_state(self, state: Dict[str, Any]) -> None:
         """Restore system state from snapshot."""

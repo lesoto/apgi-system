@@ -23,10 +23,10 @@ from numpy.typing import NDArray
 # Add project root to path for local imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # noqa: E402
 
-from apgi_simulation.core.precision import PrecisionWeighting  # noqa: E402
-from apgi_simulation.interoception.body_model import BodyModel  # noqa: E402
-from apgi_simulation.system import APGISystem  # noqa: E402
-from apgi_simulation.thermodynamic.metabolism import MetabolicBudget  # noqa: E402
+from apgi_framework.engines import PrecisionWeighting  # noqa: E402
+from apgi_framework.interoception.body_model import BodyModel  # noqa: E402
+from apgi_framework.system import APGISystem  # noqa: E402
+from apgi_framework.thermodynamic.metabolism import MetabolicBudget  # noqa: E402
 from tests.strategies import body_state_strategy  # noqa: E402
 from tests.strategies import error_variance_strategy, observation_strategy  # noqa: E402
 
@@ -47,13 +47,16 @@ settings.load_profile("property_tests")
 
 def load_config_path() -> str:
     """Get configuration file path for tests."""
-    config_path = (
-        Path(__file__).parent.parent.parent
-        / "apgi_simulation"
-        / "resources"
-        / "config"
-        / "default.yaml"
-    )
+    config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
+    if not config_path.exists():
+        # Fallback to apgi_gui resources
+        config_path = (
+            Path(__file__).parent.parent.parent
+            / "apgi_gui"
+            / "resources"
+            / "config"
+            / "default.yaml"
+        )
     return str(config_path)
 
 
@@ -61,7 +64,7 @@ def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = load_config_path()
     with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 def load_small_config() -> str:
@@ -104,7 +107,7 @@ class TestCoreSystemProperties:
         """
         config_path = load_small_config()
         try:
-            apgi_simulation = APGISystem(config_path)
+            apgi_framework = APGISystem(config_path)
 
             # Process the same observation sequence multiple times
             # Note: We do NOT reset between iterations to allow learning to accumulate
@@ -116,7 +119,7 @@ class TestCoreSystemProperties:
                 for obs in observations:
                     # Reshape observation to match system expectations (1, dim)
                     obs_reshaped = obs.reshape(1, -1)
-                    state = apgi_simulation.step(obs_reshaped)
+                    state = apgi_framework.step(obs_reshaped)
                     # Extract free energy from state
                     if "free_energy" in state:
                         fe = state["free_energy"]
@@ -215,7 +218,7 @@ class TestCoreSystemProperties:
         """
         config_path = load_small_config()
         try:
-            apgi_simulation = APGISystem(config_path)
+            apgi_framework = APGISystem(config_path)
 
             # Process same sequence multiple times and track prediction errors
             # Note: We do NOT reset between iterations to allow learning to accumulate
@@ -227,7 +230,7 @@ class TestCoreSystemProperties:
                 for obs in observations:
                     # Reshape observation to match system expectations (1, dim)
                     obs_reshaped = obs.reshape(1, -1)
-                    state = apgi_simulation.step(obs_reshaped)
+                    state = apgi_framework.step(obs_reshaped)
 
                     # Extract prediction error magnitude
                     if "prediction" in state:
@@ -265,8 +268,8 @@ class TestCoreSystemProperties:
         **Validates: Requirements 2.4**
         """
         config_path = load_config_path()
-        apgi_simulation = APGISystem(config_path)
-        state = apgi_simulation.step(observation)
+        apgi_framework = APGISystem(config_path)
+        state = apgi_framework.step(observation)
 
         # Check that state is a dictionary
         assert isinstance(state, dict), "System state should be a dictionary"
@@ -380,16 +383,16 @@ class TestCoreSystemProperties:
         **Validates: Requirements 5.1**
         """
         config_path = load_config_path()
-        apgi_simulation = APGISystem(config_path)
+        apgi_framework = APGISystem(config_path)
         # Extract free energy from various sources
         free_energy_sources = []
 
         # Check if active inference provides free energy
-        if hasattr(apgi_simulation, "active_inference"):
+        if hasattr(apgi_framework, "active_inference"):
             # Try to get free energy from the active inference engine
             try:
                 # Step the active inference engine directly
-                action, ai_info = apgi_simulation.active_inference.step(observation, [])
+                action, ai_info = apgi_framework.active_inference.step(observation, [])
                 if "free_energy" in ai_info:
                     free_energy_sources.append(ai_info["free_energy"])
             except Exception:
@@ -524,21 +527,21 @@ class TestCoreSystemProperties:
         **Validates: Requirements 5.5**
         """
         config_path = load_config_path()
-        apgi_simulation = APGISystem(config_path)
+        apgi_framework = APGISystem(config_path)
 
         # Get initial state
-        initial_state = apgi_simulation.get_state_summary()
+        initial_state = apgi_framework.get_state_summary()
 
         # Run system for several steps
         for _ in range(steps_before_reset):
             obs = np.random.randn(256) * 0.5
-            apgi_simulation.step(obs)
+            apgi_framework.step(obs)
 
         # Reset system
-        apgi_simulation.reset()
+        apgi_framework.reset()
 
         # Get state after reset
-        reset_state = apgi_simulation.get_state_summary()
+        reset_state = apgi_framework.get_state_summary()
 
         # Key metrics should be restored to initial values
         assert reset_state["time_ms"] == 0.0, f"Time should reset to 0: {reset_state['time_ms']}"

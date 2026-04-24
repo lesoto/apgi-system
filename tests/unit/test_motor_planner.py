@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from apgi_simulation.core.motor_planning import GenerativeLikelihood, MotorPlanner
+from apgi_framework.core.motor_planning import GenerativeLikelihood, MotorPlanner
 
 # ---------------------------------------------------------------------------
 # Helpers / shared fixtures

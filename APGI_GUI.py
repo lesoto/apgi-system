@@ -28,9 +28,9 @@ from numpy.typing import NDArray
 
 # Import theme manager
 from apgi_gui.theme_manager import get_theme_manager
-from apgi_simulation.config_validator import ConfigValidationError, validate_config_file
-from apgi_simulation.platform_utils import get_data_dir, get_resource_path
-from apgi_simulation.system import APGISystem
+from apgi_framework.config_validator import ConfigValidationError, validate_config_file
+from apgi_framework.platform_utils import get_data_dir, get_resource_path
+from apgi_framework.system import APGISystem
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)
@@ -1524,18 +1524,23 @@ class APGIGui:
                 noise_level = params["noise"]
 
                 if pattern == "constant":
-                    base = np.full(256, intensity)
+                    base = np.full(256, intensity, dtype=np.float64)
                 elif pattern == "pulse":
                     # Create a pulse in the middle of the step
-                    base = np.zeros(256)
+                    base = np.zeros(256, dtype=np.float64)
                     base[intensity > 0.5] = intensity  # type: ignore[operator, call-overload]
                 elif pattern == "sine":
-                    base = intensity * (np.sin(2 * np.pi * t / 5.0) + 1) / 2 * np.ones(256)
+                    base = (
+                        intensity
+                        * (np.sin(2 * np.pi * t / 5.0) + 1)
+                        / 2
+                        * np.ones(256, dtype=np.float64)
+                    )
                 else:  # random
                     base = np.random.randn(256) * intensity  # type: ignore[operator]
 
                 noise = np.random.randn(256) * noise_level  # type: ignore[operator]
-                input_signal = base + noise
+                input_signal: NDArray[np.float64] = base + noise
 
                 self.custom_input_steps_remaining -= 1
                 if self.custom_input_steps_remaining == 0:
@@ -1545,9 +1550,10 @@ class APGIGui:
                 return input_signal
 
         # Default sinusoidal with noise
-        base = np.sin(2 * np.pi * t / 5.0) * np.ones(256)
+        base = np.sin(2 * np.pi * t / 5.0) * np.ones(256, dtype=np.float64)
         noise = np.random.randn(256) * 0.2
-        return base + noise
+        result: NDArray[np.float64] = base + noise
+        return result
 
     def _safe_update_fps(self, fps: float) -> None:
         """Safely update FPS label with existence check."""
@@ -1707,13 +1713,43 @@ class APGIGui:
         with self.data_lock:
             self.time_buffer.append(current_time)
 
-            # Extract and record metrics
+            # Extract and record metrics (convert arrays to scalars)
             self.data_buffers["ignition"].append(1 if state["ignition"]["ignition_occurred"] else 0)
-            self.data_buffers["free_energy"].append(state["ignition"]["total_signal"])
-            self.data_buffers["extero_precision"].append(state["precision"]["exteroceptive"])
-            self.data_buffers["intero_precision"].append(state["precision"]["interoceptive"])
-            self.data_buffers["metabolic_reserves"].append(state["metabolism"]["reserves"])
-            self.data_buffers["allostatic_load"].append(state["allostasis"]["allostatic_load"])
+            self.data_buffers["free_energy"].append(
+                float(
+                    np.mean(state["ignition"]["total_signal"])
+                    if hasattr(state["ignition"]["total_signal"], "__iter__")
+                    else state["ignition"]["total_signal"]
+                )
+            )
+            self.data_buffers["extero_precision"].append(
+                float(
+                    np.mean(state["precision"]["exteroceptive"])
+                    if hasattr(state["precision"]["exteroceptive"], "__iter__")
+                    else state["precision"]["exteroceptive"]
+                )
+            )
+            self.data_buffers["intero_precision"].append(
+                float(
+                    np.mean(state["precision"]["interoceptive"])
+                    if hasattr(state["precision"]["interoceptive"], "__iter__")
+                    else state["precision"]["interoceptive"]
+                )
+            )
+            self.data_buffers["metabolic_reserves"].append(
+                float(
+                    np.mean(state["metabolism"]["reserves"])
+                    if hasattr(state["metabolism"]["reserves"], "__iter__")
+                    else state["metabolism"]["reserves"]
+                )
+            )
+            self.data_buffers["allostatic_load"].append(
+                float(
+                    np.mean(state["allostasis"]["allostatic_load"])
+                    if hasattr(state["allostasis"]["allostatic_load"], "__iter__")
+                    else state["allostasis"]["allostatic_load"]
+                )
+            )
             self.data_buffers["heart_rate"].append(state["body"]["current"]["heart_rate"])
             self.data_buffers["cortisol"].append(state["body"]["current"]["cortisol"])
             self.data_buffers["workspace_active"].append(
@@ -1825,10 +1861,14 @@ class APGIGui:
             self.status_labels["Workspace"].config(text=workspace)
 
             reserves = summary["metabolic_reserves"]
-            self.status_labels["Metabolic Reserves"].config(text=f"{reserves:.1f}%")
+            reserves_scalar = float(
+                np.mean(reserves) if hasattr(reserves, "__iter__") else reserves
+            )
+            self.status_labels["Metabolic Reserves"].config(text=f"{reserves_scalar:.1f}%")
 
             load = summary["allostatic_load"] * 100
-            self.status_labels["Allostatic Load"].config(text=f"{load:.1f}%")
+            load_scalar = float(np.mean(load) if hasattr(load, "__iter__") else load)
+            self.status_labels["Allostatic Load"].config(text=f"{load_scalar:.1f}%")
 
         except Exception as e:
             self._log_event("Error updating status labels")
@@ -2842,15 +2882,14 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import AttentionalBlinkTask
+            from apgi_framework.experiments.tasks import AttentionalBlinkTask
 
             # Create task with specified parameters
             task = AttentionalBlinkTask(
                 stream_length=15,
-                item_duration_ms=100.0,
+                stimulus_duration_ms=100,
                 num_trials_per_lag=num_trials,
                 lags=[1, 2, 3, 4, 8],
-                target_salience=2.0,
             )
 
             # Create progress dialog
@@ -2900,7 +2939,7 @@ class APGIGui:
 
                     # Log result
                     if trial_idx % 10 == 0:
-                        msg = f"Trial {trial_idx}: Lag {result.lag}, T1: {result.t1_detected}, T2: {result.t2_detected}\n"
+                        msg = f"Trial {trial_idx}: Lag {result['lag']}, T1: {result['t1_detected']}, T2: {result['t2_detected']}\n"
                         self.root.after(
                             0,
                             lambda m=msg, rt=results_text: (  # type: ignore[misc]
@@ -3006,15 +3045,16 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import ChangeBlindnessTask
+            from apgi_framework.experiments.tasks import ChangeBlindnessTask
 
             # Create task with specified parameters
             task = ChangeBlindnessTask(
-                presentation_duration_ms=240.0,
-                blank_duration_ms=80.0,
+                display_size=(512, 512),
                 max_alternations=20,
                 num_trials_per_condition=num_trials,
                 change_magnitudes=[0.3, 0.5, 0.8],
+                presentation_duration_ms=240.0,
+                blank_duration_ms=80.0,
             )
 
             # Create progress dialog
@@ -3064,8 +3104,8 @@ class APGIGui:
 
                     # Log result
                     if trial_idx % 10 == 0:
-                        detected_str = "Yes" if result.change_detected else "No"
-                        msg = f"Trial {trial_idx}: {result.change_type.value}, Detected: {detected_str}\n"
+                        detected_str = "Yes" if result["change_detected"] else "No"
+                        msg = f"Trial {trial_idx}: {result['change_type'].value}, Detected: {detected_str}\n"
                         self.root.after(
                             0,
                             lambda m=msg, rt=results_text: (  # type: ignore[misc]
@@ -3177,10 +3217,11 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import BinocularRivalryTask
+            from apgi_framework.experiments.tasks import BinocularRivalryTask
 
             # Create task with specified parameters
             task = BinocularRivalryTask(
+                image_size=(256, 256),
                 trial_duration_ms=30000.0,  # 30 seconds per trial
                 num_trials=num_trials,
                 strength_ratios=[(1.0, 1.0), (1.0, 0.8), (1.2, 1.0)],
@@ -3235,8 +3276,8 @@ class APGIGui:
                     # Log result
                     if trial_idx % 5 == 0:
                         msg = (
-                            f"Trial {trial_idx}: {result.num_alternations} alternations, "
-                            f"Pattern A dominance: {result.pattern_a_dominance_ratio:.1%}\n"
+                            f"Trial {trial_idx}: {result['num_alternations']} alternations, "
+                            f"Pattern A dominance: {result['pattern_a_dominance_ratio']:.1%}\n"
                         )
                         self.root.after(
                             0,
@@ -3348,7 +3389,7 @@ class APGIGui:
         self._update_status("Running Masking Paradigm task...")
 
         try:
-            from apgi_simulation.experiments.tasks import MaskingParadigmTask
+            from apgi_framework.experiments.tasks import MaskingParadigmTask
 
             task = MaskingParadigmTask(num_trials_per_condition=trials_per_condition)
 
@@ -3394,10 +3435,10 @@ class APGIGui:
                         result = task.run_trial(self.apgi_simulation, trial)
 
                     if trial_idx % 10 == 0:
-                        detected = "Yes" if result.target_detected else "No"
+                        detected = "Yes" if result["target_detected"] else "No"
                         msg = (
-                            f"Trial {trial_idx}: SOA {result.soa_ms}ms, Detected: {detected}, "
-                            f"Ignitions: {result.ignition_count}\n"
+                            f"Trial {trial_idx}: SOA {result['soa_ms']}ms, Detected: {detected}, "
+                            f"Ignitions: {result['ignition_count']}\n"
                         )
                         self.root.after(
                             0,
@@ -3416,7 +3457,7 @@ class APGIGui:
                     ),
                 )
 
-                analysis = task.analyze_results()
+                analysis = task.analyze_results(task.results)
 
                 summary = f"\n{'=' * 50}\nRESULTS:\n{'=' * 50}\n"
                 summary += f"Total Trials: {analysis['total_trials']}\n"
@@ -3446,7 +3487,7 @@ class APGIGui:
 
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"masking_paradigm_results_{timestamp}.json"
-                task.save_results(filename)
+                task.save_results(task.results, filename)
 
                 self.root.after(
                     0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
@@ -3454,7 +3495,7 @@ class APGIGui:
 
                 def close_and_show_results() -> None:
                     progress_dialog.destroy()
-                    task.print_results(analysis)
+                    # task.print_results(analysis)  # type: ignore[attr-defined]
                     messagebox.showinfo(
                         "Task Complete",
                         f"Masking Paradigm task completed!\n\n"
@@ -3495,16 +3536,12 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import IowaGamblingTask
+            from apgi_framework.experiments.tasks import IowaGamblingTask
 
             # Create task with specified parameters
             task = IowaGamblingTask(
                 num_trials=num_trials,
-                initial_balance=2000,
-                deck_stimulus_strength=1.5,
-                outcome_stimulus_strength=2.0,
-                interoceptive_gain=1.0,
-                deck_selection_strategy="balanced",
+                starting_balance=2000,
             )
 
             # Create progress dialog
@@ -3555,9 +3592,9 @@ class APGIGui:
 
                     # Log result
                     if trial_idx % 10 == 0:
-                        deck = result.deck_choice.value
-                        net = result.net_outcome
-                        balance = result.running_total
+                        deck = result["deck_choice"].value
+                        net = result["net_outcome"]
+                        balance = result["running_total"]
                         msg = (
                             f"Trial {trial_idx}: Deck {deck}, Net: ${net:+d}, Balance: ${balance}\n"
                         )
@@ -3678,7 +3715,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import StroopTask
+            from apgi_framework.experiments.tasks import StroopTask
 
             # Create task with specified parameters
             task = StroopTask(
@@ -3806,7 +3843,7 @@ class APGIGui:
 
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"stroop_task_results_{timestamp}.json"
-                    task.save_results(filename)
+                    task.save_results(filepath=filename)
 
                     self.root.after(
                         0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
@@ -3872,7 +3909,7 @@ class APGIGui:
 
         # Import and create task
         try:
-            from apgi_simulation.experiments.tasks import NBackTask
+            from apgi_framework.experiments.tasks import NBackTask
 
             # Create task with specified parameters
             task = NBackTask(
@@ -3972,7 +4009,7 @@ class APGIGui:
 
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"nback_task_results_{timestamp}.json"
-                    task.save_results(filename)
+                    task.save_results(filepath=filename)
 
                     self.root.after(
                         0, lambda: self._log_event(f"Task complete. Results saved to {filename}")
@@ -4932,11 +4969,13 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
                 # Enhanced statistical analysis
                 try:
-                    from apgi_simulation.analysis import SystemAnalyzer
+                    from apgi_framework.analysis import SystemAnalyzer
 
                     analyzer = SystemAnalyzer(self.apgi_simulation.config)
                     analysis_results = analyzer.analyze_system(self.apgi_simulation)
-                    statistical_summary = analyzer.generate_statistical_summary(analysis_results)
+                    statistical_summary = analyzer.generate_statistical_summary(
+                        analysis_results._data
+                    )
 
                     f.write("STATISTICAL ANALYSIS\n")
                     f.write("-" * 30 + "\n\n")
@@ -5044,11 +5083,13 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
 
                 # Enhanced statistical analysis
                 try:
-                    from apgi_simulation.analysis import SystemAnalyzer
+                    from apgi_framework.analysis import SystemAnalyzer
 
                     analyzer = SystemAnalyzer(self.apgi_simulation.config)
                     analysis_results = analyzer.analyze_system(self.apgi_simulation)
-                    statistical_summary = analyzer.generate_statistical_summary(analysis_results)
+                    statistical_summary = analyzer.generate_statistical_summary(
+                        analysis_results._data
+                    )
 
                     story.append(Paragraph("<b>Statistical Analysis</b>", styles["Heading2"]))
                     story.append(Spacer(1, 6))
@@ -5150,7 +5191,7 @@ Average Outcome: {stats.get('avg_outcome', 0):.3f}
             text_widget.insert(tk.END, "Running statistical analysis...\n\n")
 
             try:
-                from apgi_simulation.analysis import SystemAnalyzer
+                from apgi_framework.analysis import SystemAnalyzer
 
                 analyzer = SystemAnalyzer(self.apgi_simulation.config)  # type: ignore[union-attr]
 
@@ -5545,9 +5586,9 @@ def main() -> None:
     """Main entry point for GUI application."""
     # Check dependencies before starting with user-friendly error handling
     try:
-        from utils.dependency_checker import check_dependencies_on_startup
+        from utils.dependency_checker import check_dependencies
 
-        deps_ok = check_dependencies_on_startup(silent=True)
+        deps_ok = check_dependencies(core_only=True)
 
         if not deps_ok:
             print("=" * 60)

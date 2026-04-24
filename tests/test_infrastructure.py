@@ -33,10 +33,10 @@ def test_config_fixture(config: Any) -> None:
     assert "ignition" in config
 
 
-def test_apgi_simulation_fixture(apgi_simulation: Any) -> None:
-    """Test that apgi_simulation fixture initializes correctly."""
-    assert apgi_simulation is not None
-    assert apgi_simulation.time == 0.0
+def test_apgi_framework_fixture(apgi_framework: Any) -> None:
+    """Test that apgi_framework fixture initializes correctly."""
+    assert apgi_framework is not None
+    assert apgi_framework.time == 0.0
 
 
 def test_body_model_fixture(body_model: Any) -> None:
@@ -101,7 +101,7 @@ def test_belief_state_strategy_generates_valid_beliefs() -> None:
     from hypothesis import find
 
     # Use smaller dimensions to avoid hanging during test generation
-    beliefs = find(belief_state_strategy(num_levels=2, level_dims=[4, 2]), lambda x: True)
+    beliefs = find(belief_state_strategy(num_levels=2, level_dims=[4, 2]), lambda x: True)  # type: ignore[call-arg]
 
     assert isinstance(beliefs, list)
     assert len(beliefs) == 2  # Reduced num_levels

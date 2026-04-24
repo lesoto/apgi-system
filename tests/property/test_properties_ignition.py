@@ -21,8 +21,8 @@ import numpy as np  # noqa: E402
 import yaml  # noqa: E402
 from hypothesis import HealthCheck, assume, given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
-from apgi_simulation.ignition.global_workspace import GlobalWorkspace  # noqa: E402
-from apgi_simulation.ignition.threshold import IgnitionThreshold  # noqa: E402
+from apgi_framework.ignition.global_workspace import GlobalWorkspace  # noqa: E402
+from apgi_framework.ignition.threshold import IgnitionThreshold  # noqa: E402
 from tests.strategies import (  # noqa: E402
     precision_weighted_error_strategy,
     somatic_marker_gain_strategy,
@@ -46,7 +46,7 @@ def load_config() -> Dict[str, Any]:
     """Load configuration for tests."""
     config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 class TestIgnitionDynamicsProperties:

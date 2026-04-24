@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Check FOOOF availability
 try:
-    import fooof  # noqa: F401
+    import fooof  # type: ignore[import-untyped]  # noqa: F401
 
     FOOOF_AVAILABLE = True
     logger.info("✓ FOOOF imported successfully")
@@ -41,7 +41,7 @@ except ImportError:
     sys.exit(1)
 
 try:
-    import plotly.graph_objects as go  # noqa: F401
+    import plotly.graph_objects as go  # type: ignore[import-untyped]  # noqa: F401
 
     PLOTLY_AVAILABLE = True
     logger.info("✓ Plotly available")

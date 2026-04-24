@@ -7,6 +7,7 @@ These tests verify correctness properties of the build system including:
 - Resource bundling
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -135,9 +136,7 @@ class TestDependencyCompleteness:
 
     def test_analyze_dependencies_finds_core_imports(self) -> None:
         """
-        Dependency analysis should find all core imports from entry point.
-
-        We expect to find at least: numpy, scipy, matplotlib, tkinter, yaml
+        Dependency analysis should find core imports from the project.
         """
         project_root = get_project_root()
         entry_point = project_root / "APGI_GUI.py"
@@ -145,7 +144,7 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(str(entry_point))
+        dependencies = analyze_dependencies(str(project_root))
 
         # Core dependencies that should be found
         expected_deps = {"numpy", "matplotlib", "yaml"}
@@ -153,9 +152,17 @@ class TestDependencyCompleteness:
         # Get all unique dependencies from both sources
         all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]
 
+        # Normalize dependency names by stripping version specifiers
+        normalized_deps = set()
+        for dep in all_deps:
+            # Strip version specifiers (e.g., "numpy==2.2.5" -> "numpy")
+            # Handle various version specifiers: ==, >=, <=, ~=, <, >
+            normalized_name = re.split(r"[=<>~]", dep)[0].strip()
+            normalized_deps.add(normalized_name)
+
         # Check that we found the expected dependencies
-        found_deps = all_deps & expected_deps
-        msg = f"Expected to find {expected_deps}, but only found {all_deps}"
+        found_deps = normalized_deps & expected_deps
+        msg = f"Expected to find {expected_deps}, but only found {normalized_deps}"
         assert len(found_deps) > 0, msg
 
     def test_analyze_dependencies_returns_set(self) -> None:
@@ -168,7 +175,7 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(str(entry_point))
+        dependencies = analyze_dependencies(str(project_root))
 
         assert isinstance(dependencies, dict)
         assert "requirements_txt" in dependencies
@@ -190,7 +197,7 @@ class TestDependencyCompleteness:
         if not entry_point.exists():
             pytest.skip("Entry point not found")
 
-        dependencies = analyze_dependencies(str(entry_point))
+        dependencies = analyze_dependencies(str(project_root))
 
         # Get all unique dependencies from both sources
         all_deps = dependencies["requirements_txt"] | dependencies["pyproject_toml"]

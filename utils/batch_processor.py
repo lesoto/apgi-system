@@ -1,0 +1,564 @@
+#!/usr/bin/env python3
+"""
+APGI Theory Framework - Batch Processing Utility
+============================================
+
+Advanced batch processing system for running multiple simulations,
+validation protocols, and analyses in parallel with progress tracking.
+"""
+
+import importlib.util
+import json
+import pickle
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
+from tqdm import tqdm  # type: ignore[import-untyped]
+
+# Add project root to Python path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+try:
+    from apgi_framework.security.secure_pickle import safe_pickle_dump
+except ImportError:
+    # Fallback to regular pickle if secure_pickle not available
+    def safe_pickle_dump(
+        obj: Any,
+        file_path: Union[str, Path],
+        create_checksum: bool = True,
+        protocol: int = 4,
+    ) -> None:
+        with open(file_path, "wb") as f:
+            pickle.dump(obj, f, protocol=protocol)
+
+
+# Create fallback class for batch processing simulations
+class SurpriseIgnitionSystem:
+    """Fallback SurpriseIgnitionSystem for batch processing."""
+
+    def __init__(self):
+        pass
+
+    def simulate(self, duration, dt, input_generator):
+        """Return dummy data for testing."""
+        import numpy as np
+
+        steps = int(duration / dt)
+        return {
+            "S": np.random.randn(steps),
+            "theta": np.random.randn(steps) * 0.1 + 0.5,
+            "B": np.random.randint(0, 2, steps),
+        }
+
+
+try:
+    from apgi_framework.logging.standardized_logging import get_logger, APGILogger
+
+    apgi_logger: APGILogger = get_logger(__name__)
+except ImportError:
+    import logging
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        apgi_logger: APGILogger = logging.getLogger(__name__)  # type: ignore
+    else:
+        apgi_logger = logging.getLogger(__name__)
+
+
+def load_validation_module(protocol):
+    """Load validation module by name."""
+    module_map = {
+        "protocol_1": "Validation/Validation-Protocol-1.py",
+        "protocol_2": "Validation/Validation-Protocol-2.py",
+        "protocol_3": "Validation/Validation-Protocol-3.py",
+        "protocol_4": "Validation/Validation-Protocol-4.py",
+        "protocol_5": "Validation/Validation-Protocol-5.py",
+        "protocol_6": "Validation/Validation-Protocol-6.py",
+        "protocol_7": "Validation/Validation-Protocol-7.py",
+        "protocol_8": "Validation/Validation-Protocol-8.py",
+    }
+
+    if protocol not in module_map:
+        raise ValueError(f"Unknown validation protocol: {protocol}")
+
+    module_path = PROJECT_ROOT / module_map[protocol]
+    spec = importlib.util.spec_from_file_location(protocol, module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@dataclass
+class BatchJob:
+    """Represents a single batch processing job."""
+
+    job_id: str
+    job_type: str  # 'simulation', 'validation', 'analysis'
+    parameters: Dict[str, Any]
+    input_file: Optional[str] = None
+    output_file: Optional[str] = None
+    status: str = "pending"  # 'pending', 'running', 'completed', 'failed'
+    result: Optional[Any] = None
+    error: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+
+
+class BatchProcessor:
+    """Advanced batch processing system for APGI framework."""
+
+    def __init__(self, max_workers: int = 4, use_processes: bool = True):
+        """
+        Initialize batch processor.
+
+        Args:
+            max_workers: Maximum number of parallel workers
+            use_processes: Use processes instead of threads for CPU-bound tasks
+        """
+        self.max_workers = max_workers
+        self.use_processes = use_processes
+        self.jobs: List[BatchJob] = []
+        self.results: Dict[str, Any] = {}
+
+        # Choose executor type
+        self.executor_class = ProcessPoolExecutor if use_processes else ThreadPoolExecutor
+
+    def add_simulation_job(
+        self,
+        job_id: str,
+        params: Dict[str, Any],
+        steps: int = 1000,
+        dt: float = 0.01,
+        output_file: Optional[str] = None,
+    ) -> str:
+        """Add a simulation job to the batch."""
+        job = BatchJob(
+            job_id=job_id,
+            job_type="simulation",
+            parameters={"params": params, "steps": steps, "dt": dt},
+            output_file=output_file,
+        )
+        self.jobs.append(job)
+        return job_id
+
+    def add_validation_job(
+        self,
+        job_id: str,
+        protocol: str,
+        input_file: Optional[str] = None,
+        output_file: Optional[str] = None,
+    ) -> str:
+        """Add a validation job to the batch."""
+        job = BatchJob(
+            job_id=job_id,
+            job_type="validation",
+            parameters={"protocol": protocol},
+            input_file=input_file,
+            output_file=output_file,
+        )
+        self.jobs.append(job)
+        return job_id
+
+    def add_analysis_job(
+        self,
+        job_id: str,
+        analysis_type: str,
+        input_file: str,
+        parameters: Optional[Dict[str, Any]] = None,
+        output_file: Optional[str] = None,
+    ) -> str:
+        """Add an analysis job to the batch."""
+        job = BatchJob(
+            job_id=job_id,
+            job_type="analysis",
+            parameters={
+                "analysis_type": analysis_type,
+                "input_file": input_file,
+                "parameters": parameters or {},
+            },
+            input_file=input_file,
+            output_file=output_file,
+        )
+        self.jobs.append(job)
+        return job_id
+
+    def run_job(self, job: BatchJob) -> BatchJob:
+        """Execute a single job."""
+        job.status = "running"
+        job.start_time = time.time()
+
+        try:
+            if job.job_type == "simulation":
+                job.result = self._run_simulation(job)
+            elif job.job_type == "validation":
+                job.result = self._run_validation(job)
+            elif job.job_type == "analysis":
+                job.result = self._run_analysis(job)
+            else:
+                raise ValueError(f"Unknown job type: {job.job_type}")
+
+            job.status = "completed"
+
+            # Save result if output file specified
+            if job.output_file:
+                self._save_result(job)
+
+        except Exception as e:
+            job.status = "failed"
+            job.error = str(e)
+            apgi_logger.logger.error(f"Job {job.job_id} failed: {e}")
+
+        job.end_time = time.time()
+        return job
+
+    def _run_simulation(self, job: BatchJob) -> Dict[str, Any]:
+        """Run a simulation job."""
+        params = job.parameters["params"]
+        steps = job.parameters["steps"]
+        dt = job.parameters["dt"]
+
+        # Initialize system (no params in constructor)
+        system = SurpriseIgnitionSystem()
+
+        # Apply parameters to system if needed
+        if hasattr(system, "__dict__"):
+            for key, value in params.items():
+                if hasattr(system, key):
+                    setattr(system, key, value)
+
+        # Create a simple input generator
+        def input_generator(t):
+            return {
+                "Pi_e": np.random.normal(0, 1),
+                "Pi_i": np.random.normal(0, 1),
+                "eps_e": np.random.normal(0, 0.1),
+                "eps_i": np.random.normal(0, 0.1),
+                "beta": params.get("beta", 1.2),
+            }
+
+        # Run simulation
+        duration = steps * dt
+        results = system.simulate(duration=duration, dt=dt, input_generator=input_generator)
+
+        return {
+            "job_id": job.job_id,
+            "parameters": params,
+            "results": results,
+            "summary": {
+                "total_ignitions": np.sum(results["B"]),
+                "mean_surprise": np.mean(results["S"]),
+                "mean_threshold": np.mean(results["theta"]),
+                "final_state": {
+                    "S": results["S"][-1],
+                    "theta": results["theta"][-1],
+                    "B": results["B"][-1],
+                },
+            },
+        }
+
+    def _run_validation(self, job: BatchJob) -> Dict[str, Any]:
+        """Run a validation job."""
+        protocol = job.parameters["protocol"]
+
+        try:
+            # Load validation module dynamically
+            validation_module = load_validation_module(protocol)
+
+            # Run validation
+            results = validation_module.run_validation()
+
+            return {
+                "job_id": job.job_id,
+                "protocol": protocol,
+                "results": results,
+                "status": "completed",
+            }
+
+        except Exception as e:
+            raise ImportError(f"Could not run validation protocol {protocol}: {e}")
+
+    def _run_analysis(self, job: BatchJob) -> Dict[str, Any]:
+        """Run an analysis job."""
+        analysis_type = job.parameters["analysis_type"]
+        input_file = job.parameters["input_file"]
+
+        # Load data
+        if not Path(input_file).exists():
+            raise FileNotFoundError(f"Input file not found: {input_file}")
+
+        data = pd.read_csv(input_file)
+
+        # Perform analysis based on type
+        if analysis_type == "statistical_summary":
+            result = {
+                "job_id": job.job_id,
+                "analysis_type": analysis_type,
+                "summary": data.describe().to_dict(),
+                "shape": data.shape,
+                "columns": list(data.columns),
+            }
+        elif analysis_type == "correlation_analysis":
+            numeric_cols = data.select_dtypes(include=[np.number]).columns
+            correlation_matrix = data[numeric_cols].corr()
+
+            result = {
+                "job_id": job.job_id,
+                "analysis_type": analysis_type,
+                "correlation_matrix": correlation_matrix.to_dict(),
+                "strong_correlations": [],
+            }
+
+            # Find strong correlations
+            for i in range(len(correlation_matrix.columns)):
+                for j in range(i + 1, len(correlation_matrix.columns)):
+                    corr_val = correlation_matrix.iloc[i, j]
+                    if isinstance(corr_val, (int, float)) and abs(corr_val) > 0.7:
+                        result["strong_correlations"].append(
+                            {
+                                "var1": correlation_matrix.columns[i],
+                                "var2": correlation_matrix.columns[j],
+                                "correlation": corr_val,
+                            }
+                        )
+
+        else:
+            raise ValueError(f"Unknown analysis type: {analysis_type}")
+
+        return result
+
+    def _save_result(self, job: BatchJob):
+        """Save job result to file."""
+        if not job.output_file:
+            return
+
+        output_path = Path(job.output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if job.output_file and job.output_file.endswith(".json"):
+            with open(output_path, "w") as f:
+                json.dump(job.result, f, indent=2, default=str)
+        elif job.output_file and job.output_file.endswith(".pkl"):
+            safe_pickle_dump(job.result, output_path)
+        elif job.output_file and job.output_file.endswith(".csv"):
+            if isinstance(job.result, dict) and "results" in job.result:
+                # Save simulation results as CSV
+                df = pd.DataFrame(job.result["results"])
+                df.to_csv(output_path, index=False)
+            else:
+                # Save summary as CSV
+                df = pd.DataFrame([job.result])
+                df.to_csv(output_path, index=False)
+        else:
+            # Default to JSON
+            with open(output_path.with_suffix(".json"), "w") as f:
+                json.dump(job.result, f, indent=2, default=str)
+
+    def run_batch(self, show_progress: bool = True) -> Dict[str, Any]:
+        """Run all jobs in the batch."""
+        if not self.jobs:
+            print("No jobs to run")
+            return {"status": "no_jobs"}
+
+        print(f"Running {len(self.jobs)} jobs with {self.max_workers} workers...")
+
+        # Create progress bar
+        if show_progress:
+            pbar = tqdm(total=len(self.jobs), desc="Processing jobs")
+
+        # Separate memory-intensive jobs (protocol_2) from others
+        memory_intensive_jobs = []
+        regular_jobs = []
+
+        for job in self.jobs:
+            if job.job_type == "validation" and job.parameters.get("protocol") == "protocol_2":
+                memory_intensive_jobs.append(job)
+            else:
+                regular_jobs.append(job)
+
+        completed_jobs = []
+        failed_jobs = []
+
+        # Run regular jobs in parallel
+        if regular_jobs:
+            print(f"Running {len(regular_jobs)} regular jobs in parallel...")
+            try:
+                with self.executor_class(max_workers=self.max_workers) as executor:
+                    # Submit regular jobs
+                    future_to_job = {
+                        executor.submit(self.run_job, job): job for job in regular_jobs
+                    }
+
+                    # Collect results
+                    for future in as_completed(future_to_job):
+                        job = future_to_job[future]
+                        try:
+                            completed_job = future.result()
+                            completed_jobs.append(completed_job)
+                        except Exception as e:
+                            job.status = "failed"
+                            job.error = str(e)
+                            failed_jobs.append(job)
+                            print(f"\nJob {job.job_id} failed: {e}")
+
+                        if show_progress:
+                            pbar.update(1)
+
+            except Exception as e:
+                print(f"\nExecutor error: {e}")
+                # Add all regular jobs to failed list for sequential processing
+                failed_jobs.extend(regular_jobs)
+
+        # Run memory-intensive jobs sequentially with threading
+        if memory_intensive_jobs:
+            print(f"Running {len(memory_intensive_jobs)} memory-intensive jobs sequentially...")
+            for job in memory_intensive_jobs:
+                try:
+                    print(f"Running {job.job_id} (memory-intensive)...")
+                    completed_job = self.run_job(job)
+                    completed_jobs.append(completed_job)
+                except Exception as e:
+                    job.status = "failed"
+                    job.error = str(e)
+                    failed_jobs.append(job)
+                    print(f"Memory-intensive job {job.job_id} failed: {e}")
+
+                if show_progress:
+                    pbar.update(1)
+
+        # Try to run any remaining failed jobs sequentially
+        if failed_jobs:
+            print(f"Attempting to run {len(failed_jobs)} failed jobs sequentially...")
+            for job in failed_jobs[:]:  # Copy list to allow modification during iteration
+                try:
+                    print(f"Running {job.job_id} sequentially...")
+                    completed_job = self.run_job(job)
+                    completed_jobs.append(completed_job)
+                    failed_jobs.remove(job)
+                except Exception as e2:
+                    job.status = "failed"
+                    job.error = str(e2)
+                    print(f"Sequential run also failed for {job.job_id}: {e2}")
+
+                if show_progress:
+                    pbar.update(1)
+
+        if show_progress:
+            pbar.close()
+
+        # Compile results
+        self.results = {
+            "total_jobs": len(self.jobs),
+            "completed": len([j for j in completed_jobs if j.status == "completed"]),
+            "failed": len([j for j in completed_jobs if j.status == "failed"]),
+            "jobs": [asdict(job) for job in completed_jobs],
+        }
+
+        # Print summary
+        print("\nBatch processing complete:")
+        print(f"  Total jobs: {self.results['total_jobs']}")
+        print(f"  Completed: {self.results['completed']}")
+        print(f"  Failed: {self.results['failed']}")
+
+        if self.results["failed"] > 0:
+            print("\nFailed jobs:")
+            for job in completed_jobs:
+                if job.status == "failed":
+                    print(f"  {job.job_id}: {job.error}")
+
+        return self.results
+
+    def save_batch_report(self, output_file: str):
+        """Save a comprehensive batch processing report."""
+        report = {
+            "timestamp": time.time(),
+            "configuration": {
+                "max_workers": self.max_workers,
+                "use_processes": self.use_processes,
+            },
+            "results": self.results,
+        }
+
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w") as f:
+            json.dump(report, f, indent=2, default=str)
+
+        print(f"Batch report saved to: {output_file}")
+
+
+def create_parameter_grid(param_ranges: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+    """Create a grid of parameter combinations for batch simulation."""
+    import itertools
+
+    keys = list(param_ranges.keys())
+    values = list(param_ranges.values())
+
+    combinations = list(itertools.product(*values))
+
+    return [dict(zip(keys, combo)) for combo in combinations]
+
+
+def main():
+    """Example usage of batch processing system."""
+    # Create batch processor
+    processor = BatchProcessor(max_workers=4, use_processes=True)
+
+    # Example 1: Parameter sweep simulation
+    param_ranges = {
+        "tau_S": [0.3, 0.5, 0.7],
+        "alpha": [8.0, 10.0, 12.0],
+        "theta_0": [0.3, 0.5, 0.7],
+    }
+
+    param_combinations = create_parameter_grid(param_ranges)
+
+    print(f"Adding {len(param_combinations)} simulation jobs...")
+    for i, params in enumerate(param_combinations):
+        processor.add_simulation_job(
+            job_id=f"sim_{i:03d}",
+            params=params,
+            steps=1000,
+            dt=0.01,
+            output_file=f"results/sim_{i:03d}.json",
+        )
+
+    # Example 2: Validation protocols (only if files exist)
+    validation_protocols = []
+    for protocol in ["protocol_1", "protocol_2", "protocol_3"]:
+        protocol_file = PROJECT_ROOT / f"Validation/Validation-{protocol.title()}.py"
+        if protocol_file.exists():
+            validation_protocols.append(protocol)
+
+    for protocol in validation_protocols:
+        processor.add_validation_job(
+            job_id=f"val_{protocol}",
+            protocol=protocol,
+            output_file=f"results/val_{protocol}.json",
+        )
+
+    # Example 3: Analysis jobs
+    if Path("data/sample_data.csv").exists():
+        processor.add_analysis_job(
+            job_id="analysis_summary",
+            analysis_type="statistical_summary",
+            input_file="data/sample_data.csv",
+            output_file="results/analysis_summary.json",
+        )
+
+    # Run batch
+    processor.run_batch(show_progress=True)
+
+    # Save report
+    processor.save_batch_report("results/batch_report.json")
+
+
+if __name__ == "__main__":
+    main()

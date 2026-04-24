@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from apgi_simulation.monitoring import (
+from apgi_framework.monitoring import (
     MetricsCollector,
     PerformanceMetrics,
     PerformanceMonitor,

@@ -1,0 +1,330 @@
+# APGI Framework Kubernetes Deployment Configuration
+# For production-grade container orchestration
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apgi-framework
+  labels:
+    app: apgi-framework
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: apgi-framework
+  template:
+    metadata:
+      labels:
+        app: apgi-framework
+        version: v1
+    spec:
+      containers:
+      - name: apgi-framework
+        image: apgi-framework:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: APGI_ENV
+          value: "production"
+        - name: APGI_DEBUG
+          value: "false"
+        - name: APGI_LOG_LEVEL
+          value: "INFO"
+        - name: APGUI_THEME
+          value: "dark"
+        - name: APGUI_FONT_SIZE
+          value: "12"
+        - name: APGI_MAX_WORKERS
+          value: "4"
+        - name: APGI_THREAD_POOL_SIZE
+          value: "8"
+        - name: APGI_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: apgi-secrets
+              key: secret-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+        - name: outputs-volume
+          mountPath: /app/apgi_outputs
+        - name: logs-volume
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: apgi-data-pvc
+      - name: outputs-volume
+        persistentVolumeClaim:
+          claimName: apgi-outputs-pvc
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: apgi-logs-pvc
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apgi-framework-service
+  labels:
+    app: apgi-framework
+spec:
+  selector:
+    app: apgi-framework
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  type: LoadBalancer
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apgi-data-pvc
+  labels:
+    app: apgi-framework
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apgi-outputs-pvc
+  labels:
+    app: apgi-framework
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apgi-logs-pvc
+  labels:
+    app: apgi-framework
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apgi-secrets
+  labels:
+    app: apgi-framework
+type: Opaque
+data:
+  # Generate with: echo -n "your-secret-key" | base64
+  secret-key: <BASE64_ENCODED_SECRET_KEY>
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apgi-config
+  labels:
+    app: apgi-framework
+data:
+  APGI_ENV: "production"
+  APGI_DEBUG: "false"
+  APGI_LOG_LEVEL: "INFO"
+  APGUI_THEME: "dark"
+  APGUI_FONT_SIZE: "12"
+  APGUI_WINDOW_WIDTH: "1400"
+  APGUI_WINDOW_HEIGHT: "900"
+  APGI_MAX_WORKERS: "4"
+  APGI_THREAD_POOL_SIZE: "8"
+  APGI_MEMORY_LIMIT: "2g"
+  APGI_DATA_DIR: "/app/data"
+  APGI_OUTPUTS_DIR: "/app/apgi_outputs"
+  APGI_SESSIONS_DIR: "/app/session_state"
+  APGI_LOGS_DIR: "/app/logs"
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apgi-framework-hpa
+  labels:
+    app: apgi-framework
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apgi-framework
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apgi-framework-ingress
+  labels:
+    app: apgi-framework
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - apgi.example.com
+    secretName: apgi-tls
+  rules:
+  - host: apgi.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: apgi-framework-service
+            port:
+              number: 80
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: apgi-backup
+  labels:
+    app: apgi-framework
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: apgi-framework:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Backup script
+              tar -czf /backup/apgi-backup-$(date +%Y%m%d_%H%M%S).tar.gz \
+                /app/data /app/apgi_outputs /app/session_state
+              # Keep only last 7 days of backups
+              find /backup -name "apgi-backup-*.tar.gz" -mtime +7 -delete
+            env:
+            - name: APGI_ENV
+              value: "backup"
+            volumeMounts:
+            - name: data-volume
+              mountPath: /app/data
+              readOnly: true
+            - name: outputs-volume
+              mountPath: /app/apgi_outputs
+              readOnly: true
+            - name: sessions-volume
+              mountPath: /app/session_state
+              readOnly: true
+            - name: backup-volume
+              mountPath: /backup
+          volumes:
+          - name: data-volume
+            persistentVolumeClaim:
+              claimName: apgi-data-pvc
+          - name: outputs-volume
+            persistentVolumeClaim:
+              claimName: apgi-outputs-pvc
+          - name: sessions-volume
+            persistentVolumeClaim:
+              claimName: apgi-sessions-pvc
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: apgi-backup-pvc
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apgi-backup-pvc
+  labels:
+    app: apgi-framework
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: apgi-framework-monitor
+  labels:
+    app: apgi-framework
+spec:
+  selector:
+    matchLabels:
+      app: apgi-framework
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

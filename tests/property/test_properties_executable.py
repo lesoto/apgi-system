@@ -18,7 +18,7 @@ import yaml
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from apgi_simulation.platform_utils import (
+from apgi_framework.platform_utils import (
     get_config_dir,
     get_data_dir,
     get_platform,
@@ -60,7 +60,7 @@ class TestExecutableLaunchProperties:
 
         try:
             # Import the GUI class
-            from apgi_gui import APGIGui
+            from apgi_gui.main import APGIGui
 
             # Initialize the GUI (this is what happens on launch)
             # We'll catch any initialization errors
@@ -69,7 +69,7 @@ class TestExecutableLaunchProperties:
             # Verify that the GUI was created successfully
             assert gui is not None, "GUI should be initialized"
             assert gui.root is not None, "GUI root window should exist"
-            assert gui.apgi_simulation is not None, "APGI system should be initialized"
+            assert gui.apgi_simulation is not None, "APGI system should be initialized"  # type: ignore[attr-defined]
 
             # Verify critical components exist
             assert hasattr(gui, "start_btn"), "Start button should exist"
@@ -113,14 +113,14 @@ class TestExecutableLaunchProperties:
             root.withdraw()
 
             try:
-                from apgi_gui import APGIGui
+                from apgi_gui.main import APGIGui
 
                 gui = APGIGui(root)
 
                 # Verify successful initialization
                 assert gui is not None, f"Launch {i + 1}: GUI should be initialized"
                 assert (
-                    gui.apgi_simulation is not None
+                    gui.apgi_simulation is not None  # type: ignore[attr-defined]
                 ), f"Launch {i + 1}: System should be initialized"
 
             except Exception as e:
@@ -207,27 +207,27 @@ class TestGUIFunctionalityProperties:
         root.withdraw()
 
         try:
-            from apgi_gui import APGIGui
+            from apgi_gui.main import APGIGui
 
             gui = APGIGui(root)
 
             # Manually trigger the tkinter variable conversion
             # This normally happens after a 200ms delay via root.after()
-            gui._convert_to_tkinter_variables()
+            gui._convert_to_tkinter_variables()  # type: ignore[attr-defined]
             root.update_idletasks()
 
             # Test control buttons exist and are in correct initial state
             assert (
-                str(gui.start_btn["state"]) == "normal"
+                str(gui.start_btn["state"]) == "normal"  # type: ignore[attr-defined]
             ), "Start button should be enabled initially"
             assert (
-                str(gui.pause_btn["state"]) == "disabled"
+                str(gui.pause_btn["state"]) == "disabled"  # type: ignore[attr-defined]
             ), "Pause button should be disabled initially"
             assert (
-                str(gui.stop_btn["state"]) == "disabled"
+                str(gui.stop_btn["state"]) == "disabled"  # type: ignore[attr-defined]
             ), "Stop button should be disabled initially"
             assert (
-                str(gui.reset_btn["state"]) == "normal"
+                str(gui.reset_btn["state"]) == "normal"  # type: ignore[attr-defined]
             ), "Reset button should be enabled initially"
 
             # Test parameter controls exist
@@ -249,11 +249,11 @@ class TestGUIFunctionalityProperties:
             for buffer_name, buffer in gui.data_buffers.items():
                 assert hasattr(buffer, "maxlen"), f"Buffer {buffer_name} should have maxlen"
                 assert (
-                    buffer.maxlen == gui.buffer_size
+                    buffer.maxlen == gui.buffer_size  # type: ignore[attr-defined]
                 ), f"Buffer {buffer_name} should have correct size"
 
             # Test status labels are initialized
-            for label_name, label in gui.status_labels.items():
+            for label_name, label in gui.status_labels.items():  # type: ignore[attr-defined]
                 assert label is not None, f"Status label {label_name} should exist"
                 assert label.cget("text"), f"Status label {label_name} should have text"
 
@@ -292,13 +292,13 @@ class TestGUIFunctionalityProperties:
             root = tk.Tk()
             root.withdraw()
 
-            from apgi_gui import APGIGui
+            from apgi_gui.main import APGIGui
 
             gui = APGIGui(root)
 
             # Manually trigger the tkinter variable conversion
             # This normally happens after a 200ms delay via root.after()
-            gui._convert_to_tkinter_variables()
+            gui._convert_to_tkinter_variables()  # type: ignore[attr-defined]
             root.update_idletasks()
 
             # Set parameter values
@@ -341,7 +341,7 @@ class TestGUIFunctionalityProperties:
         root.withdraw()
 
         try:
-            from apgi_gui import APGIGui
+            from apgi_gui.main import APGIGui
 
             gui = APGIGui(root)
 

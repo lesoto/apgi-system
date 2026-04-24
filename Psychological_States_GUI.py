@@ -27,7 +27,7 @@ import numpy as np
 import httpx
 import time
 from concurrent.futures import ThreadPoolExecutor
-from apgi_simulation.self_model.state_classifier import StateClassifier
+from apgi_framework.self_model.state_classifier import StateClassifier
 
 # Import empirical dataset catalog
 try:
@@ -44,9 +44,9 @@ except ImportError:
 # Import specparam (formerly fooof) for aperiodic EEG parameterization
 try:
     try:
-        from specparam import SpectralModel as FOOOF
+        from specparam import SpectralModel as FOOOF  # type: ignore[import-untyped]
     except ImportError:
-        from fooof import FOOOF
+        from fooof import FOOOF  # type: ignore[import-untyped]
 
     FOOOF_AVAILABLE = True
 except ImportError:
@@ -140,9 +140,9 @@ except ImportError:
 
 
 try:
-    import plotly.graph_objects as go
-    import plotly.io as pio
-    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go  # type: ignore[import-untyped]
+    import plotly.io as pio  # type: ignore[import-untyped]
+    from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
     PLOTLY_AVAILABLE = True
     pio.templates.default = "plotly_white"
@@ -220,7 +220,7 @@ class APGIParameters:
     @property
     def ignition_probability(self) -> float:
         """P(ignite) = σ(S_t - θ_t)"""
-        return 1.0 / (1.0 + np.exp(-(self.S_t - self.theta_t)))
+        return 1.0 / (1.0 + np.exp(-(self.S_t - self.theta_t)))  # type: ignore[no-any-return]
 
     def compute_ignition_probability(self) -> float:
         """Compute P(ignite) = σ(S_t - θ_t)"""
@@ -247,7 +247,7 @@ class APGIParameters:
         try:
             computed = self.Pi_i_baseline * np.exp(self.beta * self.M_ca)
             computed = np.clip(computed, 0.1, 10.0)
-            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)
+            return np.isclose(self.Pi_i_eff, computed, rtol=0.05)  # type: ignore[no-any-return]
         except (TypeError, AttributeError):
             return False
 
@@ -643,9 +643,9 @@ class APGIVisualizer:
             return 0.5  # Avoid division by zero
 
         if param_name in ["theta_t", "M_ca"]:
-            return (value - col_min) / (col_max - col_min)
+            return (value - col_min) / (col_max - col_min)  # type: ignore[no-any-return]
         else:
-            return value / col_max
+            return value / col_max  # type: ignore[no-any-return]
 
     def _create_3d_marker(self, size: float, color: str) -> Dict[str, Any]:
         """Create standardized 3D marker configuration"""
@@ -1857,7 +1857,7 @@ class SpectralParameters:
         # Normalize to 0-1 scale for consciousness index
         # Typical range: 0.5 (high arousal) to 2.5 (deep sleep)
         normalized = (self.aperiodic_exponent - 0.5) / 2.0
-        return np.clip(normalized, 0.0, 1.0)
+        return np.clip(normalized, 0.0, 1.0)  # type: ignore[no-any-return]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for visualization"""
@@ -4787,7 +4787,7 @@ class APGIHFMapper:
             if resp.status_code != 200:
                 logger.error(f"HF API error {resp.status_code} for query: {query}")
                 return []
-            return resp.json()
+            return resp.json()  # type: ignore[no-any-return]
         except Exception as e:
             logger.error(f"HF Request failed: {e}")
             return []
@@ -4821,7 +4821,7 @@ class APGIHFMapper:
         score += repo.get("likes", 0) * 0.015
         score += min(repo.get("downloads", 0) / 1000, 50)  # cap downloads bonus
 
-        return score
+        return score  # type: ignore[no-any-return]
 
     def build_repo_map_for_state(self, state: str, keywords: List[str]) -> List[Dict[str, Any]]:
         """Build a list of top models for a specific state"""
@@ -5092,7 +5092,7 @@ class THINGSDataAnalyzer:
         # Simulate RSA based on concept semantic properties
         concept_hash = hash(concept_name) % 1000
         base_similarity = 0.5 + (concept_hash % 100) / 500
-        return np.clip(base_similarity, 0.0, 1.0)
+        return np.clip(base_similarity, 0.0, 1.0)  # type: ignore[no-any-return]
 
     def _compute_behavioral_similarity(self, concept_name: str) -> float:
         """Compute behavioral similarity from 4.7M judgments.
@@ -5106,7 +5106,7 @@ class THINGSDataAnalyzer:
         # Simulate behavioral similarity from similarity judgments
         concept_hash = hash(concept_name) % 1000
         base_similarity = 0.55 + (concept_hash % 100) / 500
-        return np.clip(base_similarity, 0.0, 1.0)
+        return np.clip(base_similarity, 0.0, 1.0)  # type: ignore[no-any-return]
 
     def _estimate_recognition_latency(self, concept_name: str) -> float:
         """Estimate recognition latency from temporal dynamics.

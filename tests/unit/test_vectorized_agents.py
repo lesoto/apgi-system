@@ -16,7 +16,7 @@ from typing import Any, Dict
 import numpy as np
 import pytest
 
-from apgi_simulation.core.active_inference import (
+from apgi_framework.core.active_inference import (
     ActiveInferenceAgent,
     ActiveInferenceEngine,
     VectorizedAgentPool,
@@ -148,7 +148,7 @@ class TestVectorizedAgentPool:
         engine = ActiveInferenceEngine(batch_config)
         pool = VectorizedAgentPool(engine, num_agents=8)
         obs_wrong = np.random.randn(4, 32)  # 4 instead of 8
-        with pytest.raises(ValueError, match="shape"):
+        with pytest.raises(ValueError, match="batch size"):
             pool.step(obs_wrong)
 
     def test_pool_free_energies_finite(self, batch_config: Dict[str, Any]) -> None:

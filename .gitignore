@@ -63,6 +63,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+apgi_env/
 .spyderproject
 .spyproject
 .ropeproject
@@ -96,7 +97,6 @@ dmypy.json
 *.ps
 *.tiff
 *.tif
-*.log
 logs/
 apgi_output/
 apgi_complete_output/
@@ -126,9 +126,6 @@ Thumbs.db
 *~
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 debug_*.py
 temp_*.py
 *_temp.py
@@ -146,7 +143,6 @@ temp_*.py
 dashboards/
 reports/
 *.html
-.DS_Store
 cache/
 *.db
 data_repository/*.fif
@@ -154,3 +150,17 @@ data_repository/*.json
 data_repository/*.csv
 data_repository/*.db
 .gitnexus
+.clinerules/byterover-rules.md
+.kilocode/rules/byterover-rules.md
+.roo/rules/byterover-rules.md
+.windsurf/rules/byterover-rules.md
+.cursor/rules/byterover-rules.mdc
+.kiro/steering/byterover-rules.md
+.qoder/rules/byterover-rules.md
+.augment/rules/byterover-rules.md
+data/processed/*.csv
+data/processed/*.png
+data/ai_benchmarking/*.json
+data/ai_benchmarking/plots/*.png
+test_storage/
+config/presets/

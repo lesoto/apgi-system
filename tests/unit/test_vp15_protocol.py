@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pytest
 
-from apgi_simulation.core.vp15 import VP15Bounds, VP15Metrics, VP15ValidationProtocol
+from apgi_framework.core.vp15 import VP15Bounds, VP15Metrics, VP15ValidationProtocol
 
 # ---------------------------------------------------------------------------
 # Helpers

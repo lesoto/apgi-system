@@ -76,8 +76,8 @@ class TestVersionBumping:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
 
-            # Create apgi_simulation directory
-            apgi_dir = project_root / "apgi_simulation"
+            # Create apgi_framework directory
+            apgi_dir = project_root / "apgi_framework"
             apgi_dir.mkdir()
 
             # Create __init__.py with version
@@ -109,7 +109,7 @@ class TestVersionBumping:
         manager.bump_version("1.0.0")
 
         # Files should not be modified
-        init_file = temp_project / "apgi_simulation" / "__init__.py"
+        init_file = temp_project / "apgi_framework" / "__init__.py"
         content = init_file.read_text()
         assert "0.1.0" in content, "Version should not change in dry-run"
 
@@ -120,7 +120,7 @@ class TestVersionBumping:
         manager.bump_version("1.0.0")
 
         # Check __init__.py
-        init_file = temp_project / "apgi_simulation" / "__init__.py"
+        init_file = temp_project / "apgi_framework" / "__init__.py"
         content = init_file.read_text()
         assert "1.0.0" in content, "Version should be updated in __init__.py"
         assert "0.1.0" not in content, "Old version should be removed"
@@ -355,7 +355,7 @@ class TestEnvironmentValidation:
             git_dir.mkdir()
 
             # Create version file
-            apgi_dir = project_root / "apgi_simulation"
+            apgi_dir = project_root / "apgi_framework"
             apgi_dir.mkdir()
             init_file = apgi_dir / "__init__.py"
             init_file.write_text('__version__ = "0.1.0"\n')
@@ -479,7 +479,7 @@ class TestErrorHandling:
             project_root = Path(tmpdir)
 
             # Create minimal structure
-            apgi_dir = project_root / "apgi_simulation"
+            apgi_dir = project_root / "apgi_framework"
             apgi_dir.mkdir()
             init_file = apgi_dir / "__init__.py"
             init_file.write_text('__version__ = "0.1.0"\n')

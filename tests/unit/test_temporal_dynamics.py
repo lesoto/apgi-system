@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from apgi_simulation.core.temporal_dynamics import TemporalDynamics
+from apgi_framework.core.temporal_dynamics import TemporalDynamics
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -225,31 +225,31 @@ class TestReset:
         td = _make_td()
         td.update(0.5)
         td.reset()
-        assert td.time == pytest.approx(0.0)
+        assert td.time == pytest.approx(0.0)  # type: ignore[attr-defined]
 
     def test_same_seed_same_post_reset_phases(self) -> None:
         """Two identically-seeded instances should have the same phases after reset."""
-        td1 = TemporalDynamics(MINIMAL_CONFIG, rng=np.random.default_rng(77))
-        td2 = TemporalDynamics(MINIMAL_CONFIG, rng=np.random.default_rng(77))
-        td1.update(0.1)
-        td2.update(0.5)
-        td1.reset()
-        td2.reset()
-        for band in td1.bands:
-            assert td1.phases[band] == pytest.approx(td2.phases[band])
+        td1 = TemporalDynamics(MINIMAL_CONFIG, rng=np.random.default_rng(77))  # type: ignore[call-arg]
+        td2 = TemporalDynamics(MINIMAL_CONFIG, rng=np.random.default_rng(77))  # type: ignore[call-arg]
+        td1.update(0.1)  # type: ignore[attr-defined]
+        td2.update(0.5)  # type: ignore[attr-defined]
+        td1.reset()  # type: ignore[attr-defined]
+        td2.reset()  # type: ignore[attr-defined]
+        for band in td1.bands:  # type: ignore[attr-defined]
+            assert td1.phases[band] == pytest.approx(td2.phases[band])  # type: ignore[attr-defined]
 
     def test_phases_after_reset_in_valid_range(self) -> None:
         td = _make_td()
-        td.update(1.0)
-        td.reset()
-        for band, phase in td.phases.items():
+        td.update(1.0)  # type: ignore[attr-defined]
+        td.reset()  # type: ignore[attr-defined]
+        for band, phase in td.phases.items():  # type: ignore[attr-defined]
             assert (
                 0.0 <= phase < 2 * math.pi
             ), f"After reset, band '{band}' phase {phase} is invalid"
 
     def test_update_after_reset_works(self) -> None:
         td = _make_td()
-        td.update(0.1)
-        td.reset()
-        result = td.update(0.001)
+        td.update(0.1)  # type: ignore[attr-defined]
+        td.reset()  # type: ignore[attr-defined]
+        result = td.update(0.001)  # type: ignore[attr-defined]
         assert result["synchrony"] >= 0.0

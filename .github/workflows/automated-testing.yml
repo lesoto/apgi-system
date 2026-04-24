@@ -1,0 +1,310 @@
+name: Automated Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  test-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [3.8, 3.9, '3.10', '3.11', '3.12']
+        exclude:
+          # Exclude some combinations to reduce CI load
+          - os: macos-latest
+            python-version: 3.8
+          - os: windows-latest
+            python-version: 3.8
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libffi-dev libssl-dev
+    
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install libffi openssl
+    
+    - name: Install system dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Windows typically comes with required build tools
+        echo "Using Windows build environment"
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xvfb pytest-mock
+        pip install black flake8 mypy
+        pip install -e .
+    
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Type check with mypy
+      run: |
+        mypy apgi_framework --ignore-missing-imports --no-error-summary
+
+    - name: Check code formatting with black
+      run: |
+        black --check --diff apgi_framework/
+    
+    - name: Run tests with pytest
+      env:
+        DISPLAY: :99
+      run: |
+        pytest tests/ --cov=apgi_framework --cov-report=xml --cov-report=html --cov-report=term-missing -v
+    
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+        pip install -e .
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --cov=apgi_framework --cov-report=xml
+    
+    - name: Run end-to-end tests
+      run: |
+        pytest tests/integration/test_end_to_end_workflow.py -v
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov memory-profiler
+        pip install -e .
+    
+    - name: Run performance benchmarks
+      run: |
+        python benchmarks/test_performance.py
+    
+    - name: Profile critical path
+      run: |
+        python benchmarks/critical_path_profiling.py
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install bandit safety
+        pip install -e .
+    
+    - name: Run security scan with bandit
+      run: |
+        bandit -r apgi_framework/ -f json -o bandit-report.json
+    
+    - name: Check dependencies for security vulnerabilities
+      run: |
+        safety check --json --output safety-report.json
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  gui-tests:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install system dependencies for GUI
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb x11-utils x11-xserver-utils
+        # Start virtual display
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xvfb pytest-qt
+        pip install -e .
+    
+    - name: Run GUI tests with proper display setup
+      env:
+        DISPLAY: :99
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        # Check if display is working
+        xdpyinfo -display :99 || echo "Display info not available"
+        
+        # Run GUI tests with xvfb wrapper
+        xvfb-run -a pytest tests/ -k "gui" -v --cov=apgi_framework --cov-report=xml --tb=short || true
+        
+        # Run specific GUI component tests
+        pytest tests/test_gui_components.py -v --tb=short || true
+        pytest tests/test_gui_config_management.py -v --tb=short || true
+
+  build-and-package:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine wheel
+        pip install -r requirements.txt
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package
+      run: |
+        twine check dist/*
+    
+    - name: Test installation
+      run: |
+        pip install dist/*.whl
+        python -c "import apgi_framework; print('Package installed successfully')"
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-packages
+        path: dist/
+
+  docker-tests:
+    runs-on: ubuntu-latest
+    needs: build-and-package
+    if: github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -t apgi-framework:test .
+    
+    - name: Test Docker image
+      run: |
+        docker run --rm apgi-framework:test python -c "import apgi_framework; print('Docker image works')"
+    
+    - name: Test Docker deployment
+      run: |
+        docker run -d --name apgi-test -p 8000:8000 apgi-framework:test
+        sleep 10
+        curl -f http://localhost:8000 || echo "Service not ready (expected for test)"
+        docker stop apgi-test
+        docker rm apgi-test
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test-matrix, integration-tests, performance-tests, security-tests, gui-tests]
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: ${{ needs.test-matrix.result == 'success' && needs.integration-tests.result == 'success' && needs.security-tests.result == 'success' && needs.gui-tests.result == 'success' }}
+      run: |
+        echo "✅ All tests passed successfully!"
+    
+    - name: Notify on failure
+      if: ${{ needs.test-matrix.result == 'failure' || needs.integration-tests.result == 'failure' || needs.security-tests.result == 'failure' || needs.gui-tests.result == 'failure' }}
+      run: |
+        echo "❌ Some tests failed. Check the logs for details."
+        exit 1

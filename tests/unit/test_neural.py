@@ -14,7 +14,7 @@ import pytest
 
 # Import neural modules with error handling
 try:
-    from apgi_simulation.neural.oscillations import OscillationBand, OscillationEngine
+    from apgi_framework.neural.oscillations import OscillationBand, OscillationEngine
 
     HAS_OSCILLATIONS = True
 except ImportError:
@@ -24,7 +24,7 @@ except ImportError:
     print("Warning: Could not import oscillation modules")
 
 try:
-    from apgi_simulation.neural.macroscale.large_scale_networks import LargeScaleNetworkManager
+    from apgi_framework.neural.macroscale.large_scale_networks import LargeScaleNetworkManager
 
     HAS_MACROSCALE = True
 except ImportError:
@@ -33,7 +33,7 @@ except ImportError:
     print("Warning: Could not import macroscale modules")
 
 try:
-    from apgi_simulation.neural.mesoscale.neural_columns import NeuralColumn
+    from apgi_framework.neural.mesoscale.neural_columns import NeuralColumn
 
     HAS_MESOSCALE = True
 except ImportError:
@@ -42,7 +42,7 @@ except ImportError:
     print("Warning: Could not import mesoscale modules")
 
 try:
-    from apgi_simulation.neural.microscale.spiking_network import SpikingNetwork
+    from apgi_framework.neural.microscale.spiking_network import SpikingNetwork
 
     HAS_MICROSCALE = True
 except ImportError:

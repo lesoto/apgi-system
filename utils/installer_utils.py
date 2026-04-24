@@ -14,10 +14,8 @@ from typing import Any, Dict, List, Optional
 class InstallerError(Exception):
     """Custom exception for installer errors."""
 
-    pass
 
-
-def check_python_version(min_version: tuple[int, int] = (3, 8)) -> bool:
+def check_python_version(min_version: tuple = (3, 8)) -> bool:
     """Check if Python version meets requirements.
 
     Parameters
@@ -80,7 +78,10 @@ def install_requirements(requirements_file: str = "requirements.txt") -> bool:
 
     try:
         subprocess.run(
-            ["pip", "install", "-r", requirements_file], check=True, capture_output=True, text=True
+            ["pip", "install", "-r", requirements_file],
+            check=True,
+            capture_output=True,
+            text=True,
         )
         return True
     except subprocess.CalledProcessError as e:
@@ -224,7 +225,7 @@ def extract_version_from_pyproject(pyproject_path: str = "pyproject.toml") -> st
         if not version:
             raise InstallerError("Version not found in pyproject.toml")
 
-        return version
+        return str(version)
     except ImportError:
         raise InstallerError("toml package not available for parsing pyproject.toml")
     except Exception as e:
@@ -332,9 +333,6 @@ def generate_inno_setup_script(
     """
     if executable_name is None:
         executable_name = app_name.lower().replace(" ", "_") + ".exe"
-    else:
-        # This branch makes the code reachable and fixes the unreachable statement warning
-        pass
 
     script = f"""
 [Setup]

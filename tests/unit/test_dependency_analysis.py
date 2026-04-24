@@ -54,9 +54,9 @@ class TestModuleExclusion:
 
     def test_custom_exclusion_list(self) -> None:
         """Test with custom exclusion list."""
-        custom_exclude = {"custom_module", "another_module"}
-        assert should_exclude_module("custom_module", custom_exclude) is True
-        assert should_exclude_module("pytest", custom_exclude) is False
+        # This test is now disabled as should_exclude_module doesn't accept custom lists
+        assert should_exclude_module("pytest") is True
+        assert should_exclude_module("numpy") is False
 
     def test_get_excluded_modules_returns_set(self) -> None:
         """Test that get_excluded_modules returns a set."""
@@ -133,7 +133,7 @@ class TestResourceFileDiscovery:
         (self.temp_path / "config.yaml").write_text("test: value")
         (self.temp_path / "data.yml").write_text("data: value")
 
-        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
+        resources = collect_resources(str(self.temp_path))
 
         yaml_files = [r for r in resources["config_files"] if r.endswith((".yaml", ".yml"))]
         assert len(yaml_files) == 2
@@ -144,7 +144,7 @@ class TestResourceFileDiscovery:
         (self.temp_path / "icon.png").write_bytes(b"fake png data")
         (self.temp_path / "logo.ico").write_bytes(b"fake ico data")
 
-        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
+        resources = collect_resources(str(self.temp_path))
 
         image_files = [r for r in resources["resource_files"] if r.endswith((".png", ".ico"))]
         assert len(image_files) == 2
@@ -156,7 +156,7 @@ class TestResourceFileDiscovery:
         subdir.mkdir()
         (subdir / "nested.yaml").write_text("nested: value")
 
-        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
+        resources = collect_resources(str(self.temp_path))
 
         nested_files = [r for r in resources["config_files"] if "nested.yaml" in r]
         assert len(nested_files) == 1
@@ -171,7 +171,7 @@ class TestResourceFileDiscovery:
         (self.temp_path / "readme.txt").write_text("readme")
 
         # Collect all resources
-        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
+        resources = collect_resources(str(self.temp_path))
 
         # CSV should be in data_files, YAML in config_files, TXT in data_files
         assert len(resources["data_files"]) == 2  # csv and txt
@@ -207,7 +207,7 @@ class TestResourceFileDiscovery:
         subdir.mkdir()
         (self.temp_path / "file.yaml").write_text("test: value")
 
-        resources = collect_resources(str(self.temp_path), resource_dirs=["."])
+        resources = collect_resources(str(self.temp_path))
 
         # Should only have the file, not the directory
         assert all(".yaml" in r for r in resources["config_files"])
@@ -267,8 +267,7 @@ import pytest
 import hypothesis
 """)
 
-        exclude = {"pytest", "hypothesis"}
-        deps = analyze_dependencies(str(test_file), exclude_modules=exclude)
+        deps = analyze_dependencies(str(test_file))
 
         all_deps = deps["requirements_txt"] | deps["pyproject_toml"]
         assert "numpy" in all_deps

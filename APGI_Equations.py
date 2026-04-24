@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from apgi_simulation.self_model.state_classifier import StateClassifier
+from apgi_framework.self_model.state_classifier import StateClassifier
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ __all__ = [
 
 # Check for optional visualization packages
 try:
-    import plotly.io as pio
+    import plotly.io as pio  # type: ignore[import-untyped]
 
     PLOTLY_AVAILABLE = True
     pio.templates.default = "plotly_white+plotly_dark"
@@ -164,26 +164,49 @@ class CoreIgnitionSystem:
         M: float,
         M_0: float,
         beta: float,
+        use_exponential: bool = False,
     ) -> float:
         """
-        Compute effective interoceptive precision with sigmoid modulation:
+        Compute effective interoceptive precision with somatic modulation.
 
-        Π^i_eff(t) = Π^i_baseline · [1 + β·σ(M(t) - M_0)]
+        Two modulation variants are available:
 
-        From Section 2.2 of APGI-Equations.md (Option A - Sigmoid Modulation)
+        1. Sigmoid Modulation (Default):
+           Π^i_eff(t) = Π^i_baseline · [1 + β·σ(M(t) - M_0)]
+           where σ(x) = 1/(1 + exp(-x))
+
+           Properties: Bounded modulation in [Π_baseline, Π_baseline·(1+β)]
+           Rationale: Physiologically realistic - somatic effects have limits
+           Use when: Modeling bounded physiological responses
+
+        2. Exponential Modulation (Alternative):
+           Π^i_eff(t) = Π^i_baseline · exp(β·M(t))
+
+           Properties: Unbounded, multiplicative scaling
+           Rationale: Pure free energy formulation (Friston 2010)
+           Use when: Strict adherence to theoretical FEP formulation
+
+        From Section 2.2 of APGI-Equations.md
 
         Args:
             Pi_i_baseline: Baseline interoceptive precision
             M: Current somatic marker state
             M_0: Reference somatic marker level
-            beta: Modulation strength (β ∈ [0, 2])
+            beta: Modulation strength (β ∈ [0.5, 2.5] for sigmoid, β > 0 for exp)
+            use_exponential: If True, use exp(β·M) formulation; default is sigmoid
 
         Returns:
             Effective interoceptive precision Π^i_eff(t)
         """
-        sigmoid = 1.0 / (1.0 + np.exp(-(M - M_0)))
-        modulation = 1.0 + beta * sigmoid
-        return Pi_i_baseline * modulation
+        if use_exponential:
+            # Exponential formulation (unbounded, FEP-theoretic)
+            modulation = np.exp(beta * M)
+        else:
+            # Sigmoid formulation (bounded, physiologically realistic)
+            sigmoid = 1.0 / (1.0 + np.exp(-(M - M_0)))
+            modulation = 1.0 + beta * sigmoid
+
+        return float(Pi_i_baseline * modulation)
 
     @staticmethod
     def ignition_probability(
@@ -206,7 +229,7 @@ class CoreIgnitionSystem:
         Returns:
             Broadcast probability B(t) ∈ [0, 1]
         """
-        return 1.0 / (1.0 + np.exp(-alpha * (S - theta)))
+        return float(1.0 / (1.0 + np.exp(-alpha * (S - theta))))
 
 
 # =============================================================================
@@ -266,7 +289,7 @@ class DynamicalSystemEquations:
         dS_dt = decay + exteroceptive_input + interoceptive_input + noise
         S_new = S + dS_dt * dt
 
-        return max(0.0, S_new)  # Surprise must be non-negative
+        return float(max(0.0, S_new))  # Surprise must be non-negative
 
     @staticmethod
     def threshold_dynamics(
@@ -328,7 +351,7 @@ class DynamicalSystemEquations:
         dtheta_dt = restoration + somatic_modulation + metabolic_feedback + noise
         theta_new = theta + dtheta_dt * dt
 
-        return max(0.01, theta_new)  # Threshold must be positive
+        return float(max(0.01, theta_new))  # Threshold must be positive
 
     @staticmethod
     def somatic_marker_dynamics(
@@ -386,7 +409,7 @@ class DynamicalSystemEquations:
         M_new = M + dM_dt * dt
 
         # Clip to reasonable range [-2, 2]
-        return np.clip(M_new, -2.0, 2.0)
+        return float(np.clip(M_new, -2.0, 2.0))
 
     @staticmethod
     def arousal_dynamics(
@@ -430,7 +453,7 @@ class DynamicalSystemEquations:
         A_new = A + dA_dt * dt
 
         # Clip to [0, 1] range
-        return np.clip(A_new, 0.0, 1.0)
+        return float(np.clip(A_new, 0.0, 1.0))
 
     @staticmethod
     def compute_arousal_target(
@@ -476,7 +499,7 @@ class DynamicalSystemEquations:
             interoceptive = 0.0
 
         A_target = A_circ + 0.3 * g_stim + 0.2 * interoceptive
-        return np.clip(A_target, 0.0, 1.0)
+        return float(np.clip(A_target, 0.0, 1.0))
 
     @staticmethod
     def precision_dynamics(
@@ -519,7 +542,7 @@ class DynamicalSystemEquations:
         dPi_dt = dynamics + noise
         Pi_new = Pi + dPi_dt * dt
 
-        return max(0.01, Pi_new)  # Precision must be positive
+        return float(max(0.01, Pi_new))  # Precision must be positive
 
 
 # =============================================================================
@@ -584,7 +607,7 @@ class RunningStatistics:
         std = np.sqrt(self.variance)
         if std <= 0:
             return 0.0
-        return (error - self.mu) / std
+        return float((error - self.mu) / std)
 
 
 # =============================================================================
@@ -628,7 +651,7 @@ class DerivedQuantities:
             return 0.0  # Already at steady state
 
         t_star = tau_S * np.log((S_0 - I_tau_S) / (theta - I_tau_S))
-        return max(0.0, t_star)
+        return float(max(0.0, t_star))
 
     @staticmethod
     def metabolic_cost(
@@ -1000,7 +1023,7 @@ class PsychologicalState:
         else:
             effective_theta = self.theta_t
 
-        return 1.0 / (1.0 + np.exp(-5.5 * (self.S_t - effective_theta)))
+        return float(1.0 / (1.0 + np.exp(-5.5 * (self.S_t - effective_theta))))  # type: ignore[no-any-return]
 
     def get_anxiety_index(self) -> float:
         """Compute anxiety index based on precision expectation gap"""
@@ -2186,7 +2209,7 @@ class MeasurementEquations:
         # Add noise
         P3b_latency += np.random.normal(0, P3B_LATENCY_NOISE_STD)
 
-        return np.clip(P3b_latency, P3B_MIN_LATENCY, P3B_MAX_LATENCY)
+        return float(np.clip(P3b_latency, P3B_MIN_LATENCY, P3B_MAX_LATENCY))  # type: ignore[no-any-return]
 
     @staticmethod
     def compute_detection_threshold(
@@ -2245,7 +2268,7 @@ class MeasurementEquations:
         # Add variability
         duration += np.random.normal(0, IGNITION_DURATION_NOISE_STD)
 
-        return np.clip(duration, IGNITION_MIN_DURATION, IGNITION_MAX_DURATION)
+        return float(np.clip(duration, IGNITION_MIN_DURATION, IGNITION_MAX_DURATION))  # type: ignore[no-any-return]
 
     @classmethod
     def compute_all_measurements(
@@ -2543,7 +2566,7 @@ class EnhancedSurpriseIgnitionSystem:
 
     def sigmoid(self, x: float) -> float:
         """Sigmoid function with CORRECTED α range"""
-        return 1.0 / (1.0 + np.exp(-self.params.alpha * x))
+        return float(1.0 / (1.0 + np.exp(-self.params.alpha * x)))
 
     def _record_history(self, P_ignition: float, B: float) -> None:
         """Record ignition probability and broadcast to history."""

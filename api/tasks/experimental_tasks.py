@@ -11,15 +11,13 @@ from typing import Any, Dict
 import yaml
 from celery import Task  # type: ignore
 
-from apgi_simulation.experiments.tasks.attentional_blink import AttentionalBlinkTask
-from apgi_simulation.experiments.tasks.binocular_rivalry import BinocularRivalryTask
-from apgi_simulation.experiments.tasks.change_blindness import ChangeBlindnessTask
-from apgi_simulation.experiments.tasks.iowa_gambling import IowaGamblingTask
-from apgi_simulation.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_simulation.experiments.tasks.nback_task import NBackTask
-from apgi_simulation.experiments.tasks.stroop_task import StroopTask
-from apgi_simulation.platform_utils import get_resource_path
-from apgi_simulation.system import APGISystem
+from apgi_framework.experiments.tasks.attentional_blink import AttentionalBlinkTask
+from apgi_framework.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+from apgi_framework.experiments.tasks.change_blindness import ChangeBlindnessTask
+from apgi_framework.experiments.tasks.iowa_gambling import IowaGamblingTask
+from apgi_framework.experiments.tasks.masking_paradigm import MaskingParadigmTask
+from apgi_framework.platform_utils import get_resource_path
+from apgi_framework.system import APGISystem
 from api.celery_app import celery_app
 from api.database.connection import get_db
 from api.database.models import Task as TaskModel
@@ -141,20 +139,14 @@ def execute_iowa_gambling_task(
     try:
         # Extract parameters with defaults
         num_trials = parameters.get("num_trials", 100)
-        initial_balance = parameters.get("initial_balance", 2000)
-        deck_stimulus_strength = parameters.get("deck_stimulus_strength", 1.5)
-        outcome_stimulus_strength = parameters.get("outcome_stimulus_strength", 2.0)
-        interoceptive_gain = parameters.get("interoceptive_gain", 1.0)
-        deck_selection_strategy = parameters.get("deck_selection_strategy", "balanced")
+        starting_balance = parameters.get("initial_balance", 2000)
+        num_decks = parameters.get("num_decks", 4)
 
         # Create task instance
         task = IowaGamblingTask(
+            num_decks=num_decks,
+            starting_balance=starting_balance,
             num_trials=num_trials,
-            initial_balance=initial_balance,
-            deck_stimulus_strength=deck_stimulus_strength,
-            outcome_stimulus_strength=outcome_stimulus_strength,
-            interoceptive_gain=interoceptive_gain,
-            deck_selection_strategy=deck_selection_strategy,
         )
 
         # Run all trials
@@ -205,8 +197,6 @@ def execute_masking_paradigm_task(
             - soas: List of SOAs to test in ms (default: [0, 17, 33, 50, 67, 83, 100, 150, 200, 300])
             - mask_duration_ms: Mask presentation duration (default: 100.0)
             - num_trials_per_condition: Trials per SOA (default: 20)
-            - target_strength: Target stimulus strength (default: 2.0)
-            - mask_strength: Mask stimulus strength (default: 3.0)
 
     Returns:
         Dict with task results and analysis
@@ -220,8 +210,6 @@ def execute_masking_paradigm_task(
         soas = parameters.get("soas", [0, 17, 33, 50, 67, 83, 100, 150, 200, 300])
         mask_duration_ms = parameters.get("mask_duration_ms", 100.0)
         num_trials_per_condition = parameters.get("num_trials_per_condition", 20)
-        target_strength = parameters.get("target_strength", 2.0)
-        mask_strength = parameters.get("mask_strength", 3.0)
 
         # Create task instance
         task = MaskingParadigmTask(
@@ -229,8 +217,6 @@ def execute_masking_paradigm_task(
             soas=soas,
             mask_duration_ms=mask_duration_ms,
             num_trials_per_condition=num_trials_per_condition,
-            target_strength=target_strength,
-            mask_strength=mask_strength,
         )
 
         # Run all trials
@@ -278,10 +264,10 @@ def execute_attentional_blink_task(
         session_id: Session identifier
         parameters: Task parameters including:
             - stream_length: Number of items in RSVP stream (default: 15)
-            - item_duration_ms: Duration of each item (default: 100.0)
+            - stimulus_duration_ms: Duration of each item (default: 100.0)
+            - isi_ms: Inter-stimulus interval (default: 200.0)
             - num_trials_per_lag: Trials per lag condition (default: 20)
             - lags: List of lags to test (default: [1, 2, 3, 4, 8])
-            - target_salience: Target salience boost (default: 2.0)
 
     Returns:
         Dict with task results and analysis
@@ -292,18 +278,18 @@ def execute_attentional_blink_task(
     try:
         # Extract parameters with defaults
         stream_length = parameters.get("stream_length", 15)
-        item_duration_ms = parameters.get("item_duration_ms", 100.0)
+        stimulus_duration_ms = parameters.get("stimulus_duration_ms", 100.0)
+        isi_ms = parameters.get("isi_ms", 200.0)
         num_trials_per_lag = parameters.get("num_trials_per_lag", 20)
         lags = parameters.get("lags", [1, 2, 3, 4, 8])
-        target_salience = parameters.get("target_salience", 2.0)
 
         # Create task instance
         task = AttentionalBlinkTask(
-            stream_length=stream_length,
-            item_duration_ms=item_duration_ms,
-            num_trials_per_lag=num_trials_per_lag,
+            stimulus_duration_ms=stimulus_duration_ms,
+            isi_ms=isi_ms,
             lags=lags,
-            target_salience=target_salience,
+            num_trials_per_lag=num_trials_per_lag,
+            stream_length=stream_length,
         )
 
         # Run all trials
@@ -360,12 +346,10 @@ def execute_change_blindness_task(
     try:
         # Extract parameters with defaults
         change_magnitude = parameters.get("change_magnitude", 0.3)
-        flicker_duration_ms = parameters.get("flicker_duration_ms", 100.0)
         num_trials = parameters.get("num_trials", 50)
 
         # Create task instance
         task = ChangeBlindnessTask(
-            blank_duration_ms=flicker_duration_ms,
             change_magnitudes=[change_magnitude],
             num_trials_per_condition=num_trials,
         )
@@ -402,132 +386,16 @@ def execute_change_blindness_task(
     return result
 
 
-@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_nback_task")
-def execute_nback_task(
-    self: APGITask, session_id: str, parameters: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Execute N-Back Task.
+# N-Back and Stroop tasks are not yet implemented in apgi_framework
+# @celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_nback_task")
+# def execute_nback_task(...) -> Dict[str, Any]:
+#     """Execute N-Back Task."""
+#     pass
 
-    Args:
-        session_id: Session identifier
-        parameters: Task parameters including:
-            - n_back: N-back level (default: 2)
-            - sequence_length: Length of stimulus sequence (default: 20)
-            - num_trials: Number of trials (default: 1)
-            - stimulus_duration_ms: Duration each stimulus is shown (default: 500.0)
-            - isi_ms: Inter-stimulus interval (default: 2500.0)
-
-    Returns:
-        Dict with task results and analysis
-    """
-    logger.info(f"Starting N-Back Task for session {session_id}")
-
-    result = None
-    try:
-        # Extract parameters with defaults
-        n_back = parameters.get("n_back", 2)
-        num_trials = parameters.get("num_trials", 100)
-
-        # Create task instance
-        task = NBackTask(
-            n_level=n_back,
-            num_trials=num_trials,
-        )
-
-        # Run all trials
-        results = task.run_all_trials(self.apgi_simulation)
-
-        logger.info(f"N-Back Task completed for session {session_id}")
-
-        result = {
-            "task_type": "nback_task",
-            "session_id": session_id,
-            "status": "completed",
-            "results": results,
-        }
-
-    except Exception as e:
-        logger.error(f"N-Back Task failed for session {session_id}: {e}", exc_info=True)
-        result = {
-            "task_type": "nback_task",
-            "session_id": session_id,
-            "status": "failed",
-            "error": str(e),
-        }
-
-    # Trigger webhook on completion (async)
-    import asyncio
-
-    try:
-        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
-    except Exception as e:
-        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
-
-    return result
-
-
-@celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_stroop_task")
-def execute_stroop_task(
-    self: APGITask, session_id: str, parameters: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Execute Stroop Task.
-
-    Args:
-        session_id: Session identifier
-        parameters: Task parameters including:
-            - num_trials: Number of trials (default: 50)
-            - congruent_color: Color for congruent trials (default: "red")
-            - incongruent_color: Color for incongruent trials (default: "blue")
-            - stimulus_duration_ms: Duration each stimulus is shown (default: 1000.0)
-            - isi_ms: Inter-stimulus interval (default: 1500.0)
-
-    Returns:
-        Dict with task results and analysis
-    """
-    logger.info(f"Starting Stroop Task for session {session_id}")
-
-    result = None
-    try:
-        # Extract parameters with defaults
-        num_trials = parameters.get("num_trials", 50)
-
-        # Create task instance
-        task = StroopTask(
-            num_trials=num_trials,
-        )
-
-        # Run all trials
-        results = task.run_all_trials(self.apgi_simulation)
-
-        logger.info(f"Stroop Task completed for session {session_id}")
-
-        result = {
-            "task_type": "stroop_task",
-            "session_id": session_id,
-            "status": "completed",
-            "results": results,
-        }
-
-    except Exception as e:
-        logger.error(f"Stroop Task failed for session {session_id}: {e}", exc_info=True)
-        result = {
-            "task_type": "stroop_task",
-            "session_id": session_id,
-            "status": "failed",
-            "error": str(e),
-        }
-
-    # Trigger webhook on completion (async)
-    import asyncio
-
-    try:
-        asyncio.run(trigger_webhook_on_completion(self.request.id, result))
-    except Exception as e:
-        logger.error(f"Failed to trigger webhook: {e}", exc_info=True)
-
-    return result
+# @celery_app.task(bind=True, base=APGITask, name="api.tasks.experimental_tasks.execute_stroop_task")
+# def execute_stroop_task(...) -> Dict[str, Any]:
+#     """Execute Stroop Task."""
+#     pass
 
 
 @celery_app.task(
@@ -551,17 +419,12 @@ def execute_binocular_rivalry_task(
     result = None
     try:
         # Extract parameters with defaults
-        contrast_left = parameters.get("contrast_left", 1.0)
-        contrast_right = parameters.get("contrast_right", 1.0)
         duration_seconds = parameters.get("duration_seconds", 60.0)
-        sampling_rate_hz = parameters.get("sampling_rate_hz", 30.0)
 
         # Create task instance
         task = BinocularRivalryTask(
-            trial_duration_ms=duration_seconds,
-            sampling_interval_ms=sampling_rate_hz,
-            strength_ratios=[(contrast_left, contrast_right)],
-            num_trials=1,  # Single trial with one strength ratio
+            trial_duration_ms=duration_seconds * 1000,  # Convert to ms
+            num_trials=1,
         )
 
         # Run all trials

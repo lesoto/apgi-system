@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from apgi_simulation.platform_utils import (
+from apgi_framework.platform_utils import (
     get_config_dir,
     get_data_dir,
     get_platform,

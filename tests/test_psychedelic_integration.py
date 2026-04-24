@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Check dependencies
 PLOTLY_AVAILABLE = False
 try:
-    import plotly.graph_objects as go  # noqa: F401
+    import plotly.graph_objects as go  # type: ignore[import-untyped]  # noqa: F401
 
     PLOTLY_AVAILABLE = True
     logger.info("✓ Plotly available")

@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from apgi_simulation.system import APGISystem
+from apgi_framework.system import APGISystem
 
 
 class DataExporter:

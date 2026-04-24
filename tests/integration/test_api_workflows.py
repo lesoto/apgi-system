@@ -46,7 +46,7 @@ def mock_redis() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_apgi_simulation() -> Mock:
+def mock_apgi_framework() -> Mock:
     """Create a mock APGI system."""
     mock_system = Mock()
     mock_system.time = 0.0
@@ -117,7 +117,7 @@ def mock_apgi_simulation() -> Mock:
 
 
 @pytest.fixture
-def mock_session_manager(mock_apgi_simulation: Mock) -> Mock:
+def mock_session_manager(mock_apgi_framework: Mock) -> Mock:
     """Create a mock SessionManager with realistic behavior."""
     manager = Mock(spec=SessionManager)
     sessions_store: dict[str, Mock] = {}
@@ -135,33 +135,33 @@ def mock_session_manager(mock_apgi_simulation: Mock) -> Mock:
             "config_path": request.config_path or "config/default.yaml",
             "description": request.description,
         }
-        mock_sim.apgi_simulation = mock_apgi_simulation
+        mock_sim.apgi_framework = mock_apgi_framework
         mock_sim.user_id = "test-user-123"
 
         # Mock session methods
         async def mock_start() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.RUNNING
-            mock_apgi_simulation.is_running = True
+            mock_apgi_framework.is_running = True
             return {"session_id": session_id, "status": "running"}
 
         async def mock_pause() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.PAUSED
-            mock_apgi_simulation.is_running = False
+            mock_apgi_framework.is_running = False
             return {"session_id": session_id, "status": "paused"}
 
         async def mock_stop() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.STOPPED
-            mock_apgi_simulation.is_running = False
+            mock_apgi_framework.is_running = False
             return {"session_id": session_id, "status": "stopped"}
 
         async def mock_reset() -> dict[str, str]:
             mock_sim.state = SessionLifecycleState.CREATED
-            mock_apgi_simulation.time = 0.0
-            mock_apgi_simulation.reset()
+            mock_apgi_framework.time = 0.0
+            mock_apgi_framework.reset()
             return {"session_id": session_id, "status": "created"}
 
         async def mock_get_state() -> dict[str, Any]:
-            return mock_apgi_simulation.get_state()
+            return mock_apgi_framework.get_state()  # type: ignore[no-any-return]
 
         mock_sim.start = AsyncMock(side_effect=mock_start)
         mock_sim.pause = AsyncMock(side_effect=mock_pause)
@@ -265,7 +265,8 @@ def mock_task_executor() -> Mock:
 
     async def mock_get_task_result(task_id: str) -> dict[str, Any]:
         if task_id in tasks_store:
-            return tasks_store[task_id]["result"]
+            return tasks_store[task_id]["result"]  # type: ignore[no-any-return]
+
         raise ValueError(f"Task {task_id} not found")
 
     async def mock_list_available_tasks() -> dict[str, Any]:

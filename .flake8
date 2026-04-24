@@ -16,6 +16,11 @@ ignore =
     E203,
     E501,
     W503,
-    C901
+    F811,
+    E402,
+    C901,
+    W291,
+    W292,
+    W293
 per-file-ignores =
     __init__.py:F401

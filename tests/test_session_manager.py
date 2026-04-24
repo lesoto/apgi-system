@@ -417,7 +417,7 @@ class TestSessionManagerConcurrency:
 
             # Verify final state
             state = await session.get_state()
-            return state["session_metadata"]["state"]
+            return str(state["session_metadata"]["state"])
 
         # Run lifecycle tests concurrently
         tasks = [lifecycle_test(session_id) for session_id in session_ids]
@@ -557,7 +557,7 @@ class TestSessionManagerConcurrency:
         async def simulation_step(step_id: int) -> float:
             input_data = np.random.randn(256)
             result = await session.step(input_data)
-            return result["time"]
+            return float(result["time"])
 
         # Run multiple simulation steps concurrently
         tasks = [simulation_step(i) for i in range(20)]

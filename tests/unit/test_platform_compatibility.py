@@ -36,7 +36,7 @@ except ImportError:
     is_platform_supported = None
 
 try:
-    from apgi_simulation.system import APGISystem
+    from apgi_framework.system import APGISystem
 
     HAS_SYSTEM = True
 except ImportError:

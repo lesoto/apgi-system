@@ -1,0 +1,156 @@
+{
+  "test_configuration": {
+    "description": "APGI Framework Test Enhancement Configuration Template",
+    "version": "1.0.0",
+    "project_root": ".",
+    "test_discovery": {
+      "test_directories": [
+        "tests",
+        "apgi_framework"
+      ],
+      "test_patterns": [
+        "test_*.py",
+        "*_test.py"
+      ],
+      "exclude_patterns": [
+        "__pycache__",
+        "*.pyc",
+        ".pytest_cache"
+      ]
+    },
+    "execution": {
+      "parallel_execution": true,
+      "max_workers": 4,
+      "timeout_seconds": 300,
+      "retry_failed_tests": false,
+      "retry_count": 1
+    },
+    "coverage": {
+      "enabled": true,
+      "line_threshold": 80.0,
+      "branch_threshold": 75.0,
+      "function_threshold": 85.0,
+      "module_thresholds": {
+        "apgi_framework.core": 90.0,
+        "apgi_framework.testing": 95.0,
+        "apgi_framework.analysis": 85.0
+      },
+      "exclude_files": [
+        "*/tests/*",
+        "*/examples/*",
+        "*/__pycache__/*"
+      ]
+    },
+    "property_testing": {
+      "enabled": true,
+      "default_iterations": 100,
+      "max_examples": 1000,
+      "deadline": 200,
+      "strategies": {
+        "integers": {
+          "min_value": -1000,
+          "max_value": 1000
+        },
+        "floats": {
+          "min_value": -1000.0,
+          "max_value": 1000.0,
+          "allow_nan": false,
+          "allow_infinity": false
+        },
+        "strings": {
+          "max_size": 100,
+          "alphabet": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        }
+      }
+    },
+    "reporting": {
+      "formats": ["json", "html", "xml"],
+      "output_directory": "test_reports",
+      "coverage_output_directory": "coverage_reports",
+      "include_source_code": true,
+      "generate_badges": true
+    },
+    "gui": {
+      "theme": "default",
+      "auto_refresh": true,
+      "refresh_interval": 5,
+      "max_output_lines": 10000
+    },
+    "logging": {
+      "level": "INFO",
+      "file": "logs/test_enhancement.log",
+      "max_file_size": "10MB",
+      "backup_count": 5,
+      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    },
+    "notifications": {
+      "enabled": false,
+      "channels": [
+        {
+          "type": "email",
+          "enabled": false,
+          "smtp_server": "smtp.example.com",
+          "smtp_port": 587,
+          "username": "your_email@example.com",
+          "password": "your_password",
+          "recipients": ["team@example.com"]
+        },
+        {
+          "type": "slack",
+          "enabled": false,
+          "webhook_url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+        }
+      ]
+    },
+    "ci_integration": {
+      "enabled": true,
+      "pipeline_type": "generic",
+      "change_detection": true,
+      "pre_commit_hooks": true,
+      "failure_threshold": 0,
+      "coverage_enforcement": true
+    }
+  },
+  "environment_specific": {
+    "development": {
+      "execution": {
+        "parallel_execution": false,
+        "max_workers": 1
+      },
+      "logging": {
+        "level": "DEBUG"
+      },
+      "coverage": {
+        "line_threshold": 70.0
+      }
+    },
+    "ci": {
+      "execution": {
+        "parallel_execution": true,
+        "max_workers": 2,
+        "timeout_seconds": 600
+      },
+      "coverage": {
+        "line_threshold": 85.0,
+        "branch_threshold": 80.0
+      },
+      "notifications": {
+        "enabled": true
+      }
+    },
+    "production": {
+      "execution": {
+        "parallel_execution": true,
+        "max_workers": 8
+      },
+      "coverage": {
+        "line_threshold": 90.0,
+        "branch_threshold": 85.0,
+        "function_threshold": 90.0
+      },
+      "logging": {
+        "level": "WARNING"
+      }
+    }
+  }
+}

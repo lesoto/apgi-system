@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from apgi_simulation.core import ActiveInferenceEngine, FreeEnergyCalculator, PrecisionWeighting
+from apgi_framework.core import ActiveInferenceEngine, FreeEnergyCalculator, PrecisionWeighting
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def config() -> Dict[str, Any]:
     """Load default configuration."""
     config_path = Path(__file__).parent.parent / "config" / "default.yaml"
     with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 def test_free_energy_calculator() -> None:
@@ -31,6 +31,8 @@ def test_free_energy_calculator() -> None:
     prior_mean = np.array([0.0, 0.0, 0.0])
     prior_cov = np.eye(3)
 
+    fe: float
+    components: dict[str, float]
     fe, components = calc.compute_variational_free_energy(
         obs, pred, precision, posterior_mean, posterior_cov, prior_mean, prior_cov
     )
@@ -42,7 +44,7 @@ def test_free_energy_calculator() -> None:
 
 def test_precision_weighting(config: Dict[str, Any]) -> None:
     """Test precision weighting system."""
-    precision = PrecisionWeighting(config)
+    precision = PrecisionWeighting(1.0)  # Use float instead of dict
 
     # Update with error variance
     result = precision.update(
@@ -69,7 +71,7 @@ def test_active_inference_engine(config: Dict[str, Any]) -> None:
 
 def test_system_initialization(config: Dict[str, Any]) -> None:
     """Test that system can be initialized."""
-    from apgi_simulation.system import APGISystem
+    from apgi_framework.system import APGISystem
 
     system = APGISystem()
     assert system is not None
@@ -78,7 +80,7 @@ def test_system_initialization(config: Dict[str, Any]) -> None:
 
 def test_system_step(config: Dict[str, Any]) -> None:
     """Test single system step."""
-    from apgi_simulation.system import APGISystem
+    from apgi_framework.system import APGISystem
 
     system = APGISystem()
     extero_input = np.random.randn(256)

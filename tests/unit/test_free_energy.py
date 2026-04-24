@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from apgi_simulation.core.free_energy import (
+from apgi_framework.core.free_energy import (
     FreeEnergyCalculator,
     compute_accuracy,
     compute_complexity,
@@ -172,10 +172,11 @@ class TestFreeEnergyWrappers:
         uncertainty = np.array([0.5, 0.4, 0.3])
 
         efe, components = compute_expected_free_energy(
-            policy, pred_states, pred_obs, preferences, uncertainty
+            policy, pred_states, pred_obs, preferences, uncertainty, horizon=1
         )
 
         assert isinstance(efe, float)
+        assert isinstance(components, dict)
 
     def test_compute_accuracy_wrapper(self) -> None:
         """Test accuracy wrapper."""

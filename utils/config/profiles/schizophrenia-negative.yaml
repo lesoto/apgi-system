@@ -1,0 +1,23 @@
+author: APGI Framework
+category: disorder
+compatibility:
+  max_version: '2.0'
+  min_version: '1.0'
+created_at: '2026-01-28T10:55:44.210251'
+dependencies: []
+description: Reflects elevated thresholds for goal-relevant content via mesocortical hypodopaminergia.
+metadata: {}
+name: schizophrenia-negative
+parameters:
+  model:
+    alpha: 5.0
+    gamma_A: 0.05
+    gamma_M: -0.5
+    tau_S: 0.45
+    tau_theta: 25.0
+    theta_0: 0.8
+tags:
+- psychosis
+- avolition
+- hypodopaminergia
+version: '1.0'

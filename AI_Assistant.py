@@ -124,7 +124,7 @@ class ODEFunc(nn.Module):
         tau_safe = torch.clamp(self.tau, min=1e-3)
         dh_dt = (1.0 / tau_safe) * (-h + f_h)
 
-        return dh_dt
+        return dh_dt  # type: ignore
 
 
 class LiquidTimeConstantLayers(nn.Module):
@@ -217,7 +217,7 @@ class LiquidTimeConstantLayers(nn.Module):
         # Project to output
         output = self.output_projection(self.hidden_state)
 
-        return output
+        return output  # type: ignore
 
 
 # ============================================================================
@@ -312,7 +312,7 @@ class LinOSSDecomposer(nn.Module):
         # Sum over all modes
         signal = (A * decay * oscillation).sum(dim=-1)
 
-        return signal
+        return signal  # type: ignore
 
     def compute_power_spectrum(self, osc_state: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         """
@@ -696,7 +696,7 @@ class FastShallowLTC(nn.Module):
             else:
                 x = x[:, : self.input_dim]
 
-        return self.network(x)
+        return self.network(x)  # type: ignore
 
 
 class DeepGlobalLTC(nn.Module):
@@ -766,7 +766,7 @@ class DeepGlobalLTC(nn.Module):
             h = h + h_residual
 
         # Output
-        return self.output_layer(h)
+        return self.output_layer(h)  # type: ignore
 
 
 # ============================================================================
@@ -911,11 +911,11 @@ class APGI_LFM2(nn.Module):
 
     def predict_from_unconscious(self, h_unconscious: torch.Tensor) -> torch.Tensor:
         """Generate prediction from unconscious processing"""
-        return self.prediction_head(h_unconscious)
+        return self.prediction_head(h_unconscious)  # type: ignore
 
     def compute_prediction_error(self, x: torch.Tensor, x_pred: torch.Tensor) -> torch.Tensor:
         """Compute prediction error"""
-        return torch.norm(x - x_pred, dim=-1, keepdim=True)
+        return torch.norm(x - x_pred, dim=-1, keepdim=True)  # type: ignore
 
     def compute_interoceptive_error(
         self, interoceptive_signals: Optional[Dict[str, float]]
@@ -940,7 +940,7 @@ class APGI_LFM2(nn.Module):
         # Compute error
         error = torch.norm(tensor[:, :4] - prediction, dim=-1, keepdim=True)
 
-        return error.mean()
+        return error.mean()  # type: ignore
 
     def compute_somatic_bias(self, interoceptive_signals: Any) -> torch.Tensor:
         """Compute somatic bias from interoceptive signals"""
@@ -1178,7 +1178,7 @@ class LanguageModelWrapper(nn.Module):
                 # Use last hidden state, mean pooled
                 embeddings = outputs.hidden_states[-1].mean(dim=1)
 
-            return embeddings
+            return embeddings  # type: ignore
 
         except Exception as e:
             warnings.warn(f"Text encoding failed: {e}")
@@ -1188,8 +1188,8 @@ class LanguageModelWrapper(nn.Module):
         """Project hidden state to model dimension if needed"""
         if hidden_state.shape[-1] != self.hidden_size:
             projection = nn.Linear(hidden_state.shape[-1], self.hidden_size).to(hidden_state.device)
-            return projection(hidden_state)
-        return hidden_state
+            return projection(hidden_state)  # type: ignore
+        return hidden_state  # type: ignore
 
     def _create_contextual_prompt(self, hidden_state: torch.Tensor, user_input: str) -> str:
         """Create contextual prompt based on hidden state and user input"""
@@ -2551,6 +2551,8 @@ def _print_cognitive_report(assistant: Any) -> None:
         if "total_consumption" in energy:
             print(f"  Total consumption: {energy['total_consumption']:.3f}")
 
+    print("\n" + "=" * 60)
+
 
 def _print_energy_report(assistant: Any) -> None:
     """Print energy report"""
@@ -2748,7 +2750,7 @@ def LFM2(config: Dict[str, Any]) -> Any:
         def forward(self, x: Union[Dict[str, Any], torch.Tensor]) -> torch.Tensor:
             if isinstance(x, dict):
                 x = x.get("input", torch.randn(1, 128))
-            return self.net(x)
+            return self.net(x)  # type: ignore
 
     return MockLFM2(config)
 
@@ -2783,13 +2785,13 @@ def measure_flops(model: Any, dataset: List[Dict[str, Any]]) -> float:
 
         # Scale by dataset complexity
         dataset_complexity = len(dataset) * dataset[0]["input"].numel()
-        return total_flops * dataset_complexity / 1e6  # Return in MFLOPs
+        return float(total_flops * dataset_complexity / 1e6)  # Return in MFLOPs  # type: ignore
     else:
         # For standard models, use full parameter count
         # Standard LFM2 always uses full capacity (no adaptation)
         param_count = sum(p.numel() for p in model.parameters())
         dataset_complexity = len(dataset) * dataset[0]["input"].numel()
-        return param_count * dataset_complexity / 1e6  # Return in MFLOPs
+        return float(param_count * dataset_complexity / 1e6)  # Return in MFLOPs  # type: ignore
 
 
 def evaluate_accuracy(model: Any, dataset: List[Dict[str, Any]]) -> float:
@@ -3607,7 +3609,7 @@ class LLMAssistant:
             # Add to conversation history
             self.conversation_history.append(f"Assistant: {response}")
 
-            return response
+            return str(response)  # type: ignore
 
         except Exception as e:
             LOGGER.error(f"Error generating response: {e}")

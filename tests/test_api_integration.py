@@ -56,7 +56,7 @@ class APITestClient:
                 data = response.json()
                 print(f"[OK] Default user created: {data['username']}")
                 print(f"   Password: {data['password']}")
-                return data
+                return data  # type: ignore[no-any-return]
             else:
                 print(f"[FAIL] Default user creation failed: {response.status_code}")
                 return {}
@@ -73,7 +73,7 @@ class APITestClient:
             if response.status_code == 200:
                 data = response.json()
                 print(f"[OK] User profile retrieved: {data['username']}")
-                return data
+                return data  # type: ignore[no-any-return]
             else:
                 print(f"[FAIL] Profile retrieval failed: {response.status_code}")
                 return {}
@@ -96,7 +96,7 @@ class APITestClient:
             if response.status_code == 201:
                 data = response.json()
                 print(f"[OK] Session created: {data['session_id']}")
-                return data
+                return data  # type: ignore[no-any-return]
             else:
                 print(f"[FAIL] Session creation failed: {response.status_code} - {response.text}")
                 return {}
@@ -113,7 +113,7 @@ class APITestClient:
             if response.status_code == 200:
                 data = response.json()
                 print(f"[OK] Session retrieved: {data['status']}")
-                return data
+                return data  # type: ignore[no-any-return]
             else:
                 print(f"[FAIL] Session retrieval failed: {response.status_code}")
                 return {}

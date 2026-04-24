@@ -86,7 +86,7 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
             warning_msg = self._build_warning_message(path, deprecation_info)
             response.headers["Warning"] = warning_msg
 
-        return response
+        return response  # type: ignore[no-any-return]
 
     def _get_deprecation_info(self, path: str) -> Optional[Dict[str, str]]:
         """

@@ -3238,7 +3238,7 @@ def webhook_url_strategy(draw: Any) -> str:
     if len(url) > 500:
         url = url[:500]
 
-    return url
+    return str(url)
 
 
 @st.composite

@@ -25,7 +25,7 @@ from api.middleware.metrics import error_counter, request_counter, request_durat
 @st.composite
 def http_method_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate valid HTTP methods."""
-    return draw(st.sampled_from(["GET", "POST", "PUT", "DELETE", "PATCH"]))
+    return draw(st.sampled_from(["GET", "POST", "PUT", "DELETE", "PATCH"]))  # type: ignore
 
 
 @st.composite
@@ -41,42 +41,40 @@ def http_path_strategy(draw: Callable[[Any], Any]) -> str:
         "/v1/health",
         "/v1/metrics",
     ]
-    return draw(st.sampled_from(paths))
+    return draw(st.sampled_from(paths))  # type: ignore
 
 
 @st.composite
 def http_status_code_strategy(draw: Callable[[Any], Any]) -> int:
     """Generate valid HTTP status codes."""
-    return draw(st.sampled_from([200, 201, 400, 401, 403, 404, 422, 429, 500, 502, 503]))
+    return draw(st.sampled_from([200, 201, 400, 401, 403, 404, 422, 429, 500, 502, 503]))  # type: ignore
 
 
 @st.composite
 def client_id_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate client identifiers (IP addresses)."""
-    return draw(st.from_regex(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", fullmatch=True))
+    return draw(st.from_regex(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", fullmatch=True))  # type: ignore
 
 
 @st.composite
 def duration_ms_strategy(draw: Callable[[Any], Any]) -> float:
     """Generate request durations in milliseconds."""
-    return draw(st.floats(min_value=0.1, max_value=10000.0))
+    return draw(st.floats(min_value=0.1, max_value=10000.0))  # type: ignore
 
 
 @st.composite
 def error_type_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate error type names."""
-    return draw(
-        st.sampled_from(
-            [
-                "ValueError",
-                "KeyError",
-                "TypeError",
-                "RuntimeError",
-                "SessionNotFoundError",
-                "ValidationError",
-            ]
-        )
-    )
+    error_types: list[str] = [
+        "ValueError",
+        "KeyError",
+        "TypeError",
+        "RuntimeError",
+        "SessionNotFoundError",
+        "ValidationError",
+    ]
+    result: str = draw(st.sampled_from(error_types))
+    return result
 
 
 # ============================================================================

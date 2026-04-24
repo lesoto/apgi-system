@@ -18,9 +18,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 try:
     import os
 
-    from utils.dependency_checker import check_dependencies_on_startup
+    from utils.dependency_checker import check_dependencies
 
-    if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies_on_startup():
+    if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies():
         print("Dependency check failed. Exiting...")
         sys.exit(1)
 except ImportError:

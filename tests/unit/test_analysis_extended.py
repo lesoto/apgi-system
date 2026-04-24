@@ -5,12 +5,24 @@ Tests the comprehensive analysis capabilities including system analysis,
 results processing, and reporting functionality.
 """
 
+import importlib.util
 from typing import Any, Dict, List
 from unittest.mock import MagicMock
 
 import numpy as np
 
-from apgi_simulation.analysis import AnalysisResults, SystemAnalyzer, analyze_simulation_run
+# Import from analysis.py file directly to avoid conflict with analysis/ package
+spec = importlib.util.spec_from_file_location(
+    "analysis_module", "/Users/lesoto/Sites/PYTHON/apgi-system/apgi_framework/analysis.py"
+)
+if spec is None or spec.loader is None:
+    raise ImportError("Could not load analysis module")
+analysis_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(analysis_module)
+
+AnalysisResults = analysis_module.AnalysisResults
+SystemAnalyzer = analysis_module.SystemAnalyzer
+analyze_simulation_run = analysis_module.analyze_simulation_run
 
 
 class TestAnalysisResults:

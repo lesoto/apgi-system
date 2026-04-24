@@ -233,7 +233,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         # Cache the result
         self._schema_cache[cache_key] = response_schema
 
-        return response_schema
+        return response_schema  # type: ignore
 
     def _find_matching_path(self, path: str) -> Optional[Dict[str, Any]]:
         """
@@ -269,9 +269,9 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                     break
 
             if match:
-                return path_item
+                return path_item  # type: ignore
 
-        return None
+        return None  # type: ignore
 
     async def _get_response_body(self, response: Response) -> Optional[str]:
         """

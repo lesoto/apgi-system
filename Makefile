@@ -37,7 +37,7 @@ test-coverage:
 	python3 utils/run_coverage.py
 
 coverage-report:
-	pytest tests/ -v --cov=apgi_simulation --cov=api --cov-report=html --cov-report=term-missing
+	pytest tests/ -v --cov=apgi_framework --cov=api --cov-report=html --cov-report=term-missing
 	@echo "\nHTML report: htmlcov/index.html"
 
 coverage-gaps:
@@ -54,9 +54,9 @@ clean:
 	find . -type f -name "coverage_gap_analysis.json" -delete
 
 format:
-	black apgi_simulation/ api/ tests/
-	isort apgi_simulation/ api/ tests/
+	black apgi_framework/ api/ tests/
+	isort apgi_framework/ api/ tests/
 
 lint:
-	flake8 apgi_simulation/ api/ tests/
-	mypy apgi_simulation/ api/ --ignore-missing-imports
+	flake8 apgi_framework/ api/ tests/
+	mypy apgi_framework/ api/ --ignore-missing-imports

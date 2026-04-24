@@ -8,7 +8,7 @@ expected free energy, and their constituent components.
 import numpy as np
 import pytest
 
-from apgi_simulation.core.free_energy import (
+from apgi_framework.core.free_energy import (
     FreeEnergyCalculator,
     compute_accuracy,
     compute_complexity,
@@ -25,9 +25,7 @@ class TestFreeEnergyCalculator:
     def test_calculator_initialization(self) -> None:
         """Test that FreeEnergyCalculator initializes correctly."""
         config = {
-            "free_energy": {
-                "eps": 1e-8,
-            }
+            "numerical_tolerance": 1e-8,
         }
 
         calculator = FreeEnergyCalculator(config)
@@ -198,7 +196,7 @@ class TestFreeEnergyCalculator:
         state_uncertainty = np.array([0.1])
 
         epistemic_value = calculator.compute_epistemic_value(
-            policy, predicted_states, state_uncertainty, horizon=1
+            policy, predicted_states, state_uncertainty
         )
 
         assert isinstance(epistemic_value, float)
@@ -212,9 +210,7 @@ class TestFreeEnergyCalculator:
         predicted_observations = np.array([[0.8, 0.2]])
         preferences = np.array([1.0, -2.0])  # Strong preference for first observation
 
-        pragmatic_value = calculator.compute_pragmatic_value(
-            predicted_observations, preferences, horizon=1
-        )
+        pragmatic_value = calculator.compute_pragmatic_value(predicted_observations, preferences)
 
         assert isinstance(pragmatic_value, float)
         # Pragmatic value can be positive or negative depending on preferences
@@ -382,6 +378,7 @@ class TestFreeEnergyFunctions:
         prior_mean = np.array([0.33, 0.33, 0.34])
         prior_cov = np.eye(3)
 
+        free_energy: float
         free_energy, components = compute_variational_free_energy(
             observations,
             predictions,
@@ -403,6 +400,7 @@ class TestFreeEnergyFunctions:
         preferences = np.array([1.0, -1.0])
         state_uncertainty = np.array([0.1])
 
+        expected_fe: float
         expected_fe, components = compute_expected_free_energy(
             policy,
             predicted_states,
@@ -443,9 +441,7 @@ class TestFreeEnergyFunctions:
         predicted_states = np.array([[0.6, 0.4]])
         state_uncertainty = np.array([0.1])
 
-        epistemic_value = compute_epistemic_value(
-            policy, predicted_states, state_uncertainty, horizon=1
-        )
+        epistemic_value = compute_epistemic_value(policy, predicted_states, state_uncertainty)
 
         assert isinstance(epistemic_value, float)
         assert np.isfinite(epistemic_value)
@@ -455,7 +451,7 @@ class TestFreeEnergyFunctions:
         predicted_observations = np.array([[0.8, 0.2]])
         preferences = np.array([1.0, -2.0])
 
-        pragmatic_value = compute_pragmatic_value(predicted_observations, preferences, horizon=1)
+        pragmatic_value = compute_pragmatic_value(predicted_observations, preferences)
 
         assert isinstance(pragmatic_value, float)
         assert np.isfinite(pragmatic_value)

@@ -25,7 +25,7 @@ from numpy.typing import NDArray
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from apgi_simulation.system import APGISystem  # noqa: E402
+from apgi_framework.system import APGISystem  # noqa: E402
 from tests.strategies import observation_strategy  # noqa: E402
 
 # Configure Hypothesis for property-based testing
@@ -51,9 +51,9 @@ class MockGUIParameterAdjuster:
     test the backend parameter application logic.
     """
 
-    def __init__(self, apgi_simulation: Any) -> None:
+    def __init__(self, apgi_framework: Any) -> None:
         """Initialize with APGI system instance."""
-        self.apgi_simulation = apgi_simulation
+        self.apgi_framework = apgi_framework
         self.param_vars: Dict[str, Any] = {}
 
     def set_parameter(self, param_name: str, value: Any) -> None:
@@ -62,27 +62,27 @@ class MockGUIParameterAdjuster:
 
     def apply_parameters(self) -> None:
         """Apply parameter adjustments to system (simulates GUI _apply_parameters)."""
-        if not self.apgi_simulation:
+        if not self.apgi_framework:
             return
 
         try:
             # Apply body state modulations
             if "arousal" in self.param_vars:
-                self.apgi_simulation.body_model.set_arousal(self.param_vars["arousal"])
+                self.apgi_framework.body_model.set_arousal(self.param_vars["arousal"])
             if "stress" in self.param_vars:
-                self.apgi_simulation.body_model.set_stress(self.param_vars["stress"])
+                self.apgi_framework.body_model.set_stress(self.param_vars["stress"])
             if "activity" in self.param_vars:
-                self.apgi_simulation.body_model.set_activity(self.param_vars["activity"])
+                self.apgi_framework.body_model.set_activity(self.param_vars["activity"])
 
             # Apply precision
             if "extero_precision" in self.param_vars:
-                self.apgi_simulation.precision.extero_baseline = self.param_vars["extero_precision"]
+                self.apgi_framework.precision.extero_baseline = self.param_vars["extero_precision"]
             if "intero_precision" in self.param_vars:
-                self.apgi_simulation.precision.intero_baseline = self.param_vars["intero_precision"]
+                self.apgi_framework.precision.intero_baseline = self.param_vars["intero_precision"]
 
             # Apply threshold
             if "baseline_threshold" in self.param_vars:
-                self.apgi_simulation.ignition_threshold.baseline_threshold = self.param_vars[
+                self.apgi_framework.ignition_threshold.baseline_threshold = self.param_vars[
                     "baseline_threshold"
                 ]
 
@@ -160,24 +160,24 @@ class MockInterventionApplier:
     without requiring the actual GUI interface.
     """
 
-    def __init__(self, apgi_simulation: Any) -> None:
+    def __init__(self, apgi_framework: Any) -> None:
         """Initialize with APGI system instance."""
-        self.apgi_simulation = apgi_simulation
+        self.apgi_framework = apgi_framework
 
     def trigger_ignition(self) -> bool:
         """Manually trigger ignition event (simulates GUI _trigger_ignition)."""
-        if self.apgi_simulation:
+        if self.apgi_framework:
             # Force high arousal to trigger ignition (matches GUI logic)
-            self.apgi_simulation.body_model.set_arousal(0.9)
-            self.apgi_simulation.body_model.set_stress(0.8)
+            self.apgi_framework.body_model.set_arousal(0.9)
+            self.apgi_framework.body_model.set_stress(0.8)
             return True
         return False
 
     def induce_stressor(self, intensity: float = 0.5) -> bool:
         """Induce stressor event (simulates GUI _induce_stressor)."""
-        if self.apgi_simulation:
+        if self.apgi_framework:
             # Directly manipulate allostatic load since trigger_stressor method doesn't exist
-            self.apgi_simulation.allostasis.total_load = np.array([intensity])
+            self.apgi_framework.allostasis.total_load = np.array([intensity])
             return True
         return False
 

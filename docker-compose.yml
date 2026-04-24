@@ -1,5 +1,7 @@
+version: '3.8'
+
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (API)
   postgres:
     image: postgres:14-alpine
     container_name: apgi_postgres
@@ -11,11 +13,15 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apgi}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - apgi-network
+    restart: unless-stopped
 
   # Redis Cache
   redis:
@@ -30,6 +36,44 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - apgi-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # APGI Framework (GUI)
+  apgi-framework:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apgi-framework
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./apgi_framework:/app/apgi_framework:cached
+      - ./utils:/app/utils:cached
+      - ./examples:/app/examples:cached
+      - ./research:/app/research:cached
+      - ./config:/app/config:cached
+      - ./core:/app/core:cached
+      - ./docs:/app/docs:cached
+      - ./tests:/app/tests:cached
+      - ./data:/app/data
+      - ./results:/app/results
+      - ./logs:/app/logs
+      - ./figures:/app/figures
+      - ./reports:/app/reports
+      - ./apgi_outputs:/app/apgi_outputs
+    environment:
+      - PYTHONPATH=/app
+      - APGI_ENV=development
+      - APGI_LOG_LEVEL=DEBUG
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - apgi-network
+    restart: unless-stopped
 
   # APGI API
   api:
@@ -52,6 +96,9 @@ services:
       - ./api:/app/api
       - ./apgi_simulation:/app/apgi_simulation
       - ./config:/app/config
+    networks:
+      - apgi-network
+    restart: unless-stopped
 
   # Celery Worker
   celery_worker:
@@ -77,7 +124,96 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - apgi-network
+    restart: unless-stopped
+
+  # Jupyter Notebook
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: apgi-jupyter
+    ports:
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - ./apgi_framework:/app/apgi_framework:cached
+      - ./utils:/app/utils:cached
+      - ./examples:/app/examples:cached
+      - ./research:/app/research:cached
+      - ./config:/app/config:cached
+      - ./core:/app/core:cached
+      - ./notebooks:/app/notebooks
+      - ./data:/app/data
+      - ./results:/app/results
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:?err}
+    networks:
+      - apgi-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: apgi-nginx
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - apgi-framework
+      - api
+    networks:
+      - apgi-network
+    restart: unless-stopped
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apgi-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - apgi-network
+    restart: unless-stopped
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apgi-grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:?err}
+    networks:
+      - apgi-network
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
   redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  apgi-network:
+    driver: bridge

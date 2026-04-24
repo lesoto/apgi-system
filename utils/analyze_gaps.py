@@ -44,7 +44,8 @@ class GapAnalyzer:
             content = f.read().strip()
             if not content:
                 raise ValueError(f"Coverage file is empty: {self.coverage_file}")
-            return json.loads(content)
+            data = json.loads(content)  # type: ignore[return-value]
+            return data  # type: ignore[no-any-return]
 
     def classify_gap(self, filename: str, line_num: int) -> str:
         """

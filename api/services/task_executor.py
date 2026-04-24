@@ -82,7 +82,7 @@ class TaskExecutor:
                 task_name, args=[session_id, params], task_id=None  # Let Celery generate ID
             )
             logger.info(f"Task submitted with ID: {result.id}")
-            return result.id
+            return str(result.id)
 
         task_id = await asyncio.to_thread(_submit_task)
 

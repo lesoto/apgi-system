@@ -5,6 +5,7 @@ Tests the comprehensive data export capabilities including multiple formats,
 statistical analysis, and visualization exports.
 """
 
+import importlib.util
 import json
 import tempfile
 from pathlib import Path
@@ -13,8 +14,17 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from apgi_simulation.analysis import AnalysisResults
-from apgi_simulation.data_export import AdvancedAnalytics, DataExporter
+# Import from analysis.py file directly to avoid conflict with analysis/ package
+spec = importlib.util.spec_from_file_location(
+    "analysis_module", "/Users/lesoto/Sites/PYTHON/apgi-system/apgi_framework/analysis.py"
+)
+if spec is None or spec.loader is None:
+    raise ImportError("Failed to load analysis module")
+analysis_module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+spec.loader.exec_module(analysis_module)  # type: ignore[union-attr]
+
+AnalysisResults = analysis_module.AnalysisResults  # type: ignore[misc]
+from apgi_framework.data_export import AdvancedAnalytics, DataExporter
 
 
 class TestDataExporter:
