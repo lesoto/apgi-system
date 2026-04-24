@@ -4,18 +4,24 @@ Authentication Middleware
 Middleware to extract and verify JWT tokens from Authorization headers.
 """
 
+import hashlib
 import logging
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from api.database.connection import SessionLocal
+from api.database.connection import AsyncSessionLocal
 from api.exceptions import ExpiredTokenError, InvalidTokenError
 from api.services.auth_manager import AuthManager, TokenPayload
 
 logger = logging.getLogger(__name__)
+
+# In-memory token cache with TTL (5 minutes default)
+# Structure: {token_hash: (TokenPayload, expiration_timestamp)}
+_token_cache: Dict[str, tuple[TokenPayload, float]] = {}
+TOKEN_CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -163,7 +169,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     async def _verify_token(self, token: str) -> TokenPayload:
         """
-        Verify JWT token and extract payload.
+        Verify JWT token and extract payload with caching.
 
         Args:
             token: JWT token string
@@ -175,19 +181,43 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             InvalidTokenError: If token is invalid
             ExpiredTokenError: If token has expired
         """
-        # Create database session for token verification
-        db = SessionLocal()
-        try:
-            auth_manager = AuthManager(db)
+        import time
+
+        # Create cache key from token hash
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        # Check cache first
+        current_time = time.time()
+        if token_hash in _token_cache:
+            cached_payload, expiration = _token_cache[token_hash]
+            # Check if cache entry is still valid (before JWT expiration)
+            if current_time < expiration:
+                logger.debug(f"Token cache hit for user {cached_payload.user_id}")
+                return cached_payload
+            else:
+                # Cache expired, remove it
+                del _token_cache[token_hash]
+                logger.debug("Token cache entry expired, re-verifying")
+
+        # Cache miss or expired - verify with database
+        async with AsyncSessionLocal() as db:
+            auth_manager = AuthManager(db)  # type: ignore[arg-type]
 
             # Check if token is blacklisted before verification
             if await auth_manager.is_token_blacklisted(token):
                 raise InvalidTokenError("Token has been revoked")
 
             payload = auth_manager.verify_token(token, expected_type="access")
+
+            # Cache the result with TTL (token expiration or cache TTL, whichever is sooner)
+            cache_expiration = min(
+                current_time + TOKEN_CACHE_TTL_SECONDS,
+                payload.exp.timestamp(),
+            )
+            _token_cache[token_hash] = (payload, cache_expiration)
+            logger.debug(f"Token cached for user {payload.user_id}")
+
             return payload
-        finally:
-            db.close()
 
     def _create_error_response(self, status_code: int, code: str, message: str) -> JSONResponse:
         """

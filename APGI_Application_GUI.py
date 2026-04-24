@@ -82,7 +82,7 @@ from apgi_framework.utils.font_utils import get_font
 # Import managed thread pool
 from apgi_framework.utils.thread_manager import run_in_thread
 
-from apgi_gui.theme_manager import get_theme_manager
+from apgi_gui.theme_manager import get_theme_manager, ThemeManager as ThemeManagerClass
 from apgi_gui.components.gui_utils import Tooltip, KeyboardManager, UndoRedoManager
 
 # Tooltip implementation
@@ -1236,7 +1236,7 @@ class APGIFrameworkGUI(ctk.CTk):
         self.keyboard_manager: Optional[KeyboardManager] = None
         self.undo_manager: Optional[UndoRedoManager] = None
         self.widget_tracker: Optional[WidgetTracker] = None
-        self.theme_manager: Optional[ThemeManager] = None
+        self.theme_manager: Optional[ThemeManagerClass] = None  # type: ignore[valid-type]
 
         # Initialize variables
         self.data_folder = "data"
@@ -1324,9 +1324,28 @@ class APGIFrameworkGUI(ctk.CTk):
     def _setup_custom_shortcuts(self) -> None:
         """Setup application-specific keyboard shortcuts."""
         if self.keyboard_manager:
+            # Basic operations
             self.keyboard_manager.bind_shortcut("<Control-n>", self.new_config)
             self.keyboard_manager.bind_shortcut("<Control-h>", self.show_help)
             self.keyboard_manager.bind_shortcut("<F5>", self.run_consciousness_evaluation)
+
+            # Falsification tests
+            self.keyboard_manager.bind_shortcut(
+                "F9",
+                self.run_primary_falsification_test,
+                "Run primary falsification test",
+            )
+            self.keyboard_manager.bind_shortcut(
+                "F10", self.run_cwi_test, "Run consciousness-without-ignition test"
+            )
+            self.keyboard_manager.bind_shortcut(
+                "F11",
+                self.run_threshold_insensitivity_test,
+                "Run threshold insensitivity test",
+            )
+            self.keyboard_manager.bind_shortcut(
+                "F12", self.run_soma_bias_test, "Run soma bias test"
+            )
 
     def _start_autosave_timer(self) -> None:
         """Start or restart the auto-save timer."""
@@ -1402,7 +1421,7 @@ class APGIFrameworkGUI(ctk.CTk):
         # Initialize theme manager
         if THEME_AVAILABLE:
             try:
-                self.theme_manager = ThemeManager(self)
+                self.theme_manager = ThemeManagerClass(self)
                 system_theme = get_system_theme_preference()
                 self.theme_manager.set_theme(system_theme)
             except Exception as e:
@@ -1906,49 +1925,6 @@ class APGIFrameworkGUI(ctk.CTk):
         self.bind("<Control-o>", lambda e: self.load_config())
         self.bind("<Control-s>", lambda e: self.save_config())
         self.bind("<Control-q>", lambda e: self.quit())
-
-    def _setup_custom_shortcuts(self):
-        """Setup custom shortcuts specific to this GUI."""
-        if self.keyboard_manager:
-            # Falsification tests
-            self.keyboard_manager.bind_shortcut(
-                "F9",
-                self.run_primary_falsification_test,
-                "Run primary falsification test",
-            )
-            self.keyboard_manager.bind_shortcut(
-                "F10", self.run_cwi_test, "Run consciousness-without-ignition test"
-            )
-            self.keyboard_manager.bind_shortcut(
-                "F11",
-                self.run_threshold_insensitivity_test,
-                "Run threshold insensitivity test",
-            )
-            self.keyboard_manager.bind_shortcut(
-                "F12", self.run_soma_bias_test, "Run soma bias test"
-            )
-
-            # Analysis functions
-            self.keyboard_manager.bind_shortcut(
-                "Ctrl+Shift+A",
-                self.run_bayesian_estimation,
-                "Run Bayesian parameter estimation",
-            )
-            self.keyboard_manager.bind_shortcut(
-                "Ctrl+Shift+E",
-                self.run_effect_size_analysis,
-                "Run effect size analysis",
-            )
-
-            # Visualization
-            self.keyboard_manager.bind_shortcut(
-                "Ctrl+Shift+V", self.plot_parameter_space, "Plot parameter space"
-            )
-            self.keyboard_manager.bind_shortcut(
-                "Ctrl+Shift+P",
-                self.generate_report,
-                "Generate comprehensive report",
-            )
 
     def update_status(self, message):
         """Update status bar message."""

@@ -93,10 +93,10 @@ async def bulk_insert(
                 )
             else:
                 # Standard bulk insert
-                stmt = insert(model).values(batch)
+                stmt: Any = insert(model).values(batch)
 
             result = await session.execute(stmt)
-            total_inserted += result.rowcount
+            total_inserted += result.rowcount  # type: ignore[attr-defined]
 
             logger.debug(f"Inserted batch {i // batch_size + 1}: {len(batch)} records")
 
@@ -153,7 +153,7 @@ async def bulk_update(
             )
 
             result = await session.execute(stmt)
-            total_updated += result.rowcount
+            total_updated += result.rowcount  # type: ignore[attr-defined]
 
             logger.debug(f"Updated batch {i // batch_size + 1}: {len(batch_values)} records")
 
@@ -206,7 +206,7 @@ async def bulk_delete(
             stmt = delete(model).where(getattr(model, filter_column).in_(batch_values))
 
             result = await session.execute(stmt)
-            total_deleted += result.rowcount
+            total_deleted += result.rowcount  # type: ignore[attr-defined]
 
             logger.debug(f"Deleted batch {i // batch_size + 1}: {len(batch_values)} records")
 
@@ -265,7 +265,7 @@ async def bulk_upsert(
             )
 
             result = await session.execute(stmt)
-            total_upserted += result.rowcount
+            total_upserted += result.rowcount  # type: ignore[attr-defined]
 
             logger.debug(f"Upserted batch {i // batch_size + 1}: {len(batch)} records")
 
@@ -306,7 +306,7 @@ async def bulk_fetch(
         logger.warning("bulk_fetch called with empty filter_values")
         return []
 
-    all_records = []
+    all_records: List[T] = []
 
     try:
         # Process in batches
@@ -393,7 +393,7 @@ async def bulk_task_update(
     Raises:
         BatchUpdateError: If update operation fails
     """
-    update_data = {}
+    update_data: Dict[str, Any] = {}
     if status is not None:
         update_data["status"] = status
     if progress is not None:

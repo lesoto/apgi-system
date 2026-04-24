@@ -20,9 +20,14 @@ class Tooltip:
         if self.tooltip_window or not self.text:
             return
 
-        x, y, _, _ = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 25
+        # Get cursor position for tooltip
+        if hasattr(self.widget, "winfo_pointerxy"):
+            x, y = self.widget.winfo_pointerxy()
+        else:
+            x, y = self.widget.winfo_rootx() + 25, self.widget.winfo_rooty() + 25
+
+        x += 25
+        y += 25
 
         self.tooltip_window = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
@@ -35,7 +40,7 @@ class Tooltip:
             background="#FFFFE1",
             relief="solid",
             borderwidth=1,
-            font=("tahoma", "8", "normal"),
+            font=("tahoma", 8, "normal"),
         )
         label.pack(ipadx=1)
 
@@ -52,8 +57,14 @@ class KeyboardManager:
         self.root = root
         self.shortcuts: Dict[str, Callable] = {}
 
-    def bind_shortcut(self, sequence: str, callback: Callable) -> None:
-        """Bind a keyboard sequence to a callback."""
+    def bind_shortcut(self, sequence: str, callback: Callable, description: str = "") -> None:
+        """Bind a keyboard sequence to a callback.
+
+        Args:
+            sequence: The keyboard sequence (e.g., "F9", "<Control-s>")
+            callback: The function to call when the shortcut is triggered
+            description: Optional description of what the shortcut does (for documentation)
+        """
         self.shortcuts[sequence] = callback
         self.root.bind(sequence, lambda e: callback())
 

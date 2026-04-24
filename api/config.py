@@ -13,6 +13,30 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Configuration constants
+# JWT Token Settings
+DEFAULT_JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 30
+DEFAULT_JWT_REFRESH_TOKEN_EXPIRE_DAYS = 7
+MIN_JWT_KEY_LENGTH_DEV = 32
+MIN_JWT_KEY_LENGTH_PROD = 64
+MIN_JWT_CHARACTER_CLASSES = 3
+
+# Rate Limiting Defaults
+DEFAULT_RATE_LIMIT_PER_MINUTE = 60
+
+# Alerting Thresholds
+DEFAULT_ALERT_ERROR_RATE_THRESHOLD = 10
+DEFAULT_ALERT_ERROR_RATE_WINDOW_MINUTES = 1
+DEFAULT_ALERT_COOLDOWN_MINUTES = 5
+
+# Database Pool Defaults
+DEFAULT_DB_POOL_SIZE = 10
+DEFAULT_DB_MAX_OVERFLOW = 20
+
+# Data Orchestrator Defaults
+DEFAULT_BATCH_SIZE = 100
+DEFAULT_CACHE_TTL_SECONDS = 3600
+
 
 class Settings:
     """
@@ -57,8 +81,8 @@ class Settings:
             or os.getenv("DATABASE_URL")
             or "postgresql://localhost/apgi_api?sslmode=require"
         )
-        self.db_pool_size: int = int(os.getenv("DB_POOL_SIZE", "10"))
-        self.db_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+        self.db_pool_size: int = int(os.getenv("DB_POOL_SIZE", str(DEFAULT_DB_POOL_SIZE)))
+        self.db_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", str(DEFAULT_DB_MAX_OVERFLOW)))
         self.db_echo_sql: bool = os.getenv("DB_ECHO_SQL", "false").lower() == "true"
 
         # Redis Settings
@@ -85,12 +109,12 @@ class Settings:
         ) or os.getenv("JWT_PUBLIC_KEY")
 
         self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "RS256")
-        self.jwt_access_token_expire_minutes: int = 30
-        self.jwt_refresh_token_expire_days: int = 7
+        self.jwt_access_token_expire_minutes: int = DEFAULT_JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        self.jwt_refresh_token_expire_days: int = DEFAULT_JWT_REFRESH_TOKEN_EXPIRE_DAYS
 
         # Rate Limiting Settings
         self.rate_limit_enabled: bool = True
-        self.rate_limit_per_minute: int = 60
+        self.rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
 
         # CORS Settings
         cors_origins_env = os.getenv("CORS_ORIGINS")
@@ -131,11 +155,17 @@ class Settings:
         # Alerting Settings
         self.alert_webhook_urls: List[str] = []  # Can be set via environment
         self.alert_enable_log_channel: bool = True
-        self.alert_error_rate_threshold: int = int(os.getenv("ALERT_ERROR_RATE_THRESHOLD", "10"))
-        self.alert_error_rate_window_minutes: int = int(
-            os.getenv("ALERT_ERROR_RATE_WINDOW_MINUTES", "1")
+        self.alert_error_rate_threshold: int = int(
+            os.getenv("ALERT_ERROR_RATE_THRESHOLD", str(DEFAULT_ALERT_ERROR_RATE_THRESHOLD))
         )
-        self.alert_cooldown_minutes: int = int(os.getenv("ALERT_COOLDOWN_MINUTES", "5"))
+        self.alert_error_rate_window_minutes: int = int(
+            os.getenv(
+                "ALERT_ERROR_RATE_WINDOW_MINUTES", str(DEFAULT_ALERT_ERROR_RATE_WINDOW_MINUTES)
+            )
+        )
+        self.alert_cooldown_minutes: int = int(
+            os.getenv("ALERT_COOLDOWN_MINUTES", str(DEFAULT_ALERT_COOLDOWN_MINUTES))
+        )
 
         # Validate security settings after initialization
         self.__post_init__()
@@ -188,7 +218,11 @@ class Settings:
                 )
 
         # Validate minimum key length and entropy
-        min_key_length = 64 if self.environment.lower() in ["production", "prod"] else 32
+        min_key_length = (
+            MIN_JWT_KEY_LENGTH_PROD
+            if self.environment.lower() in ["production", "prod"]
+            else MIN_JWT_KEY_LENGTH_DEV
+        )
 
         # Diversity check: must use multiple character classes
         has_upper = any(c.isupper() for c in self.jwt_secret_key)
@@ -197,17 +231,18 @@ class Settings:
         has_special = any(not c.isalnum() for c in self.jwt_secret_key)
         classes_used = sum([has_upper, has_lower, has_digit, has_special])
 
-        if len(self.jwt_secret_key) < min_key_length or classes_used < 3:
+        if len(self.jwt_secret_key) < min_key_length or classes_used < MIN_JWT_CHARACTER_CLASSES:
             if self.environment.lower() in ["production", "prod"]:
                 raise ValueError(
                     f"CRITICAL: JWT_SECRET_KEY is too weak for production. "
                     f"It must be at least {min_key_length} characters long and use "
-                    f"at least 3 character classes (uppercase, lowercase, digits, symbols)."
+                    f"at least {MIN_JWT_CHARACTER_CLASSES} character classes (uppercase, lowercase, digits, symbols)."
                 )
             else:
                 warnings.warn(
                     f"DEVELOPMENT WARNING: JWT_SECRET_KEY is weak. "
-                    f"It should be at least {min_key_length} characters and use 3+ character classes.",
+                    f"It should be at least {min_key_length} characters and use "
+                    f"{MIN_JWT_CHARACTER_CLASSES}+ character classes.",
                     UserWarning,
                 )
 

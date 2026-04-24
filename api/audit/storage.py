@@ -312,11 +312,10 @@ class DatabaseAuditStorage(AuditStorage):
 
     async def connect(self) -> None:
         """Connect to database."""
-        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
         self._engine = create_async_engine(self.database_url)
-        self._sessionmaker = sessionmaker(
+        self._sessionmaker = async_sessionmaker(
             self._engine,
             class_=AsyncSession,
             expire_on_commit=False,
@@ -466,10 +465,10 @@ class DatabaseAuditStorage(AuditStorage):
             params["outcome"] = query.outcome
         if query.start_time:
             filters.append("timestamp >= :start_time")
-            params["start_time"] = query.start_time
+            params["start_time"] = query.start_time.isoformat()
         if query.end_time:
             filters.append("timestamp <= :end_time")
-            params["end_time"] = query.end_time
+            params["end_time"] = query.end_time.isoformat()
 
         where_clause = " AND ".join(filters) if filters else "1=1"
 
@@ -513,7 +512,7 @@ class DatabaseAuditStorage(AuditStorage):
                 {"cutoff_date": cutoff_date},
             )
             await session.commit()
-            return result.rowcount
+            return result.rowcount if hasattr(result, "rowcount") else 0
 
 
 # Global storage instance

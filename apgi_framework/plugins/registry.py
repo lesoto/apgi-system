@@ -118,7 +118,7 @@ class PluginRegistry:
                 eps = entry_points.select(group=self.ENTRY_POINT_GROUP)
             else:
                 # Legacy API
-                eps = entry_points.get(self.ENTRY_POINT_GROUP, [])
+                eps = entry_points.get(self.ENTRY_POINT_GROUP, [])  # type: ignore[attr-defined]
 
             for ep in eps:
                 try:

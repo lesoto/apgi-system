@@ -108,7 +108,7 @@ class PIIIdentifier:
                     PIIField(
                         field_name=f"detected_{category.value}",
                         category=category,
-                        sensitivity=self.PATTERNS[category]["sensitivity"],
+                        sensitivity=PIISensitivity(self.PATTERNS[category]["sensitivity"]),
                         pattern=match.group(),
                         description=f"Detected {category.value}",
                     )
@@ -201,7 +201,7 @@ class PIIMasker:
 
         for field_name, category in classification.items():
             if field_name in masked_data:
-                sensitivity = PIIIdentifier.PATTERNS[category]["sensitivity"]
+                sensitivity = PIISensitivity(PIIIdentifier.PATTERNS[category]["sensitivity"])
                 masked_data[field_name] = self.mask_value(masked_data[field_name], sensitivity)
 
         return masked_data

@@ -1892,8 +1892,8 @@ class CancellableProgress:
 
         # Force UI update to ensure dialog disappears
         try:
-            if hasattr(self, "frame") and hasattr(self.frame, "master") and self.frame.master:
-                self.frame.master.update_idletasks()
+            if self.frame is not None and hasattr(self.frame, "master") and self.frame.master:  # type: ignore[attr-defined]
+                self.frame.master.update_idletasks()  # type: ignore[attr-defined]
         except Exception:
             pass
 

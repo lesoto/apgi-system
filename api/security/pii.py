@@ -173,22 +173,22 @@ class PIIDetector:
                 "pii_types": list(set(d["classification"] for d in detections)),
             }
         elif isinstance(data, dict):
-            results = {}
+            field_results: Dict[str, Any] = {}
             for key, value in data.items():
                 if isinstance(value, str):
-                    results[key] = self.classify(value)
+                    field_results[key] = self.classify(value)
             return {
-                "has_pii": any(r.get("has_pii", False) for r in results.values()),
-                "fields": results,
+                "has_pii": any(r.get("has_pii", False) for r in field_results.values()),
+                "fields": field_results,
             }
         elif isinstance(data, list):
-            results = []
+            item_results: List[Dict[str, Any]] = []
             for item in data:
                 if isinstance(item, str):
-                    results.append(self.classify(item))
+                    item_results.append(self.classify(item))
             return {
-                "has_pii": any(r.get("has_pii", False) for r in results),
-                "items": results,
+                "has_pii": any(r.get("has_pii", False) for r in item_results),
+                "items": item_results,
             }
         else:
             return {"has_pii": False, "reason": "Unsupported type"}
@@ -246,8 +246,8 @@ class PIIMasker:
         else:
             # Mask all detected PII
             masked = text
-            for pii_class, pattern, _ in self.detector.compiled_patterns:
-                masked = pattern.sub(self._get_mask(pii_class), masked)
+            for pii_class, compiled_pattern, _ in self.detector.compiled_patterns:
+                masked = compiled_pattern.sub(self._get_mask(pii_class), masked)
             return masked
 
     def _get_mask(self, classification: PIIClassification) -> str:
@@ -310,7 +310,7 @@ class PIIMasker:
         Returns:
             Masked list
         """
-        masked = []
+        masked: List[Any] = []
         for item in data:
             if isinstance(item, str):
                 masked.append(self.mask_string(item))

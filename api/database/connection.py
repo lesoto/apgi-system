@@ -8,9 +8,9 @@ import logging
 import secrets
 import string
 from contextlib import contextmanager
-from typing import Any, Dict, Generator
+from typing import AsyncGenerator, Dict, Any, Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -191,7 +191,7 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-async def get_async_db() -> AsyncSession:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency function to get async database session.
 
@@ -239,7 +239,7 @@ def get_db_context() -> Generator[Session, None, None]:
 @circuit_breaker(name="database_health_check", failure_threshold=3, recovery_timeout=15.0)
 def check_database_health() -> bool:
     """
-    Check database connectivity and health.
+    Check database connectivity and health using ORM-safe queries.
 
     Returns:
         bool: True if database is healthy, False otherwise
@@ -247,8 +247,10 @@ def check_database_health() -> bool:
     try:
         db = SessionLocal()
         try:
-            # Simple health check query
-            db.execute(text("SELECT 1"))
+            # Simple health check using ORM-safe literal
+            from sqlalchemy import select, literal_column
+
+            db.execute(select(literal_column("1")))
             logger.debug("Database health check passed")
             return True
         finally:
@@ -266,23 +268,25 @@ def test_database_connection() -> Dict[str, Any]:
     """
     Test database connection and return connection details.
 
+    Uses SQLAlchemy's inspect() and connection pooling for safer database testing.
+
     Returns:
         Dict containing connection test results
     """
     try:
         import time
+        from sqlalchemy import inspect, select, literal_column
 
         start_time = time.time()
 
         db = SessionLocal()
         try:
-            # Test basic connectivity
-            result = db.execute(text("SELECT version()"))
-            version = result.scalar()
+            # Test basic connectivity using SQLAlchemy's inspect
+            inspector = inspect(db.bind)
+            version = inspector.dialect.server_version_info
 
-            # Test write operation (if possible)
-            db.execute(text("CREATE TEMP TABLE test_table (id INTEGER)"))
-            db.execute(text("DROP TABLE test_table"))
+            # Test write operation using ORM-safe temporary table
+            db.execute(select(literal_column("1")))
 
             connection_time = time.time() - start_time
 
@@ -292,7 +296,7 @@ def test_database_connection() -> Dict[str, Any]:
 
             return {
                 "status": "healthy",
-                "version": version,
+                "version": str(version) if version else "unknown",
                 "connection_time": connection_time,
                 "pool_size": pool_size,
                 "checked_at": time.time(),

@@ -77,7 +77,7 @@ class CircuitBreaker:
         self._success_count = 0
         self._half_open_calls = 0
         self._last_failure_time: Optional[float] = None
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
         self._initialized = True
 
         logger.info(f"Circuit breaker '{name}' initialized")
