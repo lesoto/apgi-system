@@ -290,7 +290,7 @@ class APIKeyRotationManager:
         Returns:
             List of key info dicts
         """
-        keys = self._keys.values()
+        keys = list(self._keys.values())
         if status:
             keys = [k for k in keys if k.status == status]
 

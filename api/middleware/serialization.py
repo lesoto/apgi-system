@@ -144,7 +144,7 @@ class SerializationManager:
     Provides consistent serialization/deserialization with format negotiation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.msgpack_available = MSGPACK_AVAILABLE
         self.preferred_format = "msgpack" if MSGPACK_AVAILABLE else "json"
 
@@ -201,4 +201,4 @@ class SerializationManager:
 
 
 # Global serialization manager instance
-serialization_manager = SerializationManager()
+serialization_manager: SerializationManager = SerializationManager()

@@ -83,7 +83,7 @@ async def list_celery_workers() -> List[CeleryWorkerResponse]:
         List of Celery worker status information
     """
     try:
-        from celery.app.control import Control  # type: ignore[import-untyped]
+        from celery.app.control import Control
 
         # Create Celery app instance
         from api.celery_app import celery_app

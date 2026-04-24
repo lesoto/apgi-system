@@ -301,11 +301,15 @@ class CCPAManager:
         Returns:
             Dict with deletion results
         """
-        results = {
+        deleted_files: List[str] = []
+        failed_deletions: List[Dict[str, str]] = []
+        retained_files: List[str] = []
+
+        results: Dict[str, Any] = {
             "consumer_id": consumer_id,
-            "deleted_files": [],
-            "failed_deletions": [],
-            "retained_files": [],
+            "deleted_files": deleted_files,
+            "failed_deletions": failed_deletions,
+            "retained_files": retained_files,
             "timestamp": datetime.now().isoformat(),
         }
 

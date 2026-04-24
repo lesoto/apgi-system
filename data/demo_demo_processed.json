@@ -83778,7 +83778,7 @@
     "Removed 519 outliers using iqr method",
     "Normalized ['time_seconds', 'eeg_fz', 'eeg_pz', 'pupil_diameter', 'eda', 'heart_rate', 'event_marker'] using zscore method"
   ],
-  "processing_timestamp": "2026-04-24T01:15:39.408485",
+  "processing_timestamp": "2026-04-24T17:03:09.863520",
   "metadata": {
     "shape": [
       6981,

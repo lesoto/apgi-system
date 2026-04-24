@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Optional, List, Dict, Callable, Set, Any
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class RectificationManager:
     def __init__(self):
         self._requests: Dict[str, RectificationRequest] = {}
         self._rectification_handlers: Dict[str, Any] = {}
-        self._notification_callbacks: List[callable] = []
+        self._notification_callbacks: List[Callable[[RectificationRequest], None]] = []
 
     def register_handler(self, data_type: str, handler: Any) -> None:
         """
@@ -124,7 +124,7 @@ class RectificationManager:
         self._rectification_handlers[data_type] = handler
         logger.info(f"Registered rectification handler for {data_type}")
 
-    def register_notification_callback(self, callback: callable) -> None:
+    def register_notification_callback(self, callback: Callable[..., Any]) -> None:
         """
         Register a callback for rectification notifications.
 
@@ -239,7 +239,7 @@ class RectificationManager:
         self,
         request_id: str,
         data_type: str,
-        apply_func: Optional[callable] = None,
+        apply_func: Optional[Callable[[Any], None]] = None,
     ) -> bool:
         """
         Apply an approved rectification to data.
@@ -313,7 +313,7 @@ class RectificationManager:
         for callback in self._notification_callbacks:
             try:
                 callback(request)
-                request.notified_systems.add(callback.__name__)
+                request.notified_systems.add(callback.__name__)  # type: ignore[attr-defined]
             except Exception as e:
                 logger.error(f"Notification failed: {e}")
 

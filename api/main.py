@@ -4,6 +4,7 @@ APGI REST API Main Application
 FastAPI application providing RESTful access to the APGI System.
 """
 
+import os
 import socket
 import sys
 from contextlib import asynccontextmanager
@@ -14,19 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-# Check dependencies before starting (skip in testing)
-try:
-    import os
-
-    from utils.dependency_checker import check_dependencies
-
-    if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies():
-        print("Dependency check failed. Exiting...")
-        sys.exit(1)
-except ImportError:
-    print("Warning: Dependency checker not available. Continuing anyway...")
-except Exception as e:
-    print(f"Warning: Error during dependency check: {e}. Continuing anyway...")
+# Dependency checks moved to lifespan() to avoid import-time side effects
 
 from api.config import settings
 from api.database.connection import close_db, init_db
@@ -44,8 +33,13 @@ from api.middleware.logging import (
 )
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
+from api.middleware.request_deduplication import (
+    RequestDeduplicationMiddleware,
+    deduplication_manager,
+)
 from api.middleware.request_size_limit import RequestSizeLimitMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
+from api.middleware.serialization import OptimizedSerializationMiddleware
 from api.routes import (
     admin,
     auth,
@@ -68,6 +62,33 @@ from apgi_framework.security.startup_security_check import get_security_posture_
 # Configure structured logging
 configure_structured_logging(settings.log_level)
 logger = StructuredLogger(__name__)
+
+
+def run_dependency_checks() -> bool:
+    """Run dependency checks safely without side effects.
+
+    Returns True if checks pass or should be skipped.
+    Raises RuntimeError in production if checks fail.
+    """
+    # Skip if explicitly disabled (for testing/embedding)
+    if os.getenv("SKIP_DEPENDENCY_CHECKS", "").lower() in ("1", "true", "yes"):
+        logger.info("Dependency checks skipped via SKIP_DEPENDENCY_CHECKS")
+        return True
+
+    try:
+        from utils.dependency_checker import check_dependencies
+
+        if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies():
+            logger.error("Dependency check failed")
+            if os.getenv("ENVIRONMENT") == "production":
+                raise RuntimeError("Dependency check failed. Refusing to start.")
+            return False
+    except ImportError:
+        logger.warning("Dependency checker not available. Continuing anyway...")
+    except Exception as e:
+        logger.warning(f"Error during dependency check: {e}. Continuing anyway...")
+
+    return True
 
 
 # Global Redis client
@@ -95,6 +116,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Startup
     logger.info("Application starting up", component="lifecycle")
+
+    # Run dependency checks (moved from import-time to startup)
+    if not run_dependency_checks():
+        raise RuntimeError("Dependency checks failed. Cannot start application.")
 
     # Configure alerting system with PagerDuty and Slack
     configure_alerting(
@@ -136,11 +161,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
 
             # Update rate limiting middleware with Redis client
-            if rate_limiting_middleware:
-                rate_limiting_middleware.set_redis_client(redis_client)
-                logger.info(
-                    "Rate limiting middleware updated with Redis client", component="middleware"
-                )
+            # Note: FastAPI's add_middleware doesn't expose the instance directly,
+            # so we set the client via a module-level reference maintained by the middleware
+            from api.middleware.rate_limiting import set_global_redis_client
+
+            set_global_redis_client(redis_client)
+            logger.info(
+                "Rate limiting middleware updated with Redis client", component="middleware"
+            )
 
     except Exception as e:
         logger.error("Failed to initialize Redis", component="redis", error=str(e))
@@ -208,6 +236,24 @@ def create_app(test_mode: bool = False) -> FastAPI:
         enabled=getattr(settings, "request_size_limit_enabled", True),
     )
 
+    # Add optimized serialization middleware (early for format negotiation)
+    if settings.optimized_serialization_enabled:
+        app.add_middleware(OptimizedSerializationMiddleware)
+
+    # Add request deduplication middleware (early to avoid duplicate processing)
+    if settings.request_dedup_enabled:
+        dedup_middleware = RequestDeduplicationMiddleware(
+            app=None,  # Will be set by FastAPI
+            max_size=settings.request_dedup_max_size,
+            default_ttl_seconds=settings.request_dedup_ttl_seconds,
+        )
+        app.add_middleware(
+            RequestDeduplicationMiddleware,
+            max_size=settings.request_dedup_max_size,
+            default_ttl_seconds=settings.request_dedup_ttl_seconds,
+        )
+        deduplication_manager.middleware = dedup_middleware
+
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
@@ -224,8 +270,41 @@ def create_app(test_mode: bool = False) -> FastAPI:
     # Add GZip compression middleware
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # Add metrics middleware (first, to track all requests)
+    # Add metrics middleware (early, to track all requests)
     app.add_middleware(PrometheusMetricsMiddleware)
+
+    # Initialize SLO tracking for key endpoints
+    from apgi_framework.performance.slo_tracker import get_slo_tracker, SLOBudget
+
+    slo_tracker = get_slo_tracker()
+    # Register SLO budgets for critical endpoints
+    slo_tracker.register_slo(
+        SLOBudget(
+            endpoint="/v1/sessions",
+            p50_ms=100,
+            p95_ms=500,
+            p99_ms=1000,
+            error_rate_threshold=0.01,
+        )
+    )
+    slo_tracker.register_slo(
+        SLOBudget(
+            endpoint="/v1/state",
+            p50_ms=50,
+            p95_ms=200,
+            p99_ms=500,
+            error_rate_threshold=0.005,
+        )
+    )
+    slo_tracker.register_slo(
+        SLOBudget(
+            endpoint="/v1/tasks",
+            p50_ms=200,
+            p95_ms=1000,
+            p99_ms=2000,
+            error_rate_threshold=0.02,
+        )
+    )
 
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
@@ -255,19 +334,20 @@ def create_app(test_mode: bool = False) -> FastAPI:
             secure=settings.https_enabled,  # Set secure flag based on HTTPS configuration
         )
 
-    # Add Compliance Middleware
-    app.add_middleware(ComplianceMiddleware)
+    # Add Compliance Middleware - skip in test mode (requires auth)
+    if not test_mode:
+        app.add_middleware(ComplianceMiddleware)
 
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
 
-    # Add rate limiting middleware (will be enabled if Redis is available)
-    global rate_limiting_middleware
-    rate_limiting_middleware = RateLimitingMiddleware(
-        app,
-        redis_client=None,  # Will be set in startup
-        enabled=settings.rate_limit_enabled,
-    )
+    # Add rate limiting middleware (Redis client set in lifespan) - skip in test mode
+    if not test_mode:
+        app.add_middleware(
+            RateLimitingMiddleware,
+            redis_client=None,  # Will be set in lifespan
+            enabled=settings.rate_limit_enabled,
+        )
 
     # Ensure CORS is configured early to handle preflight before other middlewares
 

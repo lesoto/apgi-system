@@ -271,7 +271,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             if match:
                 return path_item  # type: ignore
 
-        return None  # type: ignore
+        return None
 
     async def _get_response_body(self, response: Response) -> Optional[str]:
         """

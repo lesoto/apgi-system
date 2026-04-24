@@ -606,7 +606,7 @@ class APGIGui:
                     logger.warning(f"Could not reset {attr}: {e}")
         self.control_panel.log_event("Parameters reset to defaults")
 
-    def _run_preset_task(self):
+    def _run_preset_task(self) -> None:
         """Open preset experimental task selector."""
         tasks = [
             "Attentional Blink",

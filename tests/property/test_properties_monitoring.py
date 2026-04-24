@@ -25,7 +25,7 @@ from api.middleware.metrics import error_counter, request_counter, request_durat
 @st.composite
 def http_method_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate valid HTTP methods."""
-    return draw(st.sampled_from(["GET", "POST", "PUT", "DELETE", "PATCH"]))  # type: ignore
+    return draw(st.sampled_from(["GET", "POST", "PUT", "DELETE", "PATCH"]))
 
 
 @st.composite
@@ -41,25 +41,25 @@ def http_path_strategy(draw: Callable[[Any], Any]) -> str:
         "/v1/health",
         "/v1/metrics",
     ]
-    return draw(st.sampled_from(paths))  # type: ignore
+    return draw(st.sampled_from(paths))
 
 
 @st.composite
 def http_status_code_strategy(draw: Callable[[Any], Any]) -> int:
     """Generate valid HTTP status codes."""
-    return draw(st.sampled_from([200, 201, 400, 401, 403, 404, 422, 429, 500, 502, 503]))  # type: ignore
+    return draw(st.sampled_from([200, 201, 400, 401, 403, 404, 422, 429, 500, 502, 503]))
 
 
 @st.composite
 def client_id_strategy(draw: Callable[[Any], Any]) -> str:
     """Generate client identifiers (IP addresses)."""
-    return draw(st.from_regex(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", fullmatch=True))  # type: ignore
+    return draw(st.from_regex(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", fullmatch=True))
 
 
 @st.composite
 def duration_ms_strategy(draw: Callable[[Any], Any]) -> float:
     """Generate request durations in milliseconds."""
-    return draw(st.floats(min_value=0.1, max_value=10000.0))  # type: ignore
+    return draw(st.floats(min_value=0.1, max_value=10000.0))
 
 
 @st.composite

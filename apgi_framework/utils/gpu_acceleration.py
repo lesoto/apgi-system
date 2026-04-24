@@ -36,7 +36,7 @@ class GPUAccelerationManager:
     hardware-accelerated computation functions.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._jax_available = False
         self._tensorflow_available = False
         self._torch_available = False

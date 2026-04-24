@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import time
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, Awaitable, Dict, Optional, Tuple
 
@@ -55,15 +56,14 @@ class RequestDeduplicationCache:
         self.default_ttl_seconds = default_ttl_seconds
         self._cache: Dict[str, CachedResponse] = {}
         self._access_times: Dict[str, float] = {}
-        self._lock = None  # Asyncio lock for thread safety
+        self._lock: Optional[asyncio.Lock] = None  # Asyncio lock for thread safety
         logger.info(f"Request deduplication cache initialized (max_size={max_size})")
 
-    async def _get_lock(self) -> Any:
+    async def _get_lock(self) -> asyncio.Lock:
         """Get or create async lock for thread safety."""
         if self._lock is None:
-            import asyncio
-
             self._lock = asyncio.Lock()
+        assert self._lock is not None
         return self._lock
 
     def generate_fingerprint(self, request: Request, body: Optional[bytes] = None) -> str:
@@ -142,7 +142,7 @@ class RequestDeduplicationCache:
         async with await self._get_lock():
             # Evict oldest entries if cache is full
             while len(self._cache) >= self.max_size:
-                oldest = min(self._access_times, key=self._access_times.get)
+                oldest = min(self._access_times, key=lambda k: self._access_times[k])
                 del self._cache[oldest]
                 del self._access_times[oldest]
 
@@ -279,8 +279,12 @@ class RequestDeduplicationMiddleware(BaseHTTPMiddleware):
             try:
                 # Read response body
                 body_bytes = b""
-                async for chunk in response.body_iterator:
-                    body_bytes += chunk
+                if hasattr(response, "body_iterator"):  # type: ignore[attr-defined]
+                    async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+                        body_bytes += chunk
+                else:
+                    # Fallback for Response without body_iterator
+                    body_bytes = response.body
 
                 # Parse as JSON
                 body_content = json.loads(body_bytes) if body_bytes else {}

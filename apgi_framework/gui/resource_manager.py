@@ -5,7 +5,7 @@ Provides context managers and utilities for proper resource cleanup
 in GUI applications to prevent memory leaks.
 """
 
-from typing import Any, Optional, List, Callable
+from typing import Any, Dict, List, Callable, Optional
 from contextlib import contextmanager
 import logging
 import gc
@@ -21,7 +21,7 @@ class GUIResourceManager:
     Tracks widgets, figures, and other resources for cleanup.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the resource manager."""
         self._widgets: List[weakref.ref] = []
         self._figures: List[Any] = []
@@ -249,10 +249,10 @@ class LazyGUILoader:
     Loads GUI components on-demand instead of at startup.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the lazy loader."""
-        self._components: dict = {}
-        self._loaded: dict = {}
+        self._components: Dict[str, Callable] = {}
+        self._loaded: Dict[str, Any] = {}
 
     def register_component(self, name: str, loader: Callable) -> None:
         """

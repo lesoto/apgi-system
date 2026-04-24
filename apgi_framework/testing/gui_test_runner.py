@@ -422,7 +422,7 @@ class ComprehensiveTestRunner:
                 self.stderr = err
                 self.args = []
 
-        return MockResult(returncode, stderr)  # type: ignore[no-untyped-call]
+        return MockResult(returncode, stderr)
 
     def run_all_tests(
         self, verbose: bool = False, coverage: bool = False, parallel: bool = True

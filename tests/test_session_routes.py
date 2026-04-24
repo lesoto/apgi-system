@@ -117,7 +117,7 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     # Create mock user with admin role
     from datetime import datetime
 
-    mock_user = TokenPayload(  # type: ignore[call-arg]
+    mock_user = TokenPayload(
         user_id="test-user-123",
         username="testuser",
         roles=["admin"],

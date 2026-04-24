@@ -106,7 +106,7 @@ def mock_session_manager(mock_apgi_framework: Mock) -> Mock:
                 return {"session_id": session_id, "status": "running"}
 
             async def mock_get_state() -> Dict[str, Any]:
-                return mock_apgi_framework.get_state()  # type: ignore[no-any-return]
+                return mock_apgi_framework.get_state()
 
             mock_sim.start = AsyncMock(side_effect=mock_start)
             mock_sim.get_state = AsyncMock(side_effect=mock_get_state)
@@ -233,9 +233,9 @@ def client(
     app.dependency_overrides[get_redis_client] = mock_get_redis_client
 
     # Override data export service and task executor
-    export._data_export_service = mock_data_export_service
+    export._data_export_service = mock_data_export_service  # type: ignore[attr-defined]
     export._session_manager = mock_session_manager  # type: ignore[attr-defined]
-    tasks._task_executor = mock_task_executor
+    tasks._task_executor = mock_task_executor  # type: ignore[attr-defined]
     tasks._session_manager = mock_session_manager  # type: ignore[attr-defined]
 
     # Skip startup/shutdown events
@@ -259,7 +259,7 @@ def openapi_schema(client: Any) -> Dict[str, Any]:
     """Get the OpenAPI schema from the API."""
     response = client.get("/openapi.json")
     assert response.status_code == 200
-    return response.json()  # type: ignore[no-any-return]
+    return response.json()
 
 
 def validate_response_against_schema(

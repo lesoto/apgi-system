@@ -104,7 +104,7 @@ def test_gui_launch() -> bool:
 
         sys.path.insert(0, str(Path(__file__).parent.parent))
 
-        from APGI_Application___GUI import APGIFrameworkGUI  # type: ignore
+        from APGI_Application_GUI import APGIFrameworkGUI  # type: ignore
 
         # Create GUI instance (it inherits from ctk.CTk)
         app = APGIFrameworkGUI()

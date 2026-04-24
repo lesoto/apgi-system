@@ -329,3 +329,17 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                 response.headers["X-RateLimit-Reset"] = str(int(datetime.utcnow().timestamp()) + 60)
 
                 return response
+
+
+# Global reference for setting Redis client from lifespan
+_global_rate_limiter: Optional[RateLimiter] = None
+
+
+def set_global_redis_client(redis_client: redis.Redis) -> None:
+    """Set Redis client on the rate limiting middleware.
+
+    Called from lifespan to initialize Redis connection after
+    FastAPI app creation (since add_middleware doesn't expose instance).
+    """
+    global _global_rate_limiter
+    _global_rate_limiter = RateLimiter(redis_client)

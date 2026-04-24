@@ -64,13 +64,13 @@ class EquationOrchestrator:
     def _initialize_engines(self) -> None:
         """Initialize mathematical computation engines."""
         try:
-            from apgi_framework.engines.equation_engine import EquationEngine
-            from apgi_framework.engines.precision_engine import PrecisionEngine
-            from apgi_framework.engines.prediction_error_engine import PredictionErrorEngine
+            from apgi_framework.engines.equation_engine import APGIEquation  # type: ignore[attr-defined]
+            from apgi_framework.engines.precision_engine import PrecisionCalculator  # type: ignore[attr-defined]
+            from apgi_framework.engines.prediction_error_engine import PredictionErrorProcessor  # type: ignore[attr-defined]
 
-            self._engines["equation"] = EquationEngine()
-            self._engines["precision"] = PrecisionEngine()
-            self._engines["prediction_error"] = PredictionErrorEngine()
+            self._engines["equation"] = APGIEquation()
+            self._engines["precision"] = PrecisionCalculator()
+            self._engines["prediction_error"] = PredictionErrorProcessor()
 
             logger.debug("Mathematical engines initialized: %s", list(self._engines.keys()))
         except ImportError as e:

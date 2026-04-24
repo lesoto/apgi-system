@@ -130,7 +130,27 @@ jobs:
       - name: Run performance benchmarks
         run: |
           pytest tests/benchmarks/ --benchmark-compare --benchmark-fail-on-delta-rms=10%
-      
+
+      - name: Create performance baseline
+        env:
+          DATABASE_URL: postgresql://apgi_test:test_password@localhost:5432/apgi_test
+          REDIS_URL: redis://localhost:6379/0
+          API_BASE_URL: http://localhost:8000
+        run: |
+          # Start API server in background
+          python -c "from api.main import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=8000, log_level='error')" &
+          SERVER_PID=$!
+          sleep 5
+
+          # Create baseline if it doesn't exist
+          if [ ! -f benchmarks/baselines.json ]; then
+            echo "Creating initial performance baseline..."
+            pytest benchmarks/test_performance_gates.py::TestPerformanceGates::test_create_performance_baseline -v
+          fi
+
+          # Kill server
+          kill $SERVER_PID || true
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:

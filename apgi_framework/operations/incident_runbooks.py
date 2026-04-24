@@ -69,7 +69,7 @@ class IncidentRunbook:
 class IncidentRunbookRegistry:
     """Registry of incident runbooks."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize runbook registry."""
         self.runbooks: Dict[IncidentType, IncidentRunbook] = {}
         self._register_default_runbooks()

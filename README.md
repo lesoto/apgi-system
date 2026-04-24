@@ -66,62 +66,62 @@ python GUI-Launcher.py
 - `docs/` - Documentation
 - `utils/` - Utility scripts and tools
 
-## Entry Points Ordered by Importance
+## Entry Points (Canonical)
 
-### 1. Main CLI (`apgi_framework/cli.py`)
+### Recommended Entry Points
 
-**Type**: Command-line interface
-**Purpose**: Primary command-line interface for running tests, experiments, and configuration
+| Entry Point | Type | Purpose | Status |
+|-------------|------|---------|--------|
+| `apgi_gui/main.py` | Desktop GUI | **Primary GUI** - Component-based GUI with clean architecture | Active |
+| `apgi_framework/cli.py` | CLI | **Primary CLI** - Command-line interface for tests, experiments | Active |
+| `python -m apgi_framework` | Module | Direct module execution | Active |
 
-### 2. Main GUI Application (`GUI.py`)
+### Legacy Entry Points (Deprecated)
 
-**Type**: Desktop GUI
-**Purpose**: Main graphical user interface for the framework
+> **Note**: These monolithic files are deprecated in favor of `apgi_gui/main.py`:
 
-### 3. GUI Launcher (`GUI-Launcher.py`)
+| Entry Point | Size | Status | Migration |
+|-------------|------|--------|-----------|
+| `GUI-Launcher.py` | 54KB | Deprecated | Use `apgi_gui/main.py` |
+| `APGI_GUI.py` | 237KB | Deprecated | Use `apgi_gui/main.py` |
+| `APGI_Application_GUI.py` | 300KB | Deprecated | Use `apgi_gui/main.py` |
+| `Psychological_States_GUI.py` | 365KB | Deprecated | Use `apgi_gui/main.py` |
+| `Assistant_GUI.py` | 359KB | Deprecated | Use `apgi_gui/main.py` |
+| `Tests_GUI.py` | - | Deprecated | Use `apgi_gui/main.py` |
+| `Utils_GUI.py` | - | Deprecated | Use `apgi_gui/main.py` |
 
-**Type**: Desktop GUI
-**Purpose**: Launcher application for GUI components
+### Utility Scripts
 
-### 4. Run Tests Script (`run_tests.py`)
+| Script | Type | Purpose |
+|--------|------|---------|
+| `setup.sh` | Installation | Environment setup and dependencies |
+| `deploy.sh` | Deployment | Production deployment |
+| `delete_pycache.py` | Maintenance | Cache cleanup |
 
-**Type**: Script
-**Purpose**: Test execution and reporting
+## GUI Component Architecture (`apgi_gui/`)
 
-### 5. Tests GUI (`Tests-GUI.py`)
+The modern GUI uses a component-based architecture:
 
-**Type**: Desktop GUI
-**Purpose**: GUI for running and monitoring tests
+```
+apgi_gui/
+├── main.py              # Application entry point
+├── mediator.py          # Component coordination
+├── cli.py               # CLI interface
+├── components/
+│   ├── core.py          # Core component base
+│   ├── control_panel.py # Experiment controls
+│   ├── visualization_panel.py  # Data visualization
+│   ├── menu_bar.py      # Application menus
+│   └── status_bar.py    # Status indicators
+└── controllers/
+    └── simulation_controller.py  # Business logic
+```
 
-### 6. Utils GUI (`Utils-GUI.py`)
-
-**Type**: Desktop GUI
-**Purpose**: Utility interface for framework tools
-
-### 7. Quick Deploy Script (`quick_deploy.py`)
-
-**Type**: Deployment script
-**Purpose**: One-click deployment for non-technical users
-
-### 8. Setup Script (`setup.sh`)
-
-**Type**: Installation script
-**Purpose**: Environment setup and dependency installation
-
-### 9. Deploy Script (`deploy.sh`)
-
-**Type**: Deployment script
-**Purpose**: Production deployment and configuration
-
-### 10. Falsification GUI (`apps/apgi_falsification_gui.py`)
-
-**Type**: Desktop GUI
-**Purpose**: Interface for falsification testing
-
-### 12. Real-time Monitoring Dashboard (`apgi_framework/gui/monitoring_dashboard.py`)
-
-**Type**: Desktop GUI
-**Purpose**: Live monitoring of EEG, pupillometry, cardiac signals
+**Key Benefits:**
+- Clean separation of concerns
+- Reusable components
+- Easier testing and maintenance
+- Consistent UI patterns
 
 ## Utils Scripts
 

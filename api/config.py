@@ -37,6 +37,11 @@ DEFAULT_DB_MAX_OVERFLOW = 20
 DEFAULT_BATCH_SIZE = 100
 DEFAULT_CACHE_TTL_SECONDS = 3600
 
+# Performance Middleware Defaults
+DEFAULT_REQUEST_DEDUP_MAX_SIZE = 1000
+DEFAULT_REQUEST_DEDUP_TTL_SECONDS = 60
+DEFAULT_REQUEST_DEDUP_ENABLED = False
+
 
 class Settings:
     """
@@ -150,6 +155,20 @@ class Settings:
         )
         self.schema_validation_fail_on_error: bool = (
             os.getenv("SCHEMA_VALIDATION_FAIL_ON_ERROR", "false").lower() == "true"
+        )
+
+        # Performance Middleware Settings
+        self.request_dedup_enabled: bool = (
+            os.getenv("REQUEST_DEDUP_ENABLED", "false").lower() == "true"
+        )
+        self.request_dedup_max_size: int = int(
+            os.getenv("REQUEST_DEDUP_MAX_SIZE", str(DEFAULT_REQUEST_DEDUP_MAX_SIZE))
+        )
+        self.request_dedup_ttl_seconds: int = int(
+            os.getenv("REQUEST_DEDUP_TTL_SECONDS", str(DEFAULT_REQUEST_DEDUP_TTL_SECONDS))
+        )
+        self.optimized_serialization_enabled: bool = (
+            os.getenv("OPTIMIZED_SERIALIZATION_ENABLED", "true").lower() == "true"
         )
 
         # Alerting Settings

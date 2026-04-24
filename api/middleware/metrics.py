@@ -13,6 +13,12 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, ge
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+# Import SLO tracker
+from apgi_framework.performance.slo_tracker import (
+    get_slo_tracker,
+    record_endpoint_metric,
+)
+
 # Define Prometheus metrics
 
 # Request counter by endpoint, method, and status
@@ -20,13 +26,18 @@ request_counter = Counter(
     "apgi_api_requests_total", "Total number of API requests", ["method", "endpoint", "status_code"]
 )
 
-# Request duration histogram
+# Request duration histogram with per-endpoint percentiles
 request_duration = Histogram(
     "apgi_api_request_duration_seconds",
     "Request duration in seconds",
     ["method", "endpoint"],
     buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
 )
+
+# Per-endpoint percentile histograms
+p50_latency = Gauge("apgi_api_latency_p50_ms", "P50 latency in milliseconds", ["endpoint"])
+p95_latency = Gauge("apgi_api_latency_p95_ms", "P95 latency in milliseconds", ["endpoint"])
+p99_latency = Gauge("apgi_api_latency_p99_ms", "P99 latency in milliseconds", ["endpoint"])
 
 # Active sessions gauge
 active_sessions = Gauge("apgi_api_active_sessions", "Number of active simulation sessions")
@@ -135,6 +146,15 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             # Update system metrics
             self._update_system_metrics()
 
+            # Record to SLO tracker
+            response_time_ms = duration * 1000
+            record_endpoint_metric(
+                endpoint=endpoint,
+                response_time_ms=response_time_ms,
+                status_code=status_code,
+                error=status_code >= 400,
+            )
+
             return response
 
         except Exception as e:
@@ -145,6 +165,14 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
             request_duration.labels(method=method, endpoint=endpoint).observe(duration)
 
+            # Record error to SLO tracker
+            record_endpoint_metric(
+                endpoint=endpoint,
+                response_time_ms=duration * 1000,
+                status_code=500,
+                error=True,
+            )
+
             # Re-raise exception
             raise
 
@@ -152,9 +180,8 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             # Decrement active requests
             active_requests.dec()
 
-            # Update generic SLO budgets (Mocked calculation for demonstration)
-            slo_error_budget_remaining.labels(endpoint=endpoint).set(99.9)
-            slo_latency_budget_remaining.labels(endpoint=endpoint).set(95.5)
+            # Update real SLO metrics from SLO tracker
+            self._update_slo_metrics(endpoint)
 
     def _normalize_endpoint(self, path: str) -> str:
         """
@@ -216,6 +243,37 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             cpu_usage_percent.set(cpu_percent)
         except Exception:
             # Silently fail if psutil is not available or other errors occur
+            pass
+
+    def _update_slo_metrics(self, endpoint: str) -> None:
+        """Update SLO metrics from SLO tracker for real-time percentiles."""
+        try:
+            slo_tracker = get_slo_tracker()
+            report = slo_tracker.get_slo_report(endpoint)
+
+            if endpoint in report:
+                ep_report = report[endpoint]
+                if ep_report["status"] != "no_data":
+                    # Update percentile gauges
+                    p50_latency.labels(endpoint=endpoint).set(ep_report["p50"]["current"])
+                    p95_latency.labels(endpoint=endpoint).set(ep_report["p95"]["current"])
+                    p99_latency.labels(endpoint=endpoint).set(ep_report["p99"]["current"])
+
+                    # Calculate remaining budgets
+                    error_budget = ep_report["error_rate"]
+                    latency_budget = ep_report["p95"]
+
+                    # Set remaining budget percentages
+                    slo_error_budget_remaining.labels(endpoint=endpoint).set(
+                        (1.0 - error_budget["current"]) * 100
+                    )
+                    slo_latency_budget_remaining.labels(endpoint=endpoint).set(
+                        max(0, 1.0 - (latency_budget["current"] / latency_budget["budget"])) * 100
+                        if latency_budget["budget"] > 0
+                        else 100.0
+                    )
+        except Exception:
+            # Silently fail if SLO tracker not available
             pass
 
 

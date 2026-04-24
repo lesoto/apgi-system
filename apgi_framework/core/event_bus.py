@@ -74,7 +74,7 @@ class EventBus:
     - Event replay capability
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._subscriptions: Dict[str, List[EventSubscription]] = {}
         self._event_history: List[Event] = []
         self._history_limit = 1000

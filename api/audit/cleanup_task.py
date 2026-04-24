@@ -11,7 +11,7 @@ Implements configurable retention policies with support for:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from celery import Celery, shared_task
 from celery.schedules import crontab
@@ -54,7 +54,7 @@ class AuditCleanupManager:
 
     def __init__(self, config: Optional[AuditRetentionConfig] = None):
         self.config = config or AuditRetentionConfig()
-        self._cleanup_stats = {
+        self._cleanup_stats: Dict[str, Any] = {
             "total_runs": 0,
             "total_deleted": 0,
             "last_run": None,
@@ -71,7 +71,7 @@ class AuditCleanupManager:
             Dict with cleanup statistics
         """
         audit_logger = get_audit_logger()
-        results = {
+        results: Dict[str, Any] = {
             "deleted_count": 0,
             "archived_count": 0,
             "errors": [],
@@ -108,8 +108,8 @@ class AuditCleanupManager:
                 logger.info(f"Cleaned up {total_deleted} total audit events")
 
             # Update stats
-            self._cleanup_stats["total_runs"] += 1
-            self._cleanup_stats["total_deleted"] += results["deleted_count"]
+            self._cleanup_stats["total_runs"] += 1  # type: ignore[operator]
+            self._cleanup_stats["total_deleted"] += results["deleted_count"]  # type: ignore[operator]
             self._cleanup_stats["last_run"] = datetime.utcnow().isoformat()
 
             # Log the cleanup event
@@ -124,7 +124,8 @@ class AuditCleanupManager:
 
         except Exception as e:
             logger.error(f"Error during audit cleanup: {e}")
-            results["errors"].append(str(e))
+            if isinstance(results["errors"], list):  # type: ignore
+                results["errors"].append(str(e))
 
         return results
 
@@ -135,7 +136,7 @@ class AuditCleanupManager:
         Returns:
             Dict with comprehensive cleanup results
         """
-        all_results = {
+        all_results: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat(),
             "by_severity": {},
             "total_deleted": 0,
@@ -145,10 +146,11 @@ class AuditCleanupManager:
         for severity in self.config.severity_retention.keys():
             try:
                 result = await self.cleanup_expired_events(severity)
-                all_results["by_severity"][severity] = result
-                all_results["total_deleted"] += result.get("deleted_count", 0)
+                all_results["by_severity"][severity] = result  # type: ignore[index]
+                all_results["total_deleted"] += result.get("deleted_count", 0)  # type: ignore[operator]
             except Exception as e:
-                all_results["errors"].append({"severity": severity, "error": str(e)})
+                if isinstance(all_results["errors"], list):  # type: ignore
+                    all_results["errors"].append({"severity": severity, "error": str(e)})
 
         return all_results
 

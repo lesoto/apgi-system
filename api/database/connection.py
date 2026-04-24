@@ -191,7 +191,7 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:  # type: ignore[misc]
     """
     Dependency function to get async database session.
 

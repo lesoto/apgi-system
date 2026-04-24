@@ -53,8 +53,8 @@ def test_private_path_unauthorized(auth_client: TestClient) -> None:
     So we need an endpoint that checks for authentication.
     """
 
-    @auth_client.app.get("/protected")  # type: ignore[no-untyped-call, attr-defined, untyped-decorator]
-    async def protected_route(authenticated: bool = Depends(is_authenticated)) -> Dict[str, str]:
+    @auth_client.app.get("/protected")  # type: ignore[attr-defined]
+    async def protected_route(authenticated: bool = Depends(is_authenticated)) -> Dict[str, str]:  # type: ignore[misc]
         if not authenticated:
             from fastapi import HTTPException
 

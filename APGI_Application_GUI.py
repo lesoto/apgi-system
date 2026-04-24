@@ -1321,7 +1321,7 @@ class APGIFrameworkGUI(ctk.CTk):
         except Exception as e:
             self.log_to_console(f"Error fitting to window: {str(e)}")
 
-    def _setup_custom_shortcuts(self) -> None:
+    def _setup_custom_shortcuts(self) -> None:  # type: ignore[no-redef]
         """Setup application-specific keyboard shortcuts."""
         if self.keyboard_manager:
             # Basic operations
@@ -1421,7 +1421,7 @@ class APGIFrameworkGUI(ctk.CTk):
         # Initialize theme manager
         if THEME_AVAILABLE:
             try:
-                self.theme_manager = ThemeManagerClass(self)
+                self.theme_manager = ThemeManagerClass(self)  # type: ignore[operator]
                 system_theme = get_system_theme_preference()
                 self.theme_manager.set_theme(system_theme)
             except Exception as e:

@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 
-def load_module_from_file(module_name: str, file_path: Path):
+def load_module_from_file(module_name: str, file_path: Path) -> Any:
     """Load a Python module from a file path, handling hyphenated filenames."""
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
@@ -33,7 +33,7 @@ def load_module_from_file(module_name: str, file_path: Path):
 
 # Import the GUI class with error handling
 HAS_ASSISTANT_GUI = False
-APGIGUI: Any = None  # type: ignore[misc]
+APGIGUI: Any = None
 
 try:
     # Load from hyphenated filename using importlib
@@ -52,7 +52,7 @@ except ImportError as e:
     print(f"Warning: Could not import APGIGUI: {e}")
 
 HAS_ASSISTANT = False
-APGIAssistant: Any = None  # type: ignore[misc]
+APGIAssistant: Any = None
 
 try:
     ai_assistant_path = Path(__file__).parent.parent.parent / "AI_Assistant.py"
@@ -62,7 +62,7 @@ try:
         HAS_ASSISTANT = True
     else:
         # Fallback to standard import if file renamed
-        from AI_Assistant import APGIAssistant as _APGIAssistant  # type: ignore[import-not-found]
+        from AI_Assistant import APGIAssistant as _APGIAssistant
 
         APGIAssistant = _APGIAssistant
         HAS_ASSISTANT = True

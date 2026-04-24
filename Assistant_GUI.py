@@ -79,15 +79,15 @@ except ImportError:
 
 # Check for PDF export dependencies
 try:
-    from reportlab.lib import colors  # type: ignore[import-untyped]
-    from reportlab.lib.enums import TA_CENTER  # type: ignore[import-untyped]
-    from reportlab.lib.pagesizes import A4  # type: ignore[import-untyped]
-    from reportlab.lib.styles import (  # type: ignore[import-untyped]
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import (
         ParagraphStyle,
         getSampleStyleSheet,
     )
-    from reportlab.lib.units import inch  # type: ignore[import-untyped]
-    from reportlab.platypus import PageBreak  # type: ignore[import-untyped]
+    from reportlab.lib.units import inch
+    from reportlab.platypus import PageBreak
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     HAS_REPORTLAB = True
@@ -97,7 +97,7 @@ except ImportError:
 
 # Check for additional simulation dependencies
 try:
-    import torchdiffeq  # type: ignore[import-untyped] # noqa: F401
+    import torchdiffeq  # noqa: F401
 
     HAS_TORCHDIFFEQ = True
 except ImportError:
@@ -1170,7 +1170,7 @@ def load_apgi_module() -> Any:
 
     # Try direct import first
     try:
-        import apgi_assistant  # type: ignore[import-not-found]
+        import apgi_assistant
 
         LOGGER.info("Successfully loaded via direct import")
         return apgi_assistant
@@ -1885,15 +1885,16 @@ class CancellableProgress:
             pass  # Log error but don't crash - frame might already be destroyed
         finally:
             # Clear references to help garbage collection
-            self.frame = None  # type: ignore[assignment]
-            self.progress_bar = None  # type: ignore[assignment]
-            self.message_label = None  # type: ignore[assignment]
-            self.cancel_button = None  # type: ignore[assignment]
+            self.frame = None
+            self.progress_bar = None
+            self.message_label = None
+            self.cancel_button = None
 
         # Force UI update to ensure dialog disappears
         try:
-            if self.frame is not None and hasattr(self.frame, "master") and self.frame.master:  # type: ignore[attr-defined]
-                self.frame.master.update_idletasks()  # type: ignore[attr-defined]
+            if self.frame is not None and hasattr(self.frame, "master") and self.frame.master:
+                if self.frame.master:
+                    self.frame.master.update_idletasks()
         except Exception:
             pass
 
@@ -2064,13 +2065,13 @@ class InputValidator:
 
         # Validate heart rate
         if not isinstance(hr, (int, float)):
-            errors.append("Heart rate must be a number")  # type: ignore[unreachable]
+            errors.append("Heart rate must be a number")
         elif not (40 <= hr <= 200):  # Use hardcoded range as fallback
             errors.append("Heart rate must be between 40-200 bpm")
 
         # Validate HRV
         if not isinstance(hrv, (int, float)):
-            errors.append("HRV must be a number")  # type: ignore[unreachable]
+            errors.append("HRV must be a number")
         elif not GUIConfig.HRV_RANGE[0] <= hrv <= GUIConfig.HRV_RANGE[1]:
             errors.append(
                 f"HRV must be between {GUIConfig.HRV_RANGE[0]}-{GUIConfig.HRV_RANGE[1]} ms"
@@ -2078,7 +2079,7 @@ class InputValidator:
 
         # Validate respiration
         if not isinstance(resp, (int, float)):
-            errors.append("Respiration must be a number")  # type: ignore[unreachable]
+            errors.append("Respiration must be a number")
         elif not GUIConfig.RESP_RANGE[0] <= resp <= GUIConfig.RESP_RANGE[1]:
             errors.append(
                 f"Respiration must be between {GUIConfig.RESP_RANGE[0]}-{GUIConfig.RESP_RANGE[1]} bpm"
@@ -2086,7 +2087,7 @@ class InputValidator:
 
         # Validate EDA
         if not isinstance(eda, (int, float)):
-            errors.append("Skin conductance must be a number")  # type: ignore[unreachable]
+            errors.append("Skin conductance must be a number")
         elif not GUIConfig.EDA_RANGE[0] <= eda <= GUIConfig.EDA_RANGE[1]:
             errors.append(
                 f"Skin conductance must be between {GUIConfig.EDA_RANGE[0]}-{GUIConfig.EDA_RANGE[1]} µS"
@@ -2103,10 +2104,10 @@ class InputValidator:
             (is_valid, error_message)
         """
         if query is None:
-            return False, "Query cannot be None"  # type: ignore[unreachable]
+            return False, "Query cannot be None"
 
         if not isinstance(query, str):
-            return False, "Query must be a string"  # type: ignore[unreachable]
+            return False, "Query must be a string"
 
         if not query or not query.strip():
             return False, "Query cannot be empty"
@@ -2680,8 +2681,8 @@ class APGIGUI:
 
     def on_tab_changed(self, event: Any) -> None:
         """Handle tab change - lazy load content"""
-        current_tab = self.notebook.select()  # type: ignore[no-untyped-call]
-        tab_name = self.notebook.tab(current_tab, "text")  # type: ignore[no-untyped-call]
+        current_tab = self.notebook.select()
+        tab_name = self.notebook.tab(current_tab, "text")
 
         if tab_name not in self.tabs_created:
             self.logger.info(f"Creating tab: {tab_name}")
@@ -2959,10 +2960,10 @@ class APGIGUI:
         self.spectrum_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
         self.spectrum_ax = self.spectrum_fig.add_subplot(111) if self.spectrum_fig else None
         self.spectrum_canvas = (
-            FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
+            FigureCanvasTkAgg(self.spectrum_fig, spectrum_frame) if HAS_MATPLOTLIB else None
         )
         self.spectrum_canvas_widget = (
-            self.spectrum_canvas.get_tk_widget() if self.spectrum_canvas else None  # type: ignore[no-untyped-call]
+            self.spectrum_canvas.get_tk_widget() if self.spectrum_canvas else None
         )
         if self.spectrum_canvas_widget:
             self.spectrum_canvas_widget.pack(fill="both", expand=True)
@@ -2978,8 +2979,8 @@ class APGIGUI:
 
         self.freq_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
         self.freq_ax = self.freq_fig.add_subplot(111) if self.freq_fig else None
-        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
-        self.freq_canvas_widget = self.freq_canvas.get_tk_widget() if self.freq_canvas else None  # type: ignore[no-untyped-call]
+        self.freq_canvas = FigureCanvasTkAgg(self.freq_fig, freq_frame) if HAS_MATPLOTLIB else None
+        self.freq_canvas_widget = self.freq_canvas.get_tk_widget() if self.freq_canvas else None
         if self.freq_canvas_widget:
             self.freq_canvas_widget.pack(fill="both", expand=True)
 
@@ -3070,10 +3071,10 @@ class APGIGUI:
             self.energy_fig = Figure(figsize=(8, 4), dpi=100) if HAS_MATPLOTLIB else None
             self.energy_ax = self.energy_fig.add_subplot(111) if self.energy_fig else None
             self.energy_canvas = (
-                FigureCanvasTkAgg(self.energy_fig, usage_frame) if HAS_MATPLOTLIB else None  # type: ignore[no-untyped-call]
+                FigureCanvasTkAgg(self.energy_fig, usage_frame) if HAS_MATPLOTLIB else None
             )
             self.energy_canvas_widget = (
-                self.energy_canvas.get_tk_widget() if self.energy_canvas else None  # type: ignore[no-untyped-call]
+                self.energy_canvas.get_tk_widget() if self.energy_canvas else None
             )
             if self.energy_canvas_widget:
                 self.energy_canvas_widget.pack(fill="both", expand=True)
@@ -3463,7 +3464,7 @@ class APGIGUI:
         def filter_shortcuts(*args: Any) -> None:
             search_term = search_var.get().lower()
 
-            for tab_id in notebook.tabs():  # type: ignore[no-untyped-call]
+            for tab_id in notebook.tabs():
                 tab = notebook.nametowidget(tab_id)
                 tab_visible = False
 
@@ -3490,14 +3491,14 @@ class APGIGUI:
 
                 # Show/hide tab based on visibility of its contents
                 if tab_visible:
-                    notebook.tab(tab_id, state="normal")  # type: ignore[no-untyped-call]
+                    notebook.tab(tab_id, state="normal")
                 else:
-                    notebook.tab(tab_id, state="hidden")  # type: ignore[no-untyped-call]
+                    notebook.tab(tab_id, state="hidden")
 
             # Show first visible tab
-            for tab_id in notebook.tabs():  # type: ignore[no-untyped-call]
-                if notebook.tab(tab_id, "state") == "normal":  # type: ignore[no-untyped-call]
-                    notebook.select(tab_id)  # type: ignore[no-untyped-call]
+            for tab_id in notebook.tabs():
+                if notebook.tab(tab_id, "state") == "normal":
+                    notebook.select(tab_id)
                     break
 
         # Bind search functionality
@@ -3691,13 +3692,13 @@ class APGIGUI:
             ):
                 return
 
-            current: str = self.notebook.select()  # type: ignore[no-untyped-call]
-            tabs: tuple[str, ...] = self.notebook.tabs()  # type: ignore[no-untyped-call]
+            current: str = self.notebook.select()
+            tabs: tuple[str, ...] = self.notebook.tabs()
             if not tabs:  # No tabs to navigate
                 return
             current_index = tabs.index(current)
             next_index = (current_index + 1) % len(tabs)
-            self.notebook.select(tabs[next_index])  # type: ignore[no-untyped-call]
+            self.notebook.select(tabs[next_index])
         except Exception as e:
             self.logger.warning(f"Tab navigation error: {e}")
 
@@ -3726,13 +3727,13 @@ class APGIGUI:
             ):
                 return
 
-            current = self.notebook.select()  # type: ignore[no-untyped-call]
-            tabs: tuple[str, ...] = self.notebook.tabs()  # type: ignore[no-untyped-call]
+            current = self.notebook.select()
+            tabs: tuple[str, ...] = self.notebook.tabs()
             if not tabs:  # No tabs to navigate
                 return
             current_index = tabs.index(current)
             prev_index = (current_index - 1) % len(tabs)
-            self.notebook.select(tabs[prev_index])  # type: ignore[no-untyped-call]
+            self.notebook.select(tabs[prev_index])
         except Exception as e:
             self.logger.warning(f"Tab navigation error: {e}")
 
@@ -4701,7 +4702,7 @@ class APGIGUI:
                 self.spectrum_fig.tight_layout()
             # Disable scroll events on matplotlib canvas to prevent conflicts
             self.spectrum_canvas.mpl_connect("scroll_event", lambda e: None)
-            self.spectrum_canvas.draw()  # type: ignore[no-untyped-call]
+            self.spectrum_canvas.draw()
 
         # Update metrics text
         self.osc_metrics_text.delete(1.0, tk.END)
@@ -4842,7 +4843,7 @@ class APGIGUI:
             self.energy_fig.tight_layout()
             # Disable scroll events on matplotlib canvas to prevent conflicts
             self.energy_canvas.mpl_connect("scroll_event", lambda e: None)
-            self.energy_canvas.draw()  # type: ignore[no-untyped-call]
+            self.energy_canvas.draw()
 
         # Update statistics
         if hasattr(self, "energy_stats_text") and self.energy_stats_text.winfo_exists():
@@ -4937,7 +4938,7 @@ class APGIGUI:
                 # Check if matplotlib widgets still exist
                 if (
                     not hasattr(self, "energy_canvas")
-                    or not self.energy_canvas.get_tk_widget().winfo_exists()  # type: ignore[no-untyped-call]
+                    or not self.energy_canvas.get_tk_widget().winfo_exists()
                 ):
                     return
 
@@ -4985,7 +4986,7 @@ class APGIGUI:
                 self.energy_fig.tight_layout()
                 # Disable scroll events on matplotlib canvas to prevent conflicts
                 self.energy_canvas.mpl_connect("scroll_event", lambda e: None)
-                self.energy_canvas.draw()  # type: ignore[no-untyped-call]
+                self.energy_canvas.draw()
 
             # Update statistics
             if hasattr(self, "energy_stats_text") and self.energy_stats_text.winfo_exists():
@@ -5267,7 +5268,7 @@ Battery Status: {"Good" if battery_level > 0.5 else "Medium" if battery_level > 
         try:
             if (
                 not hasattr(self, "energy_canvas")
-                or not self.energy_canvas.get_tk_widget().winfo_exists()  # type: ignore[no-untyped-call]
+                or not self.energy_canvas.get_tk_widget().winfo_exists()
             ):
                 return
 
@@ -7126,7 +7127,7 @@ Energy Usage:
                                 # Save figure to temporary file and add to PDF
                                 import io
 
-                                from reportlab.lib.utils import (  # type: ignore[import-untyped]
+                                from reportlab.lib.utils import (
                                     ImageReader,
                                 )
                                 from reportlab.platypus import Image as RLImage
@@ -7335,7 +7336,7 @@ Energy Usage:
                     )
                 else:
                     fig = (
-                        APGIVisualizer.plot_state_timeline(self.assistant.state_history)  # type: ignore[union-attr]
+                        APGIVisualizer.plot_state_timeline(self.assistant.state_history)
                         if self.assistant
                         else None
                     )
@@ -7401,7 +7402,7 @@ Energy Usage:
                     )
                 else:
                     fig = (
-                        APGIVisualizer.plot_energy_usage(self.assistant.energy_history)  # type: ignore[union-attr]
+                        APGIVisualizer.plot_energy_usage(self.assistant.energy_history)
                         if self.assistant
                         else None
                     )
@@ -7450,7 +7451,7 @@ Energy Usage:
                 setattr(self.viz_canvas, "image", photo)  # Keep reference
 
                 # Switch to visualization tab
-                self.notebook.select(self.viz_frame)  # type: ignore[no-untyped-call]
+                self.notebook.select(self.viz_frame)
 
         except Exception as e:
             self.logger.error(f"Plot display error: {e}", exc_info=True)
@@ -7478,7 +7479,7 @@ Energy Usage:
 
         self._save_plot_with_dialog(
             plot_type="State Timeline",
-            plot_generator=lambda: APGIVisualizer.plot_state_timeline(self.assistant.state_history),  # type: ignore[union-attr]
+            plot_generator=lambda: APGIVisualizer.plot_state_timeline(self.assistant.state_history),
             default_filename="state_timeline",
         )
 
@@ -7497,7 +7498,7 @@ Energy Usage:
 
         self._save_plot_with_dialog(
             plot_type="Energy Plot",
-            plot_generator=lambda: APGIVisualizer.plot_energy_usage(self.assistant.energy_history),  # type: ignore[union-attr]
+            plot_generator=lambda: APGIVisualizer.plot_energy_usage(self.assistant.energy_history),
             default_filename="energy_plot",
         )
 
@@ -7663,7 +7664,7 @@ Energy Usage:
                     )
                 else:
                     fig = (
-                        APGIVisualizer.plot_state_timeline(self.assistant.state_history)  # type: ignore[union-attr]
+                        APGIVisualizer.plot_state_timeline(self.assistant.state_history)
                         if self.assistant
                         else None
                     )
@@ -7711,7 +7712,7 @@ Energy Usage:
                     )
                 else:
                     fig = (
-                        APGIVisualizer.plot_energy_usage(self.assistant.energy_history)  # type: ignore[union-attr]
+                        APGIVisualizer.plot_energy_usage(self.assistant.energy_history)
                         if self.assistant
                         else None
                     )
@@ -7896,7 +7897,7 @@ Energy Usage:
 
     def show_settings(self) -> None:
         """Show settings tab"""
-        self.notebook.select(self.settings_frame)  # type: ignore[no-untyped-call]
+        self.notebook.select(self.settings_frame)
 
     def show_export_settings(self) -> None:
         """Show export settings dialog"""
@@ -8516,9 +8517,9 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                     # Clear widget references to help garbage collection
                     if hasattr(self, "query_input"):
-                        self.query_input = None  # type: ignore[assignment]
+                        self.query_input = None
                     if hasattr(self, "response_display"):
-                        self.response_display = None  # type: ignore[assignment]
+                        self.response_display = None
 
                     # Perform garbage collection
                     gc.collect()
@@ -8637,7 +8638,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                 # Redraw the canvas
                 if hasattr(self, "spectrum_canvas") and self.spectrum_canvas:
-                    self.spectrum_canvas.draw()  # type: ignore[no-untyped-call]
+                    self.spectrum_canvas.draw()
 
             # Update energy figure
             if hasattr(self, "energy_fig") and self.energy_fig:
@@ -8655,7 +8656,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
 
                 # Redraw the canvas
                 if hasattr(self, "energy_canvas") and self.energy_canvas:
-                    self.energy_canvas.draw()  # type: ignore[no-untyped-call]
+                    self.energy_canvas.draw()
 
             # Update any other matplotlib figures
             figure_attrs = ["timeline_fig", "performance_fig", "cognitive_fig"]
@@ -8772,7 +8773,7 @@ Use Ctrl+Plus/Minus to adjust, Ctrl+0 to reset
                 result = self.assistant.process_query(user_input)
 
                 # Display response on main thread
-                self.root.after(0, lambda: self._display_response(user_input, result))
+                self.root.after(0, lambda: self._display_response(user_input, result))  # type: ignore[misc]
 
             except Exception as e:
                 self.root.after(0, lambda exc=e: self._display_error(str(exc)))  # type: ignore[misc]

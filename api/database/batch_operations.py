@@ -80,10 +80,10 @@ async def bulk_insert(
 
             if on_conflict == "do_nothing" or on_conflict == "ignore":
                 # Use PostgreSQL ON CONFLICT DO NOTHING
-                stmt = pg_insert(model).values(batch).on_conflict_do_nothing()
+                insert_stmt = pg_insert(model).values(batch).on_conflict_do_nothing()
             elif on_conflict == "do_update":
                 # Use PostgreSQL ON CONFLICT DO UPDATE
-                stmt = (
+                insert_stmt = (
                     pg_insert(model)
                     .values(batch)
                     .on_conflict_do_update(
@@ -93,9 +93,9 @@ async def bulk_insert(
                 )
             else:
                 # Standard bulk insert
-                stmt: Any = insert(model).values(batch)
+                insert_stmt = insert(model).values(batch)  # type: ignore[assignment]
 
-            result = await session.execute(stmt)
+            result = await session.execute(insert_stmt)
             total_inserted += result.rowcount  # type: ignore[attr-defined]
 
             logger.debug(f"Inserted batch {i // batch_size + 1}: {len(batch)} records")

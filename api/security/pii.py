@@ -279,7 +279,7 @@ class PIIMasker:
         Returns:
             Masked dictionary
         """
-        masked = {}
+        masked: Dict[str, Any] = {}
         sensitive_keys = sensitive_keys or set()
 
         for key, value in data.items():
@@ -292,9 +292,9 @@ class PIIMasker:
                 else:
                     masked[key] = value
             elif isinstance(value, dict):
-                masked[key] = self.mask_dict(value, sensitive_keys)
+                masked[key] = self.mask_dict(value, sensitive_keys)  # type: ignore[assignment]
             elif isinstance(value, list):
-                masked[key] = self.mask_list(value, sensitive_keys)
+                masked[key] = self.mask_list(value, sensitive_keys)  # type: ignore[assignment]
             else:
                 masked[key] = value
 

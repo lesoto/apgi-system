@@ -19,7 +19,12 @@ from api.middleware.logging import (
 )
 from api.middleware.metrics import MetricsCollector, PrometheusMetricsMiddleware, metrics_collector
 from api.middleware.rate_limiting import RateLimitingMiddleware
+from api.middleware.request_deduplication import (
+    RequestDeduplicationMiddleware,
+    deduplication_manager,
+)
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
+from api.middleware.serialization import OptimizedSerializationMiddleware, serialization_manager
 
 __all__ = [
     "RequestLoggingMiddleware",
@@ -39,4 +44,8 @@ __all__ = [
     "get_current_user_from_request",
     "is_authenticated",
     "RateLimitingMiddleware",
+    "RequestDeduplicationMiddleware",
+    "deduplication_manager",
+    "OptimizedSerializationMiddleware",
+    "serialization_manager",
 ]

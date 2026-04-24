@@ -161,7 +161,7 @@ def mock_session_manager(mock_apgi_framework: Mock) -> Mock:
             return {"session_id": session_id, "status": "created"}
 
         async def mock_get_state() -> dict[str, Any]:
-            return mock_apgi_framework.get_state()  # type: ignore[no-any-return]
+            return mock_apgi_framework.get_state()
 
         mock_sim.start = AsyncMock(side_effect=mock_start)
         mock_sim.pause = AsyncMock(side_effect=mock_pause)
@@ -265,7 +265,7 @@ def mock_task_executor() -> Mock:
 
     async def mock_get_task_result(task_id: str) -> dict[str, Any]:
         if task_id in tasks_store:
-            return tasks_store[task_id]["result"]  # type: ignore[no-any-return]
+            return tasks_store[task_id]["result"]
 
         raise ValueError(f"Task {task_id} not found")
 

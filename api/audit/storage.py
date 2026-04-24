@@ -315,7 +315,7 @@ class DatabaseAuditStorage(AuditStorage):
         from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
         self._engine = create_async_engine(self.database_url)
-        self._sessionmaker = async_sessionmaker(
+        self._sessionmaker = async_sessionmaker(  # type: ignore[call-overload]
             self._engine,
             class_=AsyncSession,
             expire_on_commit=False,
@@ -465,10 +465,10 @@ class DatabaseAuditStorage(AuditStorage):
             params["outcome"] = query.outcome
         if query.start_time:
             filters.append("timestamp >= :start_time")
-            params["start_time"] = query.start_time.isoformat()
+            params["start_time"] = query.start_time.isoformat()  # type: ignore[assignment]
         if query.end_time:
             filters.append("timestamp <= :end_time")
-            params["end_time"] = query.end_time.isoformat()
+            params["end_time"] = query.end_time.isoformat()  # type: ignore[assignment]
 
         where_clause = " AND ".join(filters) if filters else "1=1"
 

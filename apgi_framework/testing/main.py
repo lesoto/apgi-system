@@ -203,7 +203,7 @@ class ApplicationLifecycleManager:
         # Log shutdown completion
         activity_logger = get_activity_logger()
         activity_logger.log_activity(
-            ActivityType.SYSTEM_SHUTDOWN,  # type: ignore[attr-defined]
+            ActivityType.SYSTEM_SHUTDOWN,
             ActivityLevel.INFO,
             "Application shutdown completed",
             data={"timestamp": datetime.now().isoformat()},
@@ -362,7 +362,7 @@ def run_gui_mode(lifecycle_manager: ApplicationLifecycleManager) -> int:
 
         # Create and run GUI
         root = tk.Tk()
-        TestRunnerGUI(root=root)  # type: ignore[no-untyped-call]
+        TestRunnerGUI(root=root)
 
         # Run the GUI
         root.mainloop()
@@ -387,7 +387,7 @@ def run_cli_mode(lifecycle_manager: ApplicationLifecycleManager, args: argparse.
 
         # Create CLI runner
         cli_runner = CLITestRunner(
-            container=lifecycle_manager.container, config=lifecycle_manager.config  # type: ignore[no-untyped-call]
+            container=lifecycle_manager.container, config=lifecycle_manager.config
         )
 
         # Register CLI cleanup

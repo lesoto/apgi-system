@@ -273,11 +273,11 @@ class SecureHTTPClient:
     Wraps HTTP requests with SSRF validation and safe defaults.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ssrf_protector = SSRFProtector()
         self._allowed_schemes = {"http", "https"}
 
-    async def request(self, method: str, url: str, **kwargs) -> Any:
+    async def request(self, method: str, url: str, **kwargs: Any) -> Any:
         """
         Make an HTTP request with SSRF protection.
 
@@ -312,7 +312,7 @@ class SecureHTTPClient:
         """Make a GET request."""
         return await self.request("GET", url, **kwargs)
 
-    async def post(self, url: str, **kwargs) -> Any:
+    async def post(self, url: str, **kwargs: Any) -> Any:
         """Make a POST request."""
         return await self.request("POST", url, **kwargs)
 

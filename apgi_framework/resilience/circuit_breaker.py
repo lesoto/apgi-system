@@ -53,10 +53,10 @@ class CircuitBreaker:
     """
 
     _instances: Dict[str, "CircuitBreaker"] = {}
-    _lock = threading.Lock()
+    _instance_lock: threading.RLock = threading.RLock()
 
     def __new__(cls, name: str, config: Optional[CircuitBreakerConfig] = None):
-        with cls._lock:
+        with cls._instance_lock:
             if name not in cls._instances:
                 instance = super().__new__(cls)
                 cls._instances[name] = instance
@@ -77,7 +77,7 @@ class CircuitBreaker:
         self._success_count = 0
         self._half_open_calls = 0
         self._last_failure_time: Optional[float] = None
-        self._lock: threading.RLock = threading.RLock()
+        self._instance_lock: threading.RLock = threading.RLock()
         self._initialized = True
 
         logger.info(f"Circuit breaker '{name}' initialized")
@@ -85,12 +85,12 @@ class CircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Current circuit state."""
-        with self._lock:
+        with self._instance_lock:
             return self._state
 
     def call(self, func: Callable[..., T], *args, **kwargs) -> T:
         """Execute function with circuit breaker protection."""
-        with self._lock:
+        with self._instance_lock:
             if self._state == CircuitState.OPEN:
                 if self._should_attempt_reset():
                     self._state = CircuitState.HALF_OPEN
@@ -135,7 +135,7 @@ class CircuitBreaker:
 
     def _record_success(self) -> None:
         """Record a successful call."""
-        with self._lock:
+        with self._instance_lock:
             if self._state == CircuitState.HALF_OPEN:
                 self._success_count += 1
                 if self._success_count >= self.config.success_threshold:
@@ -148,7 +148,7 @@ class CircuitBreaker:
 
     def _record_failure(self) -> None:
         """Record a failed call."""
-        with self._lock:
+        with self._instance_lock:
             self._failure_count += 1
             self._last_failure_time = time.time()
 
@@ -165,7 +165,7 @@ class CircuitBreaker:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get circuit breaker statistics."""
-        with self._lock:
+        with self._instance_lock:
             return {
                 "name": self.name,
                 "state": self._state.name,
@@ -182,15 +182,15 @@ class CircuitBreaker:
     @classmethod
     def get_all_stats(cls) -> Dict[str, Dict[str, Any]]:
         """Get stats for all circuit breakers."""
-        with cls._lock:
+        with cls._instance_lock:
             return {name: cb.get_stats() for name, cb in cls._instances.items()}
 
     @classmethod
     def reset_all(cls) -> None:
         """Reset all circuit breakers (useful for testing)."""
-        with cls._lock:
+        with cls._instance_lock:
             for cb in cls._instances.values():
-                with cb._lock:
+                with cb._instance_lock:
                     cb._state = CircuitState.CLOSED
                     cb._failure_count = 0
                     cb._success_count = 0

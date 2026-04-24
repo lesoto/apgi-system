@@ -64,7 +64,7 @@ class DataOrchestrator:
 
     def _initialize_data_systems(self) -> None:
         """Initialize data management and storage systems."""
-        from apgi_framework.data.data_manager import IntegratedDataManager
+        from apgi_framework.data.data_manager import IntegratedDataManager  # type: ignore[attr-defined]
         from apgi_framework.data.storage_manager import StorageManager
 
         self._data_manager = IntegratedDataManager()
