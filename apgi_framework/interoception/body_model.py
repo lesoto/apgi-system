@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Union
 
 import numpy as np
+
 from apgi_framework.types import FloatArray
 
 

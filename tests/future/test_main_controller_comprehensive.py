@@ -13,12 +13,13 @@ Provides thorough testing of MainApplicationController class including:
 - Resource cleanup and teardown
 """
 
-import pytest
-from unittest.mock import patch
-from pathlib import Path
-import tempfile
 import os
 import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

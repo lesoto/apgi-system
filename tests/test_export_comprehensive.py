@@ -5,12 +5,13 @@ Tests BIDS export functionality, file validation, sanitization,
 and export of various data types (EEG, behavioral, physiological).
 """
 
-import pytest
+import json
 from pathlib import Path
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import patch
-import json
+import pytest
 
 from apgi_framework.export.bids_export import BIDSExporter, export_apgi_to_bids
 

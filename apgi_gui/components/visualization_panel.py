@@ -5,6 +5,7 @@ Visualization panel component for the APGI GUI.
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict, List
+
 from .plot_widgets import MultiPlotWidget
 
 

@@ -3,10 +3,11 @@ Tests for Concurrent Access (T-503)
 Tests for thread safety and concurrent data access patterns.
 """
 
-import pytest
-import threading
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pytest
 
 from apgi_framework.data.persistence_layer import PersistenceLayer
 
@@ -104,8 +105,9 @@ class TestThreadSafety:
 
     def test_analysis_engine_thread_safety(self):
         """Test that AnalysisEngine handles concurrent analysis requests."""
-        from apgi_framework.analysis.analysis_engine import AnalysisEngine
         import pandas as pd
+
+        from apgi_framework.analysis.analysis_engine import AnalysisEngine
 
         with tempfile.TemporaryDirectory() as temp_dir:
             engine = AnalysisEngine(output_dir=temp_dir)

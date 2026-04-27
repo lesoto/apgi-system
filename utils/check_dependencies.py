@@ -11,8 +11,8 @@ Usage:
     python check_dependencies.py [--install]
 """
 
-import sys
 import subprocess
+import sys
 from typing import Dict, List, Tuple
 
 

@@ -10,12 +10,12 @@ Provides comprehensive consent validation including:
 - Audit trail for consent changes
 """
 
-import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Set, Any
-from dataclasses import dataclass, field
-from enum import Enum
 import hashlib
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class ConsentValidator:
     Enhanced consent validation with comprehensive checks.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._consent_records: Dict[str, ConsentRecord] = {}
         self._subject_consents: Dict[str, Set[str]] = {}  # subject_id -> set of consent_ids
 

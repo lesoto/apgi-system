@@ -78,18 +78,14 @@ try:
 
     # Data management - check what's available
     try:
-        from apgi_framework.data.data_manager import (
-            IntegratedDataManager as _IntegratedDataManager,
-        )
+        from apgi_framework.data.data_manager import IntegratedDataManager as _IntegratedDataManager
 
         IntegratedDataManager = _IntegratedDataManager
     except ImportError:
         pass
 
     try:
-        from apgi_framework.data.report_generator import (
-            ReportGenerator as _ReportGenerator,
-        )
+        from apgi_framework.data.report_generator import ReportGenerator as _ReportGenerator
 
         ReportGenerator = _ReportGenerator
     except ImportError:
@@ -104,10 +100,12 @@ try:
 
     # Falsification tests - use available classes
     try:
+        from apgi_framework.falsification import ConsciousnessAssessment as _ConsciousnessAssessment
+        from apgi_framework.falsification import (
+            ConsciousnessAssessmentSimulator as _ConsciousnessAssessmentSimulator,
+        )
         from apgi_framework.falsification import (
             PrimaryFalsificationTest as _PrimaryFalsificationTest,
-            ConsciousnessAssessment as _ConsciousnessAssessment,
-            ConsciousnessAssessmentSimulator as _ConsciousnessAssessmentSimulator,
         )
 
         PrimaryFalsificationTest = _PrimaryFalsificationTest
@@ -157,36 +155,28 @@ try:
 
     # Neural simulators
     try:
-        from apgi_framework.simulators.p3b_simulator import (
-            P3bSimulator as _P3bSimulator,
-        )
+        from apgi_framework.simulators.p3b_simulator import P3bSimulator as _P3bSimulator
 
         P3bSimulator = _P3bSimulator
     except ImportError:
         pass
 
     try:
-        from apgi_framework.simulators.gamma_simulator import (
-            GammaSimulator as _GammaSimulator,
-        )
+        from apgi_framework.simulators.gamma_simulator import GammaSimulator as _GammaSimulator
 
         GammaSimulator = _GammaSimulator
     except ImportError:
         pass
 
     try:
-        from apgi_framework.simulators.bold_simulator import (
-            BOLDSimulator as _BOLDSimulator,
-        )
+        from apgi_framework.simulators.bold_simulator import BOLDSimulator as _BOLDSimulator
 
         BOLDSimulator = _BOLDSimulator
     except ImportError:
         pass
 
     try:
-        from apgi_framework.simulators.pci_calculator import (
-            PCICalculator as _PCICalculator,
-        )
+        from apgi_framework.simulators.pci_calculator import PCICalculator as _PCICalculator
 
         PCICalculator = _PCICalculator
     except ImportError:
@@ -219,12 +209,12 @@ except ImportError as e:
         project_root = Path(__file__).parent.parent
         sys.path.insert(0, str(project_root))
 
+        from apgi_framework.config import APGIParameters
         from apgi_framework.core import (
             APGIEquation,
             PrecisionCalculator,
             PredictionErrorProcessor,
         )
-        from apgi_framework.config import APGIParameters
 
         ConfigManager = APGIParameters  # Alias for compatibility
         APGIFrameworkCLI = None
@@ -4644,7 +4634,9 @@ class APGIFrameworkGUI(ctk.CTk):
 
         try:
             # Import actual analysis module
-            from core.analysis.surprise_dynamics import SurpriseDynamicsAnalyzer  # type: ignore[attr-defined]
+            from core.analysis.surprise_dynamics import (
+                SurpriseDynamicsAnalyzer,
+            )
 
             # Check if we have current results to analyze
             if not self.current_results:

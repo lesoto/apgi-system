@@ -5,11 +5,10 @@ Implements GAD, panic disorder, and social anxiety differentiation using
 neural signatures and machine learning classification with cross-validation.
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
-
-import logging
 
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier

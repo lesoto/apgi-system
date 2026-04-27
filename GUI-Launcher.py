@@ -494,14 +494,14 @@ class ComprehensiveGUILauncher:
             "Testing & Benchmarks": [
                 {
                     "name": "Comprehensive Test Runner",
-                    "file": "utils/run_tests.py",
+                    "file": "benchmarks/run_tests.py",
                     "description": "Run comprehensive test suite",
                     "icon": "[Test]",
                     "command": self.launch_test_runner,
                 },
                 {
                     "name": "Coverage Runner",
-                    "file": "utils/run_coverage.py",
+                    "file": "benchmarks/run_coverage.py",
                     "description": "Run test coverage analysis",
                     "icon": "[Coverage]",
                     "command": self.launch_coverage_runner,
@@ -545,8 +545,8 @@ class ComprehensiveGUILauncher:
                 },
                 {
                     "name": "Performance Dashboard",
-                    "file": "utils/performance_dashboard.py",
-                    "description": "Performance monitoring dashboard",
+                    "file": "utils/static_dashboard_generator.py",
+                    "description": "Generate static performance monitoring dashboards",
                     "icon": "[Chart]",
                     "command": self.launch_performance_dashboard,
                 },
@@ -708,14 +708,14 @@ class ComprehensiveGUILauncher:
                 },
                 {
                     "name": "Data Loader Example",
-                    "file": "examples/data_loader.py",
+                    "file": "examples/08_data_loader.py",
                     "description": "Data loading utility example",
                     "icon": "[Data]",
                     "command": self.launch_data_loader_example,
                 },
                 {
                     "name": "Coverage Collector Demo",
-                    "file": "examples/coverage_collector_demo.py",
+                    "file": "examples/05_coverage_collector.py",
                     "description": "Coverage collection demonstration",
                     "icon": "[Coverage]",
                     "command": self.launch_coverage_collector_demo,
@@ -1019,7 +1019,7 @@ class ComprehensiveGUILauncher:
     # CLI Tools launch methods
     def launch_test_runner(self):
         """Launch Comprehensive Test Runner."""
-        self.launch_python_script("run_tests.py", "Comprehensive Test Runner")
+        self.launch_python_script("benchmarks/run_tests.py", "Comprehensive Test Runner")
 
     def launch_framework_cli(self):
         """Launch Framework CLI."""
@@ -1050,11 +1050,11 @@ class ComprehensiveGUILauncher:
     # Examples & Demos launch methods
     def launch_data_loader_example(self):
         """Launch Data Loader Example."""
-        self.launch_python_script("examples/data_loader.py", "Data Loader Example")
+        self.launch_python_script("examples/08_data_loader.py", "Data Loader Example")
 
     def launch_coverage_collector_demo(self):
         """Launch Coverage Collector Demo."""
-        self.launch_python_script("examples/coverage_collector_demo.py", "Coverage Collector Demo")
+        self.launch_python_script("examples/05_coverage_collector.py", "Coverage Collector Demo")
 
     def launch_primary_falsification_test(self):
         """Launch Primary Falsification Test."""
@@ -1187,7 +1187,7 @@ class ComprehensiveGUILauncher:
     # Testing & Benchmarks launch methods
     def launch_coverage_runner(self):
         """Launch Coverage Runner."""
-        self.launch_python_script("utils/run_coverage.py", "Coverage Runner")
+        self.launch_python_script("benchmarks/run_coverage.py", "Coverage Runner")
 
     def launch_performance_benchmarks(self):
         """Launch Performance Benchmarks."""
@@ -1210,7 +1210,9 @@ class ComprehensiveGUILauncher:
 
     def launch_performance_dashboard(self):
         """Launch Performance Dashboard."""
-        self.launch_python_script("utils/performance_dashboard.py", "Performance Dashboard")
+        self.launch_python_script(
+            "utils/static_dashboard_generator.py", "Performance Dashboard Generator"
+        )
 
     def launch_pipeline_visualization(self):
         """Launch Pipeline Visualization."""
@@ -1319,11 +1321,19 @@ class ComprehensiveGUILauncher:
 
                     time.sleep(0.1)
                     if process.poll() is None:
+                        # Process is still running - successful launch for long-running apps
                         print(f"Successfully launched {app_name}")
                     else:
-                        stdout, stderr = process.communicate()
-                        error_msg = stderr if stderr else stdout
-                        print(f"Failed to launch {app_name}: {error_msg}")
+                        # Process exited quickly - check exit code to determine success
+                        return_code = process.poll()
+                        if return_code == 0:
+                            # Process completed successfully (e.g., example scripts)
+                            print(f"Successfully launched {app_name}")
+                        else:
+                            # Process failed with non-zero exit code
+                            stdout, stderr = process.communicate()
+                            error_msg = stderr if stderr else stdout
+                            print(f"Failed to launch {app_name}: {error_msg}")
                 except Exception as e:
                     messagebox.showerror("Launch Error", f"Failed to launch {app_name}: {str(e)}")
 

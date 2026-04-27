@@ -6,9 +6,9 @@ Provides entry point-based plugin discovery and registration.
 
 import importlib.metadata
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TypeVar
-from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class PluginRegistry:
 
     ENTRY_POINT_GROUP = "apgi.engines"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._plugins: Dict[str, PluginSpec] = {}
         self._engines: Dict[str, EngineInterface] = {}
         self._initialized: bool = False

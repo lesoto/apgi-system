@@ -28,7 +28,7 @@ except ImportError as e:
     EffectSizeCalculator = None  # type: ignore
 
 try:
-    from apgi_framework.data import IntegratedDataManager, DataValidator
+    from apgi_framework.data import DataValidator, IntegratedDataManager
 
     DATA_AVAILABLE = True
 except ImportError as e:

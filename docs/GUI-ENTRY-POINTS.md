@@ -76,6 +76,7 @@ python APGI_Application_GUI.py
 - Visual status indicators and file paths
 
 **Categories:**
+
 - Core Applications (7 apps)
 - Analysis & Visualization (9 apps)
 - Configuration & Management (7 apps)
@@ -279,7 +280,7 @@ python apps/gui_template.py
 ## User Guide
 
 | User Need | Recommended Entry Point | Reason |
-|-----------|------------------------|--------|
+| ----------- | ---------------------- | ------ |
 | **New Users** | `GUI-Launcher.py` | Easy interface selection with organized categories |
 | **Researchers** | `APGI_GUI.py` | Full-featured experiment management |
 | **Modern UI Preference** | `APGI_Application_GUI.py` | CustomTkinter with advanced theming |
@@ -295,7 +296,7 @@ python apps/gui_template.py
 
 ## File Organization
 
-```
+```text
 APGI Framework GUI Structure
 │
 ├── Root-Level GUIs (8 applications)
@@ -349,7 +350,7 @@ pip install customtkinter matplotlib numpy pandas psutil pyyaml keyboard pytest 
 ## Quick Reference
 
 | Script | Lines | Category | Key Feature |
-|--------|-------|----------|-------------|
+| -------- | ----- | ---------- | ----------- |
 | `APGI_GUI.py` | 5,649 | Primary | Full experiment management |
 | `APGI_Application_GUI.py` | 6,974 | Primary | Modern CustomTkinter UI |
 | `Assistant_GUI.py` | 8,848 | Specialized | AI-powered assistant |

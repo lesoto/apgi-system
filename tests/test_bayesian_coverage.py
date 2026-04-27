@@ -2,15 +2,17 @@
 Tests for Bayesian models module coverage.
 """
 
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
-from unittest.mock import patch, MagicMock
+
 from apgi_framework.analysis.bayesian_models import (
-    SurpriseAccumulator,
+    HierarchicalBayesianModel,
     IgnitionProbabilityCalculator,
     ParameterDistribution,
-    HierarchicalBayesianModel,
     StanModelCompiler,
+    SurpriseAccumulator,
 )
 
 

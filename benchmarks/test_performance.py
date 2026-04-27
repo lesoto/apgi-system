@@ -39,9 +39,7 @@ try:
     from apgi_framework.adaptive.stimulus_generators import (
         GaborPatchGenerator as ImportedStimulusGenerator,
     )
-    from apgi_framework.analysis.analysis_engine import (
-        AnalysisEngine as ImportedAnalysisEngine,
-    )
+    from apgi_framework.analysis.analysis_engine import AnalysisEngine as ImportedAnalysisEngine
     from apgi_framework.core.data_models import ExperimentalTrial
     from apgi_framework.core.models import APGIModel  # type: ignore[import-not-found]
 

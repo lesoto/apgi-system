@@ -4,9 +4,9 @@ APGI System - GUI Application
 
 import logging
 import tkinter as tk
-from tkinter import ttk, messagebox
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from tkinter import messagebox, ttk
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -17,13 +17,13 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from apgi_gui.theme_manager import get_theme_manager
-from apgi_framework.system import APGISystem
 from apgi_framework.platform_utils import get_data_dir
+from apgi_framework.system import APGISystem
+from apgi_gui.theme_manager import get_theme_manager
 
+from .components.control_panel import ControlPanel
 from .components.menu_bar import MenuBar
 from .components.status_bar import StatusBar
-from .components.control_panel import ControlPanel
 from .components.visualization_panel import VisualizationPanel
 from .controllers.simulation_controller import SimulationController
 from .mediator import GUIMediator
@@ -330,6 +330,7 @@ class APGIGui:
         """Load configuration from a file path."""
         try:
             import json
+
             import yaml
 
             with open(path, "r") as f:
@@ -384,6 +385,7 @@ class APGIGui:
     def _save_config(self):
         """Open file dialog to save configuration."""
         from tkinter import filedialog
+
         import yaml
 
         filetypes = [("YAML files", "*.yaml"), ("JSON files", "*.json"), ("All files", "*.*")]
@@ -425,9 +427,9 @@ class APGIGui:
 
     def _export_data(self):
         """Export simulation data to file."""
-        from tkinter import filedialog
         import csv
         import json
+        from tkinter import filedialog
 
         if not self.time_buffer:
             messagebox.showwarning("Export Error", "No data to export. Run simulation first.")
@@ -1041,10 +1043,9 @@ class APGIGui:
 
     def _generate_report(self):
         """Generate and optionally save a comprehensive text report."""
-        from tkinter import filedialog
-
         # Build report text
         import datetime
+        from tkinter import filedialog
 
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         duration = (

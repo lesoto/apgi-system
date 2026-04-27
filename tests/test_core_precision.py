@@ -5,8 +5,9 @@ This module contains comprehensive tests for the PrecisionCalculator,
 ensuring accurate precision calculations and confidence interval computations.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_framework.core.precision import PrecisionCalculator  # type: ignore[import-not-found]
 
 

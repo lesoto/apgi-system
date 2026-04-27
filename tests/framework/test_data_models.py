@@ -3,10 +3,11 @@ Test suite for core data models.
 """
 
 import pytest
+
 from apgi_framework.core.data_models import (
     APGIParameters,
-    NeuralSignatures,
     ExperimentalTrial,
+    NeuralSignatures,
     StatisticalSummary,
 )
 

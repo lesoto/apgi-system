@@ -87,8 +87,14 @@ try:
         getSampleStyleSheet,
     )
     from reportlab.lib.units import inch
-    from reportlab.platypus import PageBreak
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import (
+        PageBreak,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
 
     HAS_REPORTLAB = True
 except ImportError:

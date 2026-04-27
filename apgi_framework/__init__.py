@@ -25,17 +25,17 @@ from . import (
 )
 from .collaboration import CollaborationManager
 from .computation import IntensiveComputation
-from .engines import (
-    APGIEquation,
-    PrecisionCalculator,
-    PredictionErrorProcessor,
-    PrecisionWeighting,
-    SomaticMarkerEngine,
-    ThresholdManager,
-)
 from .core.active_inference import ActiveInferenceEngine
 from .core.free_energy import FreeEnergyCalculator
 from .core.predictive_processing import HierarchicalPredictor
+from .engines import (
+    APGIEquation,
+    PrecisionCalculator,
+    PrecisionWeighting,
+    PredictionErrorProcessor,
+    SomaticMarkerEngine,
+    ThresholdManager,
+)
 from .exceptions import APGIFrameworkError, MathematicalError, SimulationError
 from .fusion import DataFusion
 from .notification import NotificationManager

@@ -8,7 +8,7 @@ bulk inserts, updates, and deletes with proper error handling and transaction ma
 import logging
 from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar
 
-from sqlalchemy import insert, select, update, delete
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -3,7 +3,7 @@
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 try:
     import redis.asyncio as redis
@@ -12,8 +12,8 @@ try:
 except ImportError:
     REDIS_AVAILABLE = False
 
-from .models import AuditEvent, AuditQuery
 from ..logging_config import get_logger
+from .models import AuditEvent, AuditQuery
 
 logger = get_logger(__name__)
 
@@ -312,7 +312,7 @@ class DatabaseAuditStorage(AuditStorage):
 
     async def connect(self) -> None:
         """Connect to database."""
-        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
         self._engine = create_async_engine(self.database_url)
         self._sessionmaker = async_sessionmaker(  # type: ignore[call-overload]

@@ -5,9 +5,9 @@ Provides utilities for identifying, masking, and encrypting
 Personally Identifiable Information (PII).
 """
 
+import hashlib
 import re
 from typing import Any, Dict, List, Optional, Pattern
-import hashlib
 
 # PII Patterns
 PII_PATTERNS: Dict[str, Pattern[str]] = {

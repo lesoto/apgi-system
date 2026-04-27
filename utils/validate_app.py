@@ -95,8 +95,8 @@ def test_experimental_tasks() -> bool:
 
 
 def test_gui_launch() -> bool:
-    """Test that GUI can be launched."""
-    print("\nTesting GUI launch...")
+    """Test that Psychological_States_GUI can be launched."""
+    print("\nTesting GUI launch (Psychological_States_GUI)...")
     try:
         # Add parent directory to path to import GUI from project root
         import sys
@@ -104,18 +104,18 @@ def test_gui_launch() -> bool:
 
         sys.path.insert(0, str(Path(__file__).parent.parent))
 
-        from APGI_Application_GUI import APGIFrameworkGUI  # type: ignore
+        from Psychological_States_GUI import APGIVisualizerGUI  # type: ignore
 
-        # Create GUI instance (it inherits from ctk.CTk)
-        app = APGIFrameworkGUI()
+        # Create GUI instance — APGIVisualizerGUI creates its own tk.Tk root
+        app = APGIVisualizerGUI()
 
         print("✓ GUI instance created successfully!")
 
-        # Close after a short delay
-        app.after(100, app.quit)
+        # Close after a short delay via the embedded root
+        app.root.after(200, app.root.quit)
 
         # Run main loop briefly
-        app.mainloop()
+        app.root.mainloop()
 
         print("✓ GUI closed successfully!")
         return True
@@ -162,7 +162,7 @@ def main() -> int:
     if passed == total:
         print("\n✓ ALL TESTS PASSED - Application is ready to use!")
         print("\nTo launch the GUI, run:")
-        print("  python GUI.py")
+        print("  python3 Psychological_States_GUI.py")
         return 0
 
     else:

@@ -8,9 +8,9 @@ including identification, classification, masking, and access controls.
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ class PIIAccessControl:
     Access control for PII data.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.access_log: List[Dict] = []
 
     def check_access(

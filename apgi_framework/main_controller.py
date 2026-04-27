@@ -18,6 +18,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from apgi_framework.config import ConfigManager, get_config_manager
+from apgi_framework.data import DataValidator, StorageManager
 from apgi_framework.engines import (
     APGIEquation,
     PrecisionCalculator,
@@ -25,7 +26,6 @@ from apgi_framework.engines import (
     SomaticMarkerEngine,
     ThresholdManager,
 )
-from apgi_framework.data import DataValidator, StorageManager
 from apgi_framework.exceptions import APGIFrameworkError
 from apgi_framework.falsification import (
     ConsciousnessWithoutIgnitionTest,
@@ -517,9 +517,7 @@ class MainApplicationController:
         try:
             # Import required modules
             from apgi_framework.analysis import StatisticalAnalyzer
-            from apgi_framework.falsification import (
-                FalsificationEngine as ExperimentRunner,
-            )
+            from apgi_framework.falsification import FalsificationEngine as ExperimentRunner
             from apgi_framework.research import HypothesisDesigner
 
             # Step 1: Create hypothesis design

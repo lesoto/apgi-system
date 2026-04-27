@@ -1,20 +1,20 @@
 from typing import Dict, Type
 
-from apgi_framework.commands.base import BaseCommand
-from apgi_framework.commands.test import (
-    RunTestCommand,
-    RunBatchCommand,
-    BatchTestCommand,
-    RunEnhancedTestsCommand,
-    OrganizeTestsCommand,
-)
-from apgi_framework.commands.config import GenerateConfigCommand, SetParamsCommand
 from apgi_framework.commands.analysis import (
-    TestResultsCommand,
     TestAnalysisCommand,
     TestCoverageCommand,
+    TestResultsCommand,
 )
-from apgi_framework.commands.system import ValidateSystemCommand, StatusCommand
+from apgi_framework.commands.base import BaseCommand
+from apgi_framework.commands.config import GenerateConfigCommand, SetParamsCommand
+from apgi_framework.commands.system import StatusCommand, ValidateSystemCommand
+from apgi_framework.commands.test import (
+    BatchTestCommand,
+    OrganizeTestsCommand,
+    RunBatchCommand,
+    RunEnhancedTestsCommand,
+    RunTestCommand,
+)
 
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     "run-test": RunTestCommand,

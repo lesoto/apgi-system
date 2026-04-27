@@ -5,11 +5,11 @@ Provides context managers and utilities for proper resource cleanup
 in GUI applications to prevent memory leaks.
 """
 
-from typing import Any, Dict, List, Callable, Optional
-from contextlib import contextmanager
-import logging
 import gc
+import logging
 import weakref
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +142,9 @@ class GUIResourceManager:
         Returns:
             Dictionary with memory usage info
         """
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         memory_info = process.memory_info()

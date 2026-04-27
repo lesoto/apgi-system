@@ -2,9 +2,9 @@
 Control panel component for the APGI GUI.
 """
 
-import tkinter as tk
-from tkinter import ttk, scrolledtext
 import datetime
+import tkinter as tk
+from tkinter import scrolledtext, ttk
 from typing import Any, Callable, Dict, Union, cast
 
 

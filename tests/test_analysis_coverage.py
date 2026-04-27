@@ -5,15 +5,16 @@ This module contains comprehensive tests for statistical analysis,
 parameter estimation, and effect size calculations.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_framework.analysis.effect_size_calculator import (
     EffectSizeCalculator,
     EffectSizeResult,
 )
 from apgi_framework.analysis.statistical_tester import (
-    StatisticalTester,
     StatisticalResult,
+    StatisticalTester,
 )
 
 

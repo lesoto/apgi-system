@@ -321,11 +321,9 @@ def initialize_default_recovery_strategies() -> None:
 
     # Register simulation error recovery
     manager.register_recovery_strategy(SimulationError, recover_from_simulation_error)
-    logger.info("Registered recovery strategy for SimulationError")
 
     # Register data error recovery
     manager.register_recovery_strategy(DataError, recover_from_data_error)
-    logger.info("Registered recovery strategy for DataError")
 
     # Register I/O error recovery
     def recover_from_io_error(error: Exception, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -350,6 +348,5 @@ def initialize_default_recovery_strategies() -> None:
 
     manager.register_recovery_strategy(IOError, recover_from_io_error)
     manager.register_recovery_strategy(OSError, recover_from_io_error)
-    logger.info("Registered recovery strategies for IOError and OSError")
 
     logger.info("Default recovery strategies initialized successfully")

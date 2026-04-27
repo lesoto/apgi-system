@@ -155,8 +155,8 @@ class TestCLISmokeTest:
             from unittest.mock import patch
 
             from apgi_framework.data.data_models import (
-                ExperimentMetadata,
                 ExperimentalDataset,
+                ExperimentMetadata,
             )
             from apgi_framework.data.storage_manager import StorageManager
 

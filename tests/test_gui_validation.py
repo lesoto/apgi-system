@@ -7,11 +7,11 @@ Consolidated from:
 - test_gui_validation_v2.py (tab structure tests and API updates)
 """
 
-import sys
-import os
 import logging
-from unittest.mock import patch, MagicMock
+import os
+import sys
 import tkinter as tk
+from unittest.mock import MagicMock, patch
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -77,7 +77,7 @@ def test_apgi_visualizer():
     logger.info("=" * 70)
 
     try:
-        from Psychological_States_GUI import APGIVisualizer, PSYCHOLOGICAL_STATES, STATE_CATEGORIES
+        from Psychological_States_GUI import PSYCHOLOGICAL_STATES, STATE_CATEGORIES, APGIVisualizer
 
         visualizer = APGIVisualizer(PSYCHOLOGICAL_STATES, STATE_CATEGORIES)
         logger.info("✓ APGIVisualizer instantiated")

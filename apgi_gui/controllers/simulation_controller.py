@@ -2,10 +2,11 @@
 Simulation controller for the APGI GUI.
 """
 
+import logging
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
-import logging
+
 import numpy as np
 
 logger = logging.getLogger(__name__)

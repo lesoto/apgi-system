@@ -4,9 +4,9 @@ Data Orchestrator for data management and persistence.
 Handles data initialization, validation, storage, and retrieval operations.
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 from api.config import DEFAULT_BATCH_SIZE, DEFAULT_CACHE_TTL_SECONDS
 
@@ -64,7 +64,9 @@ class DataOrchestrator:
 
     def _initialize_data_systems(self) -> None:
         """Initialize data management and storage systems."""
-        from apgi_framework.data.data_manager import IntegratedDataManager  # type: ignore[attr-defined]
+        from apgi_framework.data.data_manager import (
+            IntegratedDataManager,  # type: ignore[attr-defined]
+        )
         from apgi_framework.data.storage_manager import StorageManager
 
         self._data_manager = IntegratedDataManager()

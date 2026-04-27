@@ -304,14 +304,18 @@ class TestCoreThreshold:
 
     def test_threshold_manager_with_threshold(self):
         """Test manager with specific threshold."""
-        from apgi_framework.core.threshold import ThresholdDetector  # type: ignore[import-not-found]
+        from apgi_framework.core.threshold import (
+            ThresholdDetector,  # type: ignore[import-not-found]
+        )
 
         detector = ThresholdDetector(baseline_threshold=2.5)
         assert detector.baseline_threshold == 2.5
 
     def test_get_current_threshold(self):
         """Test getting current threshold."""
-        from apgi_framework.core.threshold import ThresholdDetector  # type: ignore[import-not-found]
+        from apgi_framework.core.threshold import (
+            ThresholdDetector,  # type: ignore[import-not-found]
+        )
 
         detector = ThresholdDetector(baseline_threshold=3.0)
         threshold = detector.get_current_threshold()
@@ -321,7 +325,9 @@ class TestCoreThreshold:
 
     def test_update_threshold(self):
         """Test updating threshold based on ignition."""
-        from apgi_framework.core.threshold import ThresholdDetector  # type: ignore[import-not-found]
+        from apgi_framework.core.threshold import (
+            ThresholdDetector,  # type: ignore[import-not-found]
+        )
 
         detector = ThresholdDetector(baseline_threshold=3.0)
 
@@ -347,7 +353,9 @@ class TestCoreThreshold:
 
     def test_get_ignition_statistics(self):
         """Test getting ignition statistics."""
-        from apgi_framework.core.threshold import ThresholdDetector  # type: ignore[import-not-found]
+        from apgi_framework.core.threshold import (
+            ThresholdDetector,  # type: ignore[import-not-found]
+        )
 
         detector = ThresholdDetector(baseline_threshold=3.0)
 
@@ -362,7 +370,9 @@ class TestCoreThreshold:
 
     def test_reset_threshold(self):
         """Test resetting threshold."""
-        from apgi_framework.core.threshold import ThresholdDetector  # type: ignore[import-not-found]
+        from apgi_framework.core.threshold import (
+            ThresholdDetector,  # type: ignore[import-not-found]
+        )
 
         detector = ThresholdDetector(baseline_threshold=3.0)
 
@@ -446,14 +456,18 @@ class TestCorePrecision:
 
     def test_precision_calculator_initialization(self):
         """Test PrecisionCalculator initialization."""
-        from apgi_framework.core.precision import PrecisionCalculator  # type: ignore[import-not-found]
+        from apgi_framework.core.precision import (
+            PrecisionCalculator,  # type: ignore[import-not-found]
+        )
 
         calc = PrecisionCalculator()
         assert calc is not None
 
     def test_calculate_precision(self):
         """Test precision calculation from samples."""
-        from apgi_framework.core.precision import PrecisionCalculator  # type: ignore[import-not-found]
+        from apgi_framework.core.precision import (
+            PrecisionCalculator,  # type: ignore[import-not-found]
+        )
 
         calc = PrecisionCalculator()
 
@@ -560,14 +574,19 @@ class TestCoreSomaticMarker:
 
     def test_somatic_marker_engine_initialization(self):
         """Test SomaticMarkerEngine initialization."""
-        from apgi_framework.core.somatic_marker import SomaticMarkerEngine  # type: ignore[import-not-found]
+        from apgi_framework.core.somatic_marker import (
+            SomaticMarkerEngine,  # type: ignore[import-not-found]
+        )
 
         engine = SomaticMarkerEngine()
         assert engine is not None
 
     def test_somatic_marker_gain_calculation(self):
         """Test somatic marker gain calculation."""
-        from apgi_framework.core.somatic_marker import SomaticMarkerEngine, ContextType  # type: ignore[import-not-found]
+        from apgi_framework.core.somatic_marker import (  # type: ignore[import-not-found]
+            ContextType,
+            SomaticMarkerEngine,
+        )
 
         engine = SomaticMarkerEngine()
 

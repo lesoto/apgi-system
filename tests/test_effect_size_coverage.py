@@ -4,12 +4,13 @@ Tests for effect size calculator module coverage.
 
 import numpy as np
 import pytest
+
 from apgi_framework.analysis.effect_size_calculator import (
+    BootstrapResult,
+    ConfidenceIntervalMethod,
     EffectSizeCalculator,
     EffectSizeResult,
     EffectSizeType,
-    ConfidenceIntervalMethod,
-    BootstrapResult,
 )
 
 

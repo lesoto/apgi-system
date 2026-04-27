@@ -12,17 +12,18 @@ Provides thorough testing of system validation functionality including:
 - Error reporting and diagnostics
 """
 
-import pytest
 import os
 import sys
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 try:
-    from apgi_framework.system_validator import SystemValidator
     from apgi_framework.exceptions import APGIFrameworkError
+    from apgi_framework.system_validator import SystemValidator
 except ImportError as e:
     print(f"Import error (expected in aspirational tests): {e}")
 

@@ -6,7 +6,7 @@ performance over JSON serialization. Falls back to JSON for compatibility.
 """
 
 import logging
-from typing import Any, Callable, Awaitable, Optional, Union
+from typing import Any, Awaitable, Callable, Optional, Union
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

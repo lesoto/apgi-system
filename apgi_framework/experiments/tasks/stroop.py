@@ -159,8 +159,8 @@ class StroopTask:
         filepath : str, optional
             Output file path, by default None (generates filename)
         """
-        import json
         import datetime
+        import json
 
         results_to_save = results if results is not None else self.results
         if filepath is None:

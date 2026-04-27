@@ -42,7 +42,10 @@ try:
         HAS_PSYCHOLOGICAL_GUI = True
     else:
         # Fallback to standard import if file renamed
-        from Psychological_States_GUI import APGIVisualizer, APGIVisualizerGUI  # type: ignore[import-not-found, no-redef]
+        from Psychological_States_GUI import (  # type: ignore[import-not-found, no-redef]
+            APGIVisualizer,
+            APGIVisualizerGUI,
+        )
 
         HAS_PSYCHOLOGICAL_GUI = True
 except ImportError as e:

@@ -4,9 +4,9 @@ Analysis Orchestrator for statistical and computational analysis.
 Handles analysis pipeline execution, model fitting, and result generation.
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

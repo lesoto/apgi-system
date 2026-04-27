@@ -4,8 +4,9 @@ Tests for version and main entry points.
 
 from typing import Any
 from unittest.mock import patch
-from apgi_framework import __version__
+
 import apgi_framework.__version__ as version_module
+from apgi_framework import __version__
 
 
 def test_version_constants() -> None:

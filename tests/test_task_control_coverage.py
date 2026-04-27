@@ -9,16 +9,17 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from apgi_framework.adaptive.task_control import (
-    TaskState,
-    ResponseType,
-    TimingEvent,
-    ResponseData,
     PrecisionTimer,
     ResponseCollector,
+    ResponseData,
+    ResponseType,
     SessionConfiguration,
     SessionManager,
+    TaskState,
     TaskStateMachine,
+    TimingEvent,
 )
 
 # --- Enums ---

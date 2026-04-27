@@ -14,9 +14,9 @@ Usage:
     config = ServiceContainer.get('config_manager')
 """
 
-from typing import Any, Dict, Optional, TypeVar
 import threading
 from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional, TypeVar
 
 T = TypeVar("T")
 

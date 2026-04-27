@@ -9,23 +9,23 @@ neural signature validation, and experimental control mechanisms.
 import logging
 from typing import Any, Dict, List, Optional, Type, Union
 
-# Core test implementations
-from .primary_falsification import FalsificationResult, PrimaryFalsificationTest
+# Other supporting modules
+from .ai_acc_validation import AIACCValidator
 from .consciousness_assessment import (
     ConsciousnessAssessment,
     ConsciousnessAssessmentSimulator,
     ConsciousnessValidator,
 )
 from .consciousness_without_ignition import ConsciousnessWithoutIgnitionTest
-from .threshold_insensitivity import ThresholdInsensitivityTest
-from .soma_bias import SomaBiasTest
-from .mock_engine import FalsificationEngine
-
-# Other supporting modules
-from .ai_acc_validation import AIACCValidator
 from .edge_case_interpreter import EdgeCaseInterpreter, EdgeCaseType, FrameworkBoundary
 from .experimental_control import ExperimentalControlValidator
+from .mock_engine import FalsificationEngine
+
+# Core test implementations
+from .primary_falsification import FalsificationResult, PrimaryFalsificationTest
 from .result_interpretation import FalsificationInterpreter, ResultLogger
+from .soma_bias import SomaBiasTest
+from .threshold_insensitivity import ThresholdInsensitivityTest
 
 __all__ = [
     "ConsciousnessAssessment",

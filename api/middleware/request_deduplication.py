@@ -6,13 +6,13 @@ and returning cached responses for identical requests within a time window.
 Improves API performance and reduces resource consumption.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
 import time
-import asyncio
 from dataclasses import dataclass
-from typing import Any, Callable, Awaitable, Dict, Optional, Tuple
+from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

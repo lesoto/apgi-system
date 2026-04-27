@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Dict, Callable, Set, Any
+from typing import Any, Callable, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ class RectificationManager:
     - Downstream system notifications
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._requests: Dict[str, RectificationRequest] = {}
         self._rectification_handlers: Dict[str, Any] = {}
         self._notification_callbacks: List[Callable[[RectificationRequest], None]] = []

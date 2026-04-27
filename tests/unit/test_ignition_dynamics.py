@@ -6,6 +6,7 @@ for IgnitionThreshold, GlobalWorkspace, and IgnitionTimeline components.
 """
 
 from typing import Any, Dict, Union
+
 import numpy as np
 import pytest
 

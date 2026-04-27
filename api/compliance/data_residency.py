@@ -6,9 +6,9 @@ including GDPR, HIPAA, and regional data protection requirements.
 """
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class DataResidencyManager:
     Manager for data residency controls and cross-border transfer compliance.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.policies: Dict[str, ResidencyPolicy] = {}
         self._initialize_default_policies()
 

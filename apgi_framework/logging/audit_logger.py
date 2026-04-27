@@ -5,12 +5,13 @@ Provides immutable, tamper-evident logging of sensitive operations,
 user actions, and configuration changes.
 """
 
+import hashlib
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import hashlib
+
 from apgi_framework.security.pii_protector import get_pii_protector
 
 logger = logging.getLogger("audit")

@@ -7,14 +7,12 @@ Registry for mapping task types to their corresponding Celery task functions.
 from enum import Enum
 from typing import Any, Callable, Dict
 
-from api.tasks.experimental_tasks import (
+from api.tasks.experimental_tasks import (  # execute_nback_task,  # Not yet implemented; execute_stroop_task,  # Not yet implemented
     execute_attentional_blink_task,
     execute_binocular_rivalry_task,
     execute_change_blindness_task,
     execute_iowa_gambling_task,
     execute_masking_paradigm_task,
-    # execute_nback_task,  # Not yet implemented
-    # execute_stroop_task,  # Not yet implemented
 )
 
 

@@ -12,13 +12,13 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
 # Engine implementations
 from .equation_engine import APGIEquation
-from .precision_engine import PrecisionCalculator, PrecisionWeighting, NeuromodulatorType
-from .prediction_error_engine import PredictionErrorProcessor
-from .somatic_marker_engine import SomaticMarkerEngine, ContextType
-from .threshold_engine import ThresholdManager, ThresholdAdaptationType
 
 # Core model imports (still in core)
 from .models_engine import PredictiveIgnitionNetwork, SomaticAgent
+from .precision_engine import NeuromodulatorType, PrecisionCalculator, PrecisionWeighting
+from .prediction_error_engine import PredictionErrorProcessor
+from .somatic_marker_engine import ContextType, SomaticMarkerEngine
+from .threshold_engine import ThresholdAdaptationType, ThresholdManager
 
 logger = logging.getLogger(__name__)
 

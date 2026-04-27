@@ -1,6 +1,7 @@
 """Unit tests for extended analysis capabilities."""
 
 import importlib.util
+
 import numpy as np
 import pytest
 

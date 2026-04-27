@@ -377,6 +377,79 @@ EMPIRICAL_DATASETS: Dict[str, EmpiricalDataset] = {
         bids_compliant=True,
         notes="Largest consciousness dataset ever. fMRI+MEG releases forthcoming (not yet April 2026).",
     ),
+    "DS-17": EmpiricalDataset(
+        id="DS-17",
+        name="CRCNS [V1-1]: Visual Cortex Spiking and LFP",
+        tier=DatasetTier.THERMODYNAMIC,
+        modality="Electrophysiology (LFP/Spikes)",
+        access_status=AccessStatus.FULLY_PUBLIC,
+        primary_url="https://crcns.org/datasets/v1/v1-1",
+        sample_size=40,
+        key_measures=[
+            "Multi-unit activity (MUA)",
+            "Local Field Potential (LFP)",
+            "LFP Autocorrelation",
+            "Critical Slowing Down",
+        ],
+        apgi_innovations=["I-11", "I-21"],
+        validation_protocols=["VP-11", "VP-21"],
+        bids_compliant=False,
+        notes="Essential for testing Innovation 11 (Three Ignition Signatures), specifically the 'Critical Slowing Down' signature.",
+    ),
+    "DS-18": EmpiricalDataset(
+        id="DS-18",
+        name="CRCNS [AC-1]: Auditory Cortex Metabolic Proxies",
+        tier=DatasetTier.THERMODYNAMIC,
+        modality="Intrinsic Optical Imaging / Fluorescence",
+        access_status=AccessStatus.FULLY_PUBLIC,
+        primary_url="https://crcns.org/datasets/ac/ac-1",
+        sample_size=12,
+        key_measures=[
+            "Intrinsic Optical Imaging (IOS)",
+            "Flavoprotein fluorescence",
+            "Metabolic Cost C(t)",
+        ],
+        apgi_innovations=["I-21", "I-04"],
+        validation_protocols=["VP-21"],
+        bids_compliant=False,
+        notes="Empirical proxy for the Metabolic Cost (C(t)) equation [§4.2].",
+    ),
+    "DS-19": EmpiricalDataset(
+        id="DS-19",
+        name="Allen Visual Coding: Two-Photon Functional Data",
+        tier=DatasetTier.THERMODYNAMIC,
+        modality="Two-Photon Calcium Imaging",
+        access_status=AccessStatus.FULLY_PUBLIC,
+        primary_url="https://portal.brain-map.org/explore/circuits/visual-coding-2p",
+        sample_size=400,
+        key_measures=[
+            "Single-neuron activity (OGB-1/GCaMP6)",
+            "PCI-like complexity",
+            "Reservoir state vector x(t)",
+        ],
+        apgi_innovations=["I-33", "I-15"],
+        validation_protocols=["VP-15", "VP-21"],
+        bids_compliant=True,
+        notes="Neurodata Without Borders (.nwb) format. Validates Innovation 33 (Cross-Species Complexity Gradient).",
+    ),
+    "DS-20": EmpiricalDataset(
+        id="DS-20",
+        name="Hugging Face Tonic: Spiking-Dataset-Collection",
+        tier=DatasetTier.THERMODYNAMIC,
+        modality="Neuromorphic (DVS/Event-based)",
+        access_status=AccessStatus.FULLY_PUBLIC,
+        primary_url="https://huggingface.co/datasets/tonic/spiking-dataset-collection",
+        sample_size=10,
+        key_measures=[
+            "Event-based spike counts",
+            "Allostatic Threshold theta(t)",
+            "Information Value V(t)",
+        ],
+        apgi_innovations=["I-29", "I-04"],
+        validation_protocols=["VP-21"],
+        bids_compliant=False,
+        notes="Ideal for testing Allostatic Threshold's ability to minimize metabolic cost while maximizing information value.",
+    ),
 }
 
 
@@ -401,7 +474,14 @@ PROTOCOL_DATASET_MAPPING: Dict[str, List[str]] = {
         "DS-11",
         "DS-14",
         "DS-16",
+        "DS-19",
     ],  # fMRI, connectivity, spectral dynamics
+    "VP-21": [
+        "DS-17",
+        "DS-18",
+        "DS-19",
+        "DS-20",
+    ],  # Landauer Bridge Validation (Metabolic/Thermodynamic)
 }
 
 

@@ -125,11 +125,11 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     sessions._redis_client = mock_redis  # type: ignore[attr-defined]
 
     # Mock authentication dependencies
-    from api.services import authorization as auth
-    from api.services.auth_manager import TokenPayload
-
     # Create mock user with admin role
     from datetime import datetime
+
+    from api.services import authorization as auth
+    from api.services.auth_manager import TokenPayload
 
     mock_user = TokenPayload(
         user_id="test-user-123",

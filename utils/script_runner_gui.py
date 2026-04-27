@@ -11,8 +11,8 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
-from tkinter import ttk
 from pathlib import Path
+from tkinter import ttk
 from typing import Optional
 
 

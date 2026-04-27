@@ -19,8 +19,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from apgi_framework.data.persistence_layer import PersistenceError, PersistenceLayer
 from apgi_framework.data.data_models import ExperimentMetadata
+from apgi_framework.data.persistence_layer import PersistenceError, PersistenceLayer
 
 
 class TestPersistenceLayerInitialization:

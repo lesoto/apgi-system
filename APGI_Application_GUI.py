@@ -10,8 +10,8 @@ import json
 import logging
 import os
 import subprocess
-import traceback
 import threading
+import traceback
 from abc import ABC, abstractmethod
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -81,9 +81,9 @@ from apgi_framework.utils.font_utils import get_font
 
 # Import managed thread pool
 from apgi_framework.utils.thread_manager import run_in_thread
-
-from apgi_gui.theme_manager import get_theme_manager, ThemeManager as ThemeManagerClass
-from apgi_gui.components.gui_utils import Tooltip, KeyboardManager, UndoRedoManager
+from apgi_gui.components.gui_utils import KeyboardManager, Tooltip, UndoRedoManager
+from apgi_gui.theme_manager import ThemeManager as ThemeManagerClass
+from apgi_gui.theme_manager import get_theme_manager
 
 # Tooltip implementation
 TOOLTIPS_AVAILABLE = True
@@ -153,6 +153,9 @@ try:
     # Core Framework Components
     from apgi_framework.cli import APGIFrameworkCLI
     from apgi_framework.config import ConfigManager
+    from apgi_framework.data.data_manager import IntegratedDataManager
+    from apgi_framework.data.report_generator import ReportGenerator
+    from apgi_framework.data.visualizer import APGIVisualizer
     from apgi_framework.engines import (
         APGIEquation,
         PrecisionCalculator,
@@ -160,9 +163,6 @@ try:
         SomaticMarkerEngine,
         ThresholdManager,
     )
-    from apgi_framework.data.data_manager import IntegratedDataManager
-    from apgi_framework.data.report_generator import ReportGenerator
-    from apgi_framework.data.visualizer import APGIVisualizer
     from apgi_framework.main_controller import MainApplicationController
 
     # Falsification Tests
@@ -6779,8 +6779,9 @@ For detailed documentation, please refer to the user manual.
     def _run_fallback_ai_benchmarking(self, n_trials: int, n_participants: int):
         """Fallback AI benchmarking simulation when main controller is not available."""
         try:
-            import numpy as np
             import time
+
+            import numpy as np
 
             self.log_to_console("Running fallback AI benchmarking simulation...")
 
@@ -6825,8 +6826,9 @@ For detailed documentation, please refer to the user manual.
     def _run_fallback_interoceptive_gating(self, n_trials: int, n_participants: int):
         """Fallback interoceptive gating simulation when main controller is not available."""
         try:
-            import numpy as np
             import time
+
+            import numpy as np
 
             self.log_to_console("Running fallback interoceptive gating simulation...")
 
@@ -6866,8 +6868,9 @@ For detailed documentation, please refer to the user manual.
     def _run_fallback_dynamic_threshold(self, n_trials: int, n_participants: int):
         """Fallback dynamic threshold simulation when main controller is not available."""
         try:
-            import numpy as np
             import time
+
+            import numpy as np
 
             self.log_to_console("Running fallback dynamic threshold simulation...")
 
@@ -6906,8 +6909,9 @@ For detailed documentation, please refer to the user manual.
     def _run_fallback_precision_effects(self, n_trials: int, n_participants: int):
         """Fallback precision effects simulation when main controller is not available."""
         try:
-            import numpy as np
             import time
+
+            import numpy as np
 
             self.log_to_console("Running fallback precision effects simulation...")
 

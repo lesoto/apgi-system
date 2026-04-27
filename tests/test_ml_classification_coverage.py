@@ -7,13 +7,13 @@ import pandas as pd
 import pytest
 
 from apgi_framework.analysis.ml_classification import (
-    ConsciousnessClassifier,
-    ClassificationResult,
+    PYTORCH_AVAILABLE,
+    SKLEARN_AVAILABLE,
     BiomarkerClassifierEnsemble,
+    ClassificationResult,
+    ConsciousnessClassifier,
     create_biomarker_features,
     feature_selection,
-    SKLEARN_AVAILABLE,
-    PYTORCH_AVAILABLE,
 )
 
 

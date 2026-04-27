@@ -2,8 +2,9 @@
 Test suite for core equation module.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from apgi_framework.engines import APGIEquation
 
 

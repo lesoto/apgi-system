@@ -5,8 +5,8 @@ Provides high-level interface for running batches of simulations
 with automatic parallelization and progress tracking.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Iterator, TypeVar
 import logging
+from typing import Any, Callable, Dict, Iterator, List, Optional, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")

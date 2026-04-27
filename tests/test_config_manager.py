@@ -2,13 +2,13 @@
 Tests for configuration manager edge cases and error handling.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from apgi_framework.config.config_manager import ConfigManager, ConfigurationError
-from apgi_framework.config.config_manager import APGIParameters
+import pytest
+
+from apgi_framework.config.config_manager import APGIParameters, ConfigManager, ConfigurationError
 
 
 class TestConfigManagerEdgeCases:

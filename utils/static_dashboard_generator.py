@@ -7,7 +7,7 @@ Generates static HTML dashboards for APGI framework visualizations.
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 # APGI imports - make imports optional for testing
 apgi_logger: Any = None

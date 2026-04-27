@@ -1,15 +1,15 @@
 """Audit logger for comprehensive event logging."""
 
-import uuid
-from datetime import datetime, timedelta
 import asyncio
-from functools import wraps
-from typing import Optional, Dict, Any, List, Callable
+import uuid
 from contextlib import contextmanager
+from datetime import datetime, timedelta
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
 
-from .models import AuditEvent, AuditEventType, AuditSeverity, AuditQuery
-from .storage import AuditStorage, get_audit_storage
 from ..logging_config import get_logger
+from .models import AuditEvent, AuditEventType, AuditQuery, AuditSeverity
+from .storage import AuditStorage, get_audit_storage
 
 logger = get_logger(__name__)
 

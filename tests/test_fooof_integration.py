@@ -11,8 +11,8 @@ Validates:
 6. Consciousness index calculation
 """
 
-import sys
 import logging
+import sys
 
 # Setup logging
 logging.basicConfig(

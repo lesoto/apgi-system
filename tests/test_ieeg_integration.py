@@ -21,8 +21,8 @@ sys.path.insert(0, str(project_root))
 # Import from Psychological-States-GUI
 try:
     from Psychological_States_GUI import (
-        iEEGConsciousnessState,
         iEEGConsciousnessAnalyzer,
+        iEEGConsciousnessState,
         iEEGConsciousnessVisualizer,
     )
 

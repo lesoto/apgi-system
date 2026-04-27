@@ -5,11 +5,11 @@ Provides ProcessPoolExecutor wrapper with proper initialization,
 task distribution, and result handling for neural simulations.
 """
 
+import logging
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Generic
-import logging
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar
 
 logger = logging.getLogger(__name__)
 

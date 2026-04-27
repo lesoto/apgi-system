@@ -26,11 +26,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
-# Import theme manager
-from apgi_gui.theme_manager import get_theme_manager
 from apgi_framework.config_validator import ConfigValidationError, validate_config_file
 from apgi_framework.platform_utils import get_data_dir, get_resource_path
 from apgi_framework.system import APGISystem
+
+# Import theme manager
+from apgi_gui.theme_manager import get_theme_manager
 
 # Configure logging for GUI
 logger = logging.getLogger(__name__)

@@ -59,7 +59,7 @@ class SurpriseIgnitionSystem:
 
 
 try:
-    from apgi_framework.logging.standardized_logging import get_logger, APGILogger
+    from apgi_framework.logging.standardized_logging import APGILogger, get_logger
 
     apgi_logger: APGILogger = get_logger(__name__)
 except ImportError:

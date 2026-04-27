@@ -7,10 +7,10 @@ consent management, and privacy by design assessments.
 
 import json
 import logging
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-import shutil
 
 from apgi_framework.logging.audit_logger import get_audit_logger
 

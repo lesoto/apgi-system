@@ -6,7 +6,7 @@ compliant with GDPR, HIPAA, and SOC 2 requirements.
 
 from .logger import AuditLogger, get_audit_logger
 from .models import AuditEvent, AuditEventType, AuditSeverity
-from .storage import AuditStorage, RedisAuditStorage, DatabaseAuditStorage
+from .storage import AuditStorage, DatabaseAuditStorage, RedisAuditStorage
 
 __all__ = [
     "AuditLogger",

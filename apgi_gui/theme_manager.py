@@ -5,7 +5,7 @@ Provides consistent theming support across all GUI applications.
 """
 
 import tkinter as tk
-from typing import Any, Dict, Optional, cast, Union, List
+from typing import Any, Dict, List, Optional, Union, cast
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 

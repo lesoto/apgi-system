@@ -1,7 +1,8 @@
+from typing import Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import expit
-from typing import Union
 
 
 def ignition_probability(

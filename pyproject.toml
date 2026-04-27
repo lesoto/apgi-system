@@ -276,6 +276,10 @@ omit = [
     "*/.eggs/*",
 ]
 branch = true
+parallel = true
+concurrency = ["thread", "multiprocessing"]
+# Clean up stale coverage data to prevent DB corruption
+disable_warnings = ["module-not-measured"]
 
 [tool.coverage.report]
 precision = 2

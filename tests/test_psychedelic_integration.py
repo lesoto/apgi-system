@@ -12,8 +12,8 @@ Validates:
 7. OpenNeuro dataset information
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # Add project root to Python path
@@ -230,7 +230,7 @@ def test_flow_vs_psychedelic():
     logger.info("=" * 70)
 
     try:
-        from Psychological_States_GUI import PsychedelicAnalyzer, APGIParameters  # type: ignore
+        from Psychological_States_GUI import APGIParameters, PsychedelicAnalyzer  # type: ignore
 
         analyzer = PsychedelicAnalyzer()
 
@@ -327,7 +327,10 @@ def test_visualization_methods():
         return True
 
     try:
-        from Psychological_States_GUI import PsychedelicAnalyzer, PsychedelicVisualizer  # type: ignore
+        from Psychological_States_GUI import (  # type: ignore
+            PsychedelicAnalyzer,
+            PsychedelicVisualizer,
+        )
 
         analyzer = PsychedelicAnalyzer()
         visualizer = PsychedelicVisualizer(analyzer)

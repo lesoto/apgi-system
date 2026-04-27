@@ -147,6 +147,7 @@ class PerformanceMonitor:
     ) -> Optional[PerformanceMetrics]:
         """End timing a step and record metrics."""
         import time
+
         import psutil
 
         if not self.enabled or self.step_start_time is None:

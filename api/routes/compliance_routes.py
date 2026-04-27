@@ -1,5 +1,6 @@
+from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException, status
-from typing import Dict, Any
 
 from apgi_framework.compliance.compliance_framework import get_compliance_framework
 

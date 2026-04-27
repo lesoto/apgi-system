@@ -12,10 +12,10 @@ Handles California consumer rights including:
 
 import json
 import logging
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
-import shutil
 
 from apgi_framework.logging.audit_logger import get_audit_logger
 

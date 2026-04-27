@@ -14,8 +14,8 @@ import pytest
 # Ensure imports work
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from apgi_framework.main_controller import MainApplicationController
 from apgi_framework.exceptions import APGIFrameworkError
+from apgi_framework.main_controller import MainApplicationController
 
 
 class TestMainApplicationControllerInit:

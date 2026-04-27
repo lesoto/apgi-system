@@ -69,7 +69,7 @@ class PrivacyByDesignManager:
     Manager for privacy by design assessments and compliance.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.assessments: Dict[str, PrivacyAssessment] = {}
         self._initialize_framework_assessments()
 

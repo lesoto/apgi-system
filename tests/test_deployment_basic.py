@@ -4,16 +4,16 @@ Basic tests for deployment module core functionality.
 Tests only the DeploymentValidator class without dependencies on missing modules.
 """
 
-from pathlib import Path
-import tempfile
 import json
+import tempfile
 from datetime import datetime
+from pathlib import Path
 
 from apgi_framework.deployment.deployment_validator import (
-    DeploymentValidator,
     DeploymentValidationReport,
-    ValidationResult,
+    DeploymentValidator,
     ValidationPhase,
+    ValidationResult,
 )
 
 

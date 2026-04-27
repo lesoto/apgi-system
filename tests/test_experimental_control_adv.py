@@ -1,7 +1,7 @@
 from apgi_framework.experimental_control import (
     ConsciousnessMeasurementValidator,
-    ExperimentalIntegrityChecker,
     ExperimentalCondition,
+    ExperimentalIntegrityChecker,
 )
 
 

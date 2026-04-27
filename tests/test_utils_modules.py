@@ -22,7 +22,7 @@ try:
     from utils.cache_manager import CacheManager
     from utils.config_manager import ConfigManager
     from utils.data_validation import DataValidator
-    from utils.error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
+    from utils.error_handler import ErrorCategory, ErrorHandler, ErrorSeverity
     from utils.parameter_validator import APGIParameterValidator
     from utils.performance_profiler import PerformanceProfiler
 except ImportError as e:
@@ -476,8 +476,8 @@ class TestDataValidator:
 
     def test_data_quality_checks(self):
         """Test data quality assessment."""
-        import pandas as pd
         import numpy as np
+        import pandas as pd
 
         # Test with clean data - create DataFrame with required columns
         clean_data = pd.DataFrame(

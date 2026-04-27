@@ -5,14 +5,14 @@ Coordinates research, clinical, and falsification workflows by delegating
 to specialized orchestrators.
 """
 
-from typing import Dict, Any, Optional
+import logging
 from dataclasses import dataclass
 from enum import Enum
-import logging
+from typing import Any, Dict, Optional
 
-from .equation_orchestrator import EquationOrchestrator, EquationConfig
-from .data_orchestrator import DataOrchestrator, DataConfig
-from .analysis_orchestrator import AnalysisOrchestrator, AnalysisConfig
+from .analysis_orchestrator import AnalysisConfig, AnalysisOrchestrator
+from .data_orchestrator import DataConfig, DataOrchestrator
+from .equation_orchestrator import EquationConfig, EquationOrchestrator
 
 logger = logging.getLogger(__name__)
 

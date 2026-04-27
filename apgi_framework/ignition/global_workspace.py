@@ -4,6 +4,7 @@ Vectorized Global Workspace Implementation
 
 from enum import Enum
 from typing import Dict, Optional
+
 import numpy as np
 
 from ..types import ConfigDict

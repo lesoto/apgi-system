@@ -8,12 +8,12 @@ import logging
 import secrets
 import string
 from contextlib import contextmanager
-from typing import AsyncGenerator, Dict, Any, Generator
+from typing import Any, AsyncGenerator, Dict, Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from api.config import settings
 from api.database.models import Base, User
@@ -248,7 +248,7 @@ def check_database_health() -> bool:
         db = SessionLocal()
         try:
             # Simple health check using ORM-safe literal
-            from sqlalchemy import select, literal_column
+            from sqlalchemy import literal_column, select
 
             db.execute(select(literal_column("1")))
             logger.debug("Database health check passed")
@@ -275,7 +275,8 @@ def test_database_connection() -> Dict[str, Any]:
     """
     try:
         import time
-        from sqlalchemy import inspect, select, literal_column
+
+        from sqlalchemy import inspect, literal_column, select
 
         start_time = time.time()
 

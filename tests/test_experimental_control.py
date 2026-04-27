@@ -1,17 +1,17 @@
 import pytest
 
 from apgi_framework.experimental_control import (
-    ResponseSystemType,
-    TaskType,
+    ConsciousnessMeasurementValidator,
     ExperimentalControlManager,
+    ParticipantPopulationGenerator,
     ParticipantProfile,
     ParticipantSimulator,
-    ParticipantPopulationGenerator,
+    ResponseSystemType,
     StimulusProperties,
     StimulusValidator,
+    TaskType,
     TaskValidator,
     WellTrainedTaskChecker,
-    ConsciousnessMeasurementValidator,
 )
 
 

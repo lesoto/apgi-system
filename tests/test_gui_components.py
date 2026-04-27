@@ -50,11 +50,11 @@ except ImportError:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
-    from apgi_framework.monitoring.realtime_monitor import (
-        RealtimeDataStreamer,
-        MonitoringData,
-    )
     from apgi_framework.gui.monitoring_dashboard import MultiModalMonitoringDashboard
+    from apgi_framework.monitoring.realtime_monitor import (
+        MonitoringData,
+        RealtimeDataStreamer,
+    )
 
     GUI_COMPONENTS_AVAILABLE = True
 except ImportError as e:

@@ -8,15 +8,15 @@ ensuring proper engine registration, instantiation, and lifecycle management.
 import pytest
 
 from apgi_framework.engines import (
-    EngineRegistry,
-    EngineMetadata,
-    EngineType,
-    SomaticMarkerEngine,
-    ThresholdManager,
     APGIEquation,
+    EngineMetadata,
+    EngineRegistry,
+    EngineType,
     PrecisionCalculator,
     PredictionErrorProcessor,
     PredictiveIgnitionNetwork,
+    SomaticMarkerEngine,
+    ThresholdManager,
 )
 
 

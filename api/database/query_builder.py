@@ -5,11 +5,12 @@ Enforces parameterized queries and prevents SQL injection vulnerabilities.
 All database queries should use this module instead of raw SQL.
 """
 
-from typing import Any, Dict, List, Optional
-from sqlalchemy import select, insert, update, delete, and_, text
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, delete, insert, select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

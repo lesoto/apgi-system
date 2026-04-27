@@ -14,9 +14,8 @@ Requirements tested: 7.1, 7.2, 7.3, 7.4, 7.5
 
 from typing import Any
 
-import pytest
-
 import numpy as np
+import pytest
 
 from apgi_framework.experiments.tasks.attentional_blink import AttentionalBlinkTask, StimulusType
 from apgi_framework.experiments.tasks.binocular_rivalry import BinocularRivalryTask

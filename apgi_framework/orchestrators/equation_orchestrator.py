@@ -5,9 +5,9 @@ Handles initialization, execution, and validation of mathematical equations
 and computational models.
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,15 @@ class EquationOrchestrator:
     def _initialize_engines(self) -> None:
         """Initialize mathematical computation engines."""
         try:
-            from apgi_framework.engines.equation_engine import APGIEquation  # type: ignore[attr-defined]
-            from apgi_framework.engines.precision_engine import PrecisionCalculator  # type: ignore[attr-defined]
-            from apgi_framework.engines.prediction_error_engine import PredictionErrorProcessor  # type: ignore[attr-defined]
+            from apgi_framework.engines.equation_engine import (
+                APGIEquation,  # type: ignore[attr-defined]
+            )
+            from apgi_framework.engines.precision_engine import (
+                PrecisionCalculator,  # type: ignore[attr-defined]
+            )
+            from apgi_framework.engines.prediction_error_engine import (
+                PredictionErrorProcessor,  # type: ignore[attr-defined]
+            )
 
             self._engines["equation"] = APGIEquation()
             self._engines["precision"] = PrecisionCalculator()

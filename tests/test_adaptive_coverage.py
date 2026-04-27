@@ -5,17 +5,17 @@ Tests for adaptive staircases and stimulus generators.
 from datetime import datetime
 
 from apgi_framework.adaptive.quest_plus_staircase import (
-    QuestPlusStaircase,
     QuestPlusParameters,
+    QuestPlusStaircase,
 )
 from apgi_framework.adaptive.stimulus_generators import (
-    GaborPatchGenerator,
-    GaborParameters,
-    ToneGenerator,
-    ToneParameters,
     CO2PuffController,
     CO2PuffParameters,
+    GaborParameters,
+    GaborPatchGenerator,
     HeartbeatSynchronizer,
+    ToneGenerator,
+    ToneParameters,
 )
 
 
@@ -177,4 +177,4 @@ class TestStimulusGenerators:
             sync.monitoring_thread.join(timeout=1.0)
 
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch

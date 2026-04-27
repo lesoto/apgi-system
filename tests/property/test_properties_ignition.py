@@ -21,6 +21,7 @@ import numpy as np  # noqa: E402
 import yaml  # noqa: E402
 from hypothesis import HealthCheck, assume, given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
+
 from apgi_framework.ignition.global_workspace import GlobalWorkspace  # noqa: E402
 from apgi_framework.ignition.threshold import IgnitionThreshold  # noqa: E402
 from tests.strategies import (  # noqa: E402

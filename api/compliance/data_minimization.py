@@ -62,7 +62,7 @@ class DataMinimizationManager:
     and limited to what is necessary for the purposes.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._retention_policies: Dict[str, RetentionPolicy] = {}
         self._minimization_rules: Dict[str, List[str]] = {}
         self._anonymization_configs: Dict[str, AnonymizationConfig] = {}

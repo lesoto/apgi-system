@@ -15,14 +15,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-# Dependency checks moved to lifespan() to avoid import-time side effects
-
+from apgi_framework.security.startup_security_check import get_security_posture_report
 from api.config import settings
 from api.database.connection import close_db, init_db
 from api.exception_handlers import register_exception_handlers
 from api.middleware.alerting import configure_alerting
 from api.middleware.authentication import AuthenticationMiddleware
 from api.middleware.body_cache import RequestBodyCachingMiddleware
+from api.middleware.compliance import ComplianceMiddleware
 from api.middleware.csrf import CSRFMiddleware
 from api.middleware.deprecation import DeprecationMiddleware
 from api.middleware.https_redirect import HTTPSRedirectMiddleware
@@ -43,6 +43,7 @@ from api.middleware.serialization import OptimizedSerializationMiddleware
 from api.routes import (
     admin,
     auth,
+    compliance_routes,
     export,
     health,
     metrics,
@@ -52,12 +53,12 @@ from api.routes import (
     users,
     version,
     webhooks,
-    compliance_routes,
 )
 
 from .middleware.security_headers import SecurityHeadersMiddleware
-from api.middleware.compliance import ComplianceMiddleware
-from apgi_framework.security.startup_security_check import get_security_posture_report
+
+# Dependency checks moved to lifespan() to avoid import-time side effects
+
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -274,7 +275,7 @@ def create_app(test_mode: bool = False) -> FastAPI:
     app.add_middleware(PrometheusMetricsMiddleware)
 
     # Initialize SLO tracking for key endpoints
-    from apgi_framework.performance.slo_tracker import get_slo_tracker, SLOBudget
+    from apgi_framework.performance.slo_tracker import SLOBudget, get_slo_tracker
 
     slo_tracker = get_slo_tracker()
     # Register SLO budgets for critical endpoints

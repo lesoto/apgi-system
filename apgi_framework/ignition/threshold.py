@@ -3,6 +3,7 @@ Vectorized Ignition Threshold Computation
 """
 
 from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 from ..types import ConfigDict, FloatArray

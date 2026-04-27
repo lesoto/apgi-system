@@ -15,8 +15,8 @@ import pytest
 
 from apgi_framework.cli import (
     APGIFrameworkCLI,
-    validate_days_range,
     validate_coverage_threshold_range,
+    validate_days_range,
     validate_gain_range,
     validate_participants_range,
     validate_positive_int,

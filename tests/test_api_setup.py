@@ -16,8 +16,8 @@ def client() -> TestClient:
     app = create_app(test_mode=True)
 
     # Override authentication dependency for testing
-    from api.services.authorization import get_current_user
     from api.routes import health
+    from api.services.authorization import get_current_user
     from api.services.health_check import HealthCheckService
 
     async def override_get_current_user() -> None:

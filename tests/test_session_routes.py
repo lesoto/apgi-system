@@ -16,9 +16,9 @@ import pytest  # noqa: E402
 import redis.asyncio as redis  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from api.exceptions import SessionNotFoundError  # noqa: E402
 from api.main import create_app  # noqa: E402
 from api.routes import sessions  # noqa: E402
-from api.exceptions import SessionNotFoundError  # noqa: E402
 from api.services.session_manager import (  # noqa: E402
     SessionLifecycleState,
     SessionManager,
@@ -111,11 +111,11 @@ def client(mock_redis: AsyncMock, mock_session_manager: Mock) -> TestClient:
     sessions._redis_client = mock_redis  # type: ignore[attr-defined]
 
     # Mock authentication dependencies
-    from api.services import authorization as auth
-    from api.services.auth_manager import TokenPayload
-
     # Create mock user with admin role
     from datetime import datetime
+
+    from api.services import authorization as auth
+    from api.services.auth_manager import TokenPayload
 
     mock_user = TokenPayload(
         user_id="test-user-123",

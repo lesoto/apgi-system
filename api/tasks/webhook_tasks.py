@@ -4,14 +4,15 @@ Celery tasks for Webhook delivery and Dead Letter Queue management.
 
 import asyncio
 import logging
+from typing import Any
 
+import yaml
 from celery import Task  # type: ignore[import-untyped]
+
+from apgi_framework.platform_utils import get_resource_path
 from api.celery_app import celery_app
 from api.database.connection import get_db
-from typing import Any
 from api.services.webhook_manager import WebhookManager
-import yaml
-from apgi_framework.platform_utils import get_resource_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,9 @@ def process_webhooks_task() -> str:
 def dlq_failure_handler(self: Task, request: Any, exc: Exception, traceback: Any) -> None:
     """Handle Celery task failures by pushing them to a dead letter queue in Redis."""
     try:
-        from api.config import settings
         import redis
+
+        from api.config import settings
 
         redis_client = redis.Redis.from_url(settings.redis_url)
         dlq_payload = {

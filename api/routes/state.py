@@ -11,6 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from api.exceptions import SessionNotFoundError
 from api.models.schemas import (
     AllostaticState,
     BodyState,
@@ -38,7 +39,6 @@ from api.services.authorization import (
     has_any_role,
     require_permission,
 )
-from api.exceptions import SessionNotFoundError
 from api.services.session_manager import SessionManager, get_session_manager
 
 logger = logging.getLogger(__name__)

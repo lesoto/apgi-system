@@ -3,7 +3,7 @@ Menu bar component for the APGI GUI.
 """
 
 import tkinter as tk
-from typing import Callable, Dict, Any
+from typing import Any, Callable, Dict
 
 # Type alias for callback functions
 Callback = Callable[..., Any]

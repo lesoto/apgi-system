@@ -5,11 +5,12 @@ This module provides test coverage for the IntegratedDataManager class
 and related data management functionality.
 """
 
-import pytest
+import os
+import sys
 import tempfile
 from pathlib import Path
-import sys
-import os
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -281,6 +282,7 @@ class TestDataExportOperations:
         """Test CSV export functionality."""
         try:
             import pandas as pd
+
             from apgi_framework.data.data_exporter import DataExporter
 
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -316,8 +318,10 @@ class TestDataExportOperations:
     def test_export_to_json(self):
         """Test JSON export functionality."""
         try:
-            import pandas as pd
             import json
+
+            import pandas as pd
+
             from apgi_framework.data.data_exporter import DataExporter
 
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -350,6 +354,7 @@ class TestDataExportOperations:
         """Test exporting empty DataFrame."""
         try:
             import pandas as pd
+
             from apgi_framework.data.data_exporter import DataExporter
 
             with tempfile.TemporaryDirectory() as temp_dir:

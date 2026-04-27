@@ -5,13 +5,13 @@ Provides automatic fault detection and graceful degradation for
 external service dependencies.
 """
 
+import logging
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Optional, TypeVar
 from functools import wraps
-import logging
-import threading
+from typing import Any, Callable, Dict, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

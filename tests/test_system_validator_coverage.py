@@ -2,14 +2,16 @@
 Tests for SystemValidator module - covering system validation runs.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from apgi_framework.main_controller import MainApplicationController
 from apgi_framework.system_validator import (
     SystemValidator,
     ValidationLevel,
 )
-from apgi_framework.main_controller import MainApplicationController
 
 
 class TestSystemValidator:

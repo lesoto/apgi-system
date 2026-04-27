@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 from apgi_framework.logging.error_telemetry import (
     ErrorTelemetry,
+    enable_error_reporting,
     get_error_telemetry,
     report_error,
-    enable_error_reporting,
 )
 
 

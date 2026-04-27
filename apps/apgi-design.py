@@ -20,24 +20,24 @@ References:
   - Dehaene, S., et al. (2014). Experimental and theoretical approaches to conscious processing.
 """
 
-import sys
-from typing import Dict, List, Tuple, Optional
-from pathlib import Path
-from datetime import datetime
 import csv
 import json
 import logging
-from dataclasses import dataclass
+import sys
 from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
 try:
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.figure import Figure
     from matplotlib.gridspec import GridSpec
-    from matplotlib.colors import LinearSegmentedColormap
 
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
@@ -45,7 +45,7 @@ except ImportError:
     print("Warning: matplotlib not available. Visualization features disabled.")
 
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import filedialog, messagebox
 
 # Configure logging
 logging.basicConfig(
