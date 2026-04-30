@@ -5,10 +5,13 @@ This module provides a single point of configuration for all logging
 across the framework to eliminate redundancy and ensure consistency.
 """
 
+import json
 import logging
 import sys
+import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 class APGILogManager:
@@ -118,6 +121,45 @@ def get_logger(
         APGILogManager.setup_logging(log_file=log_file)
 
     return APGILogManager.get_logger(name, level)
+
+
+class StructuredAPGILogger:
+    """
+    Structured logger that outputs JSON-formatted log entries and supports correlation IDs.
+    """
+
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+
+    def _format_log_entry(self, level: str, message: str, **kwargs: Any) -> str:
+        """Format log entry as JSON."""
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": level,
+            "logger": self.logger.name,
+            "message": message,
+            "correlation_id": kwargs.pop("correlation_id", str(uuid.uuid4())),
+            **kwargs,
+        }
+        return json.dumps(log_entry)
+
+    def info(self, message: str, **kwargs: Any) -> None:
+        self.logger.info(self._format_log_entry("INFO", message, **kwargs))
+
+    def warning(self, message: str, **kwargs: Any) -> None:
+        self.logger.warning(self._format_log_entry("WARNING", message, **kwargs))
+
+    def error(self, message: str, **kwargs: Any) -> None:
+        self.logger.error(self._format_log_entry("ERROR", message, **kwargs))
+
+    def debug(self, message: str, **kwargs: Any) -> None:
+        self.logger.debug(self._format_log_entry("DEBUG", message, **kwargs))
+
+
+# Convenience function for structured logger
+def get_structured_logger(name: str) -> StructuredAPGILogger:
+    """Get a structured logger instance."""
+    return StructuredAPGILogger(name)
 
 
 # Auto-configure with sensible defaults when module is imported

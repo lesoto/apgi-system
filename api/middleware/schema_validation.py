@@ -40,6 +40,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         openapi_schema: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         fail_on_error: bool = False,
+        sensitive_paths: Optional[List[str]] = None,
     ) -> None:
         """
         Initialize the response schema validation middleware.
@@ -54,6 +55,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         self.openapi_schema = openapi_schema
         self.enabled = enabled
         self.fail_on_error = fail_on_error
+        self.sensitive_paths = sensitive_paths or ["/auth", "/admin", "/sessions", "/users"]
         self._schema_cache: Dict[str, Dict[str, Any]] = {}
 
         if enabled:
@@ -166,6 +168,11 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                     schema=schema,
                     validation_errors=validation_errors,
                 )
+
+                # Fail closed if sensitive path or explicitly requested
+                is_sensitive = any(path.startswith(p) for p in self.sensitive_paths)
+                if self.fail_on_error or is_sensitive:
+                    raise RuntimeError(f"Response validation failed for sensitive path: {path}")
 
         except Exception as e:
             logger.error(

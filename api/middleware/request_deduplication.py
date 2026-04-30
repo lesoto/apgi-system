@@ -57,6 +57,9 @@ class RequestDeduplicationCache:
         self._cache: Dict[str, CachedResponse] = {}
         self._access_times: Dict[str, float] = {}
         self._lock: Optional[asyncio.Lock] = None  # Asyncio lock for thread safety
+        self._in_flight: Dict[str, asyncio.Event] = (
+            {}
+        )  # Tracks in-flight requests to prevent thundering herd
         logger.info(f"Request deduplication cache initialized (max_size={max_size})")
 
     async def _get_lock(self) -> asyncio.Lock:
@@ -118,6 +121,41 @@ class RequestDeduplicationCache:
             # Update access time for LRU
             self._access_times[fingerprint] = time.time()
             return cached
+
+    async def get_or_wait(self, fingerprint: str) -> Tuple[Optional[CachedResponse], bool]:
+        """
+        Retrieve cached response or wait if the request is currently in flight.
+        Returns (cached_response, is_first).
+        is_first is True if this request is the first one and should execute the handler.
+        """
+        while True:
+            async with await self._get_lock():
+                # Check cache first
+                if fingerprint in self._cache:
+                    cached = self._cache[fingerprint]
+                    if not cached.is_expired():
+                        self._access_times[fingerprint] = time.time()
+                        return cached, False
+                    else:
+                        del self._cache[fingerprint]
+                        del self._access_times[fingerprint]
+
+                # If not cached, check if another request is in flight
+                if fingerprint in self._in_flight:
+                    event = self._in_flight[fingerprint]
+                else:
+                    self._in_flight[fingerprint] = asyncio.Event()
+                    return None, True
+
+            # Wait outside the lock for the in-flight request to finish
+            await event.wait()
+
+    async def release_in_flight(self, fingerprint: str) -> None:
+        """Release any waiters for this fingerprint."""
+        async with await self._get_lock():
+            if fingerprint in self._in_flight:
+                self._in_flight[fingerprint].set()
+                del self._in_flight[fingerprint]
 
     async def set(
         self,
@@ -228,6 +266,9 @@ class RequestDeduplicationMiddleware(BaseHTTPMiddleware):
         self.skip_methods = skip_methods or ("POST", "PUT", "DELETE", "PATCH")
         self.skip_paths = skip_paths or ("/health", "/metrics", "/admin")
 
+        # Register this middleware instance with the global manager
+        deduplication_manager.register_middleware(self)
+
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
@@ -261,8 +302,8 @@ class RequestDeduplicationMiddleware(BaseHTTPMiddleware):
         else:
             return await call_next(request)
 
-        # Check cache
-        cached = await self.cache.get(fingerprint)
+        # Check cache and handle concurrency
+        cached, is_first = await self.cache.get_or_wait(fingerprint)
         if cached:
             logger.debug(f"Cache hit for {request.method} {request.url.path}")
             return JSONResponse(
@@ -271,46 +312,50 @@ class RequestDeduplicationMiddleware(BaseHTTPMiddleware):
                 headers=cached.headers,
             )
 
-        # Process request
-        response = await call_next(request)
+        try:
+            # Process request
+            response = await call_next(request)
 
-        # Cache successful GET responses (2xx status codes)
-        if request.method == "GET" and 200 <= response.status_code < 300:
-            try:
-                # Read response body
-                body_bytes = b""
-                if hasattr(response, "body_iterator"):  # type: ignore[attr-defined]
-                    async for chunk in response.body_iterator:  # type: ignore[attr-defined]
-                        body_bytes += chunk
-                else:
-                    # Fallback for Response without body_iterator
-                    body_bytes = response.body
+            # Cache successful GET responses (2xx status codes)
+            if request.method == "GET" and 200 <= response.status_code < 300:
+                try:
+                    # Read response body
+                    body_bytes = b""
+                    if hasattr(response, "body_iterator"):  # type: ignore[attr-defined]
+                        async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+                            body_bytes += chunk
+                    else:
+                        # Fallback for Response without body_iterator
+                        body_bytes = response.body
 
-                # Parse as JSON
-                body_content = json.loads(body_bytes) if body_bytes else {}
+                    # Parse as JSON
+                    body_content = json.loads(body_bytes) if body_bytes else {}
 
-                # Cache response
-                headers = dict(response.headers)
-                headers["X-Request-Path"] = request.url.path
-                headers["X-Deduplicated"] = "false"
+                    # Cache response
+                    headers = dict(response.headers)
+                    headers["X-Request-Path"] = request.url.path
+                    headers["X-Deduplicated"] = "false"
 
-                await self.cache.set(
-                    fingerprint=fingerprint,
-                    status_code=response.status_code,
-                    body=body_content,
-                    headers=headers,
-                )
+                    await self.cache.set(
+                        fingerprint=fingerprint,
+                        status_code=response.status_code,
+                        body=body_content,
+                        headers=headers,
+                    )
 
-                # Return fresh response
-                return JSONResponse(
-                    content=body_content,
-                    status_code=response.status_code,
-                    headers=headers,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to cache response: {e}")
+                    # Return fresh response
+                    return JSONResponse(
+                        content=body_content,
+                        status_code=response.status_code,
+                        headers=headers,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to cache response: {e}")
 
-        return response
+            return response
+        finally:
+            if is_first:
+                await self.cache.release_in_flight(fingerprint)
 
 
 class DeduplicationManager:
@@ -321,6 +366,10 @@ class DeduplicationManager:
     """
 
     def __init__(self, middleware: Optional[RequestDeduplicationMiddleware] = None):
+        self.middleware = middleware
+
+    def register_middleware(self, middleware: RequestDeduplicationMiddleware) -> None:
+        """Register a middleware instance."""
         self.middleware = middleware
 
     def get_cache_stats(self) -> Optional[Dict[str, Any]]:
@@ -336,5 +385,5 @@ class DeduplicationManager:
         return 0
 
 
-# Global deduplication manager (populated when middleware is initialized)
-deduplication_manager: Optional[DeduplicationManager] = None
+# Global deduplication manager instance
+deduplication_manager = DeduplicationManager()

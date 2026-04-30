@@ -20,7 +20,6 @@ import tkinter as tk
 from collections import deque
 from datetime import datetime, timedelta
 from functools import wraps
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from tkinter import Menu, filedialog, messagebox, scrolledtext, ttk
 from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, TypeVar, cast
@@ -1053,33 +1052,11 @@ class GUIConfig:
         return padding
 
 
-def setup_logging() -> logging.Logger:
+def setup_logging() -> Any:
     """Setup comprehensive logging system"""
-    logger = logging.getLogger("APGIGUI")
-    logger.setLevel(logging.DEBUG)
+    from apgi_framework.logging.centralized_logging import get_structured_logger
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-
-    # File handler with rotation
-    file_handler = RotatingFileHandler("apgi_gui.log", maxBytes=1024 * 1024, backupCount=5)  # 1MB
-    file_handler.setLevel(logging.DEBUG)
-
-    # Formatter
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
-
-    # Avoid duplicate handlers
-    if logger.handlers:
-        for handler in list(logger.handlers):
-            logger.removeHandler(handler)
-
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-    return logger
+    return get_structured_logger("APGIGUI")
 
 
 # Initialize logger

@@ -33,10 +33,7 @@ from api.middleware.logging import (
 )
 from api.middleware.metrics import PrometheusMetricsMiddleware
 from api.middleware.rate_limiting import RateLimitingMiddleware
-from api.middleware.request_deduplication import (
-    RequestDeduplicationMiddleware,
-    deduplication_manager,
-)
+from api.middleware.request_deduplication import RequestDeduplicationMiddleware
 from api.middleware.request_size_limit import RequestSizeLimitMiddleware
 from api.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from api.middleware.serialization import OptimizedSerializationMiddleware
@@ -77,15 +74,31 @@ def run_dependency_checks() -> bool:
         return True
 
     try:
-        from utils.dependency_checker import check_dependencies
+        from utils.dependency_checker import check_dependencies, check_security_dependencies
 
-        if os.getenv("ENVIRONMENT") != "testing" and not check_dependencies():
-            logger.error("Dependency check failed")
+        # Run core dependency check
+        summary = check_dependencies(core_only=True)
+        if summary.get("overall_status") != "ready":
+            logger.error(f"Core dependency check failed: {summary}")
             if os.getenv("ENVIRONMENT") == "production":
-                raise RuntimeError("Dependency check failed. Refusing to start.")
+                raise RuntimeError("Critical core dependencies missing. Refusing to start.")
             return False
+
+        # Run security dependency check strictly in production
+        if os.getenv("ENVIRONMENT") == "production":
+            security_results = check_security_dependencies()
+            missing_security = [
+                name for name, (available, _, _, _) in security_results.items() if not available
+            ]
+            if missing_security:
+                logger.error(f"Security dependencies missing in production: {missing_security}")
+                raise RuntimeError(
+                    f"Security dependencies missing: {missing_security}. Refusing to start."
+                )
     except ImportError:
         logger.warning("Dependency checker not available. Continuing anyway...")
+    except RuntimeError:
+        raise
     except Exception as e:
         logger.warning(f"Error during dependency check: {e}. Continuing anyway...")
 
@@ -243,17 +256,12 @@ def create_app(test_mode: bool = False) -> FastAPI:
 
     # Add request deduplication middleware (early to avoid duplicate processing)
     if settings.request_dedup_enabled:
-        dedup_middleware = RequestDeduplicationMiddleware(
-            app=None,  # Will be set by FastAPI
-            max_size=settings.request_dedup_max_size,
-            default_ttl_seconds=settings.request_dedup_ttl_seconds,
-        )
+        # RequestDeduplicationMiddleware automatically populates deduplication_manager in its __init__
         app.add_middleware(
             RequestDeduplicationMiddleware,
             max_size=settings.request_dedup_max_size,
             default_ttl_seconds=settings.request_dedup_ttl_seconds,
         )
-        deduplication_manager.middleware = dedup_middleware
 
     # Configure CORS
     app.add_middleware(

@@ -175,6 +175,11 @@ class XXEProtector:
 
             return ET.fromstring(content)
         except ImportError:
+            import os
+
+            if os.getenv("ENVIRONMENT") == "production":
+                raise RuntimeError("defusedxml is required in production for secure XML parsing")
+
             import xml.etree.ElementTree as ET
 
             logger.warning("defusedxml not available, using standard XML parser")

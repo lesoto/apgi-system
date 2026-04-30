@@ -7,7 +7,6 @@ Provides complete control and visualization of all subsystems.
 
 import csv
 import json
-import logging
 import platform
 import threading
 import time
@@ -27,23 +26,15 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from apgi_framework.config_validator import ConfigValidationError, validate_config_file
+from apgi_framework.logging.centralized_logging import get_structured_logger
 from apgi_framework.platform_utils import get_data_dir, get_resource_path
 from apgi_framework.system import APGISystem
 
 # Import theme manager
 from apgi_gui.theme_manager import get_theme_manager
 
-# Configure logging for GUI
-logger = logging.getLogger(__name__)
-# Reduce logging verbosity for cleaner GUI startup
-logging.basicConfig(
-    level=logging.WARNING,  # Only show warnings and errors, not info/debug
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(str(get_data_dir() / "apgi_gui.log")),
-        # Only log to file, not console for cleaner startup
-    ],
-)
+# Initialize structured logger
+logger = get_structured_logger(__name__)
 
 
 class APGIGui:
@@ -194,6 +185,12 @@ class APGIGui:
 
         # Setup keyboard shortcuts
         self._setup_keyboard_shortcuts()
+
+    def _setup_logging(self) -> Any:
+        """Setup application logging."""
+        from apgi_framework.logging.centralized_logging import get_structured_logger
+
+        return get_structured_logger("APGIGUI")
 
     def _setup_keyboard_shortcuts(self) -> None:
         """Setup keyboard shortcuts for the application."""

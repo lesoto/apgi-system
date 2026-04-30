@@ -13,11 +13,9 @@ with no external browser dependencies, save options, or display capabilities.
 
 import hashlib
 import json
-import logging
 import os
 import shutil
 import signal
-import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -25,15 +23,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-    ],
-)
-logger = logging.getLogger(__name__)
+from apgi_framework.logging.centralized_logging import get_structured_logger
+
+logger = get_structured_logger(__name__)
 
 try:
     import httpx
@@ -333,11 +325,6 @@ class StateCategory(Enum):
     @property
     def display_name(self) -> str:
         return self._display_name
-
-
-# =============================================================================
-# ENHANCED EMBEDDED VISUALIZATION ENGINE
-# =============================================================================
 
 
 class EmbeddedVisualizationRenderer:

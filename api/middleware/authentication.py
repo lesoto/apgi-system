@@ -186,27 +186,26 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         # Create cache key from token hash
         token_hash = hashlib.sha256(token.encode()).hexdigest()
 
-        # Check cache first
+        # Check if token is blacklisted (must be done before cache hit)
+        async with AsyncSessionLocal() as db:
+            auth_manager = AuthManager(db)  # type: ignore[arg-type]
+            if await auth_manager.is_token_blacklisted(token):
+                raise InvalidTokenError("Token has been revoked")
+
+        # Check cache after blacklist check
         current_time = time.time()
         if token_hash in _token_cache:
             cached_payload, expiration = _token_cache[token_hash]
-            # Check if cache entry is still valid (before JWT expiration)
             if current_time < expiration:
                 logger.debug(f"Token cache hit for user {cached_payload.user_id}")
                 return cached_payload
             else:
-                # Cache expired, remove it
                 del _token_cache[token_hash]
                 logger.debug("Token cache entry expired, re-verifying")
 
         # Cache miss or expired - verify with database
         async with AsyncSessionLocal() as db:
             auth_manager = AuthManager(db)  # type: ignore[arg-type]
-
-            # Check if token is blacklisted before verification
-            if await auth_manager.is_token_blacklisted(token):
-                raise InvalidTokenError("Token has been revoked")
-
             payload = auth_manager.verify_token(token, expected_type="access")
 
             # Cache the result with TTL (token expiration or cache TTL, whichever is sooner)

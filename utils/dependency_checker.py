@@ -42,6 +42,23 @@ CORE_DEPENDENCIES = {
     "requests": {"min_version": "2.28.0", "description": "HTTP requests"},
 }
 
+# Security dependencies (required for production)
+SECURITY_DEPENDENCIES = {
+    "jwt": {
+        "min_version": "2.8.0",
+        "description": "JSON Web Token handling",
+        "package_name": "pyjwt",
+    },
+    "bcrypt": {"min_version": "4.1.0", "description": "Password hashing"},
+    "jose": {
+        "min_version": "3.3.0",
+        "description": "JOSE framework",
+        "package_name": "python-jose",
+    },
+    "RestrictedPython": {"min_version": "5.0", "description": "Restricted execution environment"},
+    "cryptography": {"min_version": "42.0.0", "description": "Low-level cryptography primitives"},
+}
+
 # Optional dependencies with version requirements
 OPTIONAL_DEPENDENCIES = {
     "pyautogui": {
@@ -223,6 +240,36 @@ def check_optional_dependencies() -> Dict[str, Tuple[bool, str, Optional[str], O
     return results
 
 
+def check_security_dependencies() -> Dict[str, Tuple[bool, str, Optional[str], Optional[str]]]:
+    """Check all security dependencies with version compatibility."""
+    results: Dict[str, Tuple[bool, str, Optional[str], Optional[str]]] = {}
+    print("Checking security dependencies:")
+    print("-" * 50)
+
+    for package_name, version_info in SECURITY_DEPENDENCIES.items():
+        # Use actual package name if specified, else use key
+        import_name = package_name
+        check_name = version_info.get("package_name", package_name)
+
+        is_available, message = check_import(import_name)
+        if is_available:
+            is_compatible, current_version, error = check_version_compatibility(
+                check_name, version_info["min_version"]
+            )
+            if is_compatible:
+                results[package_name] = (True, "✓", current_version, None)
+            else:
+                results[package_name] = (False, "⚠️", current_version, error)
+        else:
+            results[package_name] = (False, "✗", None, message)
+
+        print(f"  {results[package_name][1]} {package_name:<20} {version_info['description']}")
+        if results[package_name][3]:
+            print(f"    ⚠️  {results[package_name][3]}")
+
+    return results
+
+
 def generate_summary(
     core_results: Dict[str, Tuple[bool, str, Optional[str], Optional[str]]],
     optional_results: Dict[str, Tuple[bool, str, Optional[str], Optional[str]]],
@@ -308,6 +355,15 @@ def check_dependencies(install_missing=False, core_only=False) -> Dict[str, Any]
         print(
             f"Optional dependencies: {summary['optional_dependencies']['available']}/{summary['optional_dependencies']['total']} ({summary['optional_dependencies']['percentage']:.1f}%)"
         )
+
+        # Check security dependencies if not core-only
+        security_results = check_security_dependencies()
+        security_available = sum(
+            1 for is_available, _, _, _ in security_results.values() if is_available
+        )
+        security_total = len(security_results)
+        print(f"Security dependencies: {security_available}/{security_total}")
+
         print(f"Overall status: {summary['overall_status']}")
 
         if summary["version_issues"]:

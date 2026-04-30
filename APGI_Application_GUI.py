@@ -20,8 +20,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Initialize logger for fallback use
-logger = logging.getLogger(__name__)
+from apgi_framework.logging.centralized_logging import get_structured_logger
+
+# Initialize structured logger
+logger = get_structured_logger(__name__)
 
 import pandas as pd
 
@@ -243,10 +245,10 @@ except ImportError as e:
     try:
         from apgi_framework.logging.centralized_logging import get_logger
 
-        logger = get_logger("gui_import")
+        logger = get_logger("gui_import")  # type: ignore[assignment]
         logger.warning(f"Critical: Core APGI Framework modules not available: {e}")
     except ImportError:
-        logger = logging.getLogger("gui_import")
+        logger = logging.getLogger("gui_import")  # type: ignore[assignment]
         logger.warning(f"Critical: Core APGI Framework modules not available: {e}")
 
     # Set all missing components to None for graceful degradation

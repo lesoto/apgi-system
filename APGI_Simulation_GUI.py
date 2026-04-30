@@ -19,7 +19,6 @@ Version: 2.0.0
 """
 
 import json
-import logging
 import queue
 import sys
 import threading
@@ -27,7 +26,6 @@ import time
 import tkinter as tk
 from collections import deque
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Any, Callable, Dict, Optional, Tuple, Union
@@ -227,7 +225,9 @@ class APGISystemGUI:
         self.root.minsize(*GUIConfig.MIN_WINDOW_SIZE)
 
         # Setup logging
-        self.logger = self._setup_logging()
+        from apgi_framework.logging.centralized_logging import get_structured_logger
+
+        self.logger = get_structured_logger("APGIGUI")
         self.logger.info("Initializing APGI System GUI")
 
         # State variables
@@ -262,33 +262,6 @@ class APGISystemGUI:
 
         # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    def _setup_logging(self) -> logging.Logger:
-        """Setup application logging."""
-        logger = logging.getLogger("APGIGUI")
-        logger.setLevel(logging.DEBUG)
-
-        # Only add handlers if none exist (prevent duplicates)
-        if not logger.handlers:
-            # Console handler
-            console = logging.StreamHandler()
-            console.setLevel(logging.INFO)
-
-            # File handler
-            file_handler = RotatingFileHandler(
-                "apgi_simulation_gui.log", maxBytes=1024 * 1024, backupCount=5
-            )
-            file_handler.setLevel(logging.DEBUG)
-
-            # Formatter
-            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-            console.setFormatter(formatter)
-            file_handler.setFormatter(formatter)
-
-            logger.addHandler(console)
-            logger.addHandler(file_handler)
-
-        return logger
 
     def create_menu(self) -> None:
         """Create application menu bar."""
