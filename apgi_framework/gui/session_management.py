@@ -673,6 +673,8 @@ if __name__ == "__main__":
                 )
             )
 
+
+if __name__ == "__main__":
     # Launch GUI
     try:
         app = SessionManagementGUI()  # type: ignore[no-untyped-call]

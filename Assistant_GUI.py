@@ -2285,12 +2285,13 @@ class APGIGUI:
         # Model configuration variables
         self.memory_length_var = tk.IntVar(value=100)
         self.hidden_dim_var = tk.IntVar(value=256)
+        self.input_dim_var = tk.IntVar(value=128)
 
         # Physiology variables
         self.hr_var = tk.IntVar(value=70)
         self.hrv_var = tk.IntVar(value=50)
-        self.respiration_var = tk.IntVar(value=15)
-        self.skin_conductance_var = tk.DoubleVar(value=4.5)
+        self.resp_var = tk.IntVar(value=16)
+        self.eda_var = tk.DoubleVar(value=5.0)
 
         # Export settings
         self.export_settings: dict[str, Any] = {
@@ -2752,7 +2753,8 @@ class APGIGUI:
 
         # Respiration
         ttk.Label(physio_frame, text="Respiration:").grid(row=2, column=0, sticky="w", pady=2)
-        self.resp_var = tk.IntVar(value=16)
+        if not hasattr(self, "resp_var"):
+            self.resp_var = tk.IntVar(value=16)
         self.resp_slider = ttk.Scale(
             physio_frame,
             from_=GUIConfig.RESP_RANGE[0],
@@ -2768,7 +2770,8 @@ class APGIGUI:
 
         # EDA
         ttk.Label(physio_frame, text="Skin Conductance:").grid(row=3, column=0, sticky="w", pady=2)
-        self.eda_var = tk.DoubleVar(value=5.0)
+        if not hasattr(self, "eda_var"):
+            self.eda_var = tk.DoubleVar(value=5.0)
         self.eda_slider = ttk.Scale(
             physio_frame,
             from_=GUIConfig.EDA_RANGE[0],
@@ -7221,6 +7224,11 @@ Energy Usage:
         # Overall session overview
         total_queries = metrics.get("query_metrics", {}).get("total_queries", 0)
         total_states = metrics.get("state_metrics", {}).get("total_state_changes", 0)
+
+        # Initialize variables for recommendations check
+        avg_processing_time = 0
+        success_rate = 1.0
+        avg_energy = 0.0
 
         summary_parts.append(
             f"This report summarizes a session containing {total_queries} queries and "

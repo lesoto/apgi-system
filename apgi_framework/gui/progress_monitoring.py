@@ -239,6 +239,8 @@ if __name__ == "__main__":
             """Run the demo."""
             self.root.mainloop()
 
+
+if __name__ == "__main__":
     # Run demo
     demo = ProgressMonitorDemo()
     demo.run()

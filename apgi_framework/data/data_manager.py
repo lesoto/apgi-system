@@ -29,7 +29,7 @@ class IntegratedDataManager:
 
     def __init__(
         self,
-        base_output_dir: str = "apgi_outputs",
+        base_output_dir: str = "output",
         enable_dashboard: bool = True,
         dashboard_port: int = 8080,
     ):

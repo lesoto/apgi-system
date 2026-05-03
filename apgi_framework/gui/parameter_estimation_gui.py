@@ -148,7 +148,10 @@ else:
 
 
 try:
+    logger.info("Importing session_management...")
     from .session_management import ParticipantManager, SessionSetupManager
+
+    logger.info("All GUI component imports successful")
 except ImportError:
     if "SessionSetupManager" not in globals():
 

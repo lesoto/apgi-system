@@ -2,33 +2,193 @@
 
 This document provides a comprehensive analysis of each file in the `/utils` directory of the APGI System, explaining their functionality, purpose, and how they differ from one another.
 
+## Available GUI Applications
+
+Core Applications:
+  [✓] APGI GUI
+      APGI_GUI.py
+  [✓] APGI Application GUI
+      APGI_Application_GUI.py
+  [✓] Assistant GUI
+      Assistant_GUI.py
+  [✓] AI Assistant
+      AI_Assistant.py
+  [✓] APGI Simulation GUI
+      APGI_Simulation_GUI.py
+  [✓] Psychological States GUI
+      Psychological_States_GUI.py
+
+Analysis & Visualization:
+  [✓] Parameter Estimation GUI
+      apgi_framework/gui/parameter_estimation_gui.py
+  [✓] Interactive Dashboard
+      apgi_framework/gui/interactive_dashboard.py
+  [✓] Monitoring Dashboard
+      apgi_framework/gui/monitoring_dashboard.py
+  [✓] Web Monitoring Dashboard
+      apgi_framework/gui/web_monitoring_dashboard.py
+  [✓] Reporting & Visualization
+      apgi_framework/gui/reporting_visualization.py
+  [✓] Enhanced Monitoring Dashboard
+      apgi_framework/gui/enhanced_monitoring_dashboard.py
+  [✓] Results Viewer
+      apgi_framework/gui/results_viewer.py
+  [✓] Coverage Visualization
+      apgi_framework/gui/coverage_visualization.py
+  [✓] Real-time Data Stream
+      apgi_framework/gui/realtime_data_stream.py
+
+Configuration & Management:
+  [✓] Task Configuration
+      apgi_framework/gui/task_configuration.py
+  [✓] Session Management
+      apgi_framework/gui/session_management.py
+  [✓] Progress Monitoring
+      apgi_framework/gui/progress_monitoring.py
+  [✓] Error Handling
+      apgi_framework/gui/error_handling.py
+  [✓] Error Logging Utils
+      apgi_framework/gui/error_logging_utils.py
+  [✓] apgi GUI Main
+      apgi_gui/main.py
+
+Development & Testing:
+  [✓] Tests GUI
+      Tests_GUI.py
+  [✓] Utils GUI
+      Utils_GUI.py
+  [✓] GUI Template
+      apps/gui_template.py
+  [✓] APGI Design
+      apps/apgi-design.py
+  [✓] Script Runner GUI
+      utils/script_runner_gui.py
+  [✓] Framework Testing Main
+      apgi_framework/testing/main.py
+  [✓] GUI Test Runner
+      apgi_framework/testing/gui_test_runner.py
+
+CLI Tools & Framework:
+  [✓] Framework CLI
+      apgi_framework/cli.py
+  [✓] apgi GUI CLI
+      apgi_gui/cli.py
+  [✓] Diagnostics CLI
+      apgi_framework/validation/diagnostics_cli.py
+  [✓] Deployment CLI
+      apgi_framework/deployment/cli.py
+  [✓] Deployment Automation
+      apgi_framework/deployment/automation.py
+  [✓] Main Controller
+      apgi_framework/main_controller.py
+  [✓] Installation Validator
+      apgi_framework/installation_validator.py
+  [✓] Module Mode
+      apgi_framework/__main__.py
+
+API & Backend:
+  [✓] API Server
+      api/main.py
+  [✓] Celery App
+      api/celery_app.py
+
+Testing & Benchmarks:
+  [✓] Comprehensive Test Runner
+      benchmarks/run_tests.py
+  [✓] Coverage Runner
+      benchmarks/run_coverage.py
+  [✓] Performance Benchmarks
+      benchmarks/test_performance.py
+  [✓] Critical Path Profiling
+      benchmarks/critical_path_profiling.py
+
+Utilities & Tools:
+  [✓] Delete Cache
+      delete_pycache.py
+  [✓] Backup Manager
+      utils/backup_manager.py
+  [✓] Diagnostics
+      utils/diagnostics.py
+  [✓] Performance Dashboard
+      utils/static_dashboard_generator.py
+  [✓] Pipeline Visualization
+      utils/pipeline_visualization.py
+  [✓] Report Generator
+      utils/report_generator.py
+  [✓] Tutorial
+      utils/tutorial.py
+  [✓] Validate App
+      utils/validate_app.py
+  [✓] Dependency Checker
+      utils/dependency_checker.py
+  [✓] Config Manager
+      utils/config_manager.py
+  [✓] Cache Manager
+      utils/cache_manager.py
+  [✓] Data Processor
+      utils/data_processor.py
+  [✓] Batch Processor
+      utils/batch_processor.py
+  [✓] Sample Data Generator
+      utils/sample_data_generator.py
+  [✓] Demo Analysis
+      utils/demo_analysis.py
+  [✓] Basic Simulation
+      utils/basic_simulation.py
+  [✓] Gap Analyzer
+      utils/analyze_gaps.py
+  [✓] Data Validation
+      utils/data_validation.py
+  [✓] Error Handler
+      utils/error_handler.py
+  [✓] Parameter Validator
+      utils/parameter_validator.py
+  [✓] GUI Testing Framework
+      utils/gui_testing_framework.py
+  [✓] Deployment Validator
+      apgi_framework/deployment/deployment_validator.py
+
+Examples & Tutorials:
+  [✓] Primary Falsification Test
+      examples/01_run_primary_falsification_test.py
+  [✓] Batch Processing Config
+      examples/02_batch_processing_configurations.py
+  [✓] Custom Analysis Results
+      examples/03_custom_analysis_saved_results.py
+  [✓] Extending Falsification Criteria
+      examples/04_extending_falsification_criteria.py
+  [✓] Data Loader Example
+      examples/08_data_loader.py
+  [✓] Coverage Collector Demo
+      examples/05_coverage_collector.py
+
 ## File Categories Overview
 
 The utils directory contains 13 Python files that can be categorized into five main groups:
 
-1. **Simulation & Analysis Scripts** - Core system demonstration and analysis tools
-2. **System Validation & Testing** - Validation, testing, and debugging utilities
-3. **Application Launchers** - GUI and application startup scripts
-4. **Development & Build Tools** - Dependency checking, build validation, and release management
-5. **Utility Libraries** - Reusable utility modules for common operations
+1. __Simulation & Analysis Scripts__ - Core system demonstration and analysis tools
+2. __System Validation & Testing__ - Validation, testing, and debugging utilities
+3. __Application Launchers__ - GUI and application startup scripts
+4. __Development & Build Tools__ - Dependency checking, build validation, and release management
+5. __Utility Libraries__ - Reusable utility modules for common operations
 
 ## 1. Simulation & Analysis Scripts
 
 ### `basic_simulation.py`
 
-**Purpose**: A configurable demonstration of APGI System's core simulation capabilities with CLI options.
+__Purpose__: A configurable demonstration of APGI System's core simulation capabilities with CLI options.
 
-**Key Features**:
+__Key Features__:
 
-- **Command-line interface** with argparse for flexible configuration
-- **Configurable parameters**: duration, input size, noise level, output file
-- **Quick mode**: `--quick` flag for 100ms validation runs
-- **Headless support**: `--no-plot` flag for automated environments
-- **Enhanced visualization**: 4-panel plots with customizable output
-- **Time tracking**: Uses `datetime_utils` for performance measurement
-- **Robust error handling**: Graceful handling of dependencies and exceptions
+- __Command-line interface__ with argparse for flexible configuration
+- __Configurable parameters__: duration, input size, noise level, output file
+- __Quick mode__: `--quick` flag for 100ms validation runs
+- __Headless support__: `--no-plot` flag for automated environments
+- __Enhanced visualization__: 4-panel plots with customizable output
+- __Time tracking__: Uses `datetime_utils` for performance measurement
+- __Robust error handling__: Graceful handling of dependencies and exceptions
 
-**CLI Options**:
+__CLI Options__:
 
 - `--duration`: Simulation duration (default: 1000ms)
 - `--input-size`: Sensory input vector size (default: 256)
@@ -39,20 +199,20 @@ The utils directory contains 13 Python files that can be categorized into five m
 - `--config`: Custom configuration file path
 - `--quick`: Quick mode (100ms, no plots)
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Most flexible simulation** - fully configurable via command line
-- **Production-ready** - comprehensive error handling and logging
-- **Automated testing friendly** - supports headless and quick modes
-- **Integration with datetime utilities** - proper timing and duration formatting
+- __Most flexible simulation__ - fully configurable via command line
+- __Production-ready__ - comprehensive error handling and logging
+- __Automated testing friendly__ - supports headless and quick modes
+- __Integration with datetime utilities__ - proper timing and duration formatting
 
-**Differentiation**: The most robust and configurable simulation script, suitable for both development and production use.
+__Differentiation__: The most robust and configurable simulation script, suitable for both development and production use.
 
 ### `demo_simulation.py`
 
-**Purpose**: A more comprehensive demonstration that showcases system features with detailed output formatting.
+__Purpose__: A more comprehensive demonstration that showcases system features with detailed output formatting.
 
-**Key Features**:
+__Key Features__:
 
 - Uses explicit configuration file loading (`config/default.yaml`)
 - Runs a 1-second simulation but with richer output
@@ -64,38 +224,38 @@ The utils directory contains 13 Python files that can be categorized into five m
   - Neural oscillations (band powers)
   - System summary with somatic markers
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Comprehensive output formatting** - uses structured sections with clear headers
-- **Subsystem focus** - shows detailed state of each system component
-- **Configuration-aware** - explicitly loads config file
-- **User guidance** - provides instructions for GUI launch
+- __Comprehensive output formatting__ - uses structured sections with clear headers
+- __Subsystem focus__ - shows detailed state of each system component
+- __Configuration-aware__ - explicitly loads config file
+- __User guidance__ - provides instructions for GUI launch
 
-**Differentiation**: More detailed than `basic_simulation.py` but less analytical than `demo_analysis.py`. Focuses on showing system state rather than performance metrics.
+__Differentiation__: More detailed than `basic_simulation.py` but less analytical than `demo_analysis.py`. Focuses on showing system state rather than performance metrics.
 
 ### `demo_analysis.py`
 
-**Purpose**: Demonstrates the extended analysis capabilities of the APGI System after simulation runs.
+__Purpose__: Demonstrates the extended analysis capabilities of the APGI System after simulation runs.
 
-**Key Features**:
+__Key Features__:
 
 - Runs a 5-second simulation then performs comprehensive post-analysis
 - Uses the `analyze_simulation_run()` function for deep insights
 - Provides detailed statistics across multiple domains:
-  - **Ignition Statistics**: rate, intervals, durations
-  - **Energy Budget**: consumption, reserves, depletion rates
-  - **Somatic Markers**: capacity, retrieval success, learning events
-  - **Coherence Metrics**: mean/current coherence, phenomenal unity
-  - **Temporal Dynamics**: ranges of key variables over time
+  - __Ignition Statistics__: rate, intervals, durations
+  - __Energy Budget__: consumption, reserves, depletion rates
+  - __Somatic Markers__: capacity, retrieval success, learning events
+  - __Coherence Metrics__: mean/current coherence, phenomenal unity
+  - __Temporal Dynamics__: ranges of key variables over time
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Analysis-focused** - primary purpose is post-simulation analysis, not the simulation itself
-- **Statistical depth** - provides comprehensive metrics and performance indicators
-- **Research-oriented** - designed for scientific analysis and system evaluation
-- **No visualization** - focuses on numerical analysis rather than plots
+- __Analysis-focused__ - primary purpose is post-simulation analysis, not the simulation itself
+- __Statistical depth__ - provides comprehensive metrics and performance indicators
+- __Research-oriented__ - designed for scientific analysis and system evaluation
+- __No visualization__ - focuses on numerical analysis rather than plots
 
-**Differentiation**: The only file focused purely on analysis rather than simulation. Provides the deepest insights into system behavior patterns.
+__Differentiation__: The only file focused purely on analysis rather than simulation. Provides the deepest insights into system behavior patterns.
 
 ---
 
@@ -103,73 +263,73 @@ The utils directory contains 13 Python files that can be categorized into five m
 
 ### `validate_app.py`
 
-**Purpose**: Comprehensive application validation that tests all core functionality including GUI launch.
+__Purpose__: Comprehensive application validation that tests all core functionality including GUI launch.
 
-**Key Features**:
+__Key Features__:
 
-- **Multi-stage validation** with 7 distinct test categories:
+- __Multi-stage validation__ with 7 distinct test categories:
   1. Core dependency imports (numpy, scipy, matplotlib, yaml, tkinter)
   2. Configuration file validation
   3. APGI System initialization
   4. System step execution with state validation
   5. GUI dependency verification
-  6. **GUI launch testing** - opens and closes GUI window automatically
+  6. __GUI launch testing__ - opens and closes GUI window automatically
   7. Experimental task imports
-- **Structured testing** with clear pass/fail reporting
-- **State validation** - checks for required keys in system state output
-- **Configuration validation** - verifies required config sections exist
-- **GUI validation** - tests actual GUI window creation and closing
+- __Structured testing__ with clear pass/fail reporting
+- __State validation__ - checks for required keys in system state output
+- __Configuration validation__ - verifies required config sections exist
+- __GUI validation__ - tests actual GUI window creation and closing
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Most comprehensive validation** - tests entire application stack including GUI
-- **Non-interactive GUI testing** - validates GUI without user interaction
-- **Educational feedback** - provides detailed success/failure information
-- **Readiness assessment** - determines if application is ready for use
+- __Most comprehensive validation__ - tests entire application stack including GUI
+- __Non-interactive GUI testing__ - validates GUI without user interaction
+- __Educational feedback__ - provides detailed success/failure information
+- __Readiness assessment__ - determines if application is ready for use
 
-**Differentiation**: The most thorough validation tool, covering everything from basic imports to GUI functionality.
+__Differentiation__: The most thorough validation tool, covering everything from basic imports to GUI functionality.
 
 ### `test_platform_utils.py`
 
-**Purpose**: Quick validation of platform utility functions across different operating systems.
+__Purpose__: Quick validation of platform utility functions across different operating systems.
 
-**Key Features**:
+__Key Features__:
 
 - Tests platform detection (`get_platform()`)
 - Validates bundled application detection (`is_bundled()`)
 - Checks configuration and data directory paths
 - Verifies resource path resolution for config files
-- **Minimal output** - just displays function results
+- __Minimal output__ - just displays function results
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Platform-focused** - specifically tests cross-platform compatibility
-- **Utility verification** - validates helper functions, not core system
-- **Instant feedback** - provides immediate results without complex analysis
-- **Development tool** - primarily for developers during platform-specific debugging
+- __Platform-focused__ - specifically tests cross-platform compatibility
+- __Utility verification__ - validates helper functions, not core system
+- __Instant feedback__ - provides immediate results without complex analysis
+- __Development tool__ - primarily for developers during platform-specific debugging
 
-**Differentiation**: Focuses on platform utilities rather than system simulation or GUI functionality.
+__Differentiation__: Focuses on platform utilities rather than system simulation or GUI functionality.
 
 ### `test_rate_limiter_debug.py`
 
-**Purpose**: Debugging script specifically for testing the API rate limiter functionality.
+__Purpose__: Debugging script specifically for testing the API rate limiter functionality.
 
-**Key Features**:
+__Key Features__:
 
-- **API-focused** - tests Redis-based rate limiting for web API
-- **Async/await pattern** - uses modern asynchronous programming
-- **Redis integration** - tests actual Redis connection and operations
-- **Debug output** - shows detailed request-by-request analysis
-- **Configurable testing** - tests specific client/endpoint combinations
+- __API-focused__ - tests Redis-based rate limiting for web API
+- __Async/await pattern__ - uses modern asynchronous programming
+- __Redis integration__ - tests actual Redis connection and operations
+- __Debug output__ - shows detailed request-by-request analysis
+- __Configurable testing__ - tests specific client/endpoint combinations
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Web API specific** - only relevant for the REST API components
-- **Database dependency** - requires Redis to be running
-- **Production debugging** - designed for troubleshooting live rate limiting
-- **Network testing** - tests actual network operations, not simulation
+- __Web API specific__ - only relevant for the REST API components
+- __Database dependency__ - requires Redis to be running
+- __Production debugging__ - designed for troubleshooting live rate limiting
+- __Network testing__ - tests actual network operations, not simulation
 
-**Differentiation**: The only file focused on web API infrastructure rather than the core simulation system.
+__Differentiation__: The only file focused on web API infrastructure rather than the core simulation system.
 
 ---
 
@@ -177,20 +337,20 @@ The utils directory contains 13 Python files that can be categorized into five m
 
 ### `run_gui.py`
 
-**Purpose**: Enhanced GUI launcher supporting both normal operation and testing modes.
+__Purpose__: Enhanced GUI launcher supporting both normal operation and testing modes.
 
-**Key Features**:
+__Key Features__:
 
-- **Dual-mode operation**: Normal launch and test mode
-- **Command-line interface** with argparse:
+- __Dual-mode operation__: Normal launch and test mode
+- __Command-line interface__ with argparse:
   - `--test`: Test mode (launches GUI briefly then closes)
   - `--test-duration`: Duration for test mode (default: 3 seconds)
-- **Normal launch**: Full GUI application with error handling
-- **Test mode**: Automated GUI validation for CI/CD pipelines
-- **Comprehensive error handling**: Graceful handling of all exceptions
-- **User feedback**: Clear status messages and error reporting
+- __Normal launch__: Full GUI application with error handling
+- __Test mode__: Automated GUI validation for CI/CD pipelines
+- __Comprehensive error handling__: Graceful handling of all exceptions
+- __User feedback__: Clear status messages and error reporting
 
-**Usage Examples**:
+__Usage Examples__:
 
 ```bash
 # Normal launch
@@ -203,14 +363,14 @@ python utils/run_gui.py --test
 python utils/run_gui.py --test --test-duration 5
 ```
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Consolidated functionality** - replaces separate test script
-- **Production-ready** - robust error handling and user feedback
-- **CI/CD friendly** - supports automated testing workflows
-- **Flexible configuration** - customizable test durations
+- __Consolidated functionality__ - replaces separate test script
+- __Production-ready__ - robust error handling and user feedback
+- __CI/CD friendly__ - supports automated testing workflows
+- __Flexible configuration__ - customizable test durations
 
-**Differentiation**: The only launcher that supports both user operation and automated testing, consolidating functionality from multiple scripts.
+__Differentiation__: The only launcher that supports both user operation and automated testing, consolidating functionality from multiple scripts.
 
 ---
 
@@ -218,40 +378,40 @@ python utils/run_gui.py --test --test-duration 5
 
 ### `build_common.py`
 
-**Purpose**: Build utilities for packaging and deployment of the APGI system.
+__Purpose__: Build utilities for packaging and deployment of the APGI system.
 
-**Key Features**:
+__Key Features__:
 
-- **Version management**: Extract and manage version information
-- **Dependency analysis**: Analyze project dependencies from multiple sources
-- **Resource collection**: Gather project resources for packaging
-- **Hidden import detection**: Identify hidden imports for PyInstaller
-- **Build configuration**: Centralized build settings and parameters
-- **Module exclusion**: Define which modules to exclude from packaging
+- __Version management__: Extract and manage version information
+- __Dependency analysis__: Analyze project dependencies from multiple sources
+- __Resource collection__: Gather project resources for packaging
+- __Hidden import detection__: Identify hidden imports for PyInstaller
+- __Build configuration__: Centralized build settings and parameters
+- __Module exclusion__: Define which modules to exclude from packaging
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Build-focused** - specifically for creating distributable packages
-- **Multi-format support** - handles requirements.txt and pyproject.toml
-- **Packaging integration** - designed for PyInstaller and similar tools
-- **Cross-platform awareness** - considers platform-specific requirements
+- __Build-focused__ - specifically for creating distributable packages
+- __Multi-format support__ - handles requirements.txt and pyproject.toml
+- __Packaging integration__ - designed for PyInstaller and similar tools
+- __Cross-platform awareness__ - considers platform-specific requirements
 
-**Differentiation**: The only file focused on build and packaging workflows rather than system functionality.
+__Differentiation__: The only file focused on build and packaging workflows rather than system functionality.
 
 ### `dependency_checker.py`
 
-**Purpose**: Comprehensive dependency checking with installation guidance.
+__Purpose__: Comprehensive dependency checking with installation guidance.
 
-**Key Features**:
+__Key Features__:
 
-- **Multi-level checking**: Python version, packages, and system services
-- **Platform-specific validation**: Different checks for macOS/Linux
-- **Installation guidance**: Provides specific installation instructions
-- **Service verification**: Checks Redis and PostgreSQL availability
-- **Interactive mode**: Asks user confirmation when issues found
-- **Silent mode**: For automated environments
+- __Multi-level checking__: Python version, packages, and system services
+- __Platform-specific validation__: Different checks for macOS/Linux
+- __Installation guidance__: Provides specific installation instructions
+- __Service verification__: Checks Redis and PostgreSQL availability
+- __Interactive mode__: Asks user confirmation when issues found
+- __Silent mode__: For automated environments
 
-**Validation Categories**:
+__Validation Categories__:
 
 - Python version (3.8+ required)
 - Core scientific packages (numpy, scipy, matplotlib, etc.)
@@ -259,50 +419,50 @@ python utils/run_gui.py --test --test-duration 5
 - GUI packages (tkinter)
 - System services (Redis, PostgreSQL)
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Most comprehensive dependency tool** - covers all aspects of system requirements
-- **User-friendly guidance** - provides specific installation commands
-- **Production-ready** - supports both interactive and automated workflows
-- **Service awareness** - checks external dependencies beyond Python packages
+- __Most comprehensive dependency tool__ - covers all aspects of system requirements
+- __User-friendly guidance__ - provides specific installation commands
+- __Production-ready__ - supports both interactive and automated workflows
+- __Service awareness__ - checks external dependencies beyond Python packages
 
-**Differentiation**: The most thorough dependency validation tool, covering both Python packages and system services.
+__Differentiation__: The most thorough dependency validation tool, covering both Python packages and system services.
 
 ### `installer_utils.py`
 
-**Purpose**: Installation utilities for creating distributable packages.
+__Purpose__: Installation utilities for creating distributable packages.
 
-**Key Features**:
+__Key Features__:
 
-- **Virtual environment management**: Create and manage Python virtual environments
-- **Package installation**: Install individual packages or from requirements files
-- **System information gathering**: Collect platform and hardware information
-- **Windows installer generation**: Create Inno Setup scripts for Windows
-- **Registry management**: Generate Windows registry entries
-- **Installation validation**: Verify successful installation
+- __Virtual environment management__: Create and manage Python virtual environments
+- __Package installation__: Install individual packages or from requirements files
+- __System information gathering__: Collect platform and hardware information
+- __Windows installer generation__: Create Inno Setup scripts for Windows
+- __Registry management__: Generate Windows registry entries
+- __Installation validation__: Verify successful installation
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Installation-focused** - specifically for setting up the system on new machines
-- **Cross-platform support** - handles Windows, macOS, and Linux differences
-- **Professional packaging** - creates proper installers with registry entries
-- **System integration** - integrates with operating system features
+- __Installation-focused__ - specifically for setting up the system on new machines
+- __Cross-platform support__ - handles Windows, macOS, and Linux differences
+- __Professional packaging__ - creates proper installers with registry entries
+- __System integration__ - integrates with operating system features
 
-**Differentiation**: The only file focused on installation and setup workflows rather than system operation.
+__Differentiation__: The only file focused on installation and setup workflows rather than system operation.
 
 ### `release.py`
 
-**Purpose**: Release management utilities for versioning and deployment.
+__Purpose__: Release management utilities for versioning and deployment.
 
-**Key Features**:
+__Key Features__:
 
-- **Version management**: Increment versions (major, minor, patch)
-- **Git integration**: Create and push version tags
-- **Changelog management**: Generate and update changelog entries
-- **Build automation**: Build source distributions and wheels
-- **Release workflow**: Complete release process automation
+- __Version management__: Increment versions (major, minor, patch)
+- __Git integration__: Create and push version tags
+- __Changelog management__: Generate and update changelog entries
+- __Build automation__: Build source distributions and wheels
+- __Release workflow__: Complete release process automation
 
-**Release Process**:
+__Release Process__:
 
 1. Version incrementing
 2. Changelog updates
@@ -310,14 +470,14 @@ python utils/run_gui.py --test --test-duration 5
 4. Package building
 5. Distribution preparation
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Release-focused** - specifically for managing software releases
-- **Git integration** - integrates with version control workflows
-- **Automated building** - handles PyPI package creation
-- **Professional workflow** - follows software release best practices
+- __Release-focused__ - specifically for managing software releases
+- __Git integration__ - integrates with version control workflows
+- __Automated building__ - handles PyPI package creation
+- __Professional workflow__ - follows software release best practices
 
-**Differentiation**: The only file focused on release management and distribution workflows.
+__Differentiation__: The only file focused on release management and distribution workflows.
 
 ---
 
@@ -325,19 +485,19 @@ python utils/run_gui.py --test --test-duration 5
 
 ### `datetime_utils.py`
 
-**Purpose**: Comprehensive datetime utilities for consistent timestamp handling throughout the APGI system.
+__Purpose__: Comprehensive datetime utilities for consistent timestamp handling throughout the APGI system.
 
-**Key Features**:
+__Key Features__:
 
-- **Timezone safety**: All functions handle timezone-aware datetime objects
-- **Timestamp parsing**: Support multiple ISO timestamp formats
-- **Duration formatting**: Human-readable duration strings (e.g., "1h 23m 45.6s")
-- **Simulation time utilities**: Specialized functions for simulation timing
-- **Elapsed time tracking**: Calculate and format elapsed time periods
-- **Unix timestamp conversion**: Convert between datetime and Unix timestamps
-- **Duration parsing**: Parse duration strings like "1h 30m" to milliseconds
+- __Timezone safety__: All functions handle timezone-aware datetime objects
+- __Timestamp parsing__: Support multiple ISO timestamp formats
+- __Duration formatting__: Human-readable duration strings (e.g., "1h 23m 45.6s")
+- __Simulation time utilities__: Specialized functions for simulation timing
+- __Elapsed time tracking__: Calculate and format elapsed time periods
+- __Unix timestamp conversion__: Convert between datetime and Unix timestamps
+- __Duration parsing__: Parse duration strings like "1h 30m" to milliseconds
 
-**Core Functions**:
+__Core Functions__:
 
 - `utc_now()`: Get current UTC time
 - `format_duration_ms()`: Format milliseconds to human-readable strings
@@ -346,14 +506,14 @@ python utils/run_gui.py --test --test-duration 5
 - `format_simulation_time()`: Format simulation time for display
 - `parse_duration()`: Parse duration strings to milliseconds
 
-**Unique Characteristics**:
+__Unique Characteristics__:
 
-- **Comprehensive coverage** - handles all common datetime operations
-- **Simulation-focused** - includes utilities specific to simulation timing
-- **Timezone-safe** - prevents common timezone comparison issues
-- **Performance optimized** - efficient operations for time-critical code
+- __Comprehensive coverage__ - handles all common datetime operations
+- __Simulation-focused__ - includes utilities specific to simulation timing
+- __Timezone-safe__ - prevents common timezone comparison issues
+- __Performance optimized__ - efficient operations for time-critical code
 
-**Differentiation**: The most comprehensive datetime utility library, specifically enhanced for simulation and timing needs.
+__Differentiation__: The most comprehensive datetime utility library, specifically enhanced for simulation and timing needs.
 
 ---
 
@@ -413,17 +573,17 @@ python utils/run_gui.py --test --test-duration 5
 
 ### Consolidation Improvements
 
-- **Merged functionality**: `test_gui_launch.py` functionality moved to `run_gui.py`
-- **Enhanced validation**: GUI launch testing added to `validate_app.py`
-- **Improved simulation**: `basic_simulation.py` now fully configurable with CLI options
-- **Enhanced utilities**: `datetime_utils.py` expanded with comprehensive time handling
+- __Merged functionality__: `test_gui_launch.py` functionality moved to `run_gui.py`
+- __Enhanced validation__: GUI launch testing added to `validate_app.py`
+- __Improved simulation__: `basic_simulation.py` now fully configurable with CLI options
+- __Enhanced utilities__: `datetime_utils.py` expanded with comprehensive time handling
 
 ### Quality Improvements
 
-- **Error handling**: All scripts now have robust exception handling
-- **Type hints**: Comprehensive type annotations throughout
-- **Documentation**: Enhanced docstrings and usage examples
-- **CLI interfaces**: Consistent argument parsing with help text
+- __Error handling__: All scripts now have robust exception handling
+- __Type hints__: Comprehensive type annotations throughout
+- __Documentation__: Enhanced docstrings and usage examples
+- __CLI interfaces__: Consistent argument parsing with help text
 
 ### Removed Files
 

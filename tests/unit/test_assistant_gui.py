@@ -108,8 +108,12 @@ class TestAssistantGUIInitialization:
             assert hasattr(app, "session_file")
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_gui_initializes_with_default_config(self):
@@ -136,8 +140,12 @@ class TestAssistantGUIInitialization:
             assert app.response_display is not None
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_gui_creates_all_ui_panels(self):
@@ -163,8 +171,12 @@ class TestAssistantGUIInitialization:
             assert app.response_display.winfo_exists()
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 class TestQueryProcessing:
@@ -219,8 +231,12 @@ class TestQueryProcessing:
             assert app.query_input.get(1.0, tk.END).strip() == "Test query"
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_query_type_classification(self):
@@ -242,8 +258,12 @@ class TestQueryProcessing:
             assert app._classify_query_type("Hello") == "general"
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 class TestUIInteractions:
@@ -268,8 +288,12 @@ class TestUIInteractions:
             assert app.query_input.get(1.0, tk.END).strip() == ""
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_status_updates(self):
@@ -290,8 +314,12 @@ class TestUIInteractions:
             assert isinstance(initial_text, str)
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_progress_bar_updates(self):
@@ -319,8 +347,12 @@ class TestUIInteractions:
             progress.hide()
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 class TestDataManagement:
@@ -346,8 +378,12 @@ class TestDataManagement:
             assert app.query_history[-1]["response"] == "Assistant response"
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_export_conversation_to_json(self):
@@ -388,8 +424,12 @@ class TestDataManagement:
                 os.unlink(json_filename)
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_configuration_persistence(self):
@@ -435,8 +475,12 @@ class TestDataManagement:
             app.hidden_dim_var.set(original_hidden_dim)
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 class TestErrorHandling:
@@ -473,8 +517,12 @@ class TestErrorHandling:
             app.assistant = original_assistant
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_invalid_query_handling(self):
@@ -497,8 +545,12 @@ class TestErrorHandling:
             assert "empty" in error_msg.lower()
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 class TestThreadingAndAsync:
@@ -527,8 +579,12 @@ class TestThreadingAndAsync:
             assert callable(app.process_query)
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
     @pytest.mark.skipif(not HAS_ASSISTANT_GUI, reason="APGIGUI not available")
     def test_ui_update_threading(self):
@@ -555,8 +611,12 @@ class TestThreadingAndAsync:
             assert app.status_label.cget("text") != initial_status
 
         finally:
-            root.quit()
-            root.destroy()
+            try:
+                if root.winfo_exists():
+                    root.quit()
+                    root.destroy()
+            except tk.TclError:
+                pass
 
 
 if __name__ == "__main__":

@@ -5843,6 +5843,12 @@ class APGIVisualizerGUI:
             self.canvas = self.embedded_display
             self.parameter_controls: Dict[str, Any] = {}  # Compatibility for tests
 
+            # Initialize missing variables referenced in save_parameters
+            self.pi_e_var = tk.StringVar(value="1.0")
+            self.pi_i_var = tk.StringVar(value="1.0")
+            self.m_ca_var = tk.StringVar(value="0.0")
+            self.theta_t_var = tk.StringVar(value="0.5")
+
             # Matplotlib components
             self.matplotlib_canvas: Optional[FigureCanvasTkAgg] = None
             self.toolbar: Optional[NavigationToolbar2Tk] = None
@@ -8750,30 +8756,30 @@ class APGIVisualizerGUI:
                 raise ImportError(f"Simulation module not found: {sim_module_path}")
 
             try:
-                import importlib.util
+                # Try standard import first (safer on macOS)
+                import sys
 
-                spec = importlib.util.spec_from_file_location("APGI_Equations", sim_module_path)
-                if spec is None or spec.loader is None:
-                    raise ImportError(f"Could not create spec for {sim_module_path}")
-
-                APGI_module = importlib.util.module_from_spec(spec)
-
-                # Verify required classes exist before loading
-                required_classes = ["EnhancedSurpriseIgnitionSystem", "APGIParameters"]
-                missing_classes = []
+                if os.getcwd() not in sys.path:
+                    sys.path.insert(0, os.getcwd())
 
                 try:
+                    import APGI_Equations as APGI_module
+                except ImportError:
+                    # Fallback to dynamic loading
+                    import importlib.util
+
+                    spec = importlib.util.spec_from_file_location("APGI_Equations", sim_module_path)
+                    if spec is None or spec.loader is None:
+                        raise ImportError(f"Could not create spec for {sim_module_path}")
+
+                    APGI_module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(APGI_module)
 
-                    for class_name in required_classes:
-                        if not hasattr(APGI_module, class_name):
-                            missing_classes.append(class_name)
-
-                    if missing_classes:
-                        raise ImportError(f"Missing required classes: {missing_classes}")
-
-                except Exception as load_error:
-                    raise ImportError(f"Failed to load simulation module: {load_error}")
+                # Verify required classes exist
+                required_classes = ["EnhancedSurpriseIgnitionSystem", "APGIParameters"]
+                for class_name in required_classes:
+                    if not hasattr(APGI_module, class_name):
+                        raise ImportError(f"Missing required class: {class_name}")
 
                 SurpriseIgnitionSystem = APGI_module.EnhancedSurpriseIgnitionSystem
                 SimAPGIParameters = APGI_module.APGIParameters

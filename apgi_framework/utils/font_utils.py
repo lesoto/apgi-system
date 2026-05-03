@@ -51,17 +51,22 @@ def get_font_fallback(primary: str, *fallbacks: str) -> str:
     return "Arial"  # Most widely available
 
 
-# Common font families with fallbacks
-FONT_FAMILIES = {
-    "sans-serif": get_font_fallback("Arial", "Helvetica", "Verdana", "Tahoma", "sans-serif"),
-    "serif": get_font_fallback("Times New Roman", "Times", "Georgia", "serif"),
-    "monospace": get_font_fallback("Courier New", "Courier", "Consolas", "monospace"),
-}
+# Cache for font families
+_FONT_FAMILIES = None
 
-# Common font configurations
-STANDARD_FONT = FONT_FAMILIES["sans-serif"]
-BOLD_FONT = (FONT_FAMILIES["sans-serif"], 12, "bold")
-MONOSPACE_FONT = FONT_FAMILIES["monospace"]
+
+def get_font_families() -> dict:
+    """Get standard font families with lazy initialization."""
+    global _FONT_FAMILIES
+    if _FONT_FAMILIES is None:
+        _FONT_FAMILIES = {
+            "sans-serif": get_font_fallback(
+                "Arial", "Helvetica", "Verdana", "Tahoma", "sans-serif"
+            ),
+            "serif": get_font_fallback("Times New Roman", "Times", "Georgia", "serif"),
+            "monospace": get_font_fallback("Courier New", "Courier", "Consolas", "monospace"),
+        }
+    return _FONT_FAMILIES
 
 
 def get_font(size: int, weight: str = "normal", family: str = "sans-serif") -> Tuple[str, int, str]:
@@ -75,7 +80,7 @@ def get_font(size: int, weight: str = "normal", family: str = "sans-serif") -> T
     Returns:
         Font tuple for tkinter/CustomTkinter
     """
-    font_name = FONT_FAMILIES.get(family, "Arial")
+    font_name = get_font_families().get(family, "Arial")
 
     if weight == "bold":
         return (font_name, size, "bold")

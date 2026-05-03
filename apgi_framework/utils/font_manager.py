@@ -288,27 +288,35 @@ class FontManager:
 
 
 # Global font manager instance
-font_manager = FontManager()
+_font_manager = None
+
+
+def get_font_manager() -> FontManager:
+    """Get global font manager with lazy initialization."""
+    global _font_manager
+    if _font_manager is None:
+        _font_manager = FontManager()
+    return _font_manager
 
 
 def get_ui_font(size: int = 12) -> tkFont.Font:
     """Convenience function to get UI font."""
-    return font_manager.get_ui_font(size)
+    return get_font_manager().get_ui_font(size)
 
 
 def get_code_font(size: int = 11) -> tkFont.Font:
     """Convenience function to get code font."""
-    return font_manager.get_code_font(size)
+    return get_font_manager().get_code_font(size)
 
 
 def get_heading_font(size: int = 16, weight: str = "bold") -> tkFont.Font:
     """Convenience function to get heading font."""
-    return font_manager.get_heading_font(size, weight)
+    return get_font_manager().get_heading_font(size, weight)
 
 
 def get_body_font(size: int = 12) -> tkFont.Font:
     """Convenience function to get body font."""
-    return font_manager.get_body_font(size)
+    return get_font_manager().get_body_font(size)
 
 
 def configure_widget_fonts(
@@ -335,7 +343,7 @@ def configure_widget_fonts(
         else:
             size = 12
 
-    font_obj = font_manager.get_font(font_type, size)
+    font_obj = get_font_manager().get_font(font_type, size)
 
     try:
         widget.configure(font=font_obj)  # type: ignore
@@ -379,7 +387,7 @@ def get_preset_font(preset_name: str) -> tkFont.Font:
     preset = UI_FONT_PRESETS[preset_name]
     if len(preset) == 2:
         font_type, size = preset
-        return font_manager.get_font(str(font_type), int(size), weight="normal")
+        return get_font_manager().get_font(str(font_type), int(size), weight="normal")
     else:
         font_type, size, weight = preset
-        return font_manager.get_font(str(font_type), int(size), weight=str(weight))
+        return get_font_manager().get_font(str(font_type), int(size), weight=str(weight))

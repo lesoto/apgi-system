@@ -263,6 +263,8 @@ if __name__ == "__main__":
         def run(self) -> None:
             self.root.mainloop()
 
+
+if __name__ == "__main__":
     # Launch GUI
     gui = TaskConfigurationGUI()
     gui.run()

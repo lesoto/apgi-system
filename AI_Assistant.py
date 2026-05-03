@@ -2210,7 +2210,11 @@ class APGIVisualizer:
                     times = [e["timestamp"] - ts0 for e in energy_history]
             else:
                 # Fallback to simple index-based timing
-                times = list(range(len(energy_history)))
+                times = [float(i) for i in range(len(energy_history))]
+
+        # Ensure all elements in times are floats (not timedeltas)
+        if times and hasattr(times[0], "total_seconds"):
+            times = [t.total_seconds() for t in times]  # type: ignore[attr-defined]
         levels = [e["level"] for e in energy_history]
 
         fig, ax = plt.subplots(figsize=(10, 4))

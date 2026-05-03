@@ -127,8 +127,8 @@ class APGIConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     # Paths
-    data_directory: str = "data"
-    output_directory: str = "apgi_outputs"
+    data_directory: str = "dashboard_data"
+    output_directory: str = "output"
     backup_directory: str = "backups"
     temp_directory: str = "temp"
 
