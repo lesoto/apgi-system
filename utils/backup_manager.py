@@ -510,6 +510,23 @@ class BackupManager:
 
     def delete_backup(self, backup_id: str) -> bool:
         """Delete a backup."""
+        backup_exists = False
+
+        # Check if backup exists
+        for ext in [".zip", ".tar"]:
+            backup_file = self.backup_dir / f"{backup_id}{ext}"
+            if backup_file.exists():
+                backup_exists = True
+                break
+
+        metadata_file = self.backup_dir / f"{backup_id}_metadata.json"
+        if metadata_file.exists():
+            backup_exists = True
+
+        if not backup_exists:
+            apgi_logger.logger.warning(f"Backup not found: {backup_id}")
+            return False
+
         success = True
 
         # Delete backup file
@@ -524,7 +541,6 @@ class BackupManager:
                     success = False
 
         # Delete metadata file
-        metadata_file = self.backup_dir / f"{backup_id}_metadata.json"
         if metadata_file.exists():
             try:
                 metadata_file.unlink()

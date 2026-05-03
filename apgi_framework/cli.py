@@ -702,6 +702,61 @@ Examples:
         command = StatusCommand(self.controller)
         command.execute(args)
 
+    def set_parameters(self, args: argparse.Namespace) -> None:
+        """Set APGI parameters.
+
+        **Property 23f: Configuration management feature parity**
+
+        Delegates to SetParamsCommand for parameter setting.
+        """
+        from apgi_framework.commands.config import SetParamsCommand
+
+        command = SetParamsCommand(self.controller)
+        command.execute(args)
+
+    def run_individual_test(self, args: argparse.Namespace) -> None:
+        """Run individual test.
+
+        **Property 23g: Complete command coverage**
+
+        Delegates to RunTestCommand for test execution.
+        """
+        from apgi_framework.commands.test import RunTestCommand
+
+        command = RunTestCommand(self.controller)
+        command.execute(args)
+
+    def run_batch_experiments(self, args: argparse.Namespace) -> None:
+        """Run batch experiments.
+
+        **Property 23g: Complete command coverage**
+
+        Delegates to RunBatchCommand for batch execution.
+        """
+        from apgi_framework.commands.test import RunBatchCommand
+
+        command = RunBatchCommand(self.controller)
+        command.execute(args)
+
+    def _display_simple_validation(self, results: Dict[str, Any]) -> None:
+        """Display simple validation results.
+
+        Helper method for displaying validation results in simple format.
+        """
+        if self.logger:
+            overall = results.get("overall", False)
+            status = "PASSED" if overall else "FAILED"
+            self.logger.info(f"System Validation: {status}")
+
+    def _display_system_status(self, status: Dict[str, Any]) -> None:
+        """Display system status.
+
+        Helper method for displaying system status information.
+        """
+        if self.logger:
+            system_status = status.get("status", "unknown")
+            self.logger.info(f"System Status: {system_status}")
+
     def _create_default_config(self) -> Dict[str, Any]:
         """Create default configuration.
 
@@ -820,14 +875,17 @@ Examples:
         if parsed_args.command in commands_needing_controller:
             self.initialize_controller(parsed_args.config)
 
-        # Execute the requested command via registry
-        command_class = COMMAND_REGISTRY.get(parsed_args.command)
-        if not command_class:
-            if self.logger:
-                self.logger.error(f"Unknown command: {parsed_args.command}")
-            sys.exit(2)
+        # Map command names to instance method names
+        command_method_map = {
+            "run-test": "run_individual_test",
+            "run-batch": "run_batch_experiments",
+            "generate-config": "generate_configuration",
+            "validate-system": "validate_system",
+            "status": "show_status",
+            "set-params": "set_parameters",
+        }
 
-        # Execute the command
+        # Execute the requested command
         try:
             # Sanitize all string values in arguments
             sanitized_args = vars(parsed_args).copy()
@@ -839,8 +897,20 @@ Examples:
                         sanitize_input(v) if isinstance(v, str) else v for v in value
                     ]
 
-            command_instance = command_class(self.controller)
-            command_instance.execute(argparse.Namespace(**sanitized_args))
+            # Check if there's an instance method for this command
+            method_name = command_method_map.get(parsed_args.command)
+            if method_name and hasattr(self, method_name):
+                method = getattr(self, method_name)
+                method(argparse.Namespace(**sanitized_args))
+            else:
+                # Fall back to command registry
+                command_class = COMMAND_REGISTRY.get(parsed_args.command)
+                if not command_class:
+                    if self.logger:
+                        self.logger.error(f"Unknown command: {parsed_args.command}")
+                    sys.exit(2)
+                command_instance = command_class(self.controller)
+                command_instance.execute(argparse.Namespace(**sanitized_args))
         except KeyboardInterrupt:
             if self.logger:
                 self.logger.info("Operation cancelled by user")

@@ -49,6 +49,72 @@ class QuestPlusParameters:
     convergence_criterion: float = 0.05  # Threshold change criterion
     min_reversals: int = 4  # Minimum reversals for convergence
 
+    def __post_init__(self) -> None:
+        """Validate parameters after initialization."""
+        # Validate stimulus ranges
+        if self.stimulus_min >= self.stimulus_max:
+            raise ValueError("stimulus_min must be less than stimulus_max")
+
+        # Validate threshold ranges
+        if self.threshold_min >= self.threshold_max:
+            raise ValueError("threshold_min must be less than threshold_max")
+
+        # Validate slope ranges
+        if self.slope_min >= self.slope_max:
+            raise ValueError("slope_min must be less than slope_max")
+
+        # Validate steps
+        if self.stimulus_steps <= 0:
+            raise ValueError("stimulus_steps must be positive")
+
+        if self.threshold_steps <= 0:
+            raise ValueError("threshold_steps must be positive")
+
+        if self.slope_steps <= 0:
+            raise ValueError("slope_steps must be positive")
+
+        # Validate rates
+        if not 0 <= self.lapse_rate <= 1:
+            raise ValueError("lapse_rate must be between 0 and 1")
+
+        if not 0 <= self.guess_rate <= 1:
+            raise ValueError("guess_rate must be between 0 and 1")
+
+        # Validate convergence criteria
+        if self.convergence_criterion <= 0:
+            raise ValueError("convergence_criterion must be positive")
+
+        # Validate trial counts
+        if self.min_trials <= 0:
+            raise ValueError("min_trials must be positive")
+
+        if self.max_trials <= 0:
+            raise ValueError("max_trials must be positive")
+
+        if self.min_reversals <= 0:
+            raise ValueError("min_reversals must be positive")
+
+        # Validate prior distributions
+        if self.threshold_prior is not None:
+            if not isinstance(self.threshold_prior, np.ndarray):
+                raise ValueError("threshold_prior must be a numpy array")
+
+            if len(self.threshold_prior) != self.threshold_steps:
+                raise ValueError(f"threshold_prior must have length {self.threshold_steps}")
+
+            if not np.allclose(np.sum(self.threshold_prior), 1.0):
+                raise ValueError("threshold_prior must sum to 1 (normalized)")
+
+        if self.slope_prior is not None:
+            if not isinstance(self.slope_prior, np.ndarray):
+                raise ValueError("slope_prior must be a numpy array")
+
+            if len(self.slope_prior) != self.slope_steps:
+                raise ValueError(f"slope_prior must have length {self.slope_steps}")
+
+            if not np.allclose(np.sum(self.slope_prior), 1.0):
+                raise ValueError("slope_prior must sum to 1 (normalized)")
+
 
 @dataclass
 class StaircaseState:
@@ -327,6 +393,19 @@ class QuestPlusStaircase:
             intensity: Stimulus intensity that was presented
             response: Participant response (True = detected)
         """
+        # Validate response type
+        if not isinstance(response, bool):
+            raise TypeError("Response must be a boolean (True or False)")
+
+        # Validate intensity
+        if not isinstance(intensity, (int, float)):
+            raise TypeError("Intensity must be a number")
+
+        if intensity < self.parameters.stimulus_min or intensity > self.parameters.stimulus_max:
+            raise ValueError(
+                f"Intensity must be between {self.parameters.stimulus_min} and {self.parameters.stimulus_max}"
+            )
+
         # Record trial data
         self.state.trial_number += 1
         self.state.intensities.append(intensity)
@@ -559,7 +638,7 @@ class QuestPlusStaircase:
         hit_rate = np.mean(self.state.responses) if self.state.responses else 0.0
 
         return {
-            "trials_completed": self.state.trial_number,
+            "total_trials": self.state.trial_number,
             "converged": self.state.converged,
             "convergence_trial": self.state.convergence_trial,
             "reversals": self.state.reversals,

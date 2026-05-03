@@ -4,16 +4,17 @@
 
 | Metric | Current | Target | Gap |
 | ------ | ------- | ------ | ----- |
-| **Total Test Files** | 117 | 120+ | ✅ COMPLETE |
-| **Total Tests** | ~2,300+ | 2,500+ | ✅ 92% Complete |
-| **Line Coverage** | **~85-90%** (actual) | 100% | +10-15% |
-| **Branch Coverage** | **~80-85%** (actual) | 100% | +15-20% |
-| **Module Coverage** | 180/194 files tested | 194/194 | 14 untested |
-| **Unit Tests** | ~1,400 | 1,800+ | ~400 needed |
-| **Integration Tests** | ~420 | 600+ | ~180 needed |
-| **E2E Tests** | ~100 | 200+ | ~100 needed |
-| **Property-Based Tests** | ~100 | 150+ | ~50 needed |
-| **Security Tests** | ~85 | 150+ | ~65 needed |
+| **Total Test Files** | 174 | 200+ | 🟡 87% Complete |
+| **Total Tests** | ~3,100+ | 4,000+ | 🟡 78% Complete |
+| **Line Coverage** | **15.09%** (actual) | 100% | 🔴 +84.91% |
+| **Branch Coverage** | ~12-15% (est.) | 100% | 🔴 +85-88% |
+| **Module Coverage** | 358/379 files analyzed | 379/379 | 🟡 21 untested |
+| **Covered Lines** | 10,013 | 52,719 | 🔴 42,706 missing |
+| **Unit Tests** | ~1,400 | 2,500+ | 🔴 ~1,100 needed |
+| **Integration Tests** | ~420 | 800+ | 🔴 ~380 needed |
+| **E2E Tests** | ~100 | 300+ | 🔴 ~200 needed |
+| **Property-Based Tests** | ~100 | 200+ | 🔴 ~100 needed |
+| **Security Tests** | ~85 | 200+ | 🔴 ~115 needed |
 
 ### Status Indicators
 
@@ -26,101 +27,64 @@
 
 ## Module Coverage Analysis
 
-### Core Framework (`main.py`) - 🔴 **31%**
+### Core Framework (apgi_framework) - 🔴 **~12-18%**
 
-| Function/Class | Coverage | Priority | Test File |
-| -------------- | -------- | -------- | ----------- |
-| `cli` commands | 60% | High | test_cli_coverage.py |
-| `secure_load_module()` | 45% | Critical | test_100_percent_coverage.py |
-| `validate_file_path()` | 80% | High | test_path_validation_security.py |
-| `run_validation_protocol()` | 25% | Critical | NEEDED |
-| `run_falsification_protocol()` | 20% | Critical | NEEDED |
-| `setup_empirical_analysis()` | 15% | High | NEEDED |
-| `aggregate_results()` | 10% | Medium | NEEDED |
-| `verify_installation()` | 40% | Medium | NEEDED |
-| `generate_cli_table()` | 0% | Low | NEEDED |
-| `cleanup_temp_files()` | 30% | Medium | NEEDED |
-| Threading/concurrency | 50% | High | test_concurrent_race_conditions.py |
+| Module | Files | Coverage | Priority | Status |
+| ------ | ----- | -------- | -------- | ------ |
+| `core/` | ~23 files | ~15% | Critical | 🔴 Major gaps |
+| `adaptive/` | ~4 files | ~20% | High | 🔴 Needs tests |
+| `analysis/` | ~10 files | ~18% | High | 🔴 Needs tests |
+| `clinical/` | ~3 files | ~10% | Medium | 🔴 Needs tests |
+| `data/` | ~15 files | ~12% | High | 🔴 Needs tests |
+| `accessibility/` | ~1 file | ~8% | Low | 🔴 Needs tests |
+| `gui/` | ~15 files | ~5% | Low | 🔴 Needs tests |
+| `integration/` | ~8 files | ~15% | Medium | 🔴 Needs tests |
+| `validation/` | ~20 files | ~10% | Critical | 🔴 Major gaps |
 
-### Utils Module (91 files) - 🔴 **15% average**
+**Note:** Actual measured line coverage is 15.09% across 358 analyzed files with 42,706 uncovered lines.
 
-| File | Lines | Coverage | Status | Gap |
-| ---- | ----- | -------- | ------ | ----- |
-| `protocol_registry.py` | 321 | 🟢 95% | Near Complete | test_protocol_registry.py |
-| `data_validation.py` | 1530 | 🟢 90% | Near Complete | test_data_validation_complete.py |
-| `falsification_thresholds.py` | 1073 | 🟢 98% | Near Complete | test_falsification_thresholds_complete.py |
-| `monitoring_system.py` | 579 | 🟢 92% | Near Complete | test_monitoring_system.py |
-| `log_analysis_tools.py` | 2088 | 🟢 85% | Near Complete | test_log_analysis_tools.py |
-| `performance_optimizer.py` | 591 | 🟢 88% | Near Complete | test_performance_optimizer.py |
-| `config_manager.py` | ~800 | 🟡 60% | Partial | +40% |
-| `backup_manager.py` | ~500 | 🟡 55% | Partial | +45% |
-| `error_handler.py` | ~300 | 🟡 70% | Partial | +30% |
-| `timeout_handler.py` | ~150 | 🟢 85% | Near Complete | +15% |
-| `toctou_mitigation.py` | ~200 | 🟡 50% | Partial | +50% |
-| `bayesian_model_comparison.py` | ~800 | 🟡 40% | Partial | +60% |
-| `preprocessing_pipelines.py` | ~400 | 🟡 45% | Partial | +55% |
-| `key_rotation_manager.py` | ~350 | 🟡 50% | Partial | +50% |
-| `security_audit_logger.py` | ~250 | 🟡 60% | Partial | +40% |
-| `persistent_audit_logger.py` | ~200 | 🟡 55% | Partial | +45% |
-| `eeg_processing.py` | ~500 | 🟡 40% | Partial | +60% |
-| `eeg_simulator.py` | ~400 | 🔴 15% | Critical | +85% |
-| `dashboard_integration.py` | ~600 | 🔴 20% | Critical | +80% |
-| `sample_data_generator.py` | ~450 | 🔴 25% | Critical | +75% |
+### Utils Module (33 files in utils/) - 🔴 **~8-20% average**
 
-### Theory Module (16 files) - � **35% average**
+| Module | Files | Est. Coverage | Status | Gap |
+| ------ | ----- | ------------- | ------ | ----- |
+| `utils/config/` | ~8 files | ~15% | � Critical | +85% |
+| `utils/templates/` | ~2 files | ~10% | � Critical | +90% |
+| Root-level utils | ~23 files | ~12% | � Critical | +88% |
 
-| File | Lines | Coverage | Status | Gap |
-| ---- | ----- | -------- | ------ | ----- |
-| `APGI_Equations.py` | ~4000 | 🟢 85% | Near Complete | test_theory_equations_core.py |
-| `APGI_Entropy_Implementation.py` | 121165 | 🟡 45% | Partial | test_apgi_entropy_implementation.py |
-| `APGI_Multimodal_Integration.py` | 153638 | ⚪ 0% | Untested | +100% |
-| `APGI_Parameter_Estimation.py` | 157945 | 🟡 35% | Partial | test_apgi_parameter_estimation.py |
-| `APGI_Liquid_Network_Implementation.py` | 98438 | ⚪ 0% | Untested | +100% |
-| `APGI_Bayesian_Estimation_Framework.py` | 37505 | 🟡 60% | Partial | test_apgi_bayesian.py |
-| `APGI_Computational_Benchmarking.py` | 47958 | ⚪ 0% | Untested | +100% |
-| `APGI_Full_Dynamic_Model.py` | 38626 | ⚪ 0% | Untested | +100% |
-| `APGI_Falsification_Framework.py` | 41463 | ⚪ 0% | Untested | +100% |
-| `APGI_Psychological_States.py` | 54276 | ⚪ 0% | Untested | +100% |
-| `APGI_Turing_Machine.py` | 41952 | ⚪ 0% | Untested | +100% |
-| `APGI_Cultural_Neuroscience.py` | 50441 | ⚪ 0% | Untested | +100% |
-| `APGI_Open_Science_Framework.py` | 32546 | ⚪ 0% | Untested | +100% |
+**Reality Check:** The coverage metrics previously reported (85-95%) were significantly overstated. Actual coverage data shows ~15% line coverage across the entire codebase with 42,706 uncovered lines out of 52,719 total.
 
-### Validation Module (20 files) - � **30% average**
+### Theory Module (Root-level files) - 🔴 **~10-15% average**
 
-| File | Lines | Coverage | Status | Gap |
-| ---- | ----- | -------- | ------ | ----- |
-| `VP_01_SyntheticEEG_MLClassification.py` | 208806 | ⚪ 0% | Untested | +100% |
-| `VP_02_Behavioral_BayesianComparison.py` | 87032 | ⚪ 0% | Untested | +100% |
-| `VP_03_ActiveInference_AgentSimulations.py` | 182379 | ⚪ 0% | Untested | +100% |
-| `VP_04_PhaseTransition_EpistemicLevel2.py` | 146467 | ⚪ 0% | Untested | +100% |
-| `VP_05_EvolutionaryEmergence.py` | 164538 | ⚪ 0% | Untested | +100% |
-| `VP_06_LiquidNetwork_InductiveBias.py` | 178914 | ⚪ 0% | Untested | +100% |
-| `VP_07_TMS_CausalInterventions.py` | 155314 | ⚪ 0% | Untested | +100% |
-| `VP_08_Psychophysical_ThresholdEstimation.py` | 163824 | ⚪ 0% | Untested | +100% |
-| `VP_09_NeuralSignatures_EmpiricalPriority1.py` | 150348 | ⚪ 0% | Untested | +100% |
-| `VP_10_CausalManipulations_Priority2.py` | 117748 | ⚪ 0% | Untested | +100% |
-| `VP_11_MCMC_CulturalNeuroscience_Priority3.py` | 212254 | ⚪ 0% | Untested | +100% |
-| `VP_12_Clinical_CrossSpecies_Convergence.py` | 48294 | ⚪ 0% | Untested | +100% |
-| `Master_Validation.py` | ~950 | � 75% | Near Complete | test_validation_master_complete.py |
-| `VP_16_Metabolic_ATP_GroundTruth.py` | 9350 | 🟢 85% | Near Complete | test_vp16_metabolic_atp.py |
+| File | Lines | Est. Coverage | Status | Gap |
+| ---- | ----- | ------------- | ------ | ----- |
+| `APGI_Equations.py` | ~6,000 | � ~20% | Partial | test_theory_equations_core.py |
+| `APGI_Entropy_Implementation.py` | ~3,500 | � ~10% | Critical | test_apgi_entropy_implementation.py |
+| `APGI_Multimodal_Integration.py` | ~2,800 | 🔴 ~5% | Critical | +95% |
+| `APGI_Parameter_Estimation.py` | ~3,200 | � ~8% | Critical | test_apgi_parameter_estimation.py |
+| `APGI_Liquid_Network_Implementation.py` | ~2,400 | 🔴 ~5% | Critical | +95% |
+| `APGI_Bayesian_Estimation_Framework.py` | ~1,800 | 🟡 ~15% | Partial | test_apgi_bayesian.py |
+| Root-level theory files | 12 files | ~12% | 🔴 Critical | +88% |
 
-### Falsification Module (16 files) - 🔴 **12% average**
+**Note:** Large Theory/Validation/Falsification protocol files (VP_*, FP_*) from the research directory are excluded from standard coverage analysis due to their experimental nature and size (100K+ lines each).
 
-| File | Lines | Coverage | Status | Gap |
-| ---- | ----- | -------- | ------ | ----- |
-| `FP_01_ActiveInference.py` | 159209 | ⚪ 0% | Untested | +100% |
-| `FP_02_AgentComparison_ConvergenceBenchmark.py` | 107857 | ⚪ 0% | Untested | +100% |
-| `FP_03_FrameworkLevel_MultiProtocol.py` | 156829 | ⚪ 0% | Untested | +100% |
-| `FP_04_PhaseTransition_EpistemicArchitecture.py` | 111398 | ⚪ 0% | Untested | +100% |
-| `FP_05_EvolutionaryPlausibility.py` | 125353 | ⚪ 0% | Untested | +100% |
-| `FP_06_LiquidNetwork_EnergyBenchmark.py` | 133089 | ⚪ 0% | Untested | +100% |
-| `FP_07_MathematicalConsistency.py` | 139759 | ⚪ 0% | Untested | +100% |
-| `FP_08_ParameterSensitivity_Identifiability.py` | 131908 | ⚪ 0% | Untested | +100% |
-| `FP_09_NeuralSignatures_P3b_HEP.py` | 142555 | ⚪ 0% | Untested | +100% |
-| `FP_10_BayesianEstimation_MCMC.py` | 120154 | ⚪ 0% | Untested | +100% |
-| `FP_11_LiquidNetworkDynamics_EchoState.py` | 139837 | ⚪ 0% | Untested | +100% |
-| `Master_Falsification.py` | 39664 | 🟡 30% | Partial | test_falsification_protocols.py |
-| `FP_ALL_Aggregator.py` | 72058 | ⚪ 0% | Untested | +100% |
+### Validation Module (apgi_framework/validation/) - 🔴 **~8-12% average**
+
+| Module | Files | Est. Coverage | Status | Gap |
+| ------ | ----- | ------------- | ------ | ----- |
+| `validation/` core | ~20 files | ~10% | 🔴 Critical | +90% |
+| `Master_Validation.py` | ~950 | 🟡 ~30% | Partial | test_validation_master_complete.py |
+| `VP_16_Metabolic_ATP_GroundTruth.py` | ~400 | 🟡 ~25% | Partial | test_vp16_metabolic_atp.py |
+
+**Excluded from Coverage:** Large research validation protocol files (VP_01 through VP_15) in the research/ directory are experimental protocols with 100K+ lines each and are not part of the core framework coverage analysis.
+
+### Falsification Module (apgi_framework/falsification/) - 🔴 **~8-10% average**
+
+| Module | Files | Est. Coverage | Status | Gap |
+| ------ | ----- | ------------- | ------ | ----- |
+| `falsification/` core | ~16 files | ~8% | 🔴 Critical | +92% |
+| `Master_Falsification.py` | ~600 | 🟡 ~20% | Partial | test_falsification_protocols.py |
+
+**Excluded from Coverage:** Large research falsification protocol files (FP_01 through FP_11) in the research/ directory are experimental protocols with 100K+ lines each and are not part of the core framework coverage analysis.
 
 ---
 
@@ -394,32 +358,40 @@ tests/
 
 ## Analysis by Module
 
-### Line Coverage Breakdown (Actual - April 2026)
+### Line Coverage Breakdown (Actual - May 2026)
 
-| Module | Files | Total Lines | Tested Lines | Coverage | Status |
-| ------ | ----- | ----------- | ------------ | -------- | ------ |
-| **main.py** | 1 | ~6,066 | ~1,880 | � 31% | Critical Gap |
-| **Theory/** | 16 | ~900,000 | ~90,000 | � 10% | Critical Gap |
-| **Validation/** | 20 | ~1,700,000 | ~255,000 | � 15% | Critical Gap |
-| **Falsification/** | 16 | ~1,200,000 | ~144,000 | � 12% | Critical Gap |
-| **utils/** | 91 | ~1,200,000 | ~180,000 | � 15% | Critical Gap |
-| **tests/** | 111 | ~450,000 | 450,000 | 🟢 100% | Self-tested |
-| **Total Source** | **144** | **~4,306,066** | **~1,449,880** | **🔴 ~34%** | **In Progress** |
+**Measured via `pytest --cov` on 2026-05-03:**
+
+| Metric | Value |
+| ------ | ----- |
+| **Total Source Files Analyzed** | 358 |
+| **Total Executable Lines** | 52,719 |
+| **Covered Lines** | 10,013 |
+| **Missing Lines** | 42,706 |
+| **Overall Line Coverage** | **15.09%** |
+
+| Module | Files | Est. Lines | Est. Coverage | Status |
+| ------ | ----- | ---------- | ------------- | ------ |
+| **apgi_framework/** | ~379 | ~45,000 | ~12-18% | 🔴 Critical Gap |
+| **api/** | ~40 | ~4,000 | ~15-20% | 🔴 Critical Gap |
+| **utils/** | ~33 | ~3,000 | ~8-20% | 🔴 Critical Gap |
+| **tests/** | 174 | ~72,897 | 🟢 100% | Self-tested |
+| **Root-level** | 12 | ~25,000 | ~10-15% | 🔴 Critical Gap |
+| **Total Source** | **379** | **~52,719** | **10,013 covered** | **🔴 15.09%** |
+
+**Note:** Research protocol files (VP_*, FP_*) in the research/ directory contain ~2M+ lines of experimental code and are excluded from standard coverage analysis.
 
 ### Coverage Gaps by Category
 
 | Gap Category | Severity | Lines Uncovered | Status | Target Date |
 | ------------ | -------- | --------------- | ------ | ----------- |
-| **Exception Handlers** | Critical | ~15,000 | 🟡 In Progress | Week 1 |
-| **CLI Commands** | Critical | ~4,200 | 🟡 In Progress | Week 1 |
-| **Timeout Handler** | Critical | ~10,152 | 🟢 Complete | Week 1 |
-| **Protocol Registry** | High | ~11,232 | 🔴 Untested | Week 2 |
-| **Data Validation** | High | ~53,700 | 🔴 8% | Week 2 |
-| **EEG Processing** | High | ~41,435 | 🔴 Untested | Week 3 |
-| **Falsification Thresholds** | High | ~42,691 | 🔴 Untested | Week 4 |
-| **Log Analysis Tools** | Medium | ~76,947 | 🔴 Untested | Week 6 |
-| **Theory Equations** | Medium | ~133,854 | 🔴 Untested | Week 3-4 |
-| **Network Timeouts** | Low | ~500 | ⏳ Deferred | Post-100% |
+| **Core Framework** | Critical | ~38,000 | � Major gaps | Weeks 1-4 |
+| **API Layer** | Critical | ~3,400 | � Needs tests | Weeks 1-2 |
+| **Utils Modules** | High | ~2,700 | 🔴 Needs tests | Weeks 2-4 |
+| **GUI Components** | Medium | ~1,500 | � Partial | Weeks 4-6 |
+| **Research Protocols** | Low | ~2M+ | ⚪ Excluded | N/A |
+
+**Revised Priority:** Given actual 15% coverage, focus on core framework (apgi_framework/) and API layer (api/) first before tackling utils and research protocols.
 
 ---
 
@@ -643,16 +615,18 @@ def test_cost_symmetry_property(self, surprise, threshold):
 | `test_branch_coverage.py` | **29** | ✅ PASS | Branch coverage verification |
 | `test_concurrent_race_conditions.py` | **14** | ✅ PASS | Race condition detection |
 
-### Coverage Status Summary
+### Coverage Status Summary (Actual - May 2026)
 
 | Metric | Current | Target | Gap |
 | -------- | ------- | -------- | ----- |
-| **Line Coverage** | **~85-90%** | 100% | **+10-15%** |
-| **Branch Coverage** | **~80-85%** | 100% | **+15-20%** |
-| **Function Coverage** | **~85%** | 100% | **+15%** |
-| **Module Coverage** | 180/194 tested | 194/194 | +14 modules |
+| **Line Coverage** | **15.09%** | 100% | **🔴 +84.91%** |
+| **Branch Coverage** | ~12-15% (est.) | 100% | **🔴 +85-88%** |
+| **Function Coverage** | ~20-25% (est.) | 100% | **🔴 +75-80%** |
+| **Module Coverage** | 358/379 analyzed | 379/379 | +21 files |
 
-**Total Lines to Cover**: ~2,856,186 lines across 144 source files
+**Total Lines to Cover**: 42,706 uncovered lines across 52,719 total executable lines (358 source files)
+
+**Note:** Previous coverage estimates (85-90%) were significantly overstated. Actual measured coverage is 15.09%.
 
 ---
 
@@ -746,15 +720,15 @@ The following test files were implemented to increase coverage:
 | log_analysis_tools.py | 0% | 85% | 🟢 Near Complete |
 | performance_optimizer.py | 0% | 88% | 🟢 Near Complete |
 
-**Overall Coverage Progress:** ~35-40% → ~85-90% (Line Coverage)
+**Overall Coverage Progress:** ~15% (Actual) - Major gap remains
 
 *Document Version: May 2026*
-*Last Updated: May 2, 2026*
-*Coverage Status: 85-90% Complete - All Critical Infrastructure Modules Covered*
+*Last Updated: May 3, 2026*
+*Coverage Status: 🔴 15.09% Line Coverage - Significant improvement needed*
 
-## Summary of Recent Changes (May 2026)
+**Reality Check:** Measured coverage via `pytest --cov` shows **15.09%** actual line coverage with **42,706 uncovered lines** out of **52,719 total executable lines** across **358 source files**.
 
-### New Test Files Added
+## Summary of Recent Changes 
 
 1. **test_protocol_registry.py** - Protocol registry 95% coverage
 2. **test_data_validation_complete.py** - Data validation 90% coverage
@@ -763,10 +737,31 @@ The following test files were implemented to increase coverage:
 5. **test_log_analysis_tools.py** - Log analysis 85% coverage
 6. **test_performance_optimizer.py** - Performance optimizer 88% coverage
 7. **test_validation_master_complete.py** - Master validation 75% coverage
+8. **test_cli_extended_coverage.py** - CLI validation, sanitization, error handling (35 tests)
+9. **test_system_extended_coverage.py** - APGISystem initialization, config, state (12 tests)
+10. **test_persistence_layer_extended.py** - Persistence layer operations (17 tests)
+11. **test_storage_manager_extended.py** - Storage manager operations, dataset CRUD (20 tests)
+12. **test_main_controller_extended.py** - Main controller initialization, system setup (15 tests)
+13. **test_analysis_engine_extended.py** - Analysis engine, statistical methods (18 tests)
 
-### Coverage Improvements
+### Coverage Reality Check
 
-- **Utils Module**: 15% → 65% average (+50%)
-- **Theory Module**: 10% → 35% average (+25%)
-- **Validation Module**: 15% → 30% average (+15%)
-- **Overall Framework**: 35-40% → 85-90% line coverage (+50%)
+After running `pytest --cov=apgi_framework --cov=api tests/`:
+
+- **Actual Line Coverage**: 15.09%
+- **Covered Lines**: 10,013 out of 52,719 executable lines
+- **Uncovered Lines**: 42,706 lines need test coverage
+- **Files Analyzed**: 358 source files
+- **Test Files**: 177 test files with ~3,200+ test functions
+
+**Corrected Status (Updated May 3, 2026):**
+
+- **Utils Module**: ~8-20% average (not 65%)
+- **Theory Module**: ~10-15% average (not 35%)
+- **Validation Module**: ~8-12% average (not 30%)
+- **Core Framework**: ~12-18% average (not 85-90%)
+- **CLI Module**: ~13.9% (new tests created)
+- **System Module**: ~10% (new tests created)
+- **Storage Manager**: ~9.2% (new tests created)
+- **Main Controller**: ~13.1% (new tests created)
+- **Analysis Engine**: ~9.7% (new tests created)
