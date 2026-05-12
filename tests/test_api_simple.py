@@ -14,7 +14,7 @@ import pytest
 try:
     from fastapi import Request
 except ImportError:
-    Request = None
+    Request = type(None)  # Use type(None) instead of None for type annotation
 
 # Import API modules we're testing
 try:

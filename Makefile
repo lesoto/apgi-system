@@ -44,6 +44,7 @@ coverage-gaps:
 	python3 utils/analyze_gaps.py
 
 clean:
+	python3 delete_pycache.py --yes
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +

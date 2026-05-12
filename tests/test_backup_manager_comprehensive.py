@@ -19,7 +19,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import patch
 
 import pytest
@@ -105,7 +105,7 @@ def create_backup_archive(
     backup_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Collect files
-    files_to_backup = []
+    files_to_backup: List[Path] = []
     for pattern in include_patterns or ["**/*"]:
         files_to_backup.extend(source_dir.glob(pattern))
 
@@ -138,7 +138,6 @@ def create_backup_archive(
         total_size_mb=total_size / (1024 * 1024),
         checksum="mock_checksum",
         compressed=compression,
-        compression_enabled=compression,
     )
 
     return metadata
@@ -164,7 +163,7 @@ def verify_backup_integrity(backup_file: Path, metadata: BackupMetadata) -> tupl
     if not backup_file.exists():
         raise FileNotFoundError(f"Backup file not found: {backup_file}")
 
-    verification_result = {"files_verified": 0, "errors": [], "warnings": []}
+    verification_result: Dict[str, Any] = {"files_verified": 0, "errors": [], "warnings": []}
 
     try:
         with zipfile.ZipFile(backup_file, "r") as zipf:
@@ -184,7 +183,8 @@ def verify_backup_integrity(backup_file: Path, metadata: BackupMetadata) -> tupl
                 except KeyError:
                     verification_result["errors"].append(f"Missing file in archive: {file_name}")
 
-        is_valid = len(verification_result["errors"]) == 0
+        errors_list = verification_result["errors"]
+        is_valid = len(errors_list) == 0
 
     except zipfile.BadZipFile:
         verification_result["errors"].append("Corrupted ZIP file")

@@ -59,6 +59,8 @@ DEFAULT_FILE_PATTERNS: List[str] = [
     ".coverage",
     "coverage.xml",
     ".coverage.*",
+    "coverage.json",
+    "coverage_gap_analysis.json",
     # Logs and system files
     "*.log",
     ".DS_Store",

@@ -431,6 +431,7 @@ class DashboardServer:
     """
 
     def __init__(self, port: int = 8080, data_dir: str = "data"):
+        self.data: Dict[str, Any] = {}
         """
         Initialize dashboard server.
 
@@ -481,7 +482,7 @@ class DashboardServer:
         except Exception as e:
             self.logger.error(f"Error stopping dashboard server: {str(e)}")
 
-    def get_data(self) -> Dict[str, Any]:
+    def get_data(self, experiment_id: Optional[str] = None) -> Dict[str, Any]:
         """Get current unified dashboard data"""
 
         # Update with latest experiment data
@@ -489,15 +490,11 @@ class DashboardServer:
         self.data["experiments"] = experiments_data
         self.data["last_update"] = datetime.now().isoformat()
 
-        # Generate comparison if multiple experiments exist
-        if len(self.data["experiments"]) > 1:
-            try:
-                comparison = self.comparator.compare_experiments(experiments_data)
-                self.data["comparisons"] = comparison
-            except Exception as e:
-                self.logger.error(f"Error generating comparison: {str(e)}")
+        return self.data
 
-        return self.data.copy()
+    def get_dashboard_data(self, experiment_id: Optional[str] = None) -> Dict[str, Any]:
+        """Backward compatibility alias for get_data method."""
+        return self.get_data(experiment_id)
 
     def get_experiment_visualization_data(self, experiment_id: str) -> Dict[str, Any]:
         """Get visualization data for specific experiment"""
@@ -514,6 +511,8 @@ class DashboardServer:
             if results and trials:
                 viz_data = self.visualizer.create_interactive_dashboard_data(results, trials)
                 # Store in unified data structure
+                if "visualizations" not in self.data:
+                    self.data["visualizations"] = {}
                 self.data["visualizations"][experiment_id] = viz_data
                 return viz_data
             else:
@@ -594,7 +593,3 @@ def create_dashboard(port: int = 8080, data_dir: str = "data") -> DashboardServe
         Configured dashboard server
     """
     return DashboardServer(port=port, data_dir=data_dir)
-
-
-# Backward compatibility alias
-DashboardServer.get_dashboard_data = DashboardServer.get_data

@@ -6023,13 +6023,38 @@ class APGIVisualizerGUI:
         self.psych_frame.columnconfigure(1, weight=1)
         self.psych_frame.rowconfigure(0, weight=1)
 
-        # Control Panel (Left) - Enhanced
-        self.control_frame = ttk.LabelFrame(self.psych_frame, text="Controls", padding="12")
-        self.control_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        # Control Panel (Left) - Enhanced with scrolling
+        control_container = ttk.Frame(self.psych_frame)
+        control_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        # Create scrollable area
+        control_canvas = tk.Canvas(control_container, highlightthickness=0, width=320)
+        control_scrollbar = ttk.Scrollbar(
+            control_container, orient="vertical", command=control_canvas.yview
+        )
+        self.control_frame = ttk.Frame(control_canvas)
+
+        # Configure scrolling
+        control_canvas.configure(yscrollcommand=control_scrollbar.set)
+        control_canvas.pack(side="left", fill="both", expand=True)
+        control_scrollbar.pack(side="right", fill="y")
+        control_canvas.create_window((0, 0), window=self.control_frame, anchor="nw")
+
+        # Update scroll region
+        def update_scroll_region(event=None):
+            control_canvas.configure(scrollregion=control_canvas.bbox("all"))
+
+        self.control_frame.bind("<Configure>", update_scroll_region)
+        self.control_frame.bind("<Map>", update_scroll_region)
+
+        # Add title to scrollable frame
+        ttk.Label(self.control_frame, text="Controls", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(0, 10)
+        )
 
         # Visualization Type
-        ttk.Label(self.control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).grid(
-            row=0, column=0, sticky=tk.W, pady=(5, 2)
+        ttk.Label(self.control_frame, text="Visualization Type:", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(5, 2)
         )
         self.viz_type = ttk.Combobox(
             self.control_frame,
@@ -6046,11 +6071,11 @@ class APGIVisualizerGUI:
             font=("Arial", 9),
         )
         self.viz_type.set("3D State Network")
-        self.viz_type.grid(row=1, column=0, sticky="we", pady=(0, 10))
+        self.viz_type.pack(fill="x", pady=(0, 10))
 
         # State Selection
-        ttk.Label(self.control_frame, text="Select State:", font=("Arial", 10, "bold")).grid(
-            row=2, column=0, sticky=tk.W, pady=(5, 2)
+        ttk.Label(self.control_frame, text="Select State:", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(5, 2)
         )
         self.state_var = tk.StringVar()
         self.state_combo = ttk.Combobox(
@@ -6059,22 +6084,22 @@ class APGIVisualizerGUI:
             state="readonly",
             font=("Arial", 9),
         )
-        self.state_combo.grid(row=3, column=0, sticky="we", pady=(0, 10))
+        self.state_combo.pack(fill="x", pady=(0, 10))
 
         # Multiple States for Radar
         ttk.Label(
             self.control_frame,
             text="States to Compare\n(comma-separated):",
             font=("Arial", 9, "bold"),
-        ).grid(row=4, column=0, sticky=tk.W, pady=(5, 2))
+        ).pack(anchor="w", pady=(5, 2))
         self.states_text = tk.Text(self.control_frame, height=3, width=25, font=("Courier", 9))
-        self.states_text.grid(row=5, column=0, sticky="we", pady=(0, 10))
+        self.states_text.pack(fill="x", pady=(0, 10))
         self.states_text.insert("1.0", "flow\nanxiety\ncalm")
 
         # Transition States
         ttk.Label(
             self.control_frame, text="Start State for Transition:", font=("Arial", 10, "bold")
-        ).grid(row=6, column=0, sticky=tk.W, pady=(5, 2))
+        ).pack(anchor="w", pady=(5, 2))
         self.start_state_var = tk.StringVar()
         self.start_state_combo = ttk.Combobox(
             self.control_frame,
@@ -6082,11 +6107,11 @@ class APGIVisualizerGUI:
             state="readonly",
             font=("Arial", 9),
         )
-        self.start_state_combo.grid(row=7, column=0, sticky="we", pady=(0, 5))
+        self.start_state_combo.pack(fill="x", pady=(0, 5))
 
         ttk.Label(
             self.control_frame, text="End State for Transition:", font=("Arial", 10, "bold")
-        ).grid(row=8, column=0, sticky=tk.W, pady=(5, 2))
+        ).pack(anchor="w", pady=(5, 2))
         self.end_state_var = tk.StringVar()
         self.end_state_combo = ttk.Combobox(
             self.control_frame,
@@ -6094,58 +6119,52 @@ class APGIVisualizerGUI:
             state="readonly",
             font=("Arial", 9),
         )
-        self.end_state_combo.grid(row=9, column=0, sticky="we", pady=(0, 10))
+        self.end_state_combo.pack(fill="x", pady=(0, 10))
 
         # Separator
-        ttk.Separator(self.control_frame, orient="horizontal").grid(
-            row=6, column=0, sticky="we", pady=10
-        )
+        ttk.Separator(self.control_frame, orient="horizontal").pack(fill="x", pady=10)
 
         # Parameter Input Section
         ttk.Label(
             self.control_frame, text="Simulation Parameters:", font=("Arial", 10, "bold")
-        ).grid(row=7, column=0, sticky=tk.W, pady=(5, 2))
+        ).pack(anchor="w", pady=(5, 2))
 
         # tau_S parameter
-        ttk.Label(self.control_frame, text="τ_S (surprise timescale):").grid(
-            row=8, column=0, sticky=tk.W, pady=(2, 0)
+        ttk.Label(self.control_frame, text="τ_S (surprise timescale):").pack(
+            anchor="w", pady=(2, 0)
         )
         self.tau_S_var = tk.StringVar(value="0.5")
         self.tau_S_entry = ttk.Entry(self.control_frame, textvariable=self.tau_S_var, width=15)
-        self.tau_S_entry.grid(row=9, column=0, sticky=tk.W, pady=(0, 5))
+        self.tau_S_entry.pack(anchor="w", pady=(0, 5))
 
         # tau_theta parameter
-        ttk.Label(self.control_frame, text="τ_θ (threshold timescale):").grid(
-            row=10, column=0, sticky=tk.W, pady=(2, 0)
+        ttk.Label(self.control_frame, text="τ_θ (threshold timescale):").pack(
+            anchor="w", pady=(2, 0)
         )
         self.tau_theta_var = tk.StringVar(value="30.0")
         self.tau_theta_entry = ttk.Entry(
             self.control_frame, textvariable=self.tau_theta_var, width=15
         )
-        self.tau_theta_entry.grid(row=11, column=0, sticky=tk.W, pady=(0, 5))
+        self.tau_theta_entry.pack(anchor="w", pady=(0, 5))
 
         # theta_0 parameter
-        ttk.Label(self.control_frame, text="θ₀ (baseline threshold):").grid(
-            row=12, column=0, sticky=tk.W, pady=(2, 0)
-        )
+        ttk.Label(self.control_frame, text="θ₀ (baseline threshold):").pack(anchor="w", pady=(2, 0))
         self.theta_0_var = tk.StringVar(value="0.5")
         self.theta_0_entry = ttk.Entry(self.control_frame, textvariable=self.theta_0_var, width=15)
-        self.theta_0_entry.grid(row=13, column=0, sticky=tk.W, pady=(0, 5))
+        self.theta_0_entry.pack(anchor="w", pady=(0, 5))
 
         # alpha parameter
-        ttk.Label(self.control_frame, text="α (sigmoid steepness):").grid(
-            row=14, column=0, sticky=tk.W, pady=(2, 0)
-        )
+        ttk.Label(self.control_frame, text="α (sigmoid steepness):").pack(anchor="w", pady=(2, 0))
         self.alpha_var = tk.StringVar(value="5.0")
         self.alpha_entry = ttk.Entry(self.control_frame, textvariable=self.alpha_var, width=15)
-        self.alpha_entry.grid(row=15, column=0, sticky=tk.W, pady=(0, 10))
+        self.alpha_entry.pack(anchor="w", pady=(0, 10))
 
         # Validation status
         self.validation_status = tk.StringVar(value="✓ Parameters valid")
         self.validation_label = ttk.Label(
             self.control_frame, textvariable=self.validation_status, foreground="green"
         )
-        self.validation_label.grid(row=16, column=0, sticky=tk.W, pady=(0, 10))
+        self.validation_label.pack(anchor="w", pady=(0, 10))
 
         # Bind validation to entry changes
         self.tau_S_var.trace_add("write", lambda *args: self.validate_parameters())
@@ -6154,18 +6173,15 @@ class APGIVisualizerGUI:
         self.alpha_var.trace_add("write", lambda *args: self.validate_parameters())
 
         # Separator
-        ttk.Separator(self.control_frame, orient="horizontal").grid(
-            row=17, column=0, sticky="we", pady=10
-        )
+        ttk.Separator(self.control_frame, orient="horizontal").pack(fill="x", pady=10)
 
         # Buttons with better styling
-
         self.generate_button = ttk.Button(
             self.control_frame,
             text="Run Simulation",
             command=self.run_simulation_with_validation,
         )
-        self.generate_button.grid(row=18, column=0, sticky="we", pady=5)
+        self.generate_button.pack(fill="x", pady=5)
         if TOOLTIP_AVAILABLE:
             ToolTip(self.generate_button, "Run simulation with current parameters")
 
@@ -6174,23 +6190,21 @@ class APGIVisualizerGUI:
             text="Generate Visualization",
             command=self.generate_visualization,
         )
-        viz_button.grid(row=19, column=0, sticky="we", pady=5)
+        viz_button.pack(fill="x", pady=5)
         if TOOLTIP_AVAILABLE:
             ToolTip(viz_button, "Generate visualization of selected psychological state")
 
         save_btn = ttk.Button(
             self.control_frame, text="Save Parameters", command=self.save_parameters
         )
-        save_btn.grid(row=20, column=0, sticky="we", pady=5)
+        save_btn.pack(fill="x", pady=5)
 
         clear_button = ttk.Button(
             self.control_frame, text="Clear Display", command=self.clear_display
         )
-        clear_button.grid(row=21, column=0, sticky="we", pady=5)
+        clear_button.pack(fill="x", pady=5)
         if TOOLTIP_AVAILABLE:
             ToolTip(clear_button, "Clear the visualization display")
-
-        self.control_frame.columnconfigure(0, weight=1)
 
         # Visualization Panel (Right) - Enhanced with embedded display
         self.visualization_frame = ttk.LabelFrame(
@@ -9597,7 +9611,7 @@ def create_apgi_params(
     beta_override: bool = False,
 ) -> APGIParameters:
     """Factory function that computes derived parameters automatically.
-    
+
     Args:
         Pi_e: Exteroceptive precision
         Pi_i_baseline: Baseline interoceptive precision
@@ -9607,7 +9621,7 @@ def create_apgi_params(
         z_i: Interoceptive prediction error
         theta_t: Threshold
         beta_override: Whether to allow beta values outside normal range
-        
+
     Returns:
         APGIParameters instance
     """
@@ -9621,7 +9635,7 @@ def create_apgi_params(
             # Even with override, set reasonable upper bound
             beta = np.clip(beta, 0.3, 2.0)
             logger.warning(f"Clamping override beta from {beta} to extended range [0.3, 2.0]")
-        
+
         # Compute derived parameters
         Pi_i_eff = Pi_i_baseline * (1 + np.tanh(beta * M_ca))
         S_t = Pi_e * z_e + Pi_i_eff * z_i
@@ -9657,9 +9671,11 @@ def create_apgi_params(
         raise ValueError(f"Failed to create APGI parameters: {e}") from e
 
 
-def load_psychological_states_from_json(json_file_path: str = "data/psychological_states.json") -> List[Tuple]:
+def load_psychological_states_from_json(
+    json_file_path: str = "data/psychological_states.json",
+) -> List[Tuple]:
     """Load psychological states from JSON file and convert to STATE_DEFINITIONS format"""
-    
+
     # Map JSON categories to StateCategory enum
     category_mapping = {
         "OPTIMAL_FUNCTIONING": StateCategory.OPTIMAL_FUNCTIONING,
@@ -9671,53 +9687,57 @@ def load_psychological_states_from_json(json_file_path: str = "data/psychologica
         "TRANSITIONAL_CONTEXTUAL": StateCategory.TRANSITIONAL_CONTEXTUAL,
         "UNELABORATED": StateCategory.UNELABORATED,
     }
-    
+
     try:
-        with open(json_file_path, 'r', encoding='utf-8') as f:
+        with open(json_file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
+
         state_definitions = []
         psychological_states = data.get("psychological_states", [])
-        
+
         for state_data in psychological_states:
             name = state_data.get("name")
             category_str = state_data.get("category")
-            
+
             if not name or not category_str:
                 logger.warning(f"Skipping state missing name or category: {state_data}")
                 continue
-            
+
             category = category_mapping.get(category_str)
             if not category:
                 logger.warning(f"Unknown category '{category_str}' for state '{name}', skipping")
                 continue
-            
+
             # Extract parameters from JSON, using the actual values
             Pi_e = state_data.get("Pi_e_actual", 0.0)
             Pi_i_baseline = state_data.get("Pi_i_baseline_actual", 0.0)
             M_ca = state_data.get("M_ca", 0.0)
             beta = state_data.get("beta_som", 0.5)  # Use beta_som from JSON
-            
+
             # Handle beta_som bound overrides - some states have values > 0.7 with explicit rationale
             beta_override = state_data.get("beta_som_bound_override", False)
             if beta > 0.8 and not beta_override:
                 # Clamp beta to maximum allowed value if no override flag
                 beta = 0.8
-                logger.warning(f"Clamping beta_som for '{name}' from {state_data.get('beta_som')} to 0.8 (no override flag)")
+                logger.warning(
+                    f"Clamping beta_som for '{name}' from {state_data.get('beta_som')} to 0.8 (no override flag)"
+                )
             elif beta > 0.8 and beta_override:
-                logger.info(f"Accepting beta_som {beta} for '{name}' with override: {state_data.get('beta_som_override_rationale', 'No rationale provided')}")
-            
+                logger.info(
+                    f"Accepting beta_som {beta} for '{name}' with override: {state_data.get('beta_som_override_rationale', 'No rationale provided')}"
+                )
+
             z_e = state_data.get("z_e", 0.0)
             z_i = state_data.get("z_i", 0.0)
             theta_t = state_data.get("theta_t", 0.0)
-            
+
             # Create tuple in same format as original STATE_DEFINITIONS
             state_tuple = (name, category, Pi_e, Pi_i_baseline, M_ca, beta, z_e, z_i, theta_t)
             state_definitions.append(state_tuple)
-            
+
         logger.info(f"Loaded {len(state_definitions)} psychological states from {json_file_path}")
         return state_definitions
-        
+
     except FileNotFoundError:
         logger.error(f"Could not find psychological states JSON file: {json_file_path}")
         return []

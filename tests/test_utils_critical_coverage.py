@@ -159,7 +159,13 @@ def create_error_info(
     details: Optional[Dict[str, Any]] = None,
 ) -> ErrorInfo:
     """Mock error info creation function."""
-    return ErrorInfo(category=category, severity=severity, message=message, details=details or {})
+    return ErrorInfo(
+        category=category,
+        severity=severity,
+        code="TEST_ERROR",
+        message=message,
+        details=details or {},
+    )
 
 
 def handle_exception(
