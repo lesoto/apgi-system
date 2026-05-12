@@ -68,8 +68,8 @@ APGI_DEBUG=false
 APGI_LOG_LEVEL=INFO
 
 # Database Settings
-APGI_DB_PATH=/app/data/apgi.db
-APGI_DB_BACKUP_PATH=/app/data/backups/
+APGI_DB_PATH=/app/data/runtime/apgi.db
+APGI_DB_BACKUP_PATH=/app/data/runtime/backups/
 
 # GUI Settings
 APGUI_THEME=dark

@@ -575,7 +575,7 @@ class InteractiveVisualizer:
             Dictionary containing structured data for dashboard
         """
         try:
-            dashboard_data = {
+            data = {
                 "summary_stats": {
                     "total_tests": len(results),
                     "falsified_tests": sum(1 for r in results if r.is_falsified),
@@ -611,7 +611,7 @@ class InteractiveVisualizer:
                 "timestamp": datetime.now().isoformat(),
             }
 
-            return dashboard_data
+            return data
 
         except Exception as e:
             raise VisualizationError(f"Failed to create interactive dashboard data: {str(e)}")

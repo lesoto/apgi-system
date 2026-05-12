@@ -114,8 +114,8 @@ class InteractiveWebDashboard:
         self.request_queue: list[tuple] = []
         self.queue_lock = threading.Lock()
 
-        # Data cache
-        self.dashboard_cache: Dict[str, Any] = {}
+        # Data cache - unified data structure
+        self.data_cache: Dict[str, Any] = {}
         self.last_update = datetime.now()
 
         # Client request tracking for rate limiting
@@ -524,8 +524,8 @@ class InteractiveWebDashboard:
                     current_experiments = self.experiment_monitor.get_all_experiments()
 
                     # Compare with cached data
-                    if current_experiments != self.dashboard_cache.get("experiments"):
-                        self.dashboard_cache["experiments"] = current_experiments
+                    if current_experiments != self.data_cache.get("experiments"):
+                        self.data_cache["experiments"] = current_experiments
                         self.last_update = datetime.now()
 
                         # Broadcast update to all connected clients

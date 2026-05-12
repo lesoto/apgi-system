@@ -430,7 +430,7 @@ class DashboardServer:
     Web-based dashboard server for experiment monitoring and analysis.
     """
 
-    def __init__(self, port: int = 8080, data_dir: str = "dashboard_data"):
+    def __init__(self, port: int = 8080, data_dir: str = "data"):
         """
         Initialize dashboard server.
 
@@ -448,10 +448,12 @@ class DashboardServer:
 
         self.logger = logging.getLogger(__name__)
 
-        # Dashboard state
-        self.dashboard_data = {
+        # Dashboard state - unified data structure
+        self.data = {
             "experiments": {},
             "comparisons": {},
+            "visualizations": {},
+            "summary_stats": {},
             "last_update": datetime.now().isoformat(),
         }
 
@@ -479,23 +481,23 @@ class DashboardServer:
         except Exception as e:
             self.logger.error(f"Error stopping dashboard server: {str(e)}")
 
-    def get_dashboard_data(self) -> Dict[str, Any]:
-        """Get current dashboard data"""
+    def get_data(self) -> Dict[str, Any]:
+        """Get current unified dashboard data"""
 
         # Update with latest experiment data
         experiments_data: Dict[str, Dict[str, Any]] = self.monitor.get_all_experiments()
-        self.dashboard_data["experiments"] = experiments_data
-        self.dashboard_data["last_update"] = datetime.now().isoformat()
+        self.data["experiments"] = experiments_data
+        self.data["last_update"] = datetime.now().isoformat()
 
         # Generate comparison if multiple experiments exist
-        if len(self.dashboard_data["experiments"]) > 1:
+        if len(self.data["experiments"]) > 1:
             try:
                 comparison = self.comparator.compare_experiments(experiments_data)
-                self.dashboard_data["comparisons"] = comparison
+                self.data["comparisons"] = comparison
             except Exception as e:
                 self.logger.error(f"Error generating comparison: {str(e)}")
 
-        return self.dashboard_data.copy()
+        return self.data.copy()
 
     def get_experiment_visualization_data(self, experiment_id: str) -> Dict[str, Any]:
         """Get visualization data for specific experiment"""
@@ -511,6 +513,8 @@ class DashboardServer:
 
             if results and trials:
                 viz_data = self.visualizer.create_interactive_dashboard_data(results, trials)
+                # Store in unified data structure
+                self.data["visualizations"][experiment_id] = viz_data
                 return viz_data
             else:
                 return {"message": "No data available for visualization"}
@@ -523,7 +527,7 @@ class DashboardServer:
         """Export comprehensive dashboard report"""
 
         try:
-            dashboard_data = self.get_dashboard_data()
+            data = self.get_data()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             if format == "json":
@@ -531,7 +535,7 @@ class DashboardServer:
                 filepath = self.data_dir / filename
 
                 with open(filepath, "w") as f:
-                    json.dump(dashboard_data, f, indent=2, default=str)
+                    json.dump(data, f, indent=2, default=str)
 
             else:
                 raise ValueError(f"Unsupported export format: {format}")
@@ -546,8 +550,8 @@ class DashboardServer:
         """Handle experiment events"""
         self.logger.debug(f"Experiment event: {event_type} for {experiment_id}")
 
-        # Update dashboard data
-        self.dashboard_data["last_update"] = datetime.now().isoformat()
+        # Update unified data structure
+        self.data["last_update"] = datetime.now().isoformat()
 
         # Save state periodically
         if event_type in ["experiment_completed", "experiment_registered"]:
@@ -559,7 +563,7 @@ class DashboardServer:
             state_file = self.data_dir / "dashboard_state.json"
 
             with open(state_file, "w") as f:
-                json.dump(self.dashboard_data, f, indent=2, default=str)
+                json.dump(self.data, f, indent=2, default=str)
 
         except Exception as e:
             self.logger.error(f"Error saving dashboard state: {str(e)}")
@@ -571,14 +575,14 @@ class DashboardServer:
 
             if state_file.exists():
                 with open(state_file, "r") as f:
-                    self.dashboard_data = json.load(f)
+                    self.data = json.load(f)
 
         except Exception as e:
             self.logger.error(f"Error loading dashboard state: {str(e)}")
 
 
 # Convenience function for easy dashboard setup
-def create_dashboard(port: int = 8080, data_dir: str = "dashboard_data") -> DashboardServer:
+def create_dashboard(port: int = 8080, data_dir: str = "data") -> DashboardServer:
     """
     Create and configure a dashboard server instance.
 
@@ -590,3 +594,7 @@ def create_dashboard(port: int = 8080, data_dir: str = "dashboard_data") -> Dash
         Configured dashboard server
     """
     return DashboardServer(port=port, data_dir=data_dir)
+
+
+# Backward compatibility alias
+DashboardServer.get_dashboard_data = DashboardServer.get_data

@@ -9594,146 +9594,143 @@ def create_apgi_params(
     z_e: float,
     z_i: float,
     theta_t: float,
+    beta_override: bool = False,
 ) -> APGIParameters:
     """Factory function that computes derived parameters automatically.
-
+    
     Args:
-        Pi_e: Excitatory precision
-        Pi_i_baseline: Baseline inhibitory precision
-        M_ca: Allostatic modulation
-        beta: Modulation sensitivity
-        z_e: Excitatory prediction error
-        z_i: Inhibitory prediction error
+        Pi_e: Exteroceptive precision
+        Pi_i_baseline: Baseline interoceptive precision
+        M_ca: Calcium-mediated gain
+        beta: Somatic gain parameter
+        z_e: Exteroceptive prediction error
+        z_i: Interoceptive prediction error
         theta_t: Threshold
-
+        beta_override: Whether to allow beta values outside normal range
+        
     Returns:
-        APGIParameters with all computed fields
+        APGIParameters instance
     """
     try:
-        Pi_i_eff = Pi_i_baseline * np.exp(beta * M_ca)
-        Pi_i_eff = np.clip(Pi_i_eff, 0.1, 10.0)
-        S_t = Pi_e * abs(z_e) + Pi_i_eff * abs(z_i)
+        # Handle beta validation with override support
+        if not (0.3 <= beta <= 0.8) and not beta_override:
+            # Clamp beta to valid range if no override
+            beta = np.clip(beta, 0.3, 0.8)
+            logger.warning(f"Clamping beta from {beta} to valid range [0.3, 0.8]")
+        elif not (0.3 <= beta <= 2.0) and beta_override:
+            # Even with override, set reasonable upper bound
+            beta = np.clip(beta, 0.3, 2.0)
+            logger.warning(f"Clamping override beta from {beta} to extended range [0.3, 2.0]")
+        
+        # Compute derived parameters
+        Pi_i_eff = Pi_i_baseline * (1 + np.tanh(beta * M_ca))
+        S_t = Pi_e * z_e + Pi_i_eff * z_i
 
-        return APGIParameters(
-            Pi_e=Pi_e,
-            Pi_i_baseline=Pi_i_baseline,
-            Pi_i_eff=Pi_i_eff,
-            theta_t=theta_t,
-            S_t=S_t,
-            M_ca=M_ca,
-            beta=beta,
-            z_e=z_e,
-            z_i=z_i,
-        )
+        # Create parameters with relaxed validation for override cases
+        if beta_override:
+            # Bypass validation by creating with direct assignment
+            params = APGIParameters.__new__(APGIParameters)
+            params.Pi_e = Pi_e
+            params.Pi_i_baseline = Pi_i_baseline
+            params.Pi_i_eff = Pi_i_eff
+            params.theta_t = theta_t
+            params.S_t = S_t
+            params.M_ca = M_ca
+            params.beta = beta
+            params.z_e = z_e
+            params.z_i = z_i
+            return params
+        else:
+            # Use normal validation path
+            return APGIParameters(
+                Pi_e=Pi_e,
+                Pi_i_baseline=Pi_i_baseline,
+                Pi_i_eff=Pi_i_eff,
+                theta_t=theta_t,
+                S_t=S_t,
+                M_ca=M_ca,
+                beta=beta,
+                z_e=z_e,
+                z_i=z_i,
+            )
     except Exception as e:
         raise ValueError(f"Failed to create APGI parameters: {e}") from e
 
 
-# Data-driven state definitions
-STATE_DEFINITIONS = [
-    # Category 1: Optimal Functioning States
-    ("flow", StateCategory.OPTIMAL_FUNCTIONING, 6.5, 1.5, 0.3, 0.5, 0.4, 0.2, 1.8),
-    ("focus", StateCategory.OPTIMAL_FUNCTIONING, 8.0, 1.2, 0.25, 0.5, 0.8, 0.3, -0.5),
-    ("serenity", StateCategory.OPTIMAL_FUNCTIONING, 1.5, 2.0, 0.7, 0.5, 0.2, 0.3, 1.5),
-    ("mindfulness", StateCategory.OPTIMAL_FUNCTIONING, 3.0, 3.5, 0.9, 0.55, 0.6, 0.5, 0.0),
-    # Category 2: Positive Affective States
-    ("amusement", StateCategory.POSITIVE_AFFECTIVE, 4.0, 1.0, -0.1, 0.5, 1.2, 0.2, -0.3),
-    ("joy", StateCategory.POSITIVE_AFFECTIVE, 5.0, 2.5, 0.8, 0.55, 1.0, 0.7, -0.8),
-    ("pride", StateCategory.POSITIVE_AFFECTIVE, 4.5, 3.0, 1.1, 0.6, 1.2, 0.9, -0.6),
-    ("romantic_love_early", StateCategory.POSITIVE_AFFECTIVE, 7.5, 4.0, 1.8, 0.7, 1.5, 1.3, -1.5),
-    (
-        "romantic_love_sustained",
-        StateCategory.POSITIVE_AFFECTIVE,
-        5.0,
-        3.0,
-        1.2,
-        0.6,
-        0.5,
-        0.6,
-        -0.8,
-    ),
-    ("gratitude", StateCategory.POSITIVE_AFFECTIVE, 4.0, 2.5, 0.8, 0.55, 0.3, 0.5, -0.4),
-    ("hope", StateCategory.POSITIVE_AFFECTIVE, 5.0, 2.0, 0.6, 0.5, 0.9, 0.4, -0.7),
-    ("optimism", StateCategory.POSITIVE_AFFECTIVE, 3.0, 2.0, 0.4, 0.5, 0.4, 0.3, -0.5),
-    # Category 3: Cognitive and Attentional States
-    ("curiosity", StateCategory.COGNITIVE_ATTENTIONAL, 6.0, 1.0, -0.2, 0.45, 1.4, 0.2, -0.9),
-    ("boredom", StateCategory.COGNITIVE_ATTENTIONAL, 0.8, 1.5, -0.3, 0.5, 0.1, 0.2, -1.0),
-    ("creativity", StateCategory.COGNITIVE_ATTENTIONAL, 4.0, 1.0, -0.3, 0.45, 1.2, 0.2, -1.2),
-    ("inspiration", StateCategory.COGNITIVE_ATTENTIONAL, 8.5, 1.5, 0.4, 0.5, 2.0, 0.4, -2.0),
-    ("hyperfocus", StateCategory.COGNITIVE_ATTENTIONAL, 9.5, 0.5, -0.8, 0.4, 0.6, 0.1, 2.5),
-    ("fatigue", StateCategory.COGNITIVE_ATTENTIONAL, 1.5, 2.0, 0.4, 0.5, 0.3, 0.4, 1.8),
-    ("decision_fatigue", StateCategory.COGNITIVE_ATTENTIONAL, 2.5, 1.5, 0.3, 0.5, 0.8, 0.3, 1.5),
-    ("mind_wandering", StateCategory.COGNITIVE_ATTENTIONAL, 0.8, 3.5, 0.6, 0.55, 0.2, 0.9, 1.5),
-    # Category 4: Aversive Affective States
-    ("fear", StateCategory.AVERSIVE_AFFECTIVE, 8.0, 3.0, 1.9, 0.75, 2.5, 2.0, -2.5),
-    ("anxiety", StateCategory.AVERSIVE_AFFECTIVE, 6.5, 3.5, 1.5, 0.65, 1.5, 1.3, -1.5),
-    ("anger", StateCategory.AVERSIVE_AFFECTIVE, 7.5, 3.0, 1.5, 0.65, 2.0, 1.4, -1.2),
-    ("guilt", StateCategory.AVERSIVE_AFFECTIVE, 5.0, 2.5, 0.8, 0.55, 1.3, 0.9, -0.8),
-    ("shame", StateCategory.AVERSIVE_AFFECTIVE, 7.0, 3.0, 1.3, 0.6, 1.8, 1.2, -1.5),
-    ("loneliness", StateCategory.AVERSIVE_AFFECTIVE, 5.5, 2.5, 0.8, 0.55, 1.4, 0.9, -1.0),
-    ("overwhelm", StateCategory.AVERSIVE_AFFECTIVE, 3.0, 3.0, 1.2, 0.6, 2.8, 1.5, 0.0),
-    # Category 5: Pathological and Extreme States
-    ("depression", StateCategory.PATHOLOGICAL_EXTREME, 2.0, 1.5, 0.3, 0.5, 0.4, 0.8, 1.5),
-    ("learned_helplessness", StateCategory.PATHOLOGICAL_EXTREME, 1.5, 2.0, 0.5, 0.5, 0.2, 0.4, 2.0),
-    (
-        "pessimistic_depression",
-        StateCategory.PATHOLOGICAL_EXTREME,
-        2.5,
-        2.0,
-        0.7,
-        0.55,
-        0.3,
-        0.6,
-        1.8,
-    ),
-    ("panic", StateCategory.PATHOLOGICAL_EXTREME, 4.0, 5.0, 2.0, 0.8, 1.5, 3.0, -3.0),
-    ("dissociation", StateCategory.PATHOLOGICAL_EXTREME, 2.0, 0.5, -1.5, 0.35, 0.8, 0.1, 2.0),
-    ("depersonalization", StateCategory.PATHOLOGICAL_EXTREME, 3.0, 0.8, -1.2, 0.4, 1.0, 0.5, 1.5),
-    ("derealization", StateCategory.PATHOLOGICAL_EXTREME, 1.5, 1.5, -0.8, 0.45, 1.2, 0.4, 1.8),
-    # Category 6: Altered and Boundary States
-    ("awe", StateCategory.ALTERED_BOUNDARY, 3.5, 2.5, 0.8, 0.55, 2.8, 0.7, -1.5),
-    ("trance", StateCategory.ALTERED_BOUNDARY, 1.0, 4.0, 0.4, 0.5, 0.2, 0.6, 2.0),
-    ("meditation_focused", StateCategory.ALTERED_BOUNDARY, 7.0, 3.5, 1.0, 0.55, 0.5, 0.6, 1.5),
-    ("meditation_open", StateCategory.ALTERED_BOUNDARY, 3.0, 3.0, 0.7, 0.5, 0.8, 0.6, 0.0),
-    ("meditation_nondual", StateCategory.ALTERED_BOUNDARY, 2.0, 1.5, 0.5, 0.5, 0.2, 0.2, 2.0),
-    ("hypnosis", StateCategory.ALTERED_BOUNDARY, 2.0, 3.5, 0.6, 0.55, 0.3, 0.8, -1.5),
-    ("hypnagogia", StateCategory.ALTERED_BOUNDARY, 2.5, 4.0, 0.7, 0.55, 0.6, 1.0, 0.5),
-    ("deja_vu", StateCategory.ALTERED_BOUNDARY, 4.5, 1.5, 0.2, 0.5, 0.4, 0.2, -0.8),
-    # Category 7: Transitional/Contextual States
-    ("morning_flow", StateCategory.TRANSITIONAL_CONTEXTUAL, 5.5, 2.0, 0.5, 0.5, 0.3, 0.3, 1.2),
-    ("evening_fatigue", StateCategory.TRANSITIONAL_CONTEXTUAL, 1.2, 3.0, 1.0, 0.55, 0.2, 0.7, 2.2),
-    (
-        "creative_inspiration",
-        StateCategory.TRANSITIONAL_CONTEXTUAL,
-        8.0,
-        1.5,
-        0.3,
-        0.5,
-        2.2,
-        0.3,
-        -1.8,
-    ),
-    (
-        "anxious_rumination",
-        StateCategory.TRANSITIONAL_CONTEXTUAL,
-        6.0,
-        3.5,
-        1.4,
-        0.65,
-        1.6,
-        1.2,
-        -1.2,
-    ),
-    ("calm", StateCategory.TRANSITIONAL_CONTEXTUAL, 1.8, 2.0, 0.5, 0.5, 0.2, 0.3, 1.2),
-    ("productive_focus", StateCategory.TRANSITIONAL_CONTEXTUAL, 7.0, 1.5, 0.3, 0.5, 0.7, 0.3, -0.3),
-    ("second_wind", StateCategory.TRANSITIONAL_CONTEXTUAL, 5.5, 2.5, 0.5, 0.55, 0.9, 0.5, -0.8),
-    # Category 8: Previously Unelaborated States
-    ("hypervigilance", StateCategory.UNELABORATED, 8.5, 4.0, 1.7, 0.7, 1.8, 1.5, -2.0),
-    ("sadness", StateCategory.UNELABORATED, 4.5, 2.5, 0.9, 0.55, 1.2, 0.8, -0.6),
-    ("choice_paralysis", StateCategory.UNELABORATED, 2.5, 2.0, 0.5, 0.5, 0.9, 0.5, 1.5),
-    ("mental_paralysis", StateCategory.UNELABORATED, 2.0, 3.5, 1.3, 0.65, 3.0, 1.8, 0.5),
-    ("curious_exploration", StateCategory.UNELABORATED, 6.5, 1.0, -0.1, 0.45, 1.6, 0.2, -1.0),
-]
+def load_psychological_states_from_json(json_file_path: str = "data/psychological_states.json") -> List[Tuple]:
+    """Load psychological states from JSON file and convert to STATE_DEFINITIONS format"""
+    
+    # Map JSON categories to StateCategory enum
+    category_mapping = {
+        "OPTIMAL_FUNCTIONING": StateCategory.OPTIMAL_FUNCTIONING,
+        "POSITIVE_AFFECTIVE": StateCategory.POSITIVE_AFFECTIVE,
+        "COGNITIVE_ATTENTIONAL": StateCategory.COGNITIVE_ATTENTIONAL,
+        "AVERSIVE_AFFECTIVE": StateCategory.AVERSIVE_AFFECTIVE,
+        "PATHOLOGICAL_EXTREME": StateCategory.PATHOLOGICAL_EXTREME,
+        "ALTERED_BOUNDARY": StateCategory.ALTERED_BOUNDARY,
+        "TRANSITIONAL_CONTEXTUAL": StateCategory.TRANSITIONAL_CONTEXTUAL,
+        "UNELABORATED": StateCategory.UNELABORATED,
+    }
+    
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        state_definitions = []
+        psychological_states = data.get("psychological_states", [])
+        
+        for state_data in psychological_states:
+            name = state_data.get("name")
+            category_str = state_data.get("category")
+            
+            if not name or not category_str:
+                logger.warning(f"Skipping state missing name or category: {state_data}")
+                continue
+            
+            category = category_mapping.get(category_str)
+            if not category:
+                logger.warning(f"Unknown category '{category_str}' for state '{name}', skipping")
+                continue
+            
+            # Extract parameters from JSON, using the actual values
+            Pi_e = state_data.get("Pi_e_actual", 0.0)
+            Pi_i_baseline = state_data.get("Pi_i_baseline_actual", 0.0)
+            M_ca = state_data.get("M_ca", 0.0)
+            beta = state_data.get("beta_som", 0.5)  # Use beta_som from JSON
+            
+            # Handle beta_som bound overrides - some states have values > 0.7 with explicit rationale
+            beta_override = state_data.get("beta_som_bound_override", False)
+            if beta > 0.8 and not beta_override:
+                # Clamp beta to maximum allowed value if no override flag
+                beta = 0.8
+                logger.warning(f"Clamping beta_som for '{name}' from {state_data.get('beta_som')} to 0.8 (no override flag)")
+            elif beta > 0.8 and beta_override:
+                logger.info(f"Accepting beta_som {beta} for '{name}' with override: {state_data.get('beta_som_override_rationale', 'No rationale provided')}")
+            
+            z_e = state_data.get("z_e", 0.0)
+            z_i = state_data.get("z_i", 0.0)
+            theta_t = state_data.get("theta_t", 0.0)
+            
+            # Create tuple in same format as original STATE_DEFINITIONS
+            state_tuple = (name, category, Pi_e, Pi_i_baseline, M_ca, beta, z_e, z_i, theta_t)
+            state_definitions.append(state_tuple)
+            
+        logger.info(f"Loaded {len(state_definitions)} psychological states from {json_file_path}")
+        return state_definitions
+        
+    except FileNotFoundError:
+        logger.error(f"Could not find psychological states JSON file: {json_file_path}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing JSON file {json_file_path}: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error loading psychological states: {e}")
+        return []
+
+
+# Load psychological states from JSON file
+STATE_DEFINITIONS = load_psychological_states_from_json()
 
 
 # Generate state dictionaries from data-driven definitions

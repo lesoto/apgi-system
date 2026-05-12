@@ -47,8 +47,8 @@ if not exist "%ENVIRONMENT_FILE%" (
         echo APGI_LOG_LEVEL=INFO
         echo.
         echo # Database Settings
-        echo APGI_DB_PATH=/app/data/apgi.db
-        echo APGI_DB_BACKUP_PATH=/app/data/backups/
+        echo APGI_DB_PATH=/app/data/runtime/apgi.db
+        echo APGI_DB_BACKUP_PATH=/app/data/runtime/backups/
         echo.
         echo # GUI Settings
         echo APGUI_THEME=dark
